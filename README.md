@@ -94,74 +94,37 @@ checkout creates `.env` from the example if needed.
 The `/dev/...` routes are isolated UI examples for automated browser checks.
 Unit tests continue to use an in-memory database and mocked services.
 
-## Docker
+## Deployment (deployctl)
 
-Run with Docker Compose:
-
-```bash
-docker compose up --build
-```
-
-The production Docker container is different from development: it serves the
-built UI and API from the same backend process, so there is only one app port.
-The Dockerfile installs Bubblewrap, which the shell tools require. Compose allows
-its nested namespaces and procfs mount by disabling Docker's seccomp, AppArmor,
-and system-path restrictions for this service. This reduces the container's outer
-isolation; Bubblewrap still restricts each shell command to its workspace and
-isolates its network. No privileged mode or extra host capabilities are granted.
-When the backend runs as root, local-directory shell commands use the directory
-owner's UID and GID through `setpriv`, supplied by `util-linux`. This permits
-access through private home directories and creates files owned by that user.
-Rebuild and recreate existing containers after updating these files with
-`deployctl restart <deployment> --build` for deployctl-managed installations.
-On Linux, Docker Compose runs it with host networking so host-local services
-like Ollama and ComfyUI are reachable at `127.0.0.1` and `localhost`.
-`AGENTS_BACKEND_PORT` is the web UI/API port used by the production container.
-
-With defaults, the UI is available at `http://localhost:3000`. For example,
-this serves the UI on `http://localhost:5174`:
+Deploy natively with [deployctl](https://github.com/NickAwrist/deployctl) using systemd process supervision:
 
 ```bash
-AGENTS_BACKEND_PORT=5174
-docker compose up
+deployctl create git@github.com:NickAwrist/orbis-agents.git --name orbis-agents
+deployctl deploy orbis-agents --build
 ```
 
-App data is persisted in the `agents-data` Docker volume.
+In production, the backend server serves both the built UI and API from a single process on `AGENTS_BACKEND_PORT` (default `3000`).
 
-Compose also mounts your host home directory read/write at its original absolute
-path. The directory picker starts there, and `~` expands to that folder. Selecting
-a local workspace lets the chat edit files in that host folder.
+`deployctl.yaml` specifies build commands and runtime service configuration:
+- `build.commands`: installs dependencies and runs `bun run build` to generate `dist/`.
+- `build.include`: packages `package.json`, `bun.lock`, `tsconfig.json`, `src`, `dist`, and `node_modules` into the immutable release directory.
+- `services.agents`: executes `bun run src/server.ts` supervised by systemd.
 
-To use a different folder, set an existing absolute path in `.env`:
+Persistent application data (SQLite database and workspaces) is stored in `DEPLOYCTL_DATA_DIR`, which deployctl provides and preserves across releases.
+
+To update and redeploy:
 
 ```bash
-AGENTS_HOST_DIRECTORY=/home/your-user/projects
+deployctl update orbis-agents
+deployctl deploy orbis-agents --build
 ```
 
-Set this explicitly when deploying through a service account or `sudo`, whose
-`HOME` may differ from yours. Recreate the container after changing the mount:
+Manage environment variables with `deployctl env`:
 
 ```bash
-docker compose up -d --force-recreate
+deployctl env set orbis-agents AGENTS_BACKEND_PORT=3100
+deployctl restart orbis-agents
 ```
-
-Paths outside that mount still refer to the container filesystem. To access
-another host location, add a bind mount with the same source and target path.
-The mount does not change per-chat containment: tools still use the selected
-workspace as `/workspace`.
-
-When Ollama or ComfyUI are running on the same Linux host, these local endpoint
-values work because the container shares the host network namespace:
-
-```bash
-AGENTS_OLLAMA_HOST=http://127.0.0.1:11434
-AGENTS_COMFYUI_HOST=http://127.0.0.1:8188
-```
-
-If you run this Compose file on Docker Desktop for macOS or Windows, host
-networking has different behavior. In that case, use the local Bun dev commands
-or switch the Compose file back to port publishing plus
-`host.docker.internal`.
 
 ## Workspaces
 

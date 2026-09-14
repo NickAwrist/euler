@@ -2,13 +2,18 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 export const DB_PATH =
-  process.env.AGENTS_DB_PATH || join(process.cwd(), "data", "agents.db");
+  process.env.AGENTS_DB_PATH ||
+  (process.env.DEPLOYCTL_DATA_DIR
+    ? join(process.env.DEPLOYCTL_DATA_DIR, "agents.db")
+    : join(process.cwd(), "data", "agents.db"));
 
 export const DATA_ROOT =
   process.env.ORBIS_DATA_ROOT ||
-  (DB_PATH === ":memory:"
-    ? join(tmpdir(), `orbis-test-${process.pid}`)
-    : dirname(DB_PATH));
+  (process.env.DEPLOYCTL_DATA_DIR
+    ? process.env.DEPLOYCTL_DATA_DIR
+    : DB_PATH === ":memory:"
+      ? join(tmpdir(), `orbis-test-${process.pid}`)
+      : dirname(DB_PATH));
 
 export const DEFAULT_RUN_AGENT_KEY = "default_run_agent";
 export const LEGACY_USER_DATA_CLAIMED_BY_KEY = "legacy_user_data_claimed_by";

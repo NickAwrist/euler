@@ -1,0 +1,19 @@
+version: 1
+backend: systemd
+build:
+  commands:
+    - [bun, install, --frozen-lockfile]
+    - [bun, run, build]
+  include:
+    - package.json
+    - bun.lock
+    - tsconfig.json
+    - src
+    - dist
+    - node_modules
+services:
+  agents:
+    command: [bun, run, src/server.ts]
+    working_directory: .
+    restart: on-failure
+    stop_timeout: 30s
