@@ -1,8 +1,6 @@
 import { Check, ChevronDown } from "lucide-react";
 import { type ReactNode, useMemo } from "react";
 import {
-  type EffortDefinition,
-  type ThinkingOption,
   type ThinkingTier,
   buildThinkingOptions,
   normalizeThinkingTier,
@@ -11,19 +9,6 @@ import {
 import { cx } from "../styles";
 import type { ModelReasoning } from "../types";
 import { AnchoredPopover } from "./AnchoredPopover";
-
-export {
-  type ThinkingTier,
-  type EffortDefinition,
-  type ThinkingOption,
-  EFFORT_CONFIG,
-  LEVEL_TO_TIER,
-  normalizeThinkingTier,
-  buildThinkingOptions,
-  resolveEffectiveOptionFromList,
-  resolveEffectiveThinkingEffort,
-  hasConfigurableThinking,
-} from "../lib/thinkingLevel";
 
 export const TIER_COLOR_CLASSES: Readonly<
   Record<ThinkingTier, string | undefined>

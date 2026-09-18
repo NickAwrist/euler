@@ -114,7 +114,8 @@ export function buildThinkingOptions(
       tier: "medium" as ThinkingTier,
     };
     options.push({
-      value: key,
+      // Preserve the exact provider effort token while standardizing "off" / "Off" to canonical "off".
+      value: key === "off" ? "off" : effort,
       label: config.label,
       level: config.level,
       isDefault:
