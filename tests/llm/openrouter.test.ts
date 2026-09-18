@@ -171,4 +171,40 @@ describe("OpenRouter provider", () => {
     setOpenRouterScenario("corrupted-stream");
     expect(collect()).rejects.toThrow("invalid streaming response");
   });
+
+  test("configures reasoning effort in payload when specified", async () => {
+    setOpenRouterApiKey("sk-or-test");
+    const stream = await streamOpenRouterChat({
+      model,
+      messages: [{ role: "user", content: "Solve this" }],
+      tools: [],
+      reasoningEffort: "high",
+    });
+    for await (const _chunk of stream) {
+    }
+    const req = getOpenRouterRequests().at(-1)!;
+    expect(req.body.reasoning).toEqual({ effort: "high" });
+
+    const streamOff = await streamOpenRouterChat({
+      model,
+      messages: [{ role: "user", content: "Solve this" }],
+      tools: [],
+      reasoningEffort: "off",
+    });
+    for await (const _chunk of streamOff) {
+    }
+    const reqOff = getOpenRouterRequests().at(-1)!;
+    expect(reqOff.body.reasoning).toEqual({ enabled: false, effort: "none" });
+
+    const streamOn = await streamOpenRouterChat({
+      model,
+      messages: [{ role: "user", content: "Solve this" }],
+      tools: [],
+      reasoningEffort: "on",
+    });
+    for await (const _chunk of streamOn) {
+    }
+    const reqOn = getOpenRouterRequests().at(-1)!;
+    expect(reqOn.body.reasoning).toEqual({ enabled: true });
+  });
 });

@@ -20,6 +20,7 @@ import { cx, iconButton, primaryButton } from "../styles";
 import type { MessageStep, ModelOption, SessionWorkspace } from "../types";
 import { AgentSelectBar } from "./AgentSelectBar";
 import { ModelSelectBar } from "./ModelSelectBar";
+import { ThinkingLevelBar, hasConfigurableThinking } from "./ThinkingLevelBar";
 import {
   type RunCommandName,
   exactRunCommand,
@@ -37,6 +38,8 @@ export function RunInputDock({
   modelsLoadError,
   selectedModel,
   onModelChange,
+  thinkingEffort,
+  onThinkingEffortChange,
   runAgents,
   selectedSessionAgent,
   onSessionAgentChange,
@@ -66,6 +69,8 @@ export function RunInputDock({
   modelsLoadError: string | null;
   selectedModel: string;
   onModelChange: (model: string) => void;
+  thinkingEffort?: string | null;
+  onThinkingEffortChange?: (effort: string) => void;
   runAgents: { name: string }[];
   selectedSessionAgent: string;
   onSessionAgentChange: (name: string) => void;
@@ -102,6 +107,9 @@ export function RunInputDock({
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const isBusy =
     runPending || streamingStep !== null || streamingSteps.length > 0;
+  const currentModelOption = ollamaModels.find(
+    (model) => model.id === selectedModel,
+  );
   const canSend = modelSendReady && attachmentsSendReady && !isBusy;
   const activeSkillToken = skillPickerDismissed
     ? null
@@ -523,6 +531,22 @@ export function RunInputDock({
             onModelChange={onModelChange}
             disabled={isBusy}
           />
+          {currentModelOption?.reasoning &&
+            hasConfigurableThinking(currentModelOption.reasoning) &&
+            onThinkingEffortChange && (
+              <>
+                <span
+                  className="mx-1 h-4 w-px shrink-0 bg-border-subtle"
+                  aria-hidden
+                />
+                <ThinkingLevelBar
+                  reasoning={currentModelOption.reasoning}
+                  value={thinkingEffort}
+                  onChange={onThinkingEffortChange}
+                  disabled={isBusy}
+                />
+              </>
+            )}
           <span
             className="mx-1 h-4 w-px shrink-0 bg-border-subtle"
             aria-hidden

@@ -103,6 +103,7 @@ export function useSessionsAndNavigation(p: Args) {
   const [selectedModel, setSelectedModel] = useState(() =>
     effectiveDefaultRunModel(loadUserSettings(), "gemma4:e4b"),
   );
+  const [thinkingEffort, setThinkingEffort] = useState<string | null>(null);
   const [selectedSessionAgent, setSelectedSessionAgent] =
     useState("general_agent");
   const [workspace, setWorkspace] = useState<SessionWorkspace>({
@@ -200,10 +201,15 @@ export function useSessionsAndNavigation(p: Args) {
     }
   }, [p.activeSessionIdRef, p.isEphemeralRef, p.setMessages, workspace.kind]);
 
+  const handleThinkingEffortChange = useCallback((effort: string) => {
+    setThinkingEffort(effort);
+  }, []);
+
   const handleModelChange = useCallback(
     async (model: string) => {
       setSelectedModel(model);
       setSessionModel(model);
+      setThinkingEffort(null);
       if (p.isEphemeralRef.current) return;
       const sid = p.activeSessionIdRef.current;
       if (sid) {
@@ -236,6 +242,7 @@ export function useSessionsAndNavigation(p: Args) {
       setSessionLoadState("loading");
       setSessionError(null);
       setRunStatusState("pending");
+      setThinkingEffort(null);
       const cf = p.runFlightRef.current;
       const preserve = cf?.shouldPreserveMessages(id) ?? false;
       const initialHistory = preserve
@@ -521,6 +528,7 @@ export function useSessionsAndNavigation(p: Args) {
         p.resetStreamingUi();
         p.setEditingUserIndex(null);
         p.setTruncateConfirm(null);
+        setThinkingEffort(null);
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -559,6 +567,7 @@ export function useSessionsAndNavigation(p: Args) {
     p.setStepsModalData(null);
     p.setDebugOpen(false);
     p.setDebugData(null);
+    setThinkingEffort(null);
     setSidebarOpen(false);
     setSelectedSessionAgent(p.serverDefaultRunAgent);
     setWorkspace({ kind: "sandbox" });
@@ -684,10 +693,12 @@ export function useSessionsAndNavigation(p: Args) {
     pendingDeleteSessionId,
     setPendingDeleteSessionId,
     selectedModel,
+    thinkingEffort,
     selectedSessionAgent,
     workspace,
     refreshSessions,
     handleSessionAgentChange,
+    handleThinkingEffortChange,
     chooseDirectory,
     returnToSandbox,
     handleModelChange,

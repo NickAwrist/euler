@@ -191,7 +191,7 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect(menu).not.toBeVisible();
       await expect(model).toBeFocused();
       await model.click();
-      await input.click();
+      await page.mouse.click(200, 200);
       await expect(menu).not.toBeVisible();
       await expect.poll(() => sessionModel).toBe("openrouter:openai/gpt");
       await model.click();

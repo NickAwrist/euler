@@ -50,6 +50,7 @@ type SessionEvents = {
 
 export type AgentSessionOptions = {
   model?: string;
+  reasoningEffort?: string;
   agentName?: string;
   /** Pre-rendered system prompt from the run request. Takes precedence over `promptContext`. */
   systemPrompt?: string;
@@ -100,12 +101,14 @@ export class AgentSession extends EventEmitter {
     this.ownerUuid = options?.ownerUuid ?? "";
     this.attachmentSessionId = options?.attachmentSessionId;
     const agentName = options?.agentName?.trim() || "general_agent";
+    const reasoningEffort = options?.reasoningEffort?.trim();
     this.generalAgent = agentManager.createAgent(agentName, {
       systemPrompt: options?.systemPrompt,
       toolSessionDir: options?.toolSessionDir,
       promptContext: options?.promptContext,
       ownerUuid: this.ownerUuid,
       userPrompt: options?.userPrompt,
+      reasoningEffort,
     });
     const m = options?.model?.trim();
     if (m) this.generalAgent.model = m;

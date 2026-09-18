@@ -304,6 +304,17 @@ export async function streamOpenRouterChat(
       tools: request.tools,
       stream: true,
       stream_options: { include_usage: true },
+      ...(request.reasoningEffort
+        ? {
+            reasoning:
+              request.reasoningEffort === "off" ||
+              request.reasoningEffort === "none"
+                ? { enabled: false, effort: "none" }
+                : request.reasoningEffort === "on"
+                  ? { enabled: true }
+                  : { effort: request.reasoningEffort },
+          }
+        : {}),
     }),
     signal: controller.signal,
   });

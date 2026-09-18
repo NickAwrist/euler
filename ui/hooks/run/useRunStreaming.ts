@@ -41,6 +41,7 @@ type Args = {
   setDebugOpen: Dispatch<SetStateAction<boolean>>;
   setDebugData: Dispatch<SetStateAction<DebugData | null>>;
   selectedModel: string;
+  reasoningEffort?: string;
   modelSendReady: boolean;
   refreshSessions: () => Promise<void>;
   fetchOllamaHealth: () => Promise<void>;
@@ -157,6 +158,7 @@ export function useRunStreaming(p: Args) {
         debugOpenRef: p.debugOpenRef,
         modelSendReady: p.modelSendReady,
         selectedModel: p.selectedModel,
+        reasoningEffort: p.reasoningEffort,
         setMessages: p.setMessages,
         refreshSessions: p.refreshSessions,
       },

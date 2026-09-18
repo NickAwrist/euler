@@ -29,6 +29,7 @@ export type LlmChatRequest = {
   model: string;
   messages: LlmMessage[];
   tools: Tool[];
+  reasoningEffort?: string;
 };
 
 export type LlmStreamChunk = {

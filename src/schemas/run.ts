@@ -29,6 +29,7 @@ export const RunBodySchema = z.object({
   message: z.string().min(1),
   history: z.array(WireMessageSchema),
   model: z.string().optional(),
+  reasoningEffort: z.string().trim().min(1).nullish(),
   modelMessages: z.array(ModelMessageSchema).nullable().optional(),
   ephemeral: z.boolean().optional(),
   agentName: z.string().min(1),
