@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { InputCapability } from "../../src/modelCapabilities";
 import { traceStepsForModal } from "../components/ExecutionTrace";
+import { resolveEffectiveThinkingEffort } from "../lib/thinkingLevel";
 import type {
   DebugData,
   Message,
@@ -96,6 +97,13 @@ export function useRunApp() {
     ollama.ollamaConnected === false &&
     !openRouterReady;
 
+  const effectiveThinkingEffort = selectedModelOption?.reasoning
+    ? resolveEffectiveThinkingEffort(
+        selectedModelOption.reasoning,
+        sessions.thinkingEffort,
+      )
+    : undefined;
+
   const stream = useRunStreaming({
     messages,
     setMessages,
@@ -110,6 +118,7 @@ export function useRunApp() {
     setDebugOpen,
     setDebugData,
     selectedModel: sessions.selectedModel,
+    reasoningEffort: effectiveThinkingEffort,
     modelSendReady: modelSendReady && sessions.sessionSendReady,
     refreshSessions: sessions.refreshSessions,
     fetchOllamaHealth: ollama.fetchOllamaHealth,
@@ -177,6 +186,8 @@ export function useRunApp() {
     noProviderAvailable,
     modelSendReady: modelSendReady && sessions.sessionSendReady,
     supportsImageInput,
+    thinkingEffort: sessions.thinkingEffort,
+    handleThinkingEffortChange: sessions.handleThinkingEffortChange,
     handleModelChange: sessions.handleModelChange,
     isEphemeral: sessions.isEphemeral,
     userSettings: settings.userSettings,

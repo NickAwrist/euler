@@ -26,6 +26,7 @@ export type RunTurnContext = {
   /** Persisted session ID or temporary workspace lease ID. */
   sessionId: string;
   model: string;
+  reasoningEffort?: string;
   agentName: string;
   toolSessionDir?: string;
   workspace: Workspace;
@@ -148,6 +149,7 @@ export async function buildTurnContext(
     ephemeral,
     sessionId,
     model,
+    reasoningEffort: body.reasoningEffort ?? undefined,
     agentName,
     toolSessionDir,
     workspace,

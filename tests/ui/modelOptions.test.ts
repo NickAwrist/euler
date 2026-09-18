@@ -21,6 +21,12 @@ test("model response mapping retains preferences, publisher identity and capabil
       completionPricePerMillion: null,
       availability: "unverified",
       inputCapabilities: ["text", "image", "future-input"],
+      reasoning: {
+        mandatory: false,
+        defaultEnabled: true,
+        supportedEfforts: ["high", "medium", "low"],
+        defaultEffort: "high",
+      },
     },
     {
       id: "local",
@@ -46,6 +52,12 @@ test("model response mapping retains preferences, publisher identity and capabil
     isNew: true,
     created: 1700000000,
     inputCapabilities: ["text", "image"],
+    reasoning: {
+      mandatory: false,
+      defaultEnabled: true,
+      supportedEfforts: ["high", "medium", "low"],
+      defaultEffort: "high",
+    },
   });
   expect(models[1]).toMatchObject({
     id: "local",

@@ -80,6 +80,40 @@ describe("OpenRouter catalog", () => {
     expect(isNewModel(101, 100_000)).toBeFalse();
     expect(isNewModel(100, 100_000)).toBeTrue();
     expect(isNewModel(100, (100 + 22 * 86400) * 1000)).toBeFalse();
+
+    const withReasoning = normalizeCatalog({
+      data: [
+        {
+          ...remoteModel,
+          id: "openai/o3-mini",
+          reasoning: {
+            mandatory: false,
+            default_enabled: true,
+            supported_efforts: ["high", "medium", "low"],
+            default_effort: "high",
+          },
+        },
+        {
+          ...remoteModel,
+          id: "deepseek/deepseek-r1",
+          reasoning: {
+            mandatory: true,
+          },
+        },
+      ],
+    });
+    expect(withReasoning[0]?.reasoning).toEqual({
+      mandatory: false,
+      defaultEnabled: true,
+      supportedEfforts: ["high", "medium", "low"],
+      defaultEffort: "high",
+    });
+    expect(withReasoning[1]?.reasoning).toEqual({
+      mandatory: true,
+      defaultEnabled: false,
+      supportedEfforts: [],
+      defaultEffort: undefined,
+    });
   });
   test("coalesces requests and retains the last validated snapshot on failed refresh", async () => {
     const pending = deferred<Response>();

@@ -251,6 +251,7 @@ const originalFetch = globalThis.fetch;
 
 beforeEach(() => {
   resetDbConnection();
+  resetOpenRouterScenario();
 });
 
 afterEach(() => {

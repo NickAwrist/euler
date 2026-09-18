@@ -103,6 +103,7 @@ export function useSessionsAndNavigation(p: Args) {
   const [selectedModel, setSelectedModel] = useState(() =>
     effectiveDefaultRunModel(loadUserSettings(), "gemma4:e4b"),
   );
+  const [thinkingEffort, setThinkingEffort] = useState<string | null>(null);
   const [selectedSessionAgent, setSelectedSessionAgent] =
     useState("general_agent");
   const [workspace, setWorkspace] = useState<SessionWorkspace>({
@@ -200,10 +201,34 @@ export function useSessionsAndNavigation(p: Args) {
     }
   }, [p.activeSessionIdRef, p.isEphemeralRef, p.setMessages, workspace.kind]);
 
+  const resetSessionTransientState = useCallback(() => {
+    p.setMessages([]);
+    p.resetStreamingUi();
+    p.setEditingUserIndex(null);
+    p.setTruncateConfirm(null);
+    p.setStepsModalData(null);
+    p.setDebugOpen(false);
+    p.setDebugData(null);
+    setThinkingEffort(null);
+  }, [
+    p.setMessages,
+    p.resetStreamingUi,
+    p.setEditingUserIndex,
+    p.setTruncateConfirm,
+    p.setStepsModalData,
+    p.setDebugOpen,
+    p.setDebugData,
+  ]);
+
+  const handleThinkingEffortChange = useCallback((effort: string) => {
+    setThinkingEffort(effort);
+  }, []);
+
   const handleModelChange = useCallback(
     async (model: string) => {
       setSelectedModel(model);
       setSessionModel(model);
+      setThinkingEffort(null);
       if (p.isEphemeralRef.current) return;
       const sid = p.activeSessionIdRef.current;
       if (sid) {
@@ -236,6 +261,7 @@ export function useSessionsAndNavigation(p: Args) {
       setSessionLoadState("loading");
       setSessionError(null);
       setRunStatusState("pending");
+      setThinkingEffort(null);
       const cf = p.runFlightRef.current;
       const preserve = cf?.shouldPreserveMessages(id) ?? false;
       const initialHistory = preserve
@@ -468,10 +494,7 @@ export function useSessionsAndNavigation(p: Args) {
     setRunStatusState("resolved");
     setSessionError(null);
     setActiveSessionId(id);
-    p.setMessages([]);
-    p.resetStreamingUi();
-    p.setEditingUserIndex(null);
-    p.setTruncateConfirm(null);
+    resetSessionTransientState();
     setIsEphemeral(true);
     p.modelMessagesRef.current = null;
     setSidebarOpen(false);
@@ -484,10 +507,7 @@ export function useSessionsAndNavigation(p: Args) {
     canDiscardEmptySession,
     p.modelMessagesRef,
     p.serverDefaultRunAgent,
-    p.setMessages,
-    p.resetStreamingUi,
-    p.setEditingUserIndex,
-    p.setTruncateConfirm,
+    resetSessionTransientState,
     refreshSessions,
   ]);
 
@@ -517,10 +537,7 @@ export function useSessionsAndNavigation(p: Args) {
         setActiveSessionId(null);
         setIsEphemeral(false);
         setWorkspace({ kind: "sandbox" });
-        p.setMessages([]);
-        p.resetStreamingUi();
-        p.setEditingUserIndex(null);
-        p.setTruncateConfirm(null);
+        resetSessionTransientState();
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -529,10 +546,7 @@ export function useSessionsAndNavigation(p: Args) {
     loadSession,
     p.activeSessionIdRef,
     p.isEphemeralRef,
-    p.setMessages,
-    p.resetStreamingUi,
-    p.setEditingUserIndex,
-    p.setTruncateConfirm,
+    resetSessionTransientState,
   ]);
 
   const goToHome = useCallback(async () => {
@@ -552,13 +566,7 @@ export function useSessionsAndNavigation(p: Args) {
     }
     setIsEphemeral(false);
     setActiveSessionId(null);
-    p.setMessages([]);
-    p.resetStreamingUi();
-    p.setEditingUserIndex(null);
-    p.setTruncateConfirm(null);
-    p.setStepsModalData(null);
-    p.setDebugOpen(false);
-    p.setDebugData(null);
+    resetSessionTransientState();
     setSidebarOpen(false);
     setSelectedSessionAgent(p.serverDefaultRunAgent);
     setWorkspace({ kind: "sandbox" });
@@ -568,13 +576,7 @@ export function useSessionsAndNavigation(p: Args) {
     p.isEphemeralRef,
     canDiscardEmptySession,
     p.serverDefaultRunAgent,
-    p.setDebugData,
-    p.setDebugOpen,
-    p.setEditingUserIndex,
-    p.setMessages,
-    p.setStepsModalData,
-    p.resetStreamingUi,
-    p.setTruncateConfirm,
+    resetSessionTransientState,
     refreshSessions,
   ]);
 
@@ -684,10 +686,12 @@ export function useSessionsAndNavigation(p: Args) {
     pendingDeleteSessionId,
     setPendingDeleteSessionId,
     selectedModel,
+    thinkingEffort,
     selectedSessionAgent,
     workspace,
     refreshSessions,
     handleSessionAgentChange,
+    handleThinkingEffortChange,
     chooseDirectory,
     returnToSandbox,
     handleModelChange,

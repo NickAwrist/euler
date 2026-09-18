@@ -1,16 +1,10 @@
 import { Check, ChevronDown, Search, Star } from "lucide-react";
-import {
-  useEffect,
-  useId,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { compareModels } from "../../src/modelSort";
 import { modelSettingsRequest } from "../lib/modelSettingsRequest";
 import { cx } from "../styles";
 import type { ModelOption } from "../types";
+import { AnchoredPopover } from "./AnchoredPopover";
 import { FavoriteButton, NewBadge } from "./ModelPreferenceControls";
 import { type ModelProvider, groupModelProviders } from "./modelProviders";
 
@@ -64,10 +58,7 @@ export function ModelSelectBar({
   disabled: boolean;
 }) {
   const menuId = useId();
-  const menuRef = useRef<HTMLDialogElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
-  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [providerId, setProviderId] = useState("");
   const [favoriteError, setFavoriteError] = useState<string | null>(null);
@@ -138,93 +129,54 @@ export function ModelSelectBar({
       ? `${selectedModel.replace(/^openrouter:/, "")} (unavailable)`
       : statusLabel);
 
-  useEffect(() => {
-    if (disabled) menuRef.current?.hidePopover();
-  }, [disabled, providers.length]);
-
-  useLayoutEffect(() => {
-    if (!open) return;
-    const menu = menuRef.current;
-    const trigger = triggerRef.current;
-    if (!menu || !trigger) return;
-    const position = () => {
-      const rect = trigger.getBoundingClientRect();
-      const anchorTop =
-        trigger.closest("form")?.getBoundingClientRect().top ?? rect.top;
-      const viewport = window.visualViewport;
-      const left = (viewport?.offsetLeft ?? 0) + 8;
-      const top = (viewport?.offsetTop ?? 0) + 8;
-      const right = left + (viewport?.width ?? window.innerWidth) - 16;
-      const bottom = top + (viewport?.height ?? window.innerHeight) - 16;
-      menu.style.maxHeight = `${bottom - top}px`;
-      menu.style.left = `${Math.max(left, Math.min(rect.left, right - menu.offsetWidth))}px`;
-      menu.style.top = `${Math.max(top, Math.min(anchorTop - menu.offsetHeight - 8, bottom - menu.offsetHeight))}px`;
-    };
-    position();
-    const observer = new ResizeObserver(position);
-    observer.observe(menu);
-    window.addEventListener("resize", position);
-    window.visualViewport?.addEventListener("resize", position);
-    window.visualViewport?.addEventListener("scroll", position);
-    if (window.matchMedia("(hover: hover)").matches) searchRef.current?.focus();
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", position);
-      window.visualViewport?.removeEventListener("resize", position);
-      window.visualViewport?.removeEventListener("scroll", position);
-    };
-  }, [open]);
-
   return (
-    <div className="min-w-0 max-w-[60%]">
-      <button
-        ref={triggerRef}
-        id="run-model"
-        type="button"
-        popoverTarget={menuId}
-        aria-label={`Model: ${label}`}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={menuId}
-        disabled={disabled}
-        title={modelsLoadError ?? label}
-        className="flex max-w-full items-center gap-2 rounded-lg px-2 py-1 text-[0.8125rem] text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent-ring disabled:cursor-not-allowed disabled:opacity-45"
-      >
-        {selectedProvider && <ProviderIcon provider={selectedProvider} />}
-        <span className="truncate">{label}</span>
-        <ChevronDown
-          size={12}
-          className={cx(
-            "shrink-0 transition-transform duration-150",
-            open && "rotate-180",
-          )}
-          aria-hidden
-        />
-      </button>
-      <dialog
-        ref={menuRef}
-        id={menuId}
-        popover="auto"
-        aria-label="Choose model"
-        className="model-picker"
-        onToggle={(event) => {
-          const isOpen = event.newState === "open";
-          setOpen(isOpen);
-          if (isOpen) {
-            setQuery("");
-            setProviderId(
-              (current) => current || selectedProvider?.id || "favorites",
-            );
-          }
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            event.preventDefault();
-            menuRef.current?.hidePopover();
-            triggerRef.current?.focus();
-          }
-        }}
-      >
+    <AnchoredPopover
+      id={menuId}
+      disabled={disabled}
+      ariaLabel="Choose model"
+      containerClassName="min-w-0 max-w-[60%]"
+      panelClassName="model-picker"
+      maxHeight={320}
+      onOpenChange={(isOpen) => {
+        if (isOpen) {
+          setQuery("");
+          setProviderId(
+            (current) => current || selectedProvider?.id || "favorites",
+          );
+        }
+      }}
+      onOpen={() => {
+        if (window.matchMedia("(hover: hover)").matches)
+          searchRef.current?.focus();
+      }}
+      renderTrigger={({ ref, popoverTarget, isOpen }) => (
+        <button
+          ref={ref}
+          id="run-model"
+          type="button"
+          popoverTarget={popoverTarget}
+          aria-label={`Model: ${label}`}
+          aria-haspopup="dialog"
+          aria-expanded={isOpen}
+          aria-controls={popoverTarget}
+          disabled={disabled}
+          title={modelsLoadError ?? label}
+          className="flex max-w-full items-center gap-2 rounded-lg px-2 py-1 text-[0.8125rem] text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent-ring disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {selectedProvider && <ProviderIcon provider={selectedProvider} />}
+          <span className="truncate">{label}</span>
+          <ChevronDown
+            size={12}
+            className={cx(
+              "shrink-0 transition-transform duration-150",
+              isOpen && "rotate-180",
+            )}
+            aria-hidden
+          />
+        </button>
+      )}
+    >
+      {({ close, panelRef }) => (
         <div className="flex h-full min-h-0">
           <div
             role="tablist"
@@ -311,7 +263,7 @@ export function ModelSelectBar({
                 onKeyDown={(event) => {
                   if (event.key === "ArrowDown") {
                     event.preventDefault();
-                    menuRef.current
+                    panelRef.current
                       ?.querySelector<HTMLButtonElement>(
                         "[data-model-option]:not(:disabled)",
                       )
@@ -349,15 +301,14 @@ export function ModelSelectBar({
                     )}
                     onClick={() => {
                       onModelChange(model.id);
-                      menuRef.current?.hidePopover();
-                      triggerRef.current?.focus();
+                      close();
                     }}
                     onKeyDown={(event) => {
                       if (event.key !== "ArrowDown" && event.key !== "ArrowUp")
                         return;
                       event.preventDefault();
                       const options = Array.from(
-                        menuRef.current?.querySelectorAll<HTMLButtonElement>(
+                        panelRef.current?.querySelectorAll<HTMLButtonElement>(
                           "[data-model-option]:not(:disabled)",
                         ) ?? [],
                       );
@@ -452,7 +403,7 @@ export function ModelSelectBar({
                 type="button"
                 className="block rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-accent-ring"
                 onClick={() => {
-                  menuRef.current?.hidePopover();
+                  close();
                   window.history.replaceState(
                     window.history.state,
                     "",
@@ -466,7 +417,7 @@ export function ModelSelectBar({
             </div>
           </div>
         </div>
-      </dialog>
-    </div>
+      )}
+    </AnchoredPopover>
   );
 }

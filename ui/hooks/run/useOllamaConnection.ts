@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { parseInputCapabilities } from "../../../src/modelCapabilities";
+import {
+  parseInputCapabilities,
+  parseModelReasoning,
+} from "../../../src/modelCapabilities";
 import { readApiError } from "../../lib/readApiError";
-import type { ModelOption } from "../../types";
+import type { ModelOption, ModelReasoning } from "../../types";
 import { OLLAMA_HEALTH_POLL_MS } from "./constants";
 
 export function mapModelOptions(value: unknown): ModelOption[] {
@@ -61,6 +64,7 @@ export function mapModelOptions(value: unknown): ModelOption[] {
         ? { configured: m.configured }
         : {}),
       inputCapabilities: parseInputCapabilities(m.inputCapabilities),
+      ...(m.reasoning ? { reasoning: parseModelReasoning(m.reasoning) } : {}),
     }));
 }
 

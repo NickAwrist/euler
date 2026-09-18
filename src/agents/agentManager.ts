@@ -41,6 +41,7 @@ export type CreateAgentOptions = {
   promptContext?: PromptContext;
   /** Current user task, used to activate explicit `$skill-name` references. */
   userPrompt?: string;
+  reasoningEffort?: string;
 };
 
 function serverPromptContext(
@@ -148,6 +149,9 @@ function buildAgent(config: AgentData, opts: CreateAgentOptions): BaseAgent {
   if (skills.length > 0) {
     agent.addTool(new LoadSkillTool(skills));
   }
+  if (opts.reasoningEffort) {
+    agent.reasoningEffort = opts.reasoningEffort;
+  }
   return agent;
 }
 
@@ -157,6 +161,7 @@ function inheritParentModel(agent: BaseAgent, ctx?: RunContext): BaseAgent {
     typeof parentModel === "string" && parentModel.length > 0
       ? parentModel
       : DEFAULT_RUN_MODEL;
+  agent.reasoningEffort = ctx?.agentInstance?.reasoningEffort;
   return agent;
 }
 

@@ -204,4 +204,29 @@ describe("AgentTool", () => {
       agentManager.createAgentByIdForContext = original;
     }
   });
+
+  test("configures and inherits reasoning effort on agents", () => {
+    ensureUserData(RUNTIME_USER_ID);
+    const parent = agentManager.createAgent("general_agent", {
+      ownerUuid: RUNTIME_USER_ID,
+      reasoningEffort: "high",
+    });
+    expect(parent.reasoningEffort).toBe("high");
+
+    const context = new RunContext(
+      parent,
+      "Sub task",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      RUNTIME_USER_ID,
+    );
+    const subagent = agentManager.createAgentForContext(
+      "general_agent",
+      context,
+    );
+    expect(subagent.reasoningEffort).toBe("high");
+  });
 });

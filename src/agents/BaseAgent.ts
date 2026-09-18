@@ -20,6 +20,7 @@ const log = logger.child({ component: "BaseAgent" });
 
 export class BaseAgent {
   model: string;
+  reasoningEffort?: string;
   systemPrompt?: string;
   name: string;
   description: string;
@@ -181,6 +182,9 @@ export class BaseAgent {
         model: this.model,
         messages,
         tools: this.tools.map((tool) => tool.toTool()),
+        ...(this.reasoningEffort
+          ? { reasoningEffort: this.reasoningEffort }
+          : {}),
       });
 
       const onAbort = () => stream.abort();

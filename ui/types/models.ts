@@ -1,4 +1,7 @@
 import type { InputCapability } from "../../src/modelCapabilities";
+import type { ModelReasoning } from "../../src/openRouterModels";
+
+export type { ModelReasoning };
 
 /** Normalized entry from GET /api/models. */
 export interface ModelOption {
@@ -21,4 +24,5 @@ export interface ModelOption {
   modified_at?: string;
   digest?: string;
   inputCapabilities: InputCapability[];
+  reasoning?: ModelReasoning | null;
 }

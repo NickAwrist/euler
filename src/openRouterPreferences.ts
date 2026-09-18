@@ -70,6 +70,7 @@ export function publisherModels(catalog: CatalogResult, publisherId: string) {
       favorite: favorites.has(saved.route),
       availability: catalog.models ? "unavailable" : "unverified",
       isNew: isNewModel(saved.catalog_created_at),
+      reasoning: null,
     });
   }
   return models.sort(comparePublisherModels);

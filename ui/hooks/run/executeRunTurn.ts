@@ -21,6 +21,7 @@ type AppDeps = {
   debugOpenRef: MutableRefObject<boolean>;
   modelSendReady: boolean;
   selectedModel: string;
+  reasoningEffort?: string;
   setMessages: Dispatch<SetStateAction<Message[]>>;
   refreshSessions: () => Promise<void>;
 };
@@ -153,6 +154,7 @@ export async function executeRunTurn(
         message,
         history: priorMessages,
         model: p.selectedModel,
+        ...(p.reasoningEffort ? { reasoningEffort: p.reasoningEffort } : {}),
         modelMessages: modelMessagesPayload,
         agentName: p.selectedSessionAgentRef.current,
         ...(attachments.length > 0

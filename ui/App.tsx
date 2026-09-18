@@ -203,6 +203,8 @@ function ChatView({
             modelsLoadError={app.modelsLoadError}
             selectedModel={app.selectedModel}
             onModelChange={app.handleModelChange}
+            thinkingEffort={app.thinkingEffort}
+            onThinkingEffortChange={app.handleThinkingEffortChange}
             runAgents={app.runAgents}
             selectedSessionAgent={app.selectedSessionAgent}
             onSessionAgentChange={app.handleSessionAgentChange}

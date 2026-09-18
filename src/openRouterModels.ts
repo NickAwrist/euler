@@ -2,7 +2,9 @@ import { z } from "zod";
 import {
   InputCapability,
   type InputCapability as InputCapabilityValue,
+  type ModelReasoning,
   parseInputCapabilities,
+  parseModelReasoning,
 } from "./modelCapabilities";
 
 const TTL_MS = 2 * 60 * 60 * 1000;
@@ -22,8 +24,18 @@ const RemoteModel = z.object({
     output_modalities: z.array(z.string()),
   }),
   supported_parameters: z.array(z.string()).nullish(),
+  reasoning: z
+    .object({
+      mandatory: z.boolean().nullish(),
+      default_enabled: z.boolean().nullish(),
+      supported_efforts: z.array(z.string()).nullish(),
+      default_effort: z.string().nullish(),
+    })
+    .nullish(),
 });
 const RemoteCatalog = z.object({ data: z.array(RemoteModel) });
+
+export type { ModelReasoning };
 
 export type CatalogModel = {
   route: string;
@@ -37,6 +49,7 @@ export type CatalogModel = {
   inputCapabilities: InputCapabilityValue[];
   supportsTools: boolean;
   outputCapabilities: string[];
+  reasoning?: ModelReasoning | null;
 };
 export type CatalogFreshness = {
   status: "fresh" | "stale" | "unavailable";
@@ -77,6 +90,14 @@ export function normalizeCatalog(payload: unknown): CatalogModel[] {
     ),
     outputCapabilities: model.architecture.output_modalities,
     supportsTools: model.supported_parameters?.includes("tools") ?? false,
+    reasoning: model.reasoning
+      ? parseModelReasoning({
+          mandatory: model.reasoning.mandatory,
+          defaultEnabled: model.reasoning.default_enabled,
+          supportedEfforts: model.reasoning.supported_efforts,
+          defaultEffort: model.reasoning.default_effort,
+        })
+      : null,
   }));
 }
 /** The live catalog identifies asynchronous routes with the :batch variant. */
