@@ -2,7 +2,9 @@ import { z } from "zod";
 import {
   InputCapability,
   type InputCapability as InputCapabilityValue,
+  type ModelReasoning,
   parseInputCapabilities,
+  parseModelReasoning,
 } from "./modelCapabilities";
 
 const TTL_MS = 2 * 60 * 60 * 1000;
@@ -33,12 +35,7 @@ const RemoteModel = z.object({
 });
 const RemoteCatalog = z.object({ data: z.array(RemoteModel) });
 
-export type ModelReasoning = {
-  mandatory: boolean;
-  defaultEnabled: boolean;
-  supportedEfforts: string[];
-  defaultEffort?: string;
-};
+export type { ModelReasoning };
 
 export type CatalogModel = {
   route: string;
@@ -94,12 +91,12 @@ export function normalizeCatalog(payload: unknown): CatalogModel[] {
     outputCapabilities: model.architecture.output_modalities,
     supportsTools: model.supported_parameters?.includes("tools") ?? false,
     reasoning: model.reasoning
-      ? {
-          mandatory: model.reasoning.mandatory ?? false,
-          defaultEnabled: model.reasoning.default_enabled ?? false,
-          supportedEfforts: model.reasoning.supported_efforts ?? [],
-          defaultEffort: model.reasoning.default_effort ?? undefined,
-        }
+      ? parseModelReasoning({
+          mandatory: model.reasoning.mandatory,
+          defaultEnabled: model.reasoning.default_enabled,
+          supportedEfforts: model.reasoning.supported_efforts,
+          defaultEffort: model.reasoning.default_effort,
+        })
       : null,
   }));
 }

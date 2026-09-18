@@ -31,3 +31,18 @@ export function parseInputCapabilities(value: unknown): InputCapability[] {
   }
   return Array.from(capabilities);
 }
+
+export const ModelReasoningSchema = z.object({
+  mandatory: z.boolean().default(false),
+  defaultEnabled: z.boolean().default(false),
+  supportedEfforts: z.array(z.string()).default([]),
+  defaultEffort: z.string().optional(),
+});
+
+export type ModelReasoning = z.infer<typeof ModelReasoningSchema>;
+
+export function parseModelReasoning(value: unknown): ModelReasoning | null {
+  if (!value || typeof value !== "object") return null;
+  const parsed = ModelReasoningSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}

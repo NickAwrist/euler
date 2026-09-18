@@ -135,15 +135,21 @@ export function AnchoredPopover({
 
     const observer = new ResizeObserver(position);
     observer.observe(panel);
+    const scrollOptions: AddEventListenerOptions = {
+      passive: true,
+      capture: true,
+    };
     window.addEventListener("resize", position);
-    window.addEventListener("scroll", position, true);
+    window.addEventListener("scroll", position, scrollOptions);
     window.visualViewport?.addEventListener("resize", position);
-    window.visualViewport?.addEventListener("scroll", position);
+    window.visualViewport?.addEventListener("scroll", position, {
+      passive: true,
+    });
 
     return () => {
       observer.disconnect();
       window.removeEventListener("resize", position);
-      window.removeEventListener("scroll", position, true);
+      window.removeEventListener("scroll", position, scrollOptions);
       window.visualViewport?.removeEventListener("resize", position);
       window.visualViewport?.removeEventListener("scroll", position);
     };
@@ -165,6 +171,11 @@ export function AnchoredPopover({
         open: openPanel,
         close,
       })}
+      {/*
+        Using <dialog popover="auto"> preserves the established accessible role="dialog"
+        expected by assistive tech and browser test selectors for model picking,
+        while leveraging the native Top Layer Popover API for light-dismiss and stacking.
+      */}
       <dialog
         ref={panelRef}
         id={menuId}
@@ -175,6 +186,7 @@ export function AnchoredPopover({
           panelClassName,
         )}
         onToggle={(event) => {
+          // React 19 typing for ToggleEvent does not yet expose `newState` on HTMLDialogElement.
           const isOpen = (event.newState as string) === "open";
           setOpen(isOpen);
           onOpenChange?.(isOpen);

@@ -312,7 +312,7 @@ export async function streamOpenRouterChat(
                 ? { enabled: false, effort: "none" }
                 : request.reasoningEffort === "on"
                   ? { enabled: true }
-                  : { effort: request.reasoningEffort },
+                  : { effort: request.reasoningEffort, enabled: true },
           }
         : {}),
     }),

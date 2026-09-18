@@ -1,5 +1,5 @@
 import "../setup";
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { RunContext } from "../../src/RunContext";
 import { BaseAgent } from "../../src/agents/BaseAgent";
 import { setOpenRouterApiKey } from "../../src/db";
@@ -7,10 +7,15 @@ import { streamOpenRouterChat } from "../../src/llm/openRouterProvider";
 import type { LlmStreamChunk } from "../../src/llm/types";
 import {
   getOpenRouterRequests,
+  resetOpenRouterScenario,
   setOpenRouterScenario,
 } from "../helpers/mockOpenRouter";
 
 const model = "openai/gpt-5.4-mini";
+
+beforeEach(() => {
+  resetOpenRouterScenario();
+});
 
 async function collect(): Promise<LlmStreamChunk[]> {
   const stream = await streamOpenRouterChat({
@@ -183,7 +188,7 @@ describe("OpenRouter provider", () => {
     for await (const _chunk of stream) {
     }
     const req = getOpenRouterRequests().at(-1)!;
-    expect(req.body.reasoning).toEqual({ effort: "high" });
+    expect(req.body.reasoning).toEqual({ effort: "high", enabled: true });
 
     const streamOff = await streamOpenRouterChat({
       model,

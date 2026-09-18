@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { BrainTierIcon } from "../../ui/components/ThinkingLevelBar";
 import {
-  BrainTierIcon,
   buildThinkingOptions,
   hasConfigurableThinking,
   normalizeThinkingTier,
   resolveEffectiveThinkingEffort,
-} from "../../ui/components/ThinkingLevelBar";
+} from "../../ui/lib/thinkingLevel";
 
 describe("ThinkingLevelBar options builder", () => {
   test("generates options including Off for non-mandatory reasoning models", () => {

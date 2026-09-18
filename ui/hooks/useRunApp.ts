@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { InputCapability } from "../../src/modelCapabilities";
 import { traceStepsForModal } from "../components/ExecutionTrace";
-import { resolveEffectiveThinkingEffort } from "../components/ThinkingLevelBar";
+import { resolveEffectiveThinkingEffort } from "../lib/thinkingLevel";
 import type {
   DebugData,
   Message,

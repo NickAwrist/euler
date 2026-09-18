@@ -15,12 +15,13 @@ import {
   useRef,
   useState,
 } from "react";
+import { hasConfigurableThinking } from "../lib/thinkingLevel";
 import { type SkillData, fetchSkills } from "../persist/skills";
 import { cx, iconButton, primaryButton } from "../styles";
 import type { MessageStep, ModelOption, SessionWorkspace } from "../types";
 import { AgentSelectBar } from "./AgentSelectBar";
 import { ModelSelectBar } from "./ModelSelectBar";
-import { ThinkingLevelBar, hasConfigurableThinking } from "./ThinkingLevelBar";
+import { ThinkingLevelBar } from "./ThinkingLevelBar";
 import {
   type RunCommandName,
   exactRunCommand,

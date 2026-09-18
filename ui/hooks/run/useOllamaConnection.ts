@@ -1,26 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { parseInputCapabilities } from "../../../src/modelCapabilities";
+import {
+  parseInputCapabilities,
+  parseModelReasoning,
+} from "../../../src/modelCapabilities";
 import { readApiError } from "../../lib/readApiError";
 import type { ModelOption, ModelReasoning } from "../../types";
 import { OLLAMA_HEALTH_POLL_MS } from "./constants";
-
-function parseModelReasoning(value: unknown): ModelReasoning | null {
-  if (!value || typeof value !== "object") return null;
-  const raw = value as Record<string, unknown>;
-  const rawEfforts = Array.isArray(raw.supportedEfforts)
-    ? raw.supportedEfforts
-    : [];
-  const supportedEfforts = rawEfforts.filter(
-    (e: unknown): e is string => typeof e === "string",
-  );
-  return {
-    mandatory: raw.mandatory === true,
-    defaultEnabled: raw.defaultEnabled === true,
-    supportedEfforts,
-    defaultEffort:
-      typeof raw.defaultEffort === "string" ? raw.defaultEffort : undefined,
-  };
-}
 
 export function mapModelOptions(value: unknown): ModelOption[] {
   const raw = Array.isArray(value) ? value : [];

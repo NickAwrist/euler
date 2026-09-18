@@ -201,6 +201,25 @@ export function useSessionsAndNavigation(p: Args) {
     }
   }, [p.activeSessionIdRef, p.isEphemeralRef, p.setMessages, workspace.kind]);
 
+  const resetSessionTransientState = useCallback(() => {
+    p.setMessages([]);
+    p.resetStreamingUi();
+    p.setEditingUserIndex(null);
+    p.setTruncateConfirm(null);
+    p.setStepsModalData(null);
+    p.setDebugOpen(false);
+    p.setDebugData(null);
+    setThinkingEffort(null);
+  }, [
+    p.setMessages,
+    p.resetStreamingUi,
+    p.setEditingUserIndex,
+    p.setTruncateConfirm,
+    p.setStepsModalData,
+    p.setDebugOpen,
+    p.setDebugData,
+  ]);
+
   const handleThinkingEffortChange = useCallback((effort: string) => {
     setThinkingEffort(effort);
   }, []);
@@ -475,10 +494,7 @@ export function useSessionsAndNavigation(p: Args) {
     setRunStatusState("resolved");
     setSessionError(null);
     setActiveSessionId(id);
-    p.setMessages([]);
-    p.resetStreamingUi();
-    p.setEditingUserIndex(null);
-    p.setTruncateConfirm(null);
+    resetSessionTransientState();
     setIsEphemeral(true);
     p.modelMessagesRef.current = null;
     setSidebarOpen(false);
@@ -491,10 +507,7 @@ export function useSessionsAndNavigation(p: Args) {
     canDiscardEmptySession,
     p.modelMessagesRef,
     p.serverDefaultRunAgent,
-    p.setMessages,
-    p.resetStreamingUi,
-    p.setEditingUserIndex,
-    p.setTruncateConfirm,
+    resetSessionTransientState,
     refreshSessions,
   ]);
 
@@ -524,11 +537,7 @@ export function useSessionsAndNavigation(p: Args) {
         setActiveSessionId(null);
         setIsEphemeral(false);
         setWorkspace({ kind: "sandbox" });
-        p.setMessages([]);
-        p.resetStreamingUi();
-        p.setEditingUserIndex(null);
-        p.setTruncateConfirm(null);
-        setThinkingEffort(null);
+        resetSessionTransientState();
       }
     };
     window.addEventListener("popstate", onPopState);
@@ -537,10 +546,7 @@ export function useSessionsAndNavigation(p: Args) {
     loadSession,
     p.activeSessionIdRef,
     p.isEphemeralRef,
-    p.setMessages,
-    p.resetStreamingUi,
-    p.setEditingUserIndex,
-    p.setTruncateConfirm,
+    resetSessionTransientState,
   ]);
 
   const goToHome = useCallback(async () => {
@@ -560,14 +566,7 @@ export function useSessionsAndNavigation(p: Args) {
     }
     setIsEphemeral(false);
     setActiveSessionId(null);
-    p.setMessages([]);
-    p.resetStreamingUi();
-    p.setEditingUserIndex(null);
-    p.setTruncateConfirm(null);
-    p.setStepsModalData(null);
-    p.setDebugOpen(false);
-    p.setDebugData(null);
-    setThinkingEffort(null);
+    resetSessionTransientState();
     setSidebarOpen(false);
     setSelectedSessionAgent(p.serverDefaultRunAgent);
     setWorkspace({ kind: "sandbox" });
@@ -577,13 +576,7 @@ export function useSessionsAndNavigation(p: Args) {
     p.isEphemeralRef,
     canDiscardEmptySession,
     p.serverDefaultRunAgent,
-    p.setDebugData,
-    p.setDebugOpen,
-    p.setEditingUserIndex,
-    p.setMessages,
-    p.setStepsModalData,
-    p.resetStreamingUi,
-    p.setTruncateConfirm,
+    resetSessionTransientState,
     refreshSessions,
   ]);
 
