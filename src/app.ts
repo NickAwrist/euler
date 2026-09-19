@@ -65,7 +65,7 @@ if (envConfig.serveFrontend && existsSync(indexPath)) {
       return;
     }
 
-    res.sendFile(indexPath);
+    res.sendFile("index.html", { root: distPath });
   });
 }
 
