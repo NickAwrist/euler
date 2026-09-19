@@ -2,17 +2,17 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 export const DB_PATH =
-  process.env.AGENTS_DB_PATH ||
+  process.env.EULER_DB_PATH ||
   (process.env.DEPLOYCTL_DATA_DIR
-    ? join(process.env.DEPLOYCTL_DATA_DIR, "agents.db")
-    : join(process.cwd(), "data", "agents.db"));
+    ? join(process.env.DEPLOYCTL_DATA_DIR, "euler.db")
+    : join(process.cwd(), "data", "euler.db"));
 
 export const DATA_ROOT =
-  process.env.ORBIS_DATA_ROOT ||
+  process.env.EULER_DATA_ROOT ||
   (process.env.DEPLOYCTL_DATA_DIR
     ? process.env.DEPLOYCTL_DATA_DIR
     : DB_PATH === ":memory:"
-      ? join(tmpdir(), `orbis-test-${process.pid}`)
+      ? join(tmpdir(), `euler-test-${process.pid}`)
       : dirname(DB_PATH));
 
 export const DEFAULT_RUN_AGENT_KEY = "default_run_agent";

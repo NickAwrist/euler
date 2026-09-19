@@ -18,7 +18,7 @@ const SearchResponseSchema = z.object({
 
 const REQUEST_HEADERS = {
   Accept: "application/json, text/html;q=0.9",
-  "User-Agent": "OrbisAgents/1.0",
+  "User-Agent": "Euler/1.0",
   "X-Forwarded-For": "127.0.0.1",
   "X-Real-IP": "127.0.0.1",
 };

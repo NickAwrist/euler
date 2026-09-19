@@ -296,7 +296,7 @@ export async function streamOpenRouterChat(
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": "http://localhost",
-      "X-Title": "Orbis Agents",
+      "X-Title": "Euler",
     },
     body: JSON.stringify({
       model: request.model,
