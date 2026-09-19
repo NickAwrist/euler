@@ -16,6 +16,7 @@ import {
 import { renderSkillsPrompt } from "../skills/runtime";
 import { AgentTool } from "../tools/AgentTool";
 import type { BaseTool } from "../tools/BaseTool";
+import { ApplyPatchTool } from "../tools/apply_patch";
 import { BashTool } from "../tools/bash";
 import { isBuiltinToolName } from "../tools/builtinTools";
 import { CreateFileTool } from "../tools/create_file";
@@ -27,7 +28,6 @@ import { ListFilesTool } from "../tools/list_files";
 import { LoadSkillTool } from "../tools/load_skill";
 import { ModifyPlan } from "../tools/modify_plan";
 import { ReadFileTool } from "../tools/read_file";
-import { RunTscTool } from "../tools/run_tsc";
 import { WebSearchTool } from "../tools/web_search";
 import { BaseAgent } from "./BaseAgent";
 
@@ -94,8 +94,8 @@ function createBuiltinTool(toolName: string): BaseTool {
       return new ModifyPlan();
     case "read_file":
       return new ReadFileTool();
-    case "run_tsc":
-      return new RunTscTool();
+    case "apply_patch":
+      return new ApplyPatchTool();
     case "web_search":
       return new WebSearchTool();
     case "fetch_web_page":

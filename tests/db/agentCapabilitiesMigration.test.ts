@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   migrateAgentDelegations,
   migrateAgentSkills,
+  migrateFileEditingTools,
 } from "../../src/db/migrations";
 
 function legacyDatabase(): Database {
@@ -151,4 +152,37 @@ describe("agent capability migrations", () => {
     expect(db.query("PRAGMA foreign_key_check").all()).toEqual([]);
     db.close();
   });
+});
+
+test("enables patch editing once for existing shell and file tools", () => {
+  const db = legacyDatabase();
+  db.run(
+    "CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+  );
+  insertAgent(db, "source", "user-1", "source");
+  insertAgent(db, "editor", "user-1", "editor");
+  db.run(
+    "INSERT INTO agent_tools (agent_id, tool_name, position) VALUES ('source', 'bash', 0), ('editor', 'create_file', 0)",
+  );
+  migrateFileEditingTools(db);
+  expect(
+    db
+      .query(
+        "SELECT tool_name FROM agent_tools WHERE agent_id = 'source' ORDER BY position",
+      )
+      .all(),
+  ).toEqual([{ tool_name: "bash" }, { tool_name: "apply_patch" }]);
+  expect(
+    db
+      .query(
+        "SELECT tool_name FROM agent_tools WHERE agent_id = 'editor' ORDER BY position",
+      )
+      .all(),
+  ).toEqual([{ tool_name: "create_file" }, { tool_name: "apply_patch" }]);
+  db.run("DELETE FROM agent_tools WHERE tool_name = 'apply_patch'");
+  migrateFileEditingTools(db);
+  expect(
+    db.query("SELECT 1 FROM agent_tools WHERE tool_name = 'apply_patch'").get(),
+  ).toBeNull();
+  db.close();
 });

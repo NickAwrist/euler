@@ -230,3 +230,7 @@ describe("AgentTool", () => {
     expect(subagent.reasoningEffort).toBe("high");
   });
 });
+
+test("registers patch editing", () => {
+  expect(agentManager.getToolInstance("apply_patch").name).toBe("apply_patch");
+});

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { RunContext } from "../../src/RunContext";
 import { BaseAgent } from "../../src/agents/BaseAgent";
 import { sandboxRunner } from "../../src/sandbox/SandboxRunner";
+import { ApplyPatchTool } from "../../src/tools/apply_patch";
 import { BashTool } from "../../src/tools/bash";
 import { CreateFileTool } from "../../src/tools/create_file";
 import { DeleteFileTool } from "../../src/tools/delete_file";
@@ -49,7 +50,12 @@ async function fixture() {
   return { service, workspace, ctx, parent, outside };
 }
 
-for (const operation of ["grep", "create_file", "delete_file"] as const) {
+for (const operation of [
+  "grep",
+  "create_file",
+  "delete_file",
+  "apply_patch",
+] as const) {
   for (const component of ["file", "parent"] as const) {
     if (operation === "delete_file" && component === "file") continue;
     for (const timing of ["before", "after"] as const) {
@@ -85,9 +91,17 @@ for (const operation of ["grep", "create_file", "delete_file"] as const) {
               ? new GrepTool()
               : operation === "create_file"
                 ? new CreateFileTool()
-                : new DeleteFileTool();
+                : operation === "apply_patch"
+                  ? new ApplyPatchTool()
+                  : new DeleteFileTool();
           const result = await tool.execute(
-            { path: "parent/file.txt", pattern: ".", content: "new output" },
+            {
+              path: "parent/file.txt",
+              pattern: ".",
+              content: "new output",
+              patch:
+                "*** Begin Patch\n*** Update File: parent/file.txt\n@@\n-inside marker\n+new output\n*** End Patch",
+            },
             ctx,
           );
           expect(result.text).not.toContain("outside secret");
@@ -97,7 +111,10 @@ for (const operation of ["grep", "create_file", "delete_file"] as const) {
           // unlink uses only a parent descriptor and never opens the final file.
           if (operation !== "delete_file" || component === "parent")
             expect(replaced).toBeTrue();
-          if (operation === "create_file" && timing === "after") {
+          if (
+            (operation === "create_file" || operation === "apply_patch") &&
+            timing === "after"
+          ) {
             const written =
               component === "parent"
                 ? join(`${parent}.original`, "file.txt")

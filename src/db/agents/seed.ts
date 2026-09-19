@@ -36,7 +36,7 @@ const DEFAULT_AGENTS: Array<{
     name: "system_agent",
     description:
       "Uses contained shell and file tools in the active chat workspace. Provide a self-contained task description with the expected output or deliverable.",
-    tools: ["bash"],
+    tools: ["bash", "apply_patch"],
     delegates: [],
     system_prompt: [
       "You are a system agent with contained shell and file access to the active chat workspace.",

@@ -363,6 +363,26 @@ export function migrateOpenRouterCatalog(db: Database) {
   })();
 }
 
+/** Upgrade existing editing tools once, preserving subsequent user choices. */
+export function migrateFileEditingTools(db: Database) {
+  if (!tableExists(db, "agent_tools") || !tableExists(db, "app_settings"))
+    return;
+  if (
+    db
+      .query("SELECT 1 FROM app_settings WHERE key = 'file_editing_tools_v1'")
+      .get()
+  )
+    return;
+  db.transaction(() => {
+    db.run(`INSERT OR IGNORE INTO agent_tools (agent_id, tool_name, position)
+      SELECT agent_id, 'apply_patch', MAX(position) + 1 FROM agent_tools
+      GROUP BY agent_id HAVING SUM(tool_name IN ('create_file', 'bash')) > 0`);
+    db.run(
+      "INSERT INTO app_settings (key, value) VALUES ('file_editing_tools_v1', '1')",
+    );
+  })();
+}
+
 export function runMigrations(db: Database) {
   migrateOpenRouterCatalog(db);
   migrateSessionsAgentColumn(db);
@@ -372,6 +392,7 @@ export function runMigrations(db: Database) {
   migrateSessionsOwnerColumn(db);
   migrateAgentsOwnerColumn(db);
   migrateAgentSkills(db);
+  migrateFileEditingTools(db);
   migrateAgentDelegations(db);
   migrateSeededComputerAgentName(db);
   migrateMessagesAttachmentsColumn(db);

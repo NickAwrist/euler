@@ -5,7 +5,7 @@ export const BUILTIN_TOOLS = [
   "list_files",
   "modify_plan",
   "read_file",
-  "run_tsc",
+  "apply_patch",
   "web_search",
   "fetch_web_page",
   "bash",
