@@ -35,12 +35,12 @@ export default defineConfig(({ mode }) => {
   const env = { ...loadEnv(mode, process.cwd(), ""), ...process.env };
   const frontendPort = getPort(
     env,
-    ["AGENTS_FRONTEND_PORT", "FRONTEND_PORT"],
+    ["EULER_FRONTEND_PORT", "FRONTEND_PORT"],
     5174,
   );
   const backendPort = getPort(
     env,
-    ["AGENTS_BACKEND_PORT", "BACKEND_PORT"],
+    ["EULER_BACKEND_PORT", "BACKEND_PORT"],
     3000,
   );
   // The API defaults to 127.0.0.1. Using localhost here can resolve to an

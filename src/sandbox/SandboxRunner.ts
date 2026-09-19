@@ -233,7 +233,7 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
       "/bin/sh",
       "-c",
       'ulimit -t 60; ulimit -n 256; ulimit -v 2097152 2>/dev/null || true; exec /bin/sh -c "$1"',
-      "orbis-shell",
+      "euler-shell",
       command,
     );
     return args;

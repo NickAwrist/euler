@@ -2,7 +2,7 @@ import type { Request, Response } from "express";
 import { ensureUserData } from "./db/index";
 import { sendApiError } from "./http/errors";
 
-export const USER_ID_HEADER = "x-orbis-user-id";
+export const USER_ID_HEADER = "x-euler-user-id";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

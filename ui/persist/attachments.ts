@@ -13,7 +13,7 @@ export async function uploadImageAttachment(
     method: "POST",
     headers: {
       "Content-Type": file.type,
-      "X-Orbis-Session-ID": sessionId,
+      "X-Euler-Session-ID": sessionId,
       "X-Attachment-Filename": encodeURIComponent(file.name),
     },
     body: file,

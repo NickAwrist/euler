@@ -83,7 +83,7 @@ router.post(
   (req, res) => {
     const ownerUuid = requireUserId(req, res);
     if (!ownerUuid) return;
-    const sessionId = req.header("X-Orbis-Session-ID")?.trim() ?? "";
+    const sessionId = req.header("X-Euler-Session-ID")?.trim() ?? "";
     if (!sessionId || !getSessionById(ownerUuid, sessionId)) {
       sendApiError(res, 404, "NOT_FOUND", "Session not found");
       return;

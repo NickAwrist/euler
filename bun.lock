@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "agents",
+      "name": "euler",
       "dependencies": {
         "cors": "^2.8.6",
         "express": "^5.2.1",
