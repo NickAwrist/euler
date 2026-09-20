@@ -8,6 +8,7 @@ export interface UserSettings {
   location: string;
   defaultModel: string;
   includeCurrentDate: boolean;
+  showDebugButton: boolean;
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
@@ -16,6 +17,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   location: "",
   defaultModel: "",
   includeCurrentDate: true,
+  showDebugButton: false,
 };
 
 export function loadUserSettings(): UserSettings {
@@ -30,6 +32,7 @@ export function loadUserSettings(): UserSettings {
       location: parsed.location || "",
       defaultModel: parsed.defaultModel || "",
       includeCurrentDate: parsed.includeCurrentDate ?? true,
+      showDebugButton: parsed.showDebugButton === true,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -44,6 +47,7 @@ function saveUserSettings(settings: UserSettings): void {
       location: settings.location || "",
       defaultModel: settings.defaultModel || "",
       includeCurrentDate: settings.includeCurrentDate ?? true,
+      showDebugButton: settings.showDebugButton === true,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
   } catch {

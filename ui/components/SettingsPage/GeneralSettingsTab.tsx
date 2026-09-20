@@ -203,6 +203,27 @@ export function GeneralSettingsTab({
           </select>
         </div>
       </div>
+      <details className="border-t border-border-subtle pt-4">
+        <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+          Developer tools
+        </summary>
+        <label className="mt-3 flex items-start gap-3 text-[0.8125rem] text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={settings.showDebugButton}
+            onChange={(event) =>
+              onFieldChange("showDebugButton", event.target.checked)
+            }
+            className="mt-0.5 h-4 w-4 rounded border-border-subtle bg-surface text-primary focus:ring-primary"
+          />
+          <span>
+            Display debug button
+            <span className="mt-1 block text-xs">
+              Inspect model context and request details.
+            </span>
+          </span>
+        </label>
+      </details>
     </div>
   );
 }

@@ -337,3 +337,84 @@ test("chat sidebar desktop restores artifact preview and width on reload", async
   await page.reload();
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
 });
+
+test("chat sidebar desktop export and opt-in debug access", async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockApp(page);
+  await page.goto("/");
+  await page.getByRole("button", { name: "Chat options" }).click();
+  await expect(page.getByRole("menuitem")).toHaveText([
+    "Rename",
+    "Export",
+    "Delete",
+  ]);
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("menuitem", { name: "Export", exact: true }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("chat-sidebar-test.md");
+  const stream = await download.createReadStream();
+  let transcript = "";
+  for await (const chunk of stream) transcript += chunk.toString();
+  expect(transcript).toBe("USER\n===\nCheck the sidebar controls.");
+  expect(new URL(page.url()).pathname).toBe("/");
+  await page
+    .locator("#app-sidebar")
+    .getByRole("button", { name: /Sidebar test chat/ })
+    .click();
+  await expect(page.locator("main .workspace-header")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Debug inspector", exact: true }),
+  ).toHaveCount(0);
+  await page.screenshot({
+    path: testInfo.outputPath("chat-without-header.png"),
+  });
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const developerTools = page
+    .locator("details")
+    .filter({ hasText: "Developer tools" });
+  await expect(developerTools).not.toHaveAttribute("open", "");
+  await developerTools.locator("summary").click();
+  const showDebug = page.getByRole("checkbox", {
+    name: /Display debug button/,
+  });
+  await expect(showDebug).not.toBeChecked();
+  await showDebug.check();
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Save settings", exact: true }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Back to chat" }).click();
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Debug inspector", exact: true })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Debug", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Close debug inspector", exact: true })
+    .click();
+  const chatsToggle = page.getByRole("button", {
+    name: "Toggle chats",
+    exact: true,
+  });
+  if ((await chatsToggle.getAttribute("aria-expanded")) === "false")
+    await chatsToggle.click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.locator("details summary").click();
+  await showDebug.uncheck();
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Save settings", exact: true }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Back to chat" }).click();
+  await expect(
+    page.getByRole("button", { name: "Debug inspector", exact: true }),
+  ).toHaveCount(0);
+});

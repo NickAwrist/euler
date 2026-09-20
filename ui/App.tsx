@@ -1,3 +1,4 @@
+import { Bug, EyeOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AgentsPage } from "./components/AgentsPage";
 import { ArtifactContext } from "./components/Artifacts/ArtifactContext";
@@ -8,7 +9,6 @@ import { DirectoryModal } from "./components/DirectoryModal";
 import { shouldShowStepsModal } from "./components/ExecutionTrace";
 import { ProviderSetupBanner } from "./components/OllamaDisconnectedBanner";
 import { RenameSessionModal } from "./components/RenameSessionModal";
-import { RunAppHeader } from "./components/RunAppHeader";
 import { RunArea } from "./components/RunArea";
 import { RunInputDock } from "./components/RunInputDock";
 import { SettingsPage } from "./components/SettingsPage";
@@ -25,6 +25,7 @@ import { useMobileLayout } from "./hooks/useMobileLayout";
 import { useRunApp } from "./hooks/useRunApp";
 import { downloadBlob } from "./lib/downloadBlob";
 import { formatRunTranscript } from "./lib/formatRunTranscript";
+import { fetchSession } from "./persist/sessions";
 import { cx } from "./styles";
 import type { AppView } from "./types";
 
@@ -225,6 +226,27 @@ function ChatView({
             onNewSession={app.createSession}
             onNewEphemeralSession={app.createEphemeralSession}
             onRenameSession={(id) => app.setRenameSessionId(id)}
+            onExportSession={async (id) => {
+              const useCurrent =
+                id === app.activeSessionId &&
+                (app.sessionLoadState === "loaded" ||
+                  app.sessionLoadState === "empty");
+              const stored = useCurrent
+                ? null
+                : await fetchSession(id, { fresh: true });
+              const messages = useCurrent ? app.messages : stored?.history;
+              if (!messages) throw new Error("Conversation not found.");
+              const transcript = formatRunTranscript(
+                messages,
+                useCurrent
+                  ? { streamingAssistant: app.streamingContent }
+                  : undefined,
+              );
+              downloadBlob(
+                new Blob([transcript], { type: "text/markdown;charset=utf-8" }),
+                `chat-${id}.md`,
+              );
+            }}
             onDeleteSession={app.requestDeleteSession}
             isLoading={app.isLoading}
             onCustomization={onCustomization}
@@ -243,30 +265,33 @@ function ChatView({
             artifactsOpen && !app.sidebarCollapsed && "min-[1320px]:ml-[260px]",
           )}
         >
-          <RunAppHeader
-            artifactsOpen={artifactsOpen}
-            activeSessionId={app.activeSessionId}
-            sidebarCollapsed={app.sidebarCollapsed}
-            debugOpen={app.debugOpen}
-            onToggleDebug={app.toggleDebug}
-            onExportEntireRun={
-              app.activeSessionId
-                ? () =>
-                    downloadBlob(
-                      new Blob(
-                        [
-                          formatRunTranscript(app.messages, {
-                            streamingAssistant: app.streamingContent,
-                          }),
-                        ],
-                        { type: "text/markdown;charset=utf-8" },
-                      ),
-                      `chat-${app.activeSessionId}.md`,
-                    )
-                : undefined
-            }
-            isEphemeral={app.isEphemeral}
-          />
+          {app.activeSessionId && app.userSettings.showDebugButton && (
+            <button
+              type="button"
+              onClick={app.toggleDebug}
+              title="Debug inspector"
+              aria-label="Debug inspector"
+              className={cx(
+                "absolute top-[calc((var(--workspace-header-height)-2.25rem-1px)/2)] z-10 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground",
+                artifactsOpen ? "right-2" : "right-14",
+              )}
+            >
+              <Bug size={16} />
+            </button>
+          )}
+          {app.isEphemeral && (
+            <span
+              className={cx(
+                "pointer-events-none absolute left-14 top-4 z-10 inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-background px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-amber-400",
+                !app.sidebarCollapsed &&
+                  !artifactsOpen &&
+                  "min-[1320px]:left-[calc(260px+1rem)]",
+              )}
+            >
+              <EyeOff size={12} />
+              Ephemeral
+            </span>
+          )}
 
           <section
             className={cx(

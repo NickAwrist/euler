@@ -6,6 +6,7 @@ export type SidebarProps = {
   onSelectSession: (id: string) => void;
   onNewSession: () => void;
   onNewEphemeralSession: () => void;
+  onExportSession: (id: string) => Promise<void>;
   onRenameSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
   isLoading: boolean;

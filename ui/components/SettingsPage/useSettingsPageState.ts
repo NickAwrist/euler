@@ -234,7 +234,8 @@ export function useSettingsPageState({
       settings.preferredFormats !== currentSettings.preferredFormats ||
       settings.location !== currentSettings.location ||
       settings.defaultModel !== currentSettings.defaultModel ||
-      settings.includeCurrentDate !== currentSettings.includeCurrentDate
+      settings.includeCurrentDate !== currentSettings.includeCurrentDate ||
+      settings.showDebugButton !== currentSettings.showDebugButton
     ) {
       return true;
     }

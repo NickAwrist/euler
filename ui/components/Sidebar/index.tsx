@@ -17,6 +17,7 @@ export function Sidebar({
   onNewSession,
   onNewEphemeralSession,
   onRenameSession,
+  onExportSession,
   onDeleteSession,
   isLoading,
   onCustomization,
@@ -78,6 +79,7 @@ export function Sidebar({
                 setOpenMenu={setOpenMenu}
                 onSelectSession={onSelectSession}
                 onRenameSession={onRenameSession}
+                onExportSession={onExportSession}
                 onDeleteSession={onDeleteSession}
               />
             ))}
