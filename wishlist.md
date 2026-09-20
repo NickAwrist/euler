@@ -3,10 +3,6 @@ Really want
 - MCPs
 - Artifacts: file tree, Markdown, highlighted source, and image previews implemented. Remaining: HTML and interactive charts.
 
-Rebranding
-
-- Rebrand project from "Orbis Agents" to "Euler" (UI title, metadata, documentation, shell labels, and environment constants)
-
 Low priority / Nice to have
 
 - Tool approval:

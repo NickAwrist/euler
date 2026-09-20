@@ -37,25 +37,24 @@ function getBoolean(names: string[], fallback: boolean): boolean {
 }
 
 export const envConfig = {
-  hostDirectory: getEnv("AGENTS_HOST_DIRECTORY"),
+  hostDirectory: getEnv("EULER_HOST_DIRECTORY"),
   backendPort: getPort(
-    ["AGENTS_BACKEND_PORT", "BACKEND_PORT"],
+    ["EULER_BACKEND_PORT", "BACKEND_PORT"],
     DEFAULT_BACKEND_PORT,
   ),
   backendHost:
-    getFirstEnv(["AGENTS_BACKEND_HOST", "BACKEND_HOST"]) ||
-    DEFAULT_BACKEND_HOST,
+    getFirstEnv(["EULER_BACKEND_HOST", "BACKEND_HOST"]) || DEFAULT_BACKEND_HOST,
   frontendPort: getPort(
-    ["AGENTS_FRONTEND_PORT", "FRONTEND_PORT"],
+    ["EULER_FRONTEND_PORT", "FRONTEND_PORT"],
     DEFAULT_FRONTEND_PORT,
   ),
-  ollamaHost: getFirstEnv(["AGENTS_OLLAMA_HOST", "OLLAMA_HOST"]),
-  comfyuiHost: getFirstEnv(["AGENTS_COMFYUI_HOST", "COMFYUI_HOST"]),
-  searxngHost: getFirstEnv(["AGENTS_SEARXNG_HOST", "SEARXNG_HOST"]),
-  jinaApiKey: getFirstEnv(["JINA_API_KEY", "AGENTS_JINA_API_KEY"]),
-  serveFrontend: getBoolean(["AGENTS_SERVE_FRONTEND"], true),
+  ollamaHost: getFirstEnv(["EULER_OLLAMA_HOST", "OLLAMA_HOST"]),
+  comfyuiHost: getFirstEnv(["EULER_COMFYUI_HOST", "COMFYUI_HOST"]),
+  searxngHost: getFirstEnv(["EULER_SEARXNG_HOST", "SEARXNG_HOST"]),
+  jinaApiKey: getFirstEnv(["JINA_API_KEY", "EULER_JINA_API_KEY"]),
+  serveFrontend: getBoolean(["EULER_SERVE_FRONTEND"], true),
   openrouterApiKey: getFirstEnv([
     "OPENROUTER_API_KEY",
-    "AGENTS_OPENROUTER_API_KEY",
+    "EULER_OPENROUTER_API_KEY",
   ]),
 };

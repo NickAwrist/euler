@@ -23,7 +23,7 @@ beforeEach(() => {
   target = join(root, "worktree");
   mkdirSync(join(primary, "node_modules"), { recursive: true });
   mkdirSync(target);
-  writeFileSync(join(primary, ".env.example"), "AGENTS_BACKEND_PORT=3000\n");
+  writeFileSync(join(primary, ".env.example"), "EULER_BACKEND_PORT=3000\n");
 });
 
 afterEach(() => rmSync(root, { recursive: true, force: true }));
@@ -31,7 +31,7 @@ afterEach(() => rmSync(root, { recursive: true, force: true }));
 test("copies custom settings but isolates external storage paths", () => {
   writeFileSync(
     join(primary, ".env"),
-    "OPENROUTER_API_KEY=custom-key\nAGENTS_BACKEND_PORT=3200\nexport AGENTS_DB_PATH = /external/live.db\nORBIS_DATA_ROOT=/external/data\nAGENTS_HOST_DIRECTORY=/shared/projects\n",
+    "OPENROUTER_API_KEY=custom-key\nEULER_BACKEND_PORT=3200\nexport EULER_DB_PATH = /external/live.db\nEULER_DATA_ROOT=/external/data\nEULER_HOST_DIRECTORY=/shared/projects\n",
   );
   expect(initializeWorktree(target, primary)).toEqual({
     envCreated: true,
@@ -39,37 +39,37 @@ test("copies custom settings but isolates external storage paths", () => {
   });
   const contents = readFileSync(join(target, ".env"), "utf8");
   expect(contents).toContain("OPENROUTER_API_KEY=custom-key");
-  expect(contents).toContain("AGENTS_BACKEND_PORT=3200");
-  expect(contents).toContain("AGENTS_HOST_DIRECTORY=/shared/projects");
+  expect(contents).toContain("EULER_BACKEND_PORT=3200");
+  expect(contents).toContain("EULER_HOST_DIRECTORY=/shared/projects");
   expect(contents).not.toContain("/external/");
   expect(contents).toContain(
-    `AGENTS_DB_PATH=${JSON.stringify(join(target, "data", "agents.db"))}`,
+    `EULER_DB_PATH=${JSON.stringify(join(target, "data", "euler.db"))}`,
   );
   expect(contents).toContain(
-    `ORBIS_DATA_ROOT=${JSON.stringify(join(target, "data"))}`,
+    `EULER_DATA_ROOT=${JSON.stringify(join(target, "data"))}`,
   );
   expect(realpathSync(join(target, "node_modules"))).toBe(
     join(primary, "node_modules"),
   );
-  expect(existsSync(join(target, "data", "agents.db"))).toBe(false);
+  expect(existsSync(join(target, "data", "euler.db"))).toBe(false);
 });
 
 test("preserves an existing worktree env and dependencies on repeated setup", () => {
   initializeWorktree(target, primary);
-  writeFileSync(join(target, ".env"), "AGENTS_BACKEND_PORT=3456\n");
+  writeFileSync(join(target, ".env"), "EULER_BACKEND_PORT=3456\n");
   expect(initializeWorktree(target, primary)).toEqual({
     envCreated: false,
     nodeModulesLinked: false,
   });
   expect(readFileSync(join(target, ".env"), "utf8")).toBe(
-    "AGENTS_BACKEND_PORT=3456\n",
+    "EULER_BACKEND_PORT=3456\n",
   );
 });
 
 test("falls back to the example when the primary has no env", () => {
   initializeWorktree(target, primary);
   expect(readFileSync(join(target, ".env"), "utf8")).toContain(
-    "AGENTS_BACKEND_PORT=3000",
+    "EULER_BACKEND_PORT=3000",
   );
 });
 
@@ -91,7 +91,7 @@ test("snapshots committed WAL data and copies retained workspaces without changi
   const dbPath = join(data, "custom.db");
   writeFileSync(
     join(primary, ".env"),
-    `AGENTS_DB_PATH="${dbPath}"\nORBIS_DATA_ROOT=custom-data\n`,
+    `EULER_DB_PATH="${dbPath}"\nEULER_DATA_ROOT=custom-data\n`,
   );
   const source = new Database(dbPath);
   source.run("PRAGMA journal_mode=WAL");
@@ -99,7 +99,7 @@ test("snapshots committed WAL data and copies retained workspaces without changi
   source.run("INSERT INTO settings VALUES ('saved')");
   try {
     initializeWorktree(target, primary);
-    const copied = new Database(join(target, "data", "agents.db"));
+    const copied = new Database(join(target, "data", "euler.db"));
     try {
       expect(copied.query("SELECT value FROM settings").get()).toEqual({
         value: "saved",

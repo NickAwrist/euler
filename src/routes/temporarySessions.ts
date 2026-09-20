@@ -126,7 +126,7 @@ router.post("/:id/reveal", async (req, res) => {
       res,
       403,
       "FORBIDDEN",
-      "Files can only be revealed on the machine running Orbis",
+      "Files can only be revealed on the machine running Euler",
     );
     return;
   }

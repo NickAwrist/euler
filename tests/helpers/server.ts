@@ -7,7 +7,7 @@ export function userHeaders(
   ownerUuid = TEST_USER_ID,
   extra: Record<string, string> = {},
 ): Record<string, string> {
-  return { "X-Orbis-User-ID": ownerUuid, ...extra };
+  return { "X-Euler-User-ID": ownerUuid, ...extra };
 }
 
 export interface TestServer {

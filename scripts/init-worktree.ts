@@ -29,16 +29,16 @@ export function initializeWorktree(targetDir: string, primaryRoot: string) {
       const config = parseEnv(contents);
       const sourceDb = resolve(
         primary,
-        config.AGENTS_DB_PATH || "data/agents.db",
+        config.EULER_DB_PATH || "data/euler.db",
       );
-      const sourceData = config.ORBIS_DATA_ROOT
-        ? resolve(primary, config.ORBIS_DATA_ROOT)
+      const sourceData = config.EULER_DATA_ROOT
+        ? resolve(primary, config.EULER_DATA_ROOT)
         : dirname(sourceDb);
       const targetData = join(target, "data");
-      const targetDb = join(targetData, "agents.db");
+      const targetDb = join(targetData, "euler.db");
       mkdirSync(targetData, { recursive: true });
       if (
-        config.AGENTS_DB_PATH !== ":memory:" &&
+        config.EULER_DB_PATH !== ":memory:" &&
         existsSync(sourceDb) &&
         !existsSync(targetDb)
       ) {
@@ -79,10 +79,10 @@ export function initializeWorktree(targetDir: string, primaryRoot: string) {
       // Always keep mutable state in this checkout, even when the source uses
       // absolute paths outside the primary repository.
       contents = contents.replace(
-        /^\s*(?:export\s+)?(?:AGENTS_DB_PATH|ORBIS_DATA_ROOT)\s*=.*$/gm,
+        /^\s*(?:export\s+)?(?:EULER_DB_PATH|EULER_DATA_ROOT)\s*=.*$/gm,
         "",
       );
-      contents = `${contents.trimEnd()}\n\n# Worktree-local app storage.\nAGENTS_DB_PATH=${JSON.stringify(join(target, "data", "agents.db"))}\nORBIS_DATA_ROOT=${JSON.stringify(join(target, "data"))}\n`;
+      contents = `${contents.trimEnd()}\n\n# Worktree-local app storage.\nEULER_DB_PATH=${JSON.stringify(join(target, "data", "euler.db"))}\nEULER_DATA_ROOT=${JSON.stringify(join(target, "data"))}\n`;
     }
     writeFileSync(envPath, contents, { flag: "wx", mode: 0o600 });
     envCreated = true;

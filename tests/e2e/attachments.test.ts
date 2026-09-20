@@ -25,7 +25,7 @@ describe("image attachments", () => {
         method: "POST",
         headers: userHeaders(undefined, {
           "Content-Type": "image/png",
-          "X-Orbis-Session-ID": sessionId,
+          "X-Euler-Session-ID": sessionId,
           "X-Attachment-Filename": encodeURIComponent("sample.png"),
         }),
         body: PNG_SIGNATURE,

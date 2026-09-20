@@ -1,6 +1,6 @@
 import type { RunBody } from "../../src/schemas/run";
 
-const STORAGE_KEY = "agents:userSettings";
+const STORAGE_KEY = "euler:userSettings";
 
 export interface UserSettings {
   name: string;
