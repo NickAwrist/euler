@@ -18,6 +18,7 @@ import settingsRoutes from "./routes/settings";
 import skillsRoutes from "./routes/skills";
 import temporarySessionRoutes from "./routes/temporarySessions";
 import toolsRoutes from "./routes/tools";
+import usageRoutes from "./routes/usage";
 import { workspaceService } from "./workspaces/WorkspaceService";
 
 getDb();
@@ -40,6 +41,7 @@ app.use(
   }),
 );
 app.use(express.json({ limit: "10mb" }));
+app.use("/api/usage", usageRoutes);
 app.use("/api/tools", toolsRoutes);
 app.use("/api/directories", directoriesRoutes);
 app.use("/api/settings", settingsRoutes);

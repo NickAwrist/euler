@@ -14,6 +14,7 @@ export interface MessageStep {
   thinking?: string;
   metrics?: {
     cost?: number;
+    cachedTokens?: number;
     outputTokens?: number;
     outputDurationMs?: number;
     promptTokens?: number;

@@ -6,6 +6,7 @@ export type StepStatus = "running" | "done" | "error";
 
 export type LlmMetrics = {
   cost?: number;
+  cachedTokens?: number;
   outputTokens?: number;
   outputDurationMs?: number;
   promptTokens?: number;

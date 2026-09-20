@@ -1,6 +1,7 @@
-import { ArrowLeft, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { useState } from "react";
 import { cx, primaryButton } from "../../styles";
+import { BackToChatButton } from "../BackToChatButton";
 import { GeneralSettingsTab } from "./GeneralSettingsTab";
 import { ImageGenerationTab } from "./ImageGenerationTab";
 import { OllamaSettingsTab } from "./OllamaSettingsTab";
@@ -46,14 +47,7 @@ export function SettingsPage(props: SettingsPageProps) {
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <header className="flex shrink-0 items-center gap-3 border-b border-border-subtle bg-background px-5 py-3">
-        <button
-          type="button"
-          onClick={handleBack}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[0.8125rem] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <ArrowLeft size={15} />
-          Back to chat
-        </button>
+        <BackToChatButton onClick={handleBack} />
         <div className="h-4 w-px bg-border-subtle" />
         <h1 className="text-[0.9375rem] font-semibold text-foreground">
           Settings

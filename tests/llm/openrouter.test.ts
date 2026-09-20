@@ -38,6 +38,7 @@ describe("OpenRouter provider", () => {
     expect(chunks.at(-1)?.metrics).toMatchObject({
       cost: 0.00042,
       promptTokens: 10,
+      cachedTokens: 8,
       outputTokens: 5,
     });
     expect(chunks.at(-1)?.metrics?.outputDurationMs).toBeGreaterThan(0);

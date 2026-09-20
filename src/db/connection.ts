@@ -12,6 +12,14 @@ export function getDb(): Database {
   const db = new Database(DB_PATH);
   db.run("PRAGMA foreign_keys = ON;");
   db.run("PRAGMA journal_mode = WAL;");
+  db.run(`CREATE TABLE IF NOT EXISTS usage_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_uuid TEXT NOT NULL, model TEXT NOT NULL, timestamp INTEGER NOT NULL,
+    input INTEGER, output INTEGER, cached INTEGER, cost REAL, savings REAL
+  )`);
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_usage_owner_time ON usage_events(owner_uuid, timestamp)",
+  );
   db.run(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,

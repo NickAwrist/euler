@@ -51,6 +51,7 @@ type OpenRouterChunk = {
     cost?: number;
     prompt_tokens?: number;
     completion_tokens?: number;
+    prompt_tokens_details?: { cached_tokens?: number };
   };
   error?: { message?: string; code?: number | string };
 };
@@ -209,6 +210,10 @@ async function* openRouterChunks(
 
     if (payload.usage) {
       metrics = {
+        ...(typeof payload.usage.prompt_tokens_details?.cached_tokens ===
+        "number"
+          ? { cachedTokens: payload.usage.prompt_tokens_details.cached_tokens }
+          : {}),
         ...(typeof payload.usage.cost === "number"
           ? { cost: payload.usage.cost }
           : {}),

@@ -1,0 +1,48 @@
+.segmented-control {
+  position: relative;
+  margin: 0;
+  border: 0;
+  min-width: 0;
+  display: inline-grid;
+  isolation: isolate;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--color-surface);
+}
+.segmented-control > button {
+  position: relative;
+  z-index: 1;
+  padding: 5px 12px;
+  border-radius: 7px;
+  background: transparent;
+  font-size: 13px;
+  color: var(--color-muted-foreground);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.segmented-control > button[aria-pressed="true"] {
+  color: var(--color-foreground);
+}
+.segmented-control > button:focus-visible {
+  outline: 2px solid var(--color-foreground);
+  outline-offset: 2px;
+}
+.segmented-control > button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.segmented-control-highlight {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  border-radius: 7px;
+  background: var(--color-border);
+  transition: transform 180ms ease-in-out;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .segmented-control-highlight {
+    transition: none;
+  }
+}

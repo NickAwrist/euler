@@ -25,7 +25,7 @@ function metricsFromOllamaChunk(chunk: ChatResponse) {
   const promptDurationNs = finiteNumber(chunk.prompt_eval_duration);
   const totalDurationNs = finiteNumber(chunk.total_duration);
   const loadDurationNs = finiteNumber(chunk.load_duration);
-  const metrics: NonNullable<LlmStreamChunk["metrics"]> = {};
+  const metrics: NonNullable<LlmStreamChunk["metrics"]> = { cost: 0 };
 
   if (outputTokens !== undefined) metrics.outputTokens = outputTokens;
   if (outputDurationNs !== undefined) {
@@ -49,7 +49,7 @@ function metricsFromOllamaChunk(chunk: ChatResponse) {
     metrics.tokensPerSecond = outputTokens / (outputDurationNs / 1_000_000_000);
   }
 
-  return Object.keys(metrics).length > 0 ? metrics : undefined;
+  return metrics;
 }
 
 function toOllamaMessages(messages: LlmMessage[]): Message[] {
