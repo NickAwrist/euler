@@ -6,7 +6,7 @@ import { cx } from "../../styles";
 import type { Message } from "../../types";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { AttachmentImage } from "./AttachmentImage";
-import { MessageMoreActions } from "./MessageMoreActions";
+import { MessageActions } from "./MessageActions";
 import { msgIconBtn, msgIconSize, msgIconStroke } from "./messageItemStyles";
 
 type Props = {
@@ -104,40 +104,36 @@ export function UserMessageBubble({
           <div
             className={cx(
               "mt-1.5 flex max-w-[min(85%,36rem)] flex-wrap justify-end gap-1 self-end max-[640px]:max-w-[92%]",
-              "user-message-actions message-actions opacity-0 transition-opacity duration-300 ease-out",
+              "message-actions opacity-0 transition-opacity duration-300 ease-out",
               "group-hover/msg:opacity-100 focus-within:opacity-100",
             )}
           >
-            <button
-              type="button"
-              onClick={() => void copyContent()}
-              className={msgIconBtn}
-              title={copied ? "Copied" : "Copy"}
-              aria-label={copied ? "Copied" : "Copy message"}
-            >
-              {copied ? (
-                <Check size={msgIconSize} strokeWidth={msgIconStroke} />
-              ) : (
-                <Copy size={msgIconSize} strokeWidth={msgIconStroke} />
-              )}
-            </button>
-            <MessageMoreActions
+            <MessageActions
               holdTargetRef={bubbleRef}
               actions={[
                 {
                   label: "Copy message",
-                  icon: <Copy size={18} />,
+                  feedback: copied ? "Copied" : undefined,
+                  icon: copied ? (
+                    <Check size={msgIconSize} strokeWidth={msgIconStroke} />
+                  ) : (
+                    <Copy size={msgIconSize} strokeWidth={msgIconStroke} />
+                  ),
                   onSelect: copyContent,
                 },
                 {
                   label: "Edit message",
-                  icon: <Pencil size={18} />,
+                  icon: (
+                    <Pencil size={msgIconSize} strokeWidth={msgIconStroke} />
+                  ),
                   onSelect: beginEdit,
                   disabled: isBusy,
                 },
                 {
                   label: "Retry from here",
-                  icon: <RotateCcw size={18} />,
+                  icon: (
+                    <RotateCcw size={msgIconSize} strokeWidth={msgIconStroke} />
+                  ),
                   onSelect: () => onRequestRetryConfirm(messageIndex),
                   disabled: isBusy,
                 },

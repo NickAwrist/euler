@@ -11,18 +11,20 @@ import { msgIconBtn, msgIconSize } from "./messageItemStyles";
 
 type Action = {
   label: string;
+  feedback?: string;
   icon: ReactNode;
   onSelect: () => void;
   disabled?: boolean;
 };
 
-export function MessageMoreActions({
+export function MessageActions({
   actions,
   holdTargetRef,
 }: {
   actions: Action[];
   holdTargetRef?: RefObject<HTMLDivElement | null>;
 }) {
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   const openMenu = useCallback((anchor: HTMLElement, keyboard = false) => {
@@ -38,8 +40,7 @@ export function MessageMoreActions({
     const bottomEdge = topEdge + (viewport?.height ?? window.innerHeight) - 16;
     const width = dialog.offsetWidth;
     const height = dialog.offsetHeight;
-    const below = rect.bottom + 6;
-    const top = below + height <= bottomEdge ? below : rect.top - height - 6;
+    const top = rect.top - height - 6;
     dialog.style.left = `${Math.max(leftEdge, Math.min(rect.right - width, rightEdge - width))}px`;
     dialog.style.top = `${Math.max(topEdge, Math.min(top, bottomEdge - height))}px`;
   }, []);
@@ -60,6 +61,7 @@ export function MessageMoreActions({
       cancel();
       opened = false;
       if (
+        !triggerRef.current?.getClientRects().length ||
         !event.isPrimary ||
         (event.pointerType !== "touch" && event.pointerType !== "pen")
       )
@@ -74,7 +76,7 @@ export function MessageMoreActions({
       timer = setTimeout(() => {
         cancel();
         opened = true;
-        openMenu(target);
+        if (triggerRef.current) openMenu(triggerRef.current);
         navigator.vibrate?.(15);
       }, 450);
     };
@@ -95,13 +97,20 @@ export function MessageMoreActions({
         opened = false;
       }
     };
+    // A held message may be covered by the menu. Consume its release click
+    // even when the browser targets a menu action instead of the message.
+    const resetOpened = () => {
+      opened = false;
+    };
+    document.addEventListener("pointerdown", resetOpened, true);
+    document.addEventListener("click", click, true);
     target.addEventListener("pointerdown", down);
     target.addEventListener("pointermove", move);
     target.addEventListener("pointerup", cancel);
     target.addEventListener("pointercancel", cancel);
     target.addEventListener("pointerleave", cancel);
     target.addEventListener("contextmenu", context);
-    target.addEventListener("click", click, true);
+
     return () => {
       cancel();
       target.removeEventListener("pointerdown", down);
@@ -110,7 +119,8 @@ export function MessageMoreActions({
       target.removeEventListener("pointercancel", cancel);
       target.removeEventListener("pointerleave", cancel);
       target.removeEventListener("contextmenu", context);
-      target.removeEventListener("click", click, true);
+      document.removeEventListener("pointerdown", resetOpened, true);
+      document.removeEventListener("click", click, true);
     };
   }, [holdTargetRef, openMenu]);
 
@@ -154,9 +164,23 @@ export function MessageMoreActions({
 
   return (
     <>
+      {actions.map((action) => (
+        <button
+          key={action.label}
+          type="button"
+          className={`${msgIconBtn} message-action-inline`}
+          title={action.feedback ?? action.label}
+          aria-label={action.feedback ?? action.label}
+          disabled={action.disabled}
+          onClick={action.onSelect}
+        >
+          {action.icon}
+        </button>
+      ))}
       <button
+        ref={triggerRef}
         type="button"
-        className={msgIconBtn}
+        className={`${msgIconBtn} message-action-more`}
         aria-label="More message actions"
         aria-haspopup="dialog"
         onClick={(event) => openMenu(event.currentTarget, event.detail === 0)}
@@ -189,7 +213,7 @@ export function MessageMoreActions({
               }}
             >
               {action.icon}
-              {action.label}
+              {action.feedback ?? action.label}
             </button>
           ))}
         </dialog>,

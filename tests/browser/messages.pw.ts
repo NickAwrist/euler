@@ -42,7 +42,12 @@ test("mobile message actions and code layout", async ({ page }, testInfo) => {
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
     "hello world",
   );
-  await firstReply
+  await expect(
+    firstReply.getByRole("button", { name: "Copy message", exact: true }),
+  ).toHaveCount(0);
+  await firstReply.getByRole("button", { name: "More message actions" }).tap();
+  await page
+    .getByRole("dialog", { name: "Message actions", exact: true })
     .getByRole("button", { name: "Copy message", exact: true })
     .tap();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
@@ -82,12 +87,10 @@ test("mobile message actions and code layout", async ({ page }, testInfo) => {
   const trigger = await firstReply
     .getByRole("button", { name: "More message actions" })
     .boundingBox();
-  expect(
-    Math.min(
-      Math.abs((bounds?.y ?? 0) - ((trigger?.y ?? 0) + (trigger?.height ?? 0))),
-      Math.abs((bounds?.y ?? 0) + (bounds?.height ?? 0) - (trigger?.y ?? 0)),
-    ),
-  ).toBeLessThan(12);
+  if (!bounds || !trigger) throw new Error("Missing menu or trigger");
+  expect(trigger.y - (bounds.y + bounds.height)).toBeCloseTo(6, 0);
+  expect(bounds.x).toBeLessThanOrEqual(trigger.x + trigger.width);
+  expect(bounds.x + bounds.width).toBeGreaterThanOrEqual(trigger.x);
   await page.screenshot({ path: testInfo.outputPath("mobile-actions.png") });
   await sheet.getByRole("button", { name: "View trace" }).tap();
   await expect(page.getByLabel("Execution metrics")).toBeVisible();
@@ -204,19 +207,41 @@ test("desktop hover and keyboard access", async ({ browser }, testInfo) => {
   const user = page.getByRole("region", { name: "Message 1", exact: true });
   await user.hover();
   await expect(user.locator(".message-actions")).toHaveCSS("opacity", "1");
-  const more = user.getByRole("button", { name: "More message actions" });
-  await more.focus();
-  await page.keyboard.press("Enter");
-  const keyboardAction = page
-    .getByRole("dialog", { name: "Message actions", exact: true })
-    .getByRole("button", { name: "Copy message", exact: true });
-  await expect(keyboardAction).toBeFocused();
-  await expect(keyboardAction).toHaveCSS("outline-style", "solid");
   await expect(
-    page.getByRole("dialog", { name: "Message actions", exact: true }),
-  ).toBeVisible();
+    user.getByRole("button", { name: "More message actions" }),
+  ).toHaveCount(0);
+  for (const name of ["Copy message", "Edit message", "Retry from here"]) {
+    await expect(user.getByRole("button", { name, exact: true })).toBeVisible();
+  }
+  const reply = page.getByRole("region", { name: "Message 2", exact: true });
+  await reply.hover();
+  await expect(
+    reply.getByRole("button", { name: "Copy message", exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    reply.getByRole("button", { name: "More message actions" }),
+  ).toHaveCount(0);
+  await reply.getByRole("button", { name: "View trace" }).click();
+  await expect(page.getByLabel("Execution metrics")).toBeVisible();
+  await page.getByRole("button", { name: "Close steps viewer" }).click();
+  await page.mouse.move(0, 0);
+  const edit = user.getByRole("button", { name: "Edit message", exact: true });
+  await edit.focus();
+  await expect(user.locator(".message-actions")).toHaveCSS("opacity", "1");
+  await page.keyboard.press("Enter");
+  await expect(user.getByRole("textbox")).toBeFocused();
   await page.keyboard.press("Escape");
-  await expect(more).toBeFocused();
+  await page.getByRole("checkbox", { name: "Simulate busy" }).check();
+  await expect(edit).toBeDisabled();
+  await expect(
+    user.getByRole("button", { name: "Retry from here", exact: true }),
+  ).toBeDisabled();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(
+    user.getByRole("button", { name: "More message actions" }),
+  ).toBeVisible();
+  await expect(edit).toBeHidden();
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.screenshot({
     path: testInfo.outputPath("desktop-conversation.png"),
     fullPage: true,

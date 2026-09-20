@@ -7,7 +7,7 @@ import { useArtifacts } from "../Artifacts/ArtifactContext";
 import { FileIcon } from "../Artifacts/FileIcon";
 import { traceStepsForDisplay } from "../ExecutionTrace";
 import { MarkdownMessage, extractComfyUIImageUrls } from "../MarkdownMessage";
-import { MessageMoreActions } from "./MessageMoreActions";
+import { MessageActions } from "./MessageActions";
 import { msgIconBtn, msgIconSize, msgIconStroke } from "./messageItemStyles";
 
 type Props = {
@@ -80,19 +80,6 @@ export function AssistantMessageBubble({
             "group-hover/msg:opacity-100 focus-within:opacity-100",
           )}
         >
-          <button
-            type="button"
-            onClick={() => void copyContent()}
-            className={msgIconBtn}
-            title={copied ? "Copied" : "Copy"}
-            aria-label={copied ? "Copied" : "Copy message"}
-          >
-            {copied ? (
-              <Check size={msgIconSize} strokeWidth={msgIconStroke} />
-            ) : (
-              <Copy size={msgIconSize} strokeWidth={msgIconStroke} />
-            )}
-          </button>
           {comfyImageUrls.map((href, index) => (
             <a
               key={href}
@@ -110,11 +97,16 @@ export function AssistantMessageBubble({
               <Download size={msgIconSize} strokeWidth={msgIconStroke} />
             </a>
           ))}
-          <MessageMoreActions
+          <MessageActions
             actions={[
               {
                 label: "Copy message",
-                icon: <Copy size={18} />,
+                feedback: copied ? "Copied" : undefined,
+                icon: copied ? (
+                  <Check size={msgIconSize} strokeWidth={msgIconStroke} />
+                ) : (
+                  <Copy size={msgIconSize} strokeWidth={msgIconStroke} />
+                ),
                 onSelect: copyContent,
               },
               ...(message.steps &&
@@ -123,7 +115,12 @@ export function AssistantMessageBubble({
                 ? [
                     {
                       label: "View trace",
-                      icon: <Waypoints size={18} />,
+                      icon: (
+                        <Waypoints
+                          size={msgIconSize}
+                          strokeWidth={msgIconStroke}
+                        />
+                      ),
                       onSelect: onViewSteps,
                     },
                   ]

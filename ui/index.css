@@ -240,7 +240,7 @@
   position: fixed;
   inset: auto;
   margin: 0;
-  width: min(248px, calc(100vw - 16px));
+  width: min(208px, calc(100vw - 16px));
   max-width: none;
   max-height: calc(100dvh - 16px);
   overflow-y: auto;
@@ -262,8 +262,20 @@
   background: transparent;
 }
 
-/* Touch targets stay generous without outlining each target. */
-@media (hover: none), (any-pointer: coarse) {
+.message-action-more {
+  display: none;
+}
+
+/* Narrow screens and primary touch input use a visible menu trigger. */
+@media (max-width: 640px), (hover: none), (pointer: coarse) {
+  .message-action-inline {
+    display: none;
+  }
+
+  .message-action-more {
+    display: inline-flex;
+  }
+
   .message-actions {
     opacity: 1;
     margin-top: 2px;
@@ -278,14 +290,6 @@
   .code-copy-action {
     min-width: 44px;
     min-height: 44px;
-  }
-
-  .user-message-actions:not(:focus-within) {
-    height: 0;
-    min-height: 0;
-    margin: 0;
-    overflow: hidden;
-    opacity: 0;
   }
 
   .user-message-hold {
