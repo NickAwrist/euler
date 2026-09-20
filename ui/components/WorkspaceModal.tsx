@@ -1,16 +1,14 @@
-import { Download, FolderOpen, LoaderCircle, X } from "lucide-react";
+import { Download, FolderOpen, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { downloadBlob } from "../lib/downloadBlob";
-import { readApiError } from "../lib/readApiError";
-import { fetchWorkspaceFiles } from "../persist/sessions";
-import { userScopedFetch } from "../persist/userIdentity";
 import {
-  modalCloseButton,
-  modalHeader,
-  modalShell,
-  modalSurface,
-} from "../styles";
+  downloadWorkspaceFile,
+  fetchWorkspaceFiles,
+  revealWorkspaceFile,
+} from "../persist/sessions";
 import type { SessionWorkspace, WorkspaceFile } from "../types";
+import { IconButton } from "./IconButton";
+import { Modal } from "./Modal";
 
 export function WorkspaceModal({
   sessionId,
@@ -28,9 +26,12 @@ export function WorkspaceModal({
 
   useEffect(() => {
     let cancelled = false;
-    void fetchWorkspaceFiles(sessionId, temporary)
-      .then((value) => {
-        if (!cancelled) setFiles(value);
+    fetchWorkspaceFiles(sessionId, temporary)
+      .then((incoming) => {
+        if (!cancelled) {
+          setFiles(incoming);
+          setError(null);
+        }
       })
       .catch((cause) => {
         if (!cancelled) {
@@ -45,104 +46,75 @@ export function WorkspaceModal({
   }, [sessionId, temporary]);
 
   const download = async (file: WorkspaceFile) => {
-    const path = temporary
-      ? `/api/temporary-sessions/${encodeURIComponent(sessionId)}/file?path=${encodeURIComponent(file.path)}`
-      : `/api/sessions/${encodeURIComponent(sessionId)}/workspace/file?path=${encodeURIComponent(file.path)}`;
-    const response = await userScopedFetch(path);
-    if (!response.ok) throw new Error(await readApiError(response));
-    downloadBlob(await response.blob(), file.name);
+    const blob = await downloadWorkspaceFile(sessionId, file.path, temporary);
+    downloadBlob(blob, file.name);
   };
 
   const reveal = async (file: WorkspaceFile) => {
-    const base = temporary
-      ? `/api/temporary-sessions/${encodeURIComponent(sessionId)}`
-      : `/api/sessions/${encodeURIComponent(sessionId)}/workspace`;
-    const response = await userScopedFetch(`${base}/reveal`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path: file.path }),
-    });
-    if (!response.ok) throw new Error(await readApiError(response));
+    await revealWorkspaceFile(sessionId, file.path, temporary);
   };
 
   return (
-    <dialog open className={modalShell} aria-label="Workspace files">
-      <div className={`${modalSurface} w-full max-w-2xl`}>
-        <div className={modalHeader}>
-          <div>
-            <h2 className="text-sm font-semibold">Workspace files</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {workspace.kind === "local"
-                ? workspace.path
-                : "Private chat workspace"}
-            </p>
+    <Modal
+      title="Workspace files"
+      subtitle={
+        workspace.kind === "local" ? workspace.path : "Private chat workspace"
+      }
+      ariaLabel="Workspace files"
+      onClose={onClose}
+      maxWidthClass="max-w-2xl"
+    >
+      <div className="min-h-48 overflow-y-auto p-3">
+        {error && <p className="text-sm text-red-300">{error}</p>}
+        {!error && files === null && (
+          <div className="flex h-40 items-center justify-center text-muted-foreground">
+            <LoaderCircle className="animate-spin" size={18} />
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className={modalCloseButton}
-            aria-label="Close"
+        )}
+        {files?.length === 0 && (
+          <p className="py-12 text-center text-sm text-muted-foreground">
+            No files yet.
+          </p>
+        )}
+        {files?.map((file) => (
+          <div
+            key={file.path}
+            className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/60"
           >
-            <X size={17} />
-          </button>
-        </div>
-        <div className="min-h-48 overflow-y-auto p-3">
-          {error && <p className="text-sm text-red-300">{error}</p>}
-          {!error && files === null && (
-            <div className="flex h-40 items-center justify-center text-muted-foreground">
-              <LoaderCircle className="animate-spin" size={18} />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm text-foreground" title={file.path}>
+                {file.path}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {formatBytes(file.size)}
+              </p>
             </div>
-          )}
-          {files?.length === 0 && (
-            <p className="py-12 text-center text-sm text-muted-foreground">
-              No files yet.
-            </p>
-          )}
-          {files?.map((file) => (
-            <div
-              key={file.path}
-              className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/60"
-            >
-              <div className="min-w-0 flex-1">
-                <p
-                  className="truncate text-sm text-foreground"
-                  title={file.path}
-                >
-                  {file.path}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {formatBytes(file.size)}
-                </p>
-              </div>
-              <button
-                type="button"
-                className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                title={
-                  workspace.kind === "local" ? "Reveal file" : "Download file"
-                }
-                onClick={() =>
-                  void (
-                    workspace.kind === "local" ? reveal(file) : download(file)
-                  ).catch((cause) =>
-                    setError(
-                      cause instanceof Error
-                        ? cause.message
-                        : "File action failed",
-                    ),
-                  )
-                }
-              >
-                {workspace.kind === "local" ? (
-                  <FolderOpen size={15} />
-                ) : (
-                  <Download size={15} />
-                )}
-              </button>
-            </div>
-          ))}
-        </div>
+            <IconButton
+              size="sm"
+              variant="ghost"
+              icon={workspace.kind === "local" ? FolderOpen : Download}
+              title={
+                workspace.kind === "local" ? "Reveal file" : "Download file"
+              }
+              label={
+                workspace.kind === "local" ? "Reveal file" : "Download file"
+              }
+              onClick={() =>
+                void (
+                  workspace.kind === "local" ? reveal(file) : download(file)
+                ).catch((cause) =>
+                  setError(
+                    cause instanceof Error
+                      ? cause.message
+                      : "File action failed",
+                  ),
+                )
+              }
+            />
+          </div>
+        ))}
       </div>
-    </dialog>
+    </Modal>
   );
 }
 

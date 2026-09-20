@@ -1,4 +1,5 @@
 import { logger } from "../logger";
+import { errorMessage } from "../utils/errors";
 
 function redactPaths(msg: string, sessionDir?: string): string {
   const root = sessionDir?.trim();
@@ -22,7 +23,7 @@ export function toolErrorToString(
   context?: string,
   sessionDir?: string,
 ): string {
-  const raw = err instanceof Error ? err.message : String(err);
+  const raw = errorMessage(err);
   if (context) {
     logger.error({ err, context }, "tool error");
   } else {

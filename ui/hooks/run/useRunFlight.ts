@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { readSseBlocks } from "../../lib/readSseBlocks";
+import { getActiveRun } from "../../persist/runs";
 import { fetchSession } from "../../persist/sessions";
 import { userScopedFetch } from "../../persist/userIdentity";
 import type { Message, MessageStep } from "../../types";
@@ -21,6 +22,7 @@ type FlightDeps = {
   setMessages: Dispatch<SetStateAction<Message[]>>;
   refreshSessions: () => Promise<void>;
   streamBufferRef: MutableRefObject<StreamBuffer>;
+  clearStreamingUi: () => void;
   setStreamingStep: Dispatch<SetStateAction<MessageStep | null>>;
   setStreamingSteps: Dispatch<SetStateAction<MessageStep[]>>;
   setStreamingContent: Dispatch<SetStateAction<string>>;
@@ -63,10 +65,7 @@ export function useRunFlight(
 
       setInFlightSessionId(sessionId);
       d.setRunPending(true);
-      d.setStreamingStep(null);
-      d.setStreamingSteps([]);
-      d.setStreamingContent("");
-      d.setStreamingThinking("");
+      d.clearStreamingUi();
 
       const rootAgent = d.selectedSessionAgentRef.current;
       const viewing = () => d.activeSessionIdRef.current === sessionId;
@@ -85,10 +84,7 @@ export function useRunFlight(
           const reader = res.body.getReader();
           const finalizeReconnect = async () => {
             if (viewing()) {
-              d.setStreamingStep(null);
-              d.setStreamingSteps([]);
-              d.setStreamingContent("");
-              d.setStreamingThinking("");
+              d.clearStreamingUi();
             }
             try {
               const s = await fetchSession(sessionId, { fresh: true });
@@ -102,15 +98,8 @@ export function useRunFlight(
             await d.refreshSessions();
           };
           const recoverDetachedStream = async () => {
-            const statusRes = await userScopedFetch(
-              `/api/runs/active/${encodeURIComponent(sessionId)}`,
-            );
-            if (!statusRes.ok) return;
-            const status = (await statusRes.json()) as {
-              active?: boolean;
-              requestId?: string;
-            };
-            if (status.active && status.requestId) {
+            const status = await getActiveRun(sessionId);
+            if (status?.active && status.requestId) {
               retryRequestId = status.requestId;
             } else {
               await finalizeReconnect();
@@ -165,10 +154,7 @@ export function useRunFlight(
             } else if (data.type === "run_error") {
               terminalEventReceived = true;
               if (viewing()) {
-                d.setStreamingStep(null);
-                d.setStreamingSteps([]);
-                d.setStreamingContent("");
-                d.setStreamingThinking("");
+                d.clearStreamingUi();
               }
             }
           });
@@ -179,28 +165,20 @@ export function useRunFlight(
           if (controller.signal.aborted) return;
           console.error("reconnect stream error", err);
           try {
-            const statusRes = await userScopedFetch(
-              `/api/runs/active/${encodeURIComponent(sessionId)}`,
-            );
-            if (statusRes.ok) {
-              const status = (await statusRes.json()) as {
-                active?: boolean;
-                requestId?: string;
-              };
-              if (status.active && status.requestId) {
-                retryRequestId = status.requestId;
-              } else {
-                const completed = await fetchSession(sessionId, {
-                  fresh: true,
-                });
-                if (viewing()) {
-                  if (completed?.history?.length) {
-                    d.setMessages(completed.history);
-                  }
-                  d.modelMessagesRef.current = completed?.modelMessages ?? null;
+            const status = await getActiveRun(sessionId);
+            if (status?.active && status.requestId) {
+              retryRequestId = status.requestId;
+            } else {
+              const completed = await fetchSession(sessionId, {
+                fresh: true,
+              });
+              if (viewing()) {
+                if (completed?.history?.length) {
+                  d.setMessages(completed.history);
                 }
-                await d.refreshSessions();
+                d.modelMessagesRef.current = completed?.modelMessages ?? null;
               }
+              await d.refreshSessions();
             }
           } catch (recoveryError) {
             console.error("reconnect recovery error", recoveryError);
@@ -216,10 +194,7 @@ export function useRunFlight(
           setInFlightSessionId(null);
           depsRef.current.setRunPending(false);
           if (viewing()) {
-            depsRef.current.setStreamingStep(null);
-            depsRef.current.setStreamingSteps([]);
-            depsRef.current.setStreamingContent("");
-            depsRef.current.setStreamingThinking("");
+            depsRef.current.clearStreamingUi();
           }
         }
         if (retryRequestId) {

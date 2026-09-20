@@ -2,14 +2,13 @@ import {
   type ImageAttachment,
   ImageAttachmentSchema,
 } from "../../src/attachments/types";
-import { readApiError } from "../lib/readApiError";
-import { userScopedFetch } from "./userIdentity";
+import { apiBlob, apiJson } from "../lib/api";
 
 export async function uploadImageAttachment(
   sessionId: string,
   file: File,
 ): Promise<ImageAttachment> {
-  const response = await userScopedFetch("/api/attachments", {
+  const payload = await apiJson<{ attachment?: unknown }>("/api/attachments", {
     method: "POST",
     headers: {
       "Content-Type": file.type,
@@ -18,8 +17,6 @@ export async function uploadImageAttachment(
     },
     body: file,
   });
-  if (!response.ok) throw new Error(await readApiError(response));
-  const payload = (await response.json()) as { attachment?: unknown };
   const parsed = ImageAttachmentSchema.safeParse(payload.attachment);
   if (!parsed.success) throw new Error("The server returned an invalid image");
   return parsed.data;
@@ -92,12 +89,10 @@ export function fetchAttachmentImage(
             resolve(existing);
             return;
           }
-          const response = await userScopedFetch(
+          const blob = await apiBlob(
             `/api/attachments/${encodeURIComponent(id)}`,
             { signal },
           );
-          if (!response.ok) throw new Error(await readApiError(response));
-          const blob = await response.blob();
           signal?.throwIfAborted();
           const url = cachedImage(id) ?? URL.createObjectURL(blob);
           imageCache.set(id, url);

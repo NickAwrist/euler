@@ -51,19 +51,25 @@ export function createBrowserUuid(
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
+import { safeStorage } from "../lib/safeStorage";
+
 export function getOrCreateUserId(): string {
-  const stored = normalizeUserId(localStorage.getItem(USER_ID_STORAGE_KEY));
+  const stored = normalizeUserId(safeStorage.getItem(USER_ID_STORAGE_KEY));
   if (stored) return stored;
   const created = createBrowserUuid();
-  localStorage.setItem(USER_ID_STORAGE_KEY, created);
+  safeStorage.setItem(USER_ID_STORAGE_KEY, created);
   return created;
 }
 
 export function switchUserId(value: string): boolean {
   const normalized = normalizeUserId(value);
   if (!normalized) return false;
-  localStorage.setItem(USER_ID_STORAGE_KEY, normalized);
-  sessionStorage.removeItem("activeSessionId");
+  safeStorage.setItem(USER_ID_STORAGE_KEY, normalized);
+  try {
+    sessionStorage.removeItem("activeSessionId");
+  } catch {
+    // sessionStorage can be restricted
+  }
   return true;
 }
 

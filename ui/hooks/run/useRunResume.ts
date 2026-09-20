@@ -1,7 +1,6 @@
 import { type MutableRefObject, useEffect, useRef } from "react";
-import { readApiError } from "../../lib/readApiError";
+import { getActiveRun } from "../../persist/runs";
 import { fetchSession } from "../../persist/sessions";
-import { userScopedFetch } from "../../persist/userIdentity";
 import type { Message } from "../../types";
 import { reconcilePersistentRun } from "./reconcilePersistentRun";
 
@@ -50,17 +49,10 @@ export function useRunResume({
           isCurrentSession: () => activeSessionIdRef.current === sessionId,
           isLocallyPending: () => rawRunPendingRef.current,
           fetchStatus: async () => {
-            const response = await userScopedFetch(
-              `/api/runs/active/${encodeURIComponent(sessionId)}`,
-            );
-            if (!response.ok) throw new Error(await readApiError(response));
-            const status = (await response.json()) as {
-              active?: boolean;
-              requestId?: string;
-            };
+            const status = await getActiveRun(sessionId);
             return {
-              active: status.active === true,
-              ...(status.requestId ? { requestId: status.requestId } : {}),
+              active: status?.active === true,
+              ...(status?.requestId ? { requestId: status.requestId } : {}),
             };
           },
           fetchStoredSession: () => fetchSession(sessionId),

@@ -4,7 +4,8 @@ import {
   type DirectoryListing,
   fetchDirectories,
 } from "../persist/directories";
-import { modalShell, primaryButton } from "../styles";
+import { Button } from "./Button";
+import { Modal } from "./Modal";
 
 export function DirectoryModal({
   initialPath,
@@ -70,19 +71,17 @@ export function DirectoryModal({
   }
 
   return (
-    <dialog
-      open
-      className={modalShell}
-      aria-label="Choose working directory"
-      onClick={(event) => {
-        if (!pending && event.target === event.currentTarget) onClose();
-      }}
-      onKeyDown={(event) => {
-        if (!pending && event.key === "Escape") onClose();
-      }}
+    <Modal
+      ariaLabel="Choose working directory"
+      onClose={onClose}
+      closeDisabled={pending}
+      hideCloseButton
+      maxWidthClass="max-w-[640px]"
+      surfaceClassName="flex flex-col overflow-hidden max-h-[calc(100dvh-32px)]"
+      initialFocusRef={inputRef}
     >
       <form
-        className="flex max-h-[calc(100dvh-32px)] w-full max-w-[640px] flex-col overflow-hidden rounded-xl border border-border-subtle bg-surface ui-animate-modal-panel"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
         onSubmit={async (event) => {
           event.preventDefault();
           if (pending || !path.trim()) return;
@@ -119,14 +118,16 @@ export function DirectoryModal({
             aria-invalid={error !== null}
             className="min-w-0 flex-1 rounded-md bg-transparent px-2 py-2 text-sm text-foreground outline-none focus-visible:ring-1 focus-visible:ring-accent"
           />
-          <button
+          <Button
             type="submit"
-            className={`${primaryButton} shrink-0`}
+            size="sm"
             disabled={pending || !path.trim()}
+            loading={pending}
             aria-label={pending ? "Selecting directory" : "Confirm directory"}
+            className="shrink-0"
           >
             {pending ? "…" : "OK"}
-          </button>
+          </Button>
         </div>
         {error && (
           <p role="alert" className="px-3 py-2 text-sm text-red-400">
@@ -179,6 +180,6 @@ export function DirectoryModal({
           )}
         </div>
       </form>
-    </dialog>
+    </Modal>
   );
 }

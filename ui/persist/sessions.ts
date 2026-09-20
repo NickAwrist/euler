@@ -1,11 +1,10 @@
-import { readApiError } from "../lib/readApiError";
+import { apiBlob, apiJson, apiVoid } from "../lib/api";
 import type {
   Message,
   SessionSummary,
   SessionWorkspace,
   WorkspaceFile,
 } from "../types";
-import { userScopedFetch } from "./userIdentity";
 
 export type StoredRunSession = {
   id: string;
@@ -19,9 +18,7 @@ export type StoredRunSession = {
 };
 
 export async function fetchSessionSummaries(): Promise<SessionSummary[]> {
-  const res = await userScopedFetch("/api/sessions");
-  if (!res.ok) throw new Error(await readApiError(res));
-  const data = (await res.json()) as { sessions?: unknown };
+  const data = await apiJson<{ sessions?: unknown }>("/api/sessions");
   const raw = Array.isArray(data.sessions) ? data.sessions : [];
   return raw
     .filter(
@@ -58,10 +55,11 @@ export function fetchSession(
 }
 
 async function fetchSessionData(id: string): Promise<StoredRunSession | null> {
-  const res = await userScopedFetch(`/api/sessions/${encodeURIComponent(id)}`);
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(await readApiError(res));
-  const s = (await res.json()) as Record<string, unknown>;
+  const s = await apiJson<Record<string, unknown> | null>(
+    `/api/sessions/${encodeURIComponent(id)}`,
+    { notFound: "null" },
+  );
+  if (!s) return null;
   return {
     id: String(s.id ?? ""),
     createdAt: Number(s.createdAt) || 0,
@@ -97,13 +95,10 @@ export async function createSessionApi(opts?: {
 }> {
   const body: Record<string, string> = {};
   if (opts?.model?.trim()) body.model = opts.model.trim();
-  const res = await userScopedFetch("/api/sessions", {
+  const j = await apiJson<Record<string, unknown>>("/api/sessions", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    json: body,
   });
-  if (!res.ok) throw new Error(await readApiError(res));
-  const j = (await res.json()) as Record<string, unknown>;
   return {
     id: String(j.id ?? ""),
     createdAt: Number(j.createdAt) || Date.now(),
@@ -111,23 +106,21 @@ export async function createSessionApi(opts?: {
   };
 }
 
-export async function patchSessionApi(
+export function patchSessionApi(
   id: string,
   body: Record<string, unknown>,
 ): Promise<void> {
-  const res = await userScopedFetch(`/api/sessions/${encodeURIComponent(id)}`, {
+  return apiVoid(`/api/sessions/${encodeURIComponent(id)}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    json: body,
   });
-  if (!res.ok) throw new Error(await readApiError(res));
 }
 
-export async function deleteSessionApi(id: string): Promise<void> {
-  const res = await userScopedFetch(`/api/sessions/${encodeURIComponent(id)}`, {
+export function deleteSessionApi(id: string): Promise<void> {
+  return apiVoid(`/api/sessions/${encodeURIComponent(id)}`, {
     method: "DELETE",
+    notFound: "null",
   });
-  if (!res.ok && res.status !== 404) throw new Error(await readApiError(res));
 }
 
 export async function selectSessionDirectory(
@@ -136,18 +129,13 @@ export async function selectSessionDirectory(
   temporary = false,
 ): Promise<SessionWorkspace> {
   const base = temporary ? "/api/temporary-sessions" : "/api/sessions";
-  const res = await userScopedFetch(
+  const data = await apiJson<{ workspace: SessionWorkspace }>(
     `${base}/${encodeURIComponent(id)}/workspace/select-directory`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path }),
+      json: { path },
     },
   );
-  if (!res.ok) throw new Error(await readApiError(res));
-  const data = (await res.json()) as {
-    workspace: SessionWorkspace;
-  };
   return data.workspace;
 }
 
@@ -156,11 +144,9 @@ export async function useSessionSandbox(
   temporary = false,
 ): Promise<SessionWorkspace> {
   const base = temporary ? "/api/temporary-sessions" : "/api/sessions";
-  const res = await userScopedFetch(
-    `${base}/${encodeURIComponent(id)}/workspace/use-sandbox`,
-    { method: "POST" },
-  );
-  if (!res.ok) throw new Error(await readApiError(res));
+  await apiVoid(`${base}/${encodeURIComponent(id)}/workspace/use-sandbox`, {
+    method: "POST",
+  });
   return { kind: "sandbox" };
 }
 
@@ -171,25 +157,46 @@ export async function fetchWorkspaceFiles(
   const path = temporary
     ? `/api/temporary-sessions/${encodeURIComponent(id)}/files`
     : `/api/sessions/${encodeURIComponent(id)}/workspace/files`;
-  const res = await userScopedFetch(path);
-  if (!res.ok) throw new Error(await readApiError(res));
-  const data = (await res.json()) as { files?: WorkspaceFile[] };
+  const data = await apiJson<{ files?: WorkspaceFile[] }>(path);
   return Array.isArray(data.files) ? data.files : [];
 }
 
+export async function downloadWorkspaceFile(
+  sessionId: string,
+  filePath: string,
+  temporary = false,
+): Promise<Blob> {
+  const path = temporary
+    ? `/api/temporary-sessions/${encodeURIComponent(sessionId)}/file?path=${encodeURIComponent(filePath)}`
+    : `/api/sessions/${encodeURIComponent(sessionId)}/workspace/file?path=${encodeURIComponent(filePath)}`;
+  return apiBlob(path);
+}
+
+export function revealWorkspaceFile(
+  sessionId: string,
+  filePath: string,
+  temporary = false,
+): Promise<void> {
+  const base = temporary
+    ? `/api/temporary-sessions/${encodeURIComponent(sessionId)}`
+    : `/api/sessions/${encodeURIComponent(sessionId)}/workspace`;
+  return apiVoid(`${base}/reveal`, {
+    method: "POST",
+    json: { path: filePath },
+  });
+}
+
 export async function createTemporarySessionApi(): Promise<{ id: string }> {
-  const res = await userScopedFetch("/api/temporary-sessions", {
+  const data = await apiJson<{ id?: unknown }>("/api/temporary-sessions", {
     method: "POST",
   });
-  if (!res.ok) throw new Error(await readApiError(res));
-  const data = (await res.json()) as { id?: unknown };
   return { id: String(data.id ?? "") };
 }
 
-export async function deleteTemporarySessionApi(id: string): Promise<void> {
-  const res = await userScopedFetch(
-    `/api/temporary-sessions/${encodeURIComponent(id)}`,
-    { method: "DELETE", keepalive: true },
-  );
-  if (!res.ok && res.status !== 404) throw new Error(await readApiError(res));
+export function deleteTemporarySessionApi(id: string): Promise<void> {
+  return apiVoid(`/api/temporary-sessions/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    keepalive: true,
+    notFound: "null",
+  });
 }

@@ -1,99 +1,66 @@
-import { readApiError } from "../lib/readApiError";
-import { userScopedFetch } from "./userIdentity";
+import type { AgentData, AgentWriteBody } from "../../src/schemas/agents";
+import { apiJson, apiVoid, globalApiJson } from "../lib/api";
 
-export type AgentData = {
-  id: string;
-  name: string;
-  description: string;
-  system_prompt: string;
-  is_default: number;
-  tools: string[];
-  skill_ids: string[];
-  delegate_agent_ids: string[];
-  created_at: number;
-  updated_at: number;
-};
-
-export type AgentWriteBody = {
-  name: string;
-  description: string;
-  system_prompt: string;
-  tools: string[];
-  skill_ids: string[];
-  delegate_agent_ids: string[];
-};
+export type { AgentData, AgentWriteBody };
 
 export async function fetchAgents(): Promise<AgentData[]> {
-  const res = await userScopedFetch("/api/agents");
-  if (!res.ok)
-    throw new Error(await readApiError(res, "Failed to fetch agents"));
-  const data = await res.json();
-  return data.agents;
-}
-
-export async function createAgentApi(body: AgentWriteBody): Promise<AgentData> {
-  const res = await userScopedFetch("/api/agents", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+  const data = await apiJson<{ agents?: AgentData[] }>("/api/agents", {
+    errorMessage: "Failed to fetch agents",
   });
-  if (!res.ok) {
-    throw new Error(await readApiError(res, "Failed to create agent"));
-  }
-  return res.json();
+  return data.agents ?? [];
 }
 
-export async function updateAgentApi(
+export function createAgentApi(body: AgentWriteBody): Promise<AgentData> {
+  return apiJson<AgentData>("/api/agents", {
+    method: "POST",
+    json: body,
+    errorMessage: "Failed to create agent",
+  });
+}
+
+export function updateAgentApi(
   id: string,
   body: AgentWriteBody,
 ): Promise<void> {
-  const res = await userScopedFetch(`/api/agents/${id}`, {
+  return apiVoid(`/api/agents/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    json: body,
+    errorMessage: "Failed to update agent",
   });
-  if (!res.ok) {
-    throw new Error(await readApiError(res, "Failed to update agent"));
-  }
 }
 
-export async function deleteAgentApi(id: string): Promise<void> {
-  const res = await userScopedFetch(`/api/agents/${id}`, {
+export function deleteAgentApi(id: string): Promise<void> {
+  return apiVoid(`/api/agents/${id}`, {
     method: "DELETE",
+    errorMessage: "Failed to delete agent",
   });
-  if (!res.ok) {
-    throw new Error(await readApiError(res, "Failed to delete agent"));
-  }
 }
 
 export async function fetchBuiltinTools(): Promise<string[]> {
-  const res = await fetch("/api/tools");
-  if (!res.ok)
-    throw new Error(await readApiError(res, "Failed to fetch tools"));
-  const data = await res.json();
-  return data.tools;
+  const data = await globalApiJson<{ tools?: string[] }>("/api/tools", {
+    errorMessage: "Failed to fetch tools",
+  });
+  return data.tools ?? [];
 }
 
 export async function fetchDefaultRunAgent(): Promise<string> {
-  const res = await userScopedFetch("/api/settings/default-run-agent");
-  if (!res.ok) {
-    throw new Error(await readApiError(res, "Failed to fetch default agent"));
-  }
-  const data = await res.json();
+  const data = await apiJson<{ agentName?: unknown }>(
+    "/api/settings/default-run-agent",
+    { errorMessage: "Failed to fetch default agent" },
+  );
   return typeof data.agentName === "string" ? data.agentName : "general_agent";
 }
 
 export async function putDefaultRunAgentApi(
   agentName: string,
 ): Promise<string> {
-  const res = await userScopedFetch("/api/settings/default-run-agent", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ agentName }),
-  });
-  if (!res.ok) {
-    throw new Error(await readApiError(res, "Failed to update default agent"));
-  }
-  const data = await res.json();
+  const data = await apiJson<{ agentName?: unknown }>(
+    "/api/settings/default-run-agent",
+    {
+      method: "PUT",
+      json: { agentName },
+      errorMessage: "Failed to update default agent",
+    },
+  );
   return typeof data.agentName === "string" ? data.agentName : agentName;
 }

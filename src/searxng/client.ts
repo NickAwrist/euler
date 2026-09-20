@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getSearXNGHost } from "../db/index";
 import { DEFAULT_SEARXNG_HOST } from "../env";
 import { providerHostConfig } from "../providerHostConfig";
+import { errorMessage } from "../utils/errors";
 
 export type SearXNGResult = {
   title: string;
@@ -102,7 +103,7 @@ export class SearXNGClient {
     } catch (error) {
       return {
         ok: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage(error),
       };
     }
   }

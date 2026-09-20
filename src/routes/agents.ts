@@ -7,77 +7,12 @@ import {
   listAgents,
   updateAgentRow,
 } from "../db/index";
-import { sendApiError } from "../http/errors";
+import { errorMessage, sendApiError } from "../http/errors";
+import { sendValidationError } from "../http/validation";
+import { AgentWriteSchema } from "../schemas/agents";
 import { requireUserId } from "../userIdentity";
 
 const agentsRoutes = Router();
-
-type AgentWriteBody = {
-  name?: unknown;
-  description?: unknown;
-  system_prompt?: unknown;
-  tools?: unknown;
-  skill_ids?: unknown;
-  delegate_agent_ids?: unknown;
-};
-
-function parseStringArray(
-  value: unknown,
-  field: string,
-): { ok: true; value: string[] } | { ok: false; error: string } {
-  if (value === undefined) return { ok: true, value: [] };
-  if (
-    !Array.isArray(value) ||
-    value.some((item) => typeof item !== "string" || !item.trim())
-  ) {
-    return { ok: false, error: `${field} must be an array of strings` };
-  }
-  return {
-    ok: true,
-    value: [...new Set(value.map((item) => (item as string).trim()))],
-  };
-}
-
-function parseAgentBody(body: AgentWriteBody):
-  | {
-      ok: true;
-      data: {
-        name: string;
-        description: string;
-        system_prompt: string;
-        tools: string[];
-        skill_ids: string[];
-        delegate_agent_ids: string[];
-      };
-    }
-  | { ok: false; error: string } {
-  const name = typeof body.name === "string" ? body.name.trim() : "";
-  if (!name) return { ok: false, error: "name is required" };
-  const description =
-    typeof body.description === "string" ? body.description.trim() : "";
-  const system_prompt =
-    typeof body.system_prompt === "string" ? body.system_prompt.trim() : "";
-  const tools = parseStringArray(body.tools, "tools");
-  if (!tools.ok) return tools;
-  const skillIds = parseStringArray(body.skill_ids, "skill_ids");
-  if (!skillIds.ok) return skillIds;
-  const delegateAgentIds = parseStringArray(
-    body.delegate_agent_ids,
-    "delegate_agent_ids",
-  );
-  if (!delegateAgentIds.ok) return delegateAgentIds;
-  return {
-    ok: true,
-    data: {
-      name,
-      description,
-      system_prompt,
-      tools: tools.value,
-      skill_ids: skillIds.value,
-      delegate_agent_ids: delegateAgentIds.value,
-    },
-  };
-}
 
 function sendAgentWriteError(
   res: Parameters<typeof sendApiError>[0],
@@ -87,7 +22,7 @@ function sendAgentWriteError(
     sendApiError(res, 400, "VALIDATION_ERROR", error.message);
     return true;
   }
-  const message = error instanceof Error ? error.message : "";
+  const message = errorMessage(error);
   if (message.includes("UNIQUE constraint")) {
     sendApiError(
       res,
@@ -120,9 +55,9 @@ agentsRoutes.get("/:id", (req, res) => {
 agentsRoutes.post("/", (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
-  const parsed = parseAgentBody(req.body as AgentWriteBody);
-  if (!parsed.ok) {
-    sendApiError(res, 400, "VALIDATION_ERROR", parsed.error);
+  const parsed = AgentWriteSchema.safeParse(req.body);
+  if (!parsed.success) {
+    sendValidationError(res, parsed.error);
     return;
   }
   try {
@@ -137,9 +72,9 @@ agentsRoutes.post("/", (req, res) => {
 agentsRoutes.put("/:id", (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
-  const parsed = parseAgentBody(req.body as AgentWriteBody);
-  if (!parsed.ok) {
-    sendApiError(res, 400, "VALIDATION_ERROR", parsed.error);
+  const parsed = AgentWriteSchema.safeParse(req.body);
+  if (!parsed.success) {
+    sendValidationError(res, parsed.error);
     return;
   }
   try {

@@ -28,3 +28,16 @@ export const modalCloseButton =
 
 export const debugBlock =
   "rounded-lg border border-border-subtle bg-background px-[14px] py-3 text-[0.8125rem] leading-[1.6] text-foreground";
+
+export const inputClass =
+  "flex h-10 w-full rounded-lg border border-border-subtle bg-surface px-3 py-2 text-[0.875rem] text-foreground placeholder:text-muted-foreground transition-colors focus:border-border focus:outline-none";
+
+export const selectClass =
+  "flex h-10 w-full rounded-lg border border-border-subtle bg-surface px-3 py-2 text-[0.875rem] text-foreground transition-colors focus:border-border focus:outline-none";
+
+export const textareaClass =
+  "flex w-full rounded-lg border border-border-subtle bg-surface px-3 py-2.5 text-[0.875rem] leading-[1.6] text-foreground placeholder:text-muted-foreground transition-colors focus:border-border focus:outline-none";
+
+export const hintClass = "text-[0.75rem] text-muted-foreground";
+
+export const labelClass = "block text-[0.875rem] font-medium text-foreground";

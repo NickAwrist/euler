@@ -20,39 +20,35 @@ const DEFAULT_SETTINGS: UserSettings = {
   showDebugButton: false,
 };
 
-export function loadUserSettings(): UserSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
+import { safeStorage } from "../lib/safeStorage";
 
-    const parsed = JSON.parse(raw) as Partial<UserSettings>;
-    return {
-      name: parsed.name || "",
-      preferredFormats: parsed.preferredFormats || "",
-      location: parsed.location || "",
-      defaultModel: parsed.defaultModel || "",
-      includeCurrentDate: parsed.includeCurrentDate ?? true,
-      showDebugButton: parsed.showDebugButton === true,
-    };
-  } catch {
-    return DEFAULT_SETTINGS;
-  }
+export function loadUserSettings(): UserSettings {
+  const parsed = safeStorage.getJSON<Partial<UserSettings> | null>(
+    STORAGE_KEY,
+    null,
+  );
+  if (!parsed) return DEFAULT_SETTINGS;
+
+  return {
+    name: parsed.name || "",
+    preferredFormats: parsed.preferredFormats || "",
+    location: parsed.location || "",
+    defaultModel: parsed.defaultModel || "",
+    includeCurrentDate: parsed.includeCurrentDate ?? true,
+    showDebugButton: parsed.showDebugButton === true,
+  };
 }
 
 function saveUserSettings(settings: UserSettings): void {
-  try {
-    const toSave: UserSettings = {
-      name: settings.name || "",
-      preferredFormats: settings.preferredFormats || "",
-      location: settings.location || "",
-      defaultModel: settings.defaultModel || "",
-      includeCurrentDate: settings.includeCurrentDate ?? true,
-      showDebugButton: settings.showDebugButton === true,
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
-  } catch {
-    // Ignore storage errors
-  }
+  const toSave: UserSettings = {
+    name: settings.name || "",
+    preferredFormats: settings.preferredFormats || "",
+    location: settings.location || "",
+    defaultModel: settings.defaultModel || "",
+    includeCurrentDate: settings.includeCurrentDate ?? true,
+    showDebugButton: settings.showDebugButton === true,
+  };
+  safeStorage.setJSON(STORAGE_KEY, toSave);
 }
 
 export function updateUserSettings(

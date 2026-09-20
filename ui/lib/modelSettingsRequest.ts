@@ -1,19 +1,12 @@
-import { readApiError } from "./readApiError";
+import { globalApiJson } from "./api";
 
 export async function modelSettingsRequest<T>(
   path: string,
   method = "GET",
   body?: unknown,
 ): Promise<T> {
-  const res = await fetch(`/api/settings/${path}`, {
-    method,
-    ...(body === undefined
-      ? {}
-      : {
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        }),
+  return globalApiJson<T>(`/api/settings/${path}`, {
+    method: method as "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+    json: body,
   });
-  if (!res.ok) throw new Error(await readApiError(res));
-  return res.json() as Promise<T>;
 }

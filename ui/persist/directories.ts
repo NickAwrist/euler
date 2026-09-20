@@ -1,5 +1,4 @@
-import { readApiError } from "../lib/readApiError";
-import { userScopedFetch } from "./userIdentity";
+import { apiJson } from "../lib/api";
 
 export type DirectoryListing = {
   path: string;
@@ -8,14 +7,12 @@ export type DirectoryListing = {
   directories: { name: string; path: string }[];
 };
 
-export async function fetchDirectories(
+export function fetchDirectories(
   path: string,
   signal: AbortSignal,
 ): Promise<DirectoryListing> {
-  const response = await userScopedFetch(
+  return apiJson<DirectoryListing>(
     `/api/directories?path=${encodeURIComponent(path)}`,
     { signal },
   );
-  if (!response.ok) throw new Error(await readApiError(response));
-  return response.json();
 }

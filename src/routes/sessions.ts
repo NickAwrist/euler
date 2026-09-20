@@ -13,7 +13,7 @@ import {
   persistSessionMessages,
 } from "../db/index";
 import { downloadWorkspaceFile } from "../http/downloadWorkspaceFile";
-import { sendApiError } from "../http/errors";
+import { errorMessage, sendApiError } from "../http/errors";
 import { isLoopbackRequest } from "../http/isLoopbackRequest";
 import { stripReasoningFromModelMessages } from "../llm/reasoningDetails";
 import { revealFileNative } from "../nativeFolderPicker";
@@ -87,7 +87,7 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
       res,
       e instanceof WorkspaceError ? 400 : 500,
       e instanceof WorkspaceError ? "BAD_REQUEST" : "INTERNAL_ERROR",
-      e instanceof Error ? e.message : "Could not select directory",
+      errorMessage(e) || "Could not select directory",
     );
   }
 });
@@ -139,7 +139,7 @@ router.get("/:id/workspace/files", async (req, res) => {
       res,
       400,
       "BAD_REQUEST",
-      error instanceof Error ? error.message : "Could not list workspace files",
+      errorMessage(error) || "Could not list workspace files",
     );
   }
 });
@@ -172,9 +172,7 @@ router.get("/:id/workspace/file", async (req, res) => {
       res,
       400,
       "BAD_REQUEST",
-      error instanceof Error
-        ? error.message
-        : "Could not download workspace file",
+      errorMessage(error) || "Could not download workspace file",
     );
   }
 });
@@ -222,7 +220,7 @@ router.post("/:id/workspace/reveal", async (req, res) => {
       res,
       400,
       "BAD_REQUEST",
-      error instanceof Error ? error.message : "Could not reveal file",
+      errorMessage(error) || "Could not reveal file",
     );
   }
 });
