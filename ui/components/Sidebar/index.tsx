@@ -1,13 +1,13 @@
 import {
   ChartNoAxesCombined,
   EyeOff,
-  Loader2,
   Plus,
   Settings,
   SlidersHorizontal,
 } from "lucide-react";
 import { useState } from "react";
 import { cx } from "../../styles";
+import { Button } from "../Button";
 import { SessionListItem } from "./SessionListItem";
 import type { SidebarProps } from "./types";
 
@@ -44,19 +44,15 @@ export function Sidebar({
 
       <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2">
         <div className="flex gap-2">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={onNewSession}
-            disabled={isLoading}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-border-subtle bg-surface px-2.5 py-2 text-[0.8125rem] font-semibold text-foreground transition-[color,background-color,border-color,transform] duration-150 ease-out hover:border-border hover:bg-muted active:scale-[0.99] active:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100"
+            loading={isLoading}
+            icon={Plus}
+            className="flex-1 !bg-surface font-semibold"
           >
-            {isLoading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Plus size={16} />
-            )}
             <span>New chat</span>
-          </button>
+          </Button>
           <button
             type="button"
             onClick={onNewEphemeralSession}

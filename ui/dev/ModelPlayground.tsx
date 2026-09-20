@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
+import { Button } from "../components/Button";
 import { ModelSelectBar } from "../components/ModelSelectBar";
 import { OpenRouterSettingsTab } from "../components/SettingsPage/OpenRouterSettingsTab";
 import { useOllamaConnection } from "../hooks/run/useOllamaConnection";
-import { primaryButton, secondaryButton } from "../styles";
 import {
   type DemoScenario,
   addDemoModel,
@@ -102,11 +102,10 @@ export default function ModelPlayground() {
       >
         <div className="flex flex-wrap gap-2">
           {scenarios.map((item) => (
-            <button
+            <Button
               key={item.id}
-              type="button"
+              variant={scenario === item.id ? "primary" : "secondary"}
               aria-pressed={scenario === item.id}
-              className={scenario === item.id ? primaryButton : secondaryButton}
               onClick={() => {
                 resetDemo(item.id);
                 setScenario(item.id);
@@ -116,26 +115,24 @@ export default function ModelPlayground() {
               }}
             >
               {item.name}
-            </button>
+            </Button>
           ))}
         </div>
         <p className="text-sm text-muted-foreground">
           {scenarios.find((item) => item.id === scenario)?.description}
         </p>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            className={secondaryButton}
+          <Button
+            variant="secondary"
             onClick={() => {
               addDemoModel();
               refresh();
             }}
           >
             Add future Anthropic model
-          </button>
-          <button
-            type="button"
-            className={secondaryButton}
+          </Button>
+          <Button
+            variant="secondary"
             disabled={!selected.startsWith("openrouter:")}
             onClick={() => {
               removeDemoModel(selected.replace(/^openrouter:/, ""));
@@ -143,7 +140,7 @@ export default function ModelPlayground() {
             }}
           >
             Remove selected from catalog
-          </button>
+          </Button>
         </div>
         <p className="text-xs text-muted-foreground">
           To try subscriptions: enable Auto-enable new models in Anthropic,
@@ -181,10 +178,10 @@ export default function ModelPlayground() {
               onModelChange={setSelected}
               disabled={running}
             />
-            <button
-              type="button"
-              className={primaryButton}
+            <Button
+              variant="primary"
               disabled={!eligible || running}
+              loading={running}
               onClick={() => {
                 setRunning(true);
                 setMessage(
@@ -193,7 +190,7 @@ export default function ModelPlayground() {
               }}
             >
               {running ? "Running demo..." : "Simulate a message"}
-            </button>
+            </Button>
           </div>
           <p className="break-all text-xs text-muted-foreground">
             Selected: {selected}

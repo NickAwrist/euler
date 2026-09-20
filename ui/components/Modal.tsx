@@ -6,7 +6,7 @@ import type {
   ReactNode,
   RefObject,
 } from "react";
-import { useEffect, useId, useRef } from "react";
+import { useId, useLayoutEffect, useRef } from "react";
 import {
   cx,
   eyebrowText,
@@ -34,7 +34,7 @@ export interface ModalProps {
   ariaLabelledBy?: string;
   initialFocusRef?: RefObject<HTMLElement | null>;
   onKeyDown?: (event: KeyboardEvent<HTMLDialogElement>) => void;
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 export function Modal({
@@ -63,7 +63,7 @@ export function Modal({
     ariaLabelledBy ?? (title ? generatedTitleId : undefined);
   const isDismissDisabled = closeDisabled || busy;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const trigger = document.activeElement;
     const dialog = dialogRef.current;
     if (!dialog) return;
@@ -81,10 +81,12 @@ export function Modal({
     }
 
     return () => {
-      if (typeof dialog.close === "function") {
-        dialog.close();
-      } else {
-        dialog.removeAttribute("open");
+      if (dialog.open) {
+        if (typeof dialog.close === "function") {
+          dialog.close();
+        } else {
+          dialog.removeAttribute("open");
+        }
       }
       if (trigger instanceof HTMLElement && trigger.isConnected) {
         trigger.focus();

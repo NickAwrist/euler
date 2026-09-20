@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 import { ArtifactContext } from "../components/Artifacts/ArtifactContext";
 import { WorkspaceArtifacts } from "../components/Artifacts/WorkspaceArtifacts";
+import { Button } from "../components/Button";
 import { MessageItem } from "../components/MessageItem";
 import { SidebarToggle } from "../components/SidebarToggle";
-import { secondaryButton } from "../styles";
 import { fixtureMessages, fixtureSource } from "./artifactFixtures";
 
 function DemoWorkspace({ alternate }: { alternate: boolean }) {
@@ -77,13 +77,12 @@ export default function ArtifactsDemo() {
         <span className="text-xs text-muted-foreground">
           Artifacts playground
         </span>
-        <button
-          type="button"
-          className={secondaryButton}
+        <Button
+          variant="secondary"
           onClick={() => setWorkspace((value) => value + 1)}
         >
           Change directory
-        </button>
+        </Button>
       </div>
       <DemoWorkspace key={workspace} alternate={workspace % 2 === 1} />
     </div>

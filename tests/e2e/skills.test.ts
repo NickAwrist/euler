@@ -16,6 +16,13 @@ test("skills CRUD is validated and scoped to the current user", async () => {
       }),
     });
     expect(invalid.status).toBe(400);
+    expect(await invalid.json()).toMatchObject({
+      error: {
+        code: "VALIDATION_ERROR",
+        message:
+          "name must use lowercase letters, numbers, and single hyphens only",
+      },
+    });
 
     const create = await fetch(`${url}/api/skills`, {
       method: "POST",

@@ -71,7 +71,7 @@ export const IconButton = forwardRef(function IconButton(
           className="animate-spin motion-reduce:animate-none shrink-0"
         />
       ) : (
-        <Icon size={sizeConfig.icon} className="shrink-0" />
+        <Icon size={sizeConfig.icon} />
       )}
     </button>
   );
