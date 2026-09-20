@@ -1,9 +1,10 @@
-import { KeyRound, Plus, RefreshCw } from "lucide-react";
+import { KeyRound, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { modelSettingsRequest } from "../../lib/modelSettingsRequest";
 import { primaryButton, secondaryButton } from "../../styles";
 import { NewBadge } from "../ModelPreferenceControls";
 import { ProviderIcon } from "../ModelSelectBar";
+import { RefreshButton } from "../RefreshButton";
 import { providerIcons } from "../modelProviders";
 import { CatalogStatus, PublisherDialog } from "./OpenRouterPublisherDialog";
 import { inputClass, labelClass } from "./constants";
@@ -159,23 +160,12 @@ export function OpenRouterSettingsTab({
         <section className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="mr-auto font-medium">Publishers</h2>
-            <button
-              type="button"
-              className={`${secondaryButton} disabled:pointer-events-none disabled:opacity-45`}
-              disabled={busy || refreshing}
-              aria-busy={refreshing}
+            <RefreshButton
+              label="Refresh catalog"
+              refreshing={refreshing}
+              disabled={busy}
               onClick={() => void mutate(refresh)}
-            >
-              <RefreshCw
-                size={15}
-                className={
-                  refreshing
-                    ? "animate-spin motion-reduce:animate-none"
-                    : undefined
-                }
-              />
-              Refresh catalog
-            </button>
+            />
             <button
               type="button"
               className={primaryButton}

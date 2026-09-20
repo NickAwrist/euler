@@ -23,8 +23,10 @@ import {
   WorkspaceError,
   workspaceService,
 } from "../workspaces/WorkspaceService";
+import { artifactRoutes } from "./artifacts";
 
 const router = Router();
+router.use("/:id/workspace/artifacts", artifactRoutes(false));
 
 router.post("/:id/workspace/select-directory", async (req, res) => {
   const ownerUuid = requireUserId(req, res);

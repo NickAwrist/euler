@@ -131,3 +131,49 @@ test("snapshots committed WAL data and copies retained workspaces without changi
     source.close();
   }
 });
+
+for (const envName of [
+  "OPENROUTER_API_KEY",
+  "AGENTS_OPENROUTER_API_KEY",
+  null,
+]) {
+  test(`copied database respects ${envName ?? "a saved key when no environment key is configured"}`, () => {
+    const data = join(primary, "data");
+    mkdirSync(data);
+    writeFileSync(join(primary, ".env"), envName ? `${envName}=dev-key\n` : "");
+    const source = new Database(join(data, "agents.db"));
+    source.run("CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT)");
+    source.run(
+      "INSERT INTO app_settings VALUES ('openrouter_api_key', 'saved-key'), ('other', 'keep')",
+    );
+    const key = (db: Database) =>
+      db
+        .query(
+          "SELECT value FROM app_settings WHERE key = 'openrouter_api_key'",
+        )
+        .get();
+    try {
+      initializeWorktree(target, primary);
+      const copied = new Database(join(target, "data", "agents.db"));
+      try {
+        expect(key(copied)).toEqual(envName ? null : { value: "saved-key" });
+        expect(key(source)).toEqual({ value: "saved-key" });
+        expect(
+          copied
+            .query("SELECT value FROM app_settings WHERE key = 'other'")
+            .get(),
+        ).toEqual({ value: "keep" });
+        // Reinitializing must preserve a key explicitly set in this worktree.
+        copied.run(
+          "INSERT OR REPLACE INTO app_settings VALUES ('openrouter_api_key', 'worktree-key')",
+        );
+        initializeWorktree(target, primary);
+        expect(key(copied)).toEqual({ value: "worktree-key" });
+      } finally {
+        copied.close();
+      }
+    } finally {
+      source.close();
+    }
+  });
+}

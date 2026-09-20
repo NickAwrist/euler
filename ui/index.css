@@ -21,6 +21,24 @@
 
 :root {
   color-scheme: dark;
+  --workspace-header-height: 56px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --workspace-header-height: 52px;
+  }
+}
+
+@layer components {
+  /* One border-box height for the chat header and both artifact views. */
+  .workspace-header {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    height: var(--workspace-header-height);
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
 }
 
 @layer base {

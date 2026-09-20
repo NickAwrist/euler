@@ -49,6 +49,27 @@ export function initializeWorktree(targetDir: string, primaryRoot: string) {
         } finally {
           db.close();
         }
+        // A copied UI setting must not mask the explicitly configured dev key.
+        // Only change the new snapshot, never the primary or an existing worktree.
+        if (
+          config.OPENROUTER_API_KEY?.trim() ||
+          config.AGENTS_OPENROUTER_API_KEY?.trim()
+        ) {
+          const copied = new Database(targetDb);
+          try {
+            const hasSettings = copied
+              .query(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'app_settings'",
+              )
+              .get();
+            if (hasSettings)
+              copied.run("DELETE FROM app_settings WHERE key = ?", [
+                "openrouter_api_key",
+              ]);
+          } finally {
+            copied.close();
+          }
+        }
       }
       const sourceWorkspaces = join(sourceData, "workspaces");
       const targetWorkspaces = join(targetData, "workspaces");

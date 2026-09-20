@@ -9,7 +9,6 @@ export type SidebarProps = {
   onRenameSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
   isLoading: boolean;
-  onToggleCollapsed: () => void;
   onCustomization: () => void;
   onSettings: () => void;
 };

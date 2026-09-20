@@ -1,7 +1,7 @@
 Really want
 
 - MCPs
-- Artifacts (Claude-style preview for HTML, charts, markdown, and SVGs)
+- Artifacts: file tree, Markdown, highlighted source, and image previews implemented. Remaining: HTML and interactive charts.
 
 Rebranding
 

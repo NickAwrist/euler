@@ -82,8 +82,10 @@ The database snapshot includes committed WAL data. Existing destination data is
 preserved, and rerunning setup with an existing `.env` does not copy data again.
 Temporary workspaces and trash are not copied. Saved endpoint settings still take
 precedence over `.env`; clear them in Settings to use your environment values.
-Service endpoints, API keys, and
-`AGENTS_HOST_DIRECTORY` are copied unchanged. Open `/` on your configured Vite
+When `.env` supplies an OpenRouter dev key, the initializer removes the saved
+OpenRouter key override from the new database snapshot so the dev key takes effect.
+The primary database and existing worktrees are unchanged. Service endpoints,
+environment API keys, and `AGENTS_HOST_DIRECTORY` are copied unchanged. Open `/` on your configured Vite
 port to use the full app with these settings.
 
 You can also run `bun run init:worktree /path/to/worktree` from the primary checkout.

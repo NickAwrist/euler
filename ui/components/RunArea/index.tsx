@@ -63,7 +63,7 @@ export const RunArea = memo(function RunArea({
     <div className="relative h-full min-h-0 flex-1 overflow-x-hidden">
       <div
         ref={scrollRef}
-        className="absolute inset-0 z-0 overflow-x-hidden overflow-y-auto px-5 pt-[calc(3.5rem+1.25rem)] max-[640px]:px-3.5 max-[640px]:pt-[calc(52px+1rem)]"
+        className="absolute inset-0 z-0 overflow-x-hidden overflow-y-auto px-5 pt-[calc(var(--workspace-header-height)+1.25rem)] max-[640px]:px-3.5 max-[640px]:pt-[calc(var(--workspace-header-height)+1rem)]"
         style={{ paddingBottom: footerInset + 12 }}
       >
         <div

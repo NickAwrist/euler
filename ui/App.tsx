@@ -1,5 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AgentsPage } from "./components/AgentsPage";
+import { ArtifactContext } from "./components/Artifacts/ArtifactContext";
+import { WorkspaceArtifacts } from "./components/Artifacts/WorkspaceArtifacts";
+import { workspaceArtifactSource } from "./components/Artifacts/api";
 import { DebugModal } from "./components/DebugModal";
 import { DirectoryModal } from "./components/DirectoryModal";
 import { shouldShowStepsModal } from "./components/ExecutionTrace";
@@ -11,12 +14,14 @@ import { RunInputDock } from "./components/RunInputDock";
 import { SettingsPage } from "./components/SettingsPage";
 import { Sidebar } from "./components/Sidebar";
 import { SidebarBackdrop } from "./components/SidebarBackdrop";
+import { SidebarToggle } from "./components/SidebarToggle";
 import { StepsModal } from "./components/StepsModal";
 import { TruncateConfirmModal } from "./components/TruncateConfirmModal";
 import { WelcomeHome } from "./components/WelcomeHome";
 import { WorkspaceModal } from "./components/WorkspaceModal";
 import type { RunCommandName } from "./components/runCommands";
 import { useAppKeybinds } from "./hooks/useAppKeybinds";
+import { useMobileLayout } from "./hooks/useMobileLayout";
 import { useRunApp } from "./hooks/useRunApp";
 import { copyTextToClipboard } from "./lib/copyTextToClipboard";
 import { formatRunTranscript } from "./lib/formatRunTranscript";
@@ -40,6 +45,42 @@ function ChatView({
   onCustomization,
   onSettings,
 }: ChatViewProps) {
+  const workspaceKey = `${app.activeSessionId}:${app.workspace.kind === "local" ? app.workspace.path : "sandbox"}`;
+  const [artifactWorkspace, setArtifactWorkspace] = useState(workspaceKey);
+  const [artifactsOpen, setArtifactsOpen] = useState(false);
+  const mobileLayout = useMobileLayout();
+  const chatsOpen = mobileLayout ? app.sidebarOpen : !app.sidebarCollapsed;
+  const toggleChats = () => {
+    if (mobileLayout) app.setSidebarOpen((value) => !value);
+    else app.setSidebarCollapsed((value) => !value);
+  };
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  // Reset only artifacts before rendering a different workspace.
+  if (artifactWorkspace !== workspaceKey) {
+    setArtifactWorkspace(workspaceKey);
+    setArtifactsOpen(false);
+    setSelectedFile(null);
+  }
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    if (!app.runPending) setRevision((value) => value + 1);
+  }, [app.runPending]);
+  const source = useMemo(
+    () => workspaceArtifactSource(app.activeSessionId ?? "", app.isEphemeral),
+    [app.activeSessionId, app.isEphemeral],
+  );
+  const openFile = useCallback((path: string) => {
+    setSelectedFile(path);
+    setArtifactsOpen(true);
+  }, []);
+  const artifactContext = useMemo(
+    () => ({
+      openFile,
+      localPath:
+        app.workspace.kind === "local" ? app.workspace.path : undefined,
+    }),
+    [openFile, app.workspace],
+  );
   const [runFooterInset, setRunFooterInset] = useState(104);
   const { setEditingUserIndex, setTruncateConfirm } = app;
   const cancelEditUser = useCallback(
@@ -78,164 +119,196 @@ function ChatView({
   });
 
   return (
-    <div className="relative flex h-full w-full overflow-hidden">
-      <aside
-        id="app-sidebar"
-        className={cx(
-          "h-full w-[260px] min-w-[260px] shrink-0 overflow-hidden bg-background",
-          // Mobile <= 900px: overlay drawer
-          "max-[900px]:fixed max-[900px]:top-0 max-[900px]:bottom-0 max-[900px]:left-0 max-[900px]:z-30 max-[900px]:w-[min(85vw,300px)] max-[900px]:shadow-[4px_0_24px_rgba(0,0,0,0.35)] max-[900px]:transform-gpu max-[900px]:transition-transform max-[900px]:duration-300 max-[900px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
-          app.sidebarOpen
-            ? "max-[900px]:translate-x-0"
-            : "max-[900px]:-translate-x-full",
-          // Medium desktop 901px - 1319px: moves chat over so sidebar never covers chat
-          "min-[901px]:max-[1319px]:relative min-[901px]:max-[1319px]:transition-[margin-left] min-[901px]:max-[1319px]:duration-300 min-[901px]:max-[1319px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
-          app.sidebarCollapsed
-            ? "min-[901px]:max-[1319px]:pointer-events-none min-[901px]:max-[1319px]:-ml-[260px] min-[901px]:max-[1319px]:border-r-0"
-            : "min-[901px]:max-[1319px]:pointer-events-auto min-[901px]:max-[1319px]:ml-0 min-[901px]:max-[1319px]:border-r min-[901px]:max-[1319px]:border-border-subtle",
-          // Wide desktop >= 1320px: screen has plenty of gutter space, slides in without moving the chat
-          "min-[1320px]:absolute min-[1320px]:inset-y-0 min-[1320px]:left-0 min-[1320px]:z-20 min-[1320px]:transition-transform min-[1320px]:duration-300 min-[1320px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
-          app.sidebarCollapsed
-            ? "min-[1320px]:pointer-events-none min-[1320px]:-translate-x-full min-[1320px]:border-r-0"
-            : "min-[1320px]:pointer-events-auto min-[1320px]:translate-x-0 min-[1320px]:border-r min-[1320px]:border-border-subtle",
-        )}
-      >
-        <Sidebar
-          sessions={app.sessions}
-          activeSessionId={app.activeSessionId}
-          onSelectSession={(id) => {
-            app.setSidebarOpen(false);
-            app.switchToSession(id);
-          }}
-          onNewSession={app.createSession}
-          onNewEphemeralSession={app.createEphemeralSession}
-          onRenameSession={(id) => app.setRenameSessionId(id)}
-          onDeleteSession={app.requestDeleteSession}
-          isLoading={app.isLoading}
-          onToggleCollapsed={() => app.setSidebarCollapsed((value) => !value)}
-          onCustomization={onCustomization}
-          onSettings={onSettings}
+    <ArtifactContext.Provider
+      value={app.activeSessionId ? artifactContext : null}
+    >
+      <div className="relative flex h-full w-full overflow-hidden">
+        <SidebarToggle
+          side="left"
+          open={chatsOpen}
+          onToggle={toggleChats}
+          className={artifactsOpen ? "max-[900px]:hidden" : undefined}
         />
-      </aside>
-
-      <SidebarBackdrop
-        open={app.sidebarOpen}
-        onClose={() => app.setSidebarOpen(false)}
-      />
-
-      <main className="relative h-full min-h-0 min-w-0 flex-1 bg-background">
-        <RunAppHeader
-          activeSessionId={app.activeSessionId}
-          sidebarOpen={app.sidebarOpen}
-          sidebarCollapsed={app.sidebarCollapsed}
-          onOpenSidebar={() => {
-            if (window.innerWidth <= 900) {
-              app.setSidebarOpen(true);
-            } else {
-              app.setSidebarCollapsed(false);
-            }
-          }}
-          debugOpen={app.debugOpen}
-          onToggleDebug={app.toggleDebug}
-          onCopyEntireRun={
-            app.activeSessionId
-              ? async () =>
-                  copyTextToClipboard(
-                    formatRunTranscript(app.messages, {
-                      streamingAssistant: app.streamingContent.trim()
-                        ? app.streamingContent
-                        : undefined,
-                    }),
-                  )
-              : undefined
-          }
-          isEphemeral={app.isEphemeral}
-        />
-
-        <section
-          className={cx(
-            "flex h-full min-h-0 overflow-x-hidden",
-            !app.activeSessionId && "pt-0",
-          )}
-        >
-          {app.activeSessionId ? (
-            <div
-              key={app.activeSessionId}
-              className="ui-animate-fade-in flex h-full min-h-0 min-w-0 flex-1 flex-col"
-            >
-              <RunArea
-                messages={app.messages}
-                sessionLoadState={app.sessionLoadState}
-                sessionError={app.sessionError}
-                sessionSendReady={app.sessionSendReady}
-                onRetryLoad={app.retrySessionLoad}
-                streamingSteps={app.streamingSteps}
-                streamingStep={app.streamingStep}
-                streamingContent={app.streamingContent}
-                streamingThinking={app.streamingThinking}
-                runPending={app.runPending}
-                footerInset={runFooterInset}
-                onViewSteps={app.setStepsModalData}
-                editingUserIndex={app.editingUserIndex}
-                onStartEditUser={app.setEditingUserIndex}
-                onCancelEditUser={cancelEditUser}
-                onRequestEditConfirm={requestEditConfirm}
-                onRequestRetryConfirm={requestRetryConfirm}
-              />
-            </div>
-          ) : (
-            <WelcomeHome
-              key="home"
-              sessions={app.sessions}
-              isLoading={app.isLoading}
-              onNewRun={app.createSession}
-              onNewEphemeralRun={app.createEphemeralSession}
-              onOpenSession={app.switchToSession}
-            />
-          )}
-        </section>
-
         {app.activeSessionId && (
-          <RunInputDock
-            key={app.activeSessionId}
-            ollamaModels={app.ollamaModels}
-            ollamaConnected={app.ollamaConnected}
-            modelsLoadError={app.modelsLoadError}
-            selectedModel={app.selectedModel}
-            onModelChange={app.handleModelChange}
-            thinkingEffort={app.thinkingEffort}
-            onThinkingEffortChange={app.handleThinkingEffortChange}
-            runAgents={app.runAgents}
-            selectedSessionAgent={app.selectedSessionAgent}
-            onSessionAgentChange={app.handleSessionAgentChange}
-            input={app.input}
-            setInput={app.setInput}
-            onSendMessage={app.sendMessage}
-            onStopGeneration={app.stopGeneration}
-            runPending={app.runPending}
-            streamingStep={app.streamingStep}
-            streamingSteps={app.streamingSteps}
-            modelSendReady={app.modelSendReady}
-            pendingImages={app.pendingImages}
-            imageError={app.imageError}
-            addPendingImages={app.addPendingImages}
-            removePendingImage={app.removePendingImage}
-            supportsImageInput={app.supportsImageInput}
-            canAttachImages={app.canAttachImages}
-            attachImageDisabledReason={app.attachImageDisabledReason}
-            attachmentsSendReady={app.attachmentsSendReady}
-            assignedSkillIds={
-              app.runAgents.find(
-                (agent) => agent.name === app.selectedSessionAgent,
-              )?.skill_ids ?? []
-            }
-            workspace={app.workspace}
-            onRunCommand={runCommand}
-            onFooterHeightChange={setRunFooterInset}
+          <SidebarToggle
+            side="right"
+            open={artifactsOpen}
+            onToggle={() => setArtifactsOpen((value) => !value)}
           />
         )}
-      </main>
-    </div>
+        <aside
+          id="app-sidebar"
+          aria-label="Chats"
+          aria-hidden={!chatsOpen}
+          inert={!chatsOpen}
+          className={cx(
+            "h-full w-[260px] min-w-[260px] shrink-0 overflow-hidden bg-background motion-reduce:transition-none",
+            // Mobile <= 900px: overlay drawer
+            "max-[900px]:fixed max-[900px]:top-0 max-[900px]:bottom-0 max-[900px]:left-0 max-[900px]:z-30 max-[900px]:w-[min(85vw,300px)] max-[900px]:shadow-[4px_0_24px_rgba(0,0,0,0.35)] max-[900px]:transform-gpu max-[900px]:transition-transform max-[900px]:duration-300 max-[900px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
+            app.sidebarOpen
+              ? "max-[900px]:translate-x-0"
+              : "max-[900px]:-translate-x-full",
+            // Medium desktop 901px - 1319px: moves chat over so sidebar never covers chat
+            "min-[901px]:max-[1319px]:relative min-[901px]:max-[1319px]:transition-[margin-left] min-[901px]:max-[1319px]:duration-300 min-[901px]:max-[1319px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
+            app.sidebarCollapsed
+              ? "min-[901px]:max-[1319px]:pointer-events-none min-[901px]:max-[1319px]:-ml-[260px] min-[901px]:max-[1319px]:border-r-0"
+              : "min-[901px]:max-[1319px]:pointer-events-auto min-[901px]:max-[1319px]:ml-0 min-[901px]:max-[1319px]:border-r min-[901px]:max-[1319px]:border-border-subtle",
+            // Wide desktop >= 1320px: screen has plenty of gutter space, slides in without moving the chat
+            "min-[1320px]:absolute min-[1320px]:inset-y-0 min-[1320px]:left-0 min-[1320px]:z-20 min-[1320px]:transition-transform min-[1320px]:duration-300 min-[1320px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
+            app.sidebarCollapsed
+              ? "min-[1320px]:pointer-events-none min-[1320px]:-translate-x-full min-[1320px]:border-r-0"
+              : "min-[1320px]:pointer-events-auto min-[1320px]:translate-x-0 min-[1320px]:border-r min-[1320px]:border-border-subtle",
+          )}
+        >
+          <Sidebar
+            sessions={app.sessions}
+            activeSessionId={app.activeSessionId}
+            onSelectSession={(id) => {
+              app.setSidebarOpen(false);
+              app.switchToSession(id);
+            }}
+            onNewSession={app.createSession}
+            onNewEphemeralSession={app.createEphemeralSession}
+            onRenameSession={(id) => app.setRenameSessionId(id)}
+            onDeleteSession={app.requestDeleteSession}
+            isLoading={app.isLoading}
+            onCustomization={onCustomization}
+            onSettings={onSettings}
+          />
+        </aside>
+
+        <SidebarBackdrop
+          open={app.sidebarOpen}
+          onClose={() => app.setSidebarOpen(false)}
+        />
+
+        <main
+          className={cx(
+            "relative h-full min-h-0 min-w-0 flex-1 bg-background transition-[margin-left] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+            artifactsOpen && !app.sidebarCollapsed && "min-[1320px]:ml-[260px]",
+          )}
+        >
+          <RunAppHeader
+            artifactsOpen={artifactsOpen}
+            activeSessionId={app.activeSessionId}
+            sidebarCollapsed={app.sidebarCollapsed}
+            debugOpen={app.debugOpen}
+            onToggleDebug={app.toggleDebug}
+            onCopyEntireRun={
+              app.activeSessionId
+                ? async () =>
+                    copyTextToClipboard(
+                      formatRunTranscript(app.messages, {
+                        streamingAssistant: app.streamingContent.trim()
+                          ? app.streamingContent
+                          : undefined,
+                      }),
+                    )
+                : undefined
+            }
+            isEphemeral={app.isEphemeral}
+          />
+
+          <section
+            className={cx(
+              "flex h-full min-h-0 overflow-x-hidden",
+              !app.activeSessionId && "pt-0",
+            )}
+          >
+            {app.activeSessionId ? (
+              <div
+                key={app.activeSessionId}
+                className="ui-animate-fade-in flex h-full min-h-0 min-w-0 flex-1 flex-col"
+              >
+                <RunArea
+                  messages={app.messages}
+                  sessionLoadState={app.sessionLoadState}
+                  sessionError={app.sessionError}
+                  sessionSendReady={app.sessionSendReady}
+                  onRetryLoad={app.retrySessionLoad}
+                  streamingSteps={app.streamingSteps}
+                  streamingStep={app.streamingStep}
+                  streamingContent={app.streamingContent}
+                  streamingThinking={app.streamingThinking}
+                  runPending={app.runPending}
+                  footerInset={runFooterInset}
+                  onViewSteps={app.setStepsModalData}
+                  editingUserIndex={app.editingUserIndex}
+                  onStartEditUser={app.setEditingUserIndex}
+                  onCancelEditUser={cancelEditUser}
+                  onRequestEditConfirm={requestEditConfirm}
+                  onRequestRetryConfirm={requestRetryConfirm}
+                />
+              </div>
+            ) : (
+              <WelcomeHome
+                key="home"
+                sessions={app.sessions}
+                isLoading={app.isLoading}
+                onNewRun={app.createSession}
+                onNewEphemeralRun={app.createEphemeralSession}
+                onOpenSession={app.switchToSession}
+              />
+            )}
+          </section>
+
+          {app.activeSessionId && (
+            <RunInputDock
+              key={app.activeSessionId}
+              ollamaModels={app.ollamaModels}
+              ollamaConnected={app.ollamaConnected}
+              modelsLoadError={app.modelsLoadError}
+              selectedModel={app.selectedModel}
+              onModelChange={app.handleModelChange}
+              thinkingEffort={app.thinkingEffort}
+              onThinkingEffortChange={app.handleThinkingEffortChange}
+              runAgents={app.runAgents}
+              selectedSessionAgent={app.selectedSessionAgent}
+              onSessionAgentChange={app.handleSessionAgentChange}
+              input={app.input}
+              setInput={app.setInput}
+              onSendMessage={app.sendMessage}
+              onStopGeneration={app.stopGeneration}
+              runPending={app.runPending}
+              streamingStep={app.streamingStep}
+              streamingSteps={app.streamingSteps}
+              modelSendReady={app.modelSendReady}
+              pendingImages={app.pendingImages}
+              imageError={app.imageError}
+              addPendingImages={app.addPendingImages}
+              removePendingImage={app.removePendingImage}
+              supportsImageInput={app.supportsImageInput}
+              canAttachImages={app.canAttachImages}
+              attachImageDisabledReason={app.attachImageDisabledReason}
+              attachmentsSendReady={app.attachmentsSendReady}
+              assignedSkillIds={
+                app.runAgents.find(
+                  (agent) => agent.name === app.selectedSessionAgent,
+                )?.skill_ids ?? []
+              }
+              workspace={app.workspace}
+              onRunCommand={runCommand}
+              onFooterHeightChange={setRunFooterInset}
+            />
+          )}
+        </main>
+        {app.activeSessionId && (
+          <WorkspaceArtifacts
+            key={workspaceKey}
+            open={artifactsOpen}
+            source={source}
+            path={selectedFile}
+            revision={revision}
+            rootLabel={
+              app.workspace.kind === "local" ? app.workspace.path : "/workspace"
+            }
+            onOpen={openFile}
+            onBack={() => setSelectedFile(null)}
+            onClose={() => setArtifactsOpen(false)}
+          />
+        )}
+      </div>
+    </ArtifactContext.Provider>
   );
 }
 

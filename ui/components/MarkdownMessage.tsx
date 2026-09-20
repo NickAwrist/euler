@@ -3,7 +3,6 @@ import {
   type ComponentPropsWithoutRef,
   isValidElement,
   memo,
-  useEffect,
   useRef,
   useState,
 } from "react";
@@ -12,71 +11,12 @@ import ReactMarkdown, {
   type ExtraProps,
 } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { bundledLanguages, createHighlighter } from "shiki";
 import { copyTextToClipboard } from "../lib/copyTextToClipboard";
 import { cx } from "../styles";
+import { artifactPath, useArtifacts } from "./Artifacts/ArtifactContext";
+import { HighlightedCode } from "./HighlightedCode";
 
 const remarkPlugins = [remarkGfm];
-
-type HighlighterInstance = Awaited<ReturnType<typeof createHighlighter>>;
-let highlighterPromise: Promise<HighlighterInstance> | null = null;
-
-function getHighlighter(): Promise<HighlighterInstance> {
-  if (!highlighterPromise) {
-    highlighterPromise = createHighlighter({
-      themes: ["github-dark-dimmed"],
-      langs: [
-        "javascript",
-        "typescript",
-        "tsx",
-        "jsx",
-        "json",
-        "html",
-        "css",
-        "python",
-        "bash",
-        "sh",
-        "yaml",
-        "markdown",
-        "sql",
-        "rust",
-        "go",
-      ],
-    });
-  }
-  return highlighterPromise;
-}
-
-async function highlightCode(
-  code: string,
-  lang: string,
-): Promise<string | null> {
-  try {
-    const highlighter = await getHighlighter();
-    const cleanLang = lang.toLowerCase();
-    if (
-      cleanLang in bundledLanguages &&
-      !highlighter.getLoadedLanguages().includes(cleanLang)
-    ) {
-      await highlighter.loadLanguage(
-        cleanLang as keyof typeof bundledLanguages,
-      );
-    }
-    const targetLang = highlighter.getLoadedLanguages().includes(cleanLang)
-      ? cleanLang
-      : "text";
-
-    const fullHtml = highlighter.codeToHtml(code, {
-      lang: targetLang,
-      theme: "github-dark-dimmed",
-    });
-    const match = /<code>([\s\S]*?)<\/code>/.exec(fullHtml);
-    return match?.[1] ?? null;
-  } catch (err) {
-    console.error("Syntax highlighting error:", err);
-    return null;
-  }
-}
 
 /** GFM tables need newline-separated rows; streamed/model text often uses a single line. */
 function normalizeFlattenedPipeTables(markdown: string): string {
@@ -97,35 +37,13 @@ function CodeBlock({
   const match = /language-(\w+)/.exec(className || "");
   const lang = match?.[1] || "text";
   const rawCode = String(children).replace(/\n$/, "");
-  const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void highlightCode(rawCode, lang).then((html) => {
-      if (!cancelled && html) {
-        setHighlightedHtml(html);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [rawCode, lang]);
-
-  if (highlightedHtml) {
-    return (
-      <code
-        {...rest}
-        className={className}
-        // biome-ignore lint/security/noDangerouslySetInnerHtml: shiki generated code spans
-        dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-      />
-    );
-  }
-
   return (
-    <code {...rest} className={className}>
-      {children}
-    </code>
+    <HighlightedCode
+      {...rest}
+      code={rawCode}
+      language={lang}
+      className={className}
+    />
   );
 }
 
@@ -335,7 +253,35 @@ function convertComfyUIUrls(markdown: string): string {
   return result;
 }
 
+function MarkdownLink({
+  href,
+  children,
+  node: _node,
+  ...rest
+}: ComponentPropsWithoutRef<"a"> & ExtraProps) {
+  const artifacts = useArtifacts();
+  const path =
+    artifacts && href ? artifactPath(href, artifacts.localPath) : null;
+  if (path && artifacts)
+    return (
+      <button
+        type="button"
+        className="cursor-pointer text-accent hover:underline"
+        onClick={() => artifacts.openFile(path)}
+        title={`Preview ${path}`}
+      >
+        {children}
+      </button>
+    );
+  return (
+    <a {...rest} href={href}>
+      {children}
+    </a>
+  );
+}
+
 const markdownComponents: Components = {
+  a: MarkdownLink,
   pre: MarkdownPre,
   code: MarkdownCode,
   img: MarkdownImg,

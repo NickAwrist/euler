@@ -1,7 +1,6 @@
 import {
   EyeOff,
   Loader2,
-  PanelLeft,
   Plus,
   Settings,
   SlidersHorizontal,
@@ -20,7 +19,6 @@ export function Sidebar({
   onRenameSession,
   onDeleteSession,
   isLoading,
-  onToggleCollapsed,
   onCustomization,
   onSettings,
 }: SidebarProps) {
@@ -30,8 +28,8 @@ export function Sidebar({
   } | null>(null);
 
   return (
-    <div className="grid h-full w-[260px] min-w-[260px] grid-rows-[auto_minmax(0,1fr)_auto] overflow-x-hidden px-2.5 pb-3 pt-3">
-      <div className="mb-2.5 flex items-center justify-between gap-2 px-1">
+    <div className="grid h-full w-[260px] min-w-[260px] grid-rows-[auto_minmax(0,1fr)_auto] overflow-x-hidden px-2.5 pb-3">
+      <div className="workspace-header -mx-2.5 mb-2.5 gap-2 pl-14 pr-3">
         <div className="min-w-0">
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className="text-[0.9375rem] font-semibold text-foreground">
@@ -39,15 +37,6 @@ export function Sidebar({
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          className={cx(iconButton, "shrink-0 max-[900px]:hidden")}
-          onClick={onToggleCollapsed}
-          aria-label="Collapse sidebar"
-          title="Collapse sidebar"
-        >
-          <PanelLeft size={16} />
-        </button>
       </div>
 
       <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2">

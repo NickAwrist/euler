@@ -1,5 +1,6 @@
 import { Download, FolderOpen, LoaderCircle, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { downloadBlob } from "../lib/downloadBlob";
 import { readApiError } from "../lib/readApiError";
 import { fetchWorkspaceFiles } from "../persist/sessions";
 import { userScopedFetch } from "../persist/userIdentity";
@@ -49,12 +50,7 @@ export function WorkspaceModal({
       : `/api/sessions/${encodeURIComponent(sessionId)}/workspace/file?path=${encodeURIComponent(file.path)}`;
     const response = await userScopedFetch(path);
     if (!response.ok) throw new Error(await readApiError(response));
-    const url = URL.createObjectURL(await response.blob());
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = file.name;
-    anchor.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(await response.blob(), file.name);
   };
 
   const reveal = async (file: WorkspaceFile) => {
