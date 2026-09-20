@@ -82,6 +82,22 @@ function ChatView({
   const [artifactsOpen, setArtifactsOpen] = useState(savedArtifacts.open);
   const workspaceReady =
     app.sessionLoadState === "loaded" || app.sessionLoadState === "empty";
+  useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const onResize = () => {
+      document.documentElement.setAttribute("data-window-resizing", "");
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        document.documentElement.removeAttribute("data-window-resizing");
+      }, 150);
+    };
+    window.addEventListener("resize", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      clearTimeout(timeout);
+      document.documentElement.removeAttribute("data-window-resizing");
+    };
+  }, []);
   const mobileLayout = useMobileLayout();
   const chatsOpen = mobileLayout ? app.sidebarOpen : !app.sidebarCollapsed;
   const toggleChats = () => {
