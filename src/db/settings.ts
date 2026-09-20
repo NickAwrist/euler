@@ -33,12 +33,9 @@ export function setDefaultRunAgent(ownerUuid: string, name: string): boolean {
   return true;
 }
 
-/** Stored setting, then optional .env setting; empty means use the ollama-js default local URL. */
+/** Explicit environment configuration takes precedence over saved UI settings. */
 export function getOllamaHost(): string {
-  const row = getDb()
-    .query("SELECT value FROM app_settings WHERE key = ?")
-    .get(OLLAMA_HOST_KEY) as { value: string } | null;
-  return row?.value?.trim() || envConfig.ollamaHost;
+  return envConfig.ollamaHost || getAppSetting(OLLAMA_HOST_KEY);
 }
 
 export function setOllamaHost(host: string): void {
@@ -63,7 +60,7 @@ function setAppSetting(key: string, value: string): void {
 }
 
 export function getComfyUIHost(): string {
-  return getAppSetting(COMFYUI_HOST_KEY) || envConfig.comfyuiHost;
+  return envConfig.comfyuiHost || getAppSetting(COMFYUI_HOST_KEY);
 }
 
 export function setComfyUIHost(host: string): void {
@@ -102,7 +99,7 @@ export function setComfyUINegativePrompt(value: string): void {
 }
 
 export function getSearXNGHost(): string {
-  return getAppSetting(SEARXNG_HOST_KEY) || envConfig.searxngHost;
+  return envConfig.searxngHost || getAppSetting(SEARXNG_HOST_KEY);
 }
 
 export function setSearXNGHost(host: string): void {
@@ -114,10 +111,7 @@ export function setSearXNGHost(host: string): void {
 }
 
 export function getOpenRouterApiKey(): string {
-  const row = getDb()
-    .query("SELECT value FROM app_settings WHERE key = ?")
-    .get(OPENROUTER_API_KEY_KEY) as { value: string } | null;
-  return row === null ? envConfig.openrouterApiKey : row.value.trim();
+  return envConfig.openrouterApiKey || getAppSetting(OPENROUTER_API_KEY_KEY);
 }
 
 export function setOpenRouterApiKey(key: string): void {

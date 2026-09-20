@@ -56,7 +56,9 @@ for (const device of ["desktop", "mobile"] as const) {
       )
         sessionReads++;
       if (path === "/api/settings/openrouter")
-        return route.fulfill({ json: { hasKey: true } });
+        return route.fulfill({
+          json: { hasKey: true, environmentManaged: false },
+        });
       if (path === "/api/settings/openrouter/catalog")
         return route.fulfill({
           json: {

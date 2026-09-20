@@ -11,10 +11,12 @@ import { UnsavedChangesModal } from "./UnsavedChangesModal";
 import { WebSearchTab } from "./WebSearchTab";
 import type { SettingsPageProps } from "./types";
 import type { SettingsTab } from "./types";
+import { useEnvironmentSettings } from "./useEnvironmentSettings";
 import { useSettingsPageState } from "./useSettingsPageState";
 
 export function SettingsPage(props: SettingsPageProps) {
   const p = useSettingsPageState(props);
+  const environment = useEnvironmentSettings();
   const [leavePromptOpen, setLeavePromptOpen] = useState(false);
 
   const leave = () => {
@@ -95,9 +97,9 @@ export function SettingsPage(props: SettingsPageProps) {
 
       <main className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="mx-auto max-w-2xl space-y-6">
-          {p.error && (
+          {(p.error || environment.error) && (
             <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
-              {p.error}
+              {p.error || environment.error}
             </div>
           )}
 
@@ -111,6 +113,7 @@ export function SettingsPage(props: SettingsPageProps) {
 
           {p.tab === "ollama" && (
             <OllamaSettingsTab
+              environmentManaged={environment.settings?.ollamaHost}
               ollamaUri={p.ollamaUri}
               onOllamaUriInput={p.onOllamaUriInput}
               ollamaConnected={props.ollamaConnected}
@@ -121,6 +124,7 @@ export function SettingsPage(props: SettingsPageProps) {
 
           {p.tab === "image-generation" && (
             <ImageGenerationTab
+              environmentManaged={environment.settings?.comfyuiHost}
               comfyuiConnected={props.comfyuiConnected}
               comfyUri={p.comfyUri}
               onComfyUriInput={p.onComfyUriInput}
@@ -142,6 +146,7 @@ export function SettingsPage(props: SettingsPageProps) {
 
           {p.tab === "web-search" && (
             <WebSearchTab
+              environmentManaged={environment.settings?.searxngHost}
               searxngConnected={props.searxngConnected}
               searxngUri={p.searxngUri}
               onSearxngUriInput={p.onSearxngUriInput}
@@ -154,7 +159,7 @@ export function SettingsPage(props: SettingsPageProps) {
             <div className="flex justify-end border-t border-border-subtle pt-6">
               <Button
                 variant="primary"
-                disabled={!p.isDirty || p.isSaving}
+                disabled={!environment.settings || !p.isDirty || p.isSaving}
                 loading={p.isSaving}
                 icon={Save}
                 onClick={() => void p.handleSubmit()}

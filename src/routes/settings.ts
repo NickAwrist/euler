@@ -15,7 +15,9 @@ import {
   setPublisherSubscription,
   trackOpenRouterPublisher,
 } from "../db/openrouter";
+import { envConfig, getEnvironmentSettings } from "../env";
 import { asyncRoute } from "../http/asyncRoute";
+import { canEditEnvironmentSetting } from "../http/environmentSettings";
 import { sendApiError } from "../http/errors";
 import { catalogFreshness, isInteractiveModel } from "../openRouterModels";
 import {
@@ -29,6 +31,10 @@ import { publisherName } from "../openRouterPublishers";
 import { requireUserId } from "../userIdentity";
 
 const settingsRoutes = Router();
+
+settingsRoutes.get("/environment", (_req, res) => {
+  res.json(getEnvironmentSettings());
+});
 
 settingsRoutes.get("/default-run-agent", (req, res) => {
   const ownerUuid = requireUserId(req, res);
@@ -49,7 +55,10 @@ settingsRoutes.put("/default-run-agent", (req, res) => {
 });
 
 settingsRoutes.get("/openrouter", (_req, res) => {
-  res.json({ hasKey: getOpenRouterApiKey().length > 0 });
+  res.json({
+    hasKey: getOpenRouterApiKey().length > 0,
+    environmentManaged: Boolean(envConfig.openrouterApiKey),
+  });
 });
 
 settingsRoutes.put("/openrouter", (req, res) => {
@@ -60,7 +69,11 @@ settingsRoutes.put("/openrouter", (req, res) => {
     sendApiError(res, 400, "BAD_REQUEST", "apiKey must be a string");
     return;
   }
-  setOpenRouterApiKey(parsed.data.apiKey);
+  if (
+    canEditEnvironmentSetting(envConfig.openrouterApiKey, parsed.data.apiKey)
+  ) {
+    setOpenRouterApiKey(parsed.data.apiKey);
+  }
   res.json({ ok: true, hasKey: getOpenRouterApiKey().length > 0 });
 });
 

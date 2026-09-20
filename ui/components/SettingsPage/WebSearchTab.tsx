@@ -3,11 +3,13 @@ import {
   ConnectionTestFeedback,
   searxngConnectionFeedback,
 } from "./ConnectionTestFeedback";
-import { hintClass, inputClass, labelClass } from "./constants";
+import { EnvironmentSettingHint } from "./EnvironmentSettingHint";
+import { inputClass, labelClass } from "./constants";
 import type { SearXNGTestState } from "./types";
 
 type Props = {
   searxngConnected: boolean | null;
+  environmentManaged: boolean | undefined;
   searxngUri: string;
   onSearxngUriInput: (v: string) => void;
   searxngTestState: SearXNGTestState;
@@ -16,6 +18,7 @@ type Props = {
 
 export function WebSearchTab({
   searxngConnected,
+  environmentManaged,
   searxngUri,
   onSearxngUriInput,
   searxngTestState,
@@ -33,7 +36,9 @@ export function WebSearchTab({
           <input
             type="text"
             id="searxngUri"
+            aria-describedby="searxngUri-environment"
             value={searxngUri}
+            disabled={environmentManaged !== false}
             onChange={(e) => onSearxngUriInput(e.target.value)}
             placeholder="http://127.0.0.1:8080"
             autoComplete="off"
@@ -50,10 +55,13 @@ export function WebSearchTab({
               : "Test connection"}
           </button>
         </div>
-        <p className={hintClass}>
+        <EnvironmentSettingHint
+          id="searxngUri-environment"
+          managed={environmentManaged}
+        >
           Leave empty to use the default local SearXNG address
           (http://127.0.0.1:8080).
-        </p>
+        </EnvironmentSettingHint>
         <ConnectionTestFeedback
           {...searxngConnectionFeedback(searxngTestState, searxngConnected)}
         />

@@ -59,10 +59,9 @@ export function useSettings(
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(comfyui),
         });
-        if (cRes.ok) {
-          const cData = (await cRes.json()) as ComfyConfigResponse;
-          applyComfyConfigResponse(cData);
-        }
+        if (!cRes.ok) throw new Error("Failed to save ComfyUI settings");
+        const cData = (await cRes.json()) as ComfyConfigResponse;
+        applyComfyConfigResponse(cData);
         void fetchComfyUIHealth();
       }
 
@@ -72,10 +71,9 @@ export function useSettings(
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(searxng),
         });
-        if (sRes.ok) {
-          const sData = (await sRes.json()) as SearXNGConfigResponse;
-          applySearXNGConfigResponse(sData);
-        }
+        if (!sRes.ok) throw new Error("Failed to save SearXNG settings");
+        const sData = (await sRes.json()) as SearXNGConfigResponse;
+        applySearXNGConfigResponse(sData);
         void fetchSearXNGHealth();
       }
     },

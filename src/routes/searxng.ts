@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { withContainerLoopbackHint } from "../containerNetworkHint";
 import { setSearXNGHost } from "../db/index";
+import { envConfig } from "../env";
+import { canEditEnvironmentSetting } from "../http/environmentSettings";
 import { sendValidationError } from "../http/validation";
 import {
   SearXNGConfigPutSchema,
@@ -32,7 +34,9 @@ router.put("/config", (req, res) => {
     return;
   }
   if (parsed.data.host !== undefined) {
-    setSearXNGHost(parsed.data.host);
+    if (canEditEnvironmentSetting(envConfig.searxngHost, parsed.data.host)) {
+      setSearXNGHost(parsed.data.host);
+    }
     invalidateSearXNGClient();
   }
   res.json(getSearXNGHostConfig());

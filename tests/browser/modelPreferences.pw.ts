@@ -162,7 +162,7 @@ for (const device of ["desktop", "mobile"] as const) {
               : path.endsWith("/publishers")
                 ? { catalog: catalog(), publishers: [publisher()] }
                 : path.endsWith("/openrouter")
-                  ? { hasKey: true }
+                  ? { hasKey: true, environmentManaged: false }
                   : path.endsWith("/health")
                     ? { connected: true }
                     : {};
