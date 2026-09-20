@@ -27,7 +27,7 @@ function normalizeFlattenedPipeTables(markdown: string): string {
 }
 
 const codeCopyBtn =
-  "code-copy-action inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md bg-transparent text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent-ring";
+  "code-copy-action inline-flex shrink-0 items-center justify-center rounded-md bg-transparent text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-2 focus-visible:outline-accent-ring";
 
 function CodeBlock({
   className,
@@ -109,7 +109,6 @@ function MarkdownPre({
       aria-label={copied ? "Copied" : "Copy code"}
     >
       {copied ? <Check size={15} /> : <Copy size={15} />}
-      {!singleLine && <span>{copied ? "Copied" : "Copy"}</span>}
     </button>
   );
 
