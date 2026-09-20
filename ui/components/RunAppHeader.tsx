@@ -1,5 +1,4 @@
-import { Bug, Check, Copy, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { Bug, Download, EyeOff } from "lucide-react";
 import { cx, iconButton } from "../styles";
 
 type RunAppHeaderProps = {
@@ -8,7 +7,7 @@ type RunAppHeaderProps = {
   sidebarCollapsed?: boolean;
   debugOpen: boolean;
   onToggleDebug: () => void;
-  onCopyEntireRun?: () => Promise<boolean>;
+  onExportEntireRun?: () => void;
   isEphemeral?: boolean;
 };
 
@@ -22,20 +21,9 @@ export function RunAppHeader({
   sidebarCollapsed = false,
   debugOpen,
   onToggleDebug,
-  onCopyEntireRun,
+  onExportEntireRun,
   isEphemeral,
 }: RunAppHeaderProps) {
-  const [runCopied, setRunCopied] = useState(false);
-
-  const handleCopyRun = async () => {
-    if (!onCopyEntireRun) return;
-    const ok = await onCopyEntireRun();
-    if (ok) {
-      setRunCopied(true);
-      window.setTimeout(() => setRunCopied(false), 1500);
-    }
-  };
-
   return (
     <div
       className={cx(
@@ -60,15 +48,15 @@ export function RunAppHeader({
         )}
       </div>
       <div className="pointer-events-auto flex shrink-0 items-center gap-1">
-        {activeSessionId && onCopyEntireRun && (
+        {activeSessionId && onExportEntireRun && (
           <button
             type="button"
-            onClick={() => void handleCopyRun()}
+            onClick={onExportEntireRun}
             className={cx(iconButton)}
-            title={runCopied ? "Copied" : "Copy entire chat"}
-            aria-label={runCopied ? "Copied" : "Copy entire chat"}
+            title="Export chat as Markdown"
+            aria-label="Export chat as Markdown"
           >
-            {runCopied ? <Check size={18} /> : <Copy size={18} />}
+            <Download size={18} />
           </button>
         )}
         {activeSessionId && (

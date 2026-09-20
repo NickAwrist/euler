@@ -23,7 +23,7 @@ import type { RunCommandName } from "./components/runCommands";
 import { useAppKeybinds } from "./hooks/useAppKeybinds";
 import { useMobileLayout } from "./hooks/useMobileLayout";
 import { useRunApp } from "./hooks/useRunApp";
-import { copyTextToClipboard } from "./lib/copyTextToClipboard";
+import { downloadBlob } from "./lib/downloadBlob";
 import { formatRunTranscript } from "./lib/formatRunTranscript";
 import { cx } from "./styles";
 import type { AppView } from "./types";
@@ -249,15 +249,19 @@ function ChatView({
             sidebarCollapsed={app.sidebarCollapsed}
             debugOpen={app.debugOpen}
             onToggleDebug={app.toggleDebug}
-            onCopyEntireRun={
+            onExportEntireRun={
               app.activeSessionId
-                ? async () =>
-                    copyTextToClipboard(
-                      formatRunTranscript(app.messages, {
-                        streamingAssistant: app.streamingContent.trim()
-                          ? app.streamingContent
-                          : undefined,
-                      }),
+                ? () =>
+                    downloadBlob(
+                      new Blob(
+                        [
+                          formatRunTranscript(app.messages, {
+                            streamingAssistant: app.streamingContent,
+                          }),
+                        ],
+                        { type: "text/markdown;charset=utf-8" },
+                      ),
+                      `chat-${app.activeSessionId}.md`,
                     )
                 : undefined
             }
