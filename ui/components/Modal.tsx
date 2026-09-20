@@ -29,6 +29,7 @@ export interface ModalProps {
   busy?: boolean;
   maxWidthClass?: string;
   surfaceClassName?: string;
+  layout?: "grid" | "flex";
   className?: string;
   ariaLabel?: string;
   ariaLabelledBy?: string;
@@ -50,6 +51,7 @@ export function Modal({
   busy = false,
   maxWidthClass = "max-w-[400px]",
   surfaceClassName,
+  layout = "grid",
   className,
   ariaLabel,
   ariaLabelledBy,
@@ -135,7 +137,15 @@ export function Modal({
       onKeyDown={handleKeyDown}
     >
       <div className={cx("relative w-full", maxWidthClass)}>
-        <div className={cx(modalSurface, surfaceClassName)}>
+        <div
+          className={cx(
+            modalSurface,
+            layout === "flex"
+              ? "flex flex-col"
+              : "grid grid-rows-[auto_minmax(0,1fr)]",
+            surfaceClassName,
+          )}
+        >
           {showHeader && (
             <div className={modalHeader}>
               <div>

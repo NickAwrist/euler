@@ -104,7 +104,8 @@ export function PublisherDialog({
       onClose={onClose}
       busy={busy}
       maxWidthClass="max-w-3xl"
-      surfaceClassName="flex h-[min(42rem,85dvh)] flex-col overflow-hidden shadow-xl"
+      layout="flex"
+      surfaceClassName="h-[min(42rem,85dvh)] overflow-hidden shadow-xl"
     >
       <div className="shrink-0 space-y-3 border-b border-border-subtle p-4">
         {publisher !== "add" && (

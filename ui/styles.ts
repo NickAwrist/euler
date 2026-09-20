@@ -9,10 +9,10 @@ export const modalShell =
   "fixed inset-0 z-50 m-0 [&:not([open])]:hidden flex h-screen max-h-none w-screen max-w-none items-center justify-center border-0 bg-black/55 p-4 text-foreground backdrop-blur-[8px] sm:p-[10px] ui-animate-modal-shell";
 
 export const modalSurface =
-  "grid max-h-[calc(100vh-32px)] grid-rows-[auto_minmax(0,1fr)] rounded-xl border border-border-subtle bg-surface ui-animate-modal-panel";
+  "max-h-[calc(100vh-32px)] rounded-xl border border-border-subtle bg-surface ui-animate-modal-panel";
 
 export const modalHeader =
-  "flex items-center justify-between gap-3 border-b border-border-subtle px-[18px] py-[14px] sm:px-3.5 sm:py-3.5";
+  "flex shrink-0 items-center justify-between gap-3 border-b border-border-subtle px-[18px] py-[14px] sm:px-3.5 sm:py-3.5";
 
 export const modalCloseButton =
   "inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-[color,background-color,transform] duration-150 ease-out hover:bg-muted hover:text-foreground active:scale-[0.94] active:bg-muted/80";

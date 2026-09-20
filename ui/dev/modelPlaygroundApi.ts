@@ -6,6 +6,7 @@ import {
 
 export type DemoScenario =
   | "ready"
+  | "large"
   | "empty"
   | "stale"
   | "unavailable"
@@ -68,6 +69,25 @@ export function resetDemo(next: DemoScenario) {
   simulatedNow = now;
   knownModels = [...initialModels, archived];
   models = next === "empty" ? [] : [...initialModels];
+  if (next === "large") {
+    models.push(
+      ...Array.from({ length: 24 }, (_, index) =>
+        sample(
+          `anthropic/demo-extra-${index}`,
+          `Additional model ${index + 1} · Demo`,
+          30,
+        ),
+      ),
+      ...Array.from({ length: 24 }, (_, index) =>
+        sample(
+          `publisher-${index}/demo-model`,
+          `Publisher model ${index + 1}`,
+          30,
+        ),
+      ),
+    );
+    knownModels = [...models, archived];
+  }
   choices =
     next === "empty"
       ? new Map()

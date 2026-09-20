@@ -77,7 +77,8 @@ export function DirectoryModal({
       closeDisabled={pending}
       hideCloseButton
       maxWidthClass="max-w-[640px]"
-      surfaceClassName="flex flex-col overflow-hidden max-h-[calc(100dvh-32px)]"
+      layout="flex"
+      surfaceClassName="overflow-hidden max-h-[calc(100dvh-32px)]"
       initialFocusRef={inputRef}
     >
       <form

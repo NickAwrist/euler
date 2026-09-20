@@ -22,6 +22,12 @@ const scenarios: { id: DemoScenario; name: string; description: string }[] = [
       "Browse publishers, enable models, and try stars in settings or the composer. Includes a retired saved model and a free chat-only model.",
   },
   {
+    id: "large",
+    name: "Large catalog",
+    description:
+      "Long model and publisher lists to check scrolling and fixed dialog controls.",
+  },
+  {
     id: "empty",
     name: "Empty",
     description:
