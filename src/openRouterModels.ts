@@ -18,7 +18,13 @@ const RemoteModel = z.object({
   top_provider: z
     .object({ context_length: z.number().int().positive().nullish() })
     .nullish(),
-  pricing: z.object({ prompt: z.unknown(), completion: z.unknown() }).nullish(),
+  pricing: z
+    .object({
+      prompt: z.unknown(),
+      completion: z.unknown(),
+      input_cache_read: z.unknown(),
+    })
+    .nullish(),
   architecture: z.object({
     input_modalities: z.array(z.string()),
     output_modalities: z.array(z.string()),
@@ -46,6 +52,7 @@ export type CatalogModel = {
   contextLength: number | null;
   promptPricePerMillion: number | null;
   completionPricePerMillion: number | null;
+  cacheReadPricePerMillion?: number | null;
   inputCapabilities: InputCapabilityValue[];
   supportsTools: boolean;
   outputCapabilities: string[];
@@ -85,6 +92,7 @@ export function normalizeCatalog(payload: unknown): CatalogModel[] {
       model.top_provider?.context_length ?? model.context_length ?? null,
     promptPricePerMillion: price(model.pricing?.prompt),
     completionPricePerMillion: price(model.pricing?.completion),
+    cacheReadPricePerMillion: price(model.pricing?.input_cache_read),
     inputCapabilities: parseInputCapabilities(
       model.architecture.input_modalities,
     ),

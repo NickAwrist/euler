@@ -1,6 +1,6 @@
-import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { cx } from "../../styles";
+import { BackToChatButton } from "../BackToChatButton";
 import { TruncateConfirmModal } from "../TruncateConfirmModal";
 import { AgentEditor } from "./AgentEditor";
 import { AgentList } from "./AgentList";
@@ -32,14 +32,7 @@ export function AgentsPage({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex shrink-0 items-center gap-3 border-b border-border-subtle px-5 py-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[0.8125rem] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <ArrowLeft size={15} />
-          Back to chat
-        </button>
+        <BackToChatButton onClick={onBack} />
         <div className="h-4 w-px bg-border-subtle" />
         <h1 className="text-[0.9375rem] font-semibold text-foreground">
           Customization

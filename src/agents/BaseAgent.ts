@@ -1,6 +1,7 @@
 import type { Plan } from "../Plan";
 import type { LlmMetrics, RunContext, Step } from "../RunContext";
 import { DEFAULT_RUN_MODEL } from "../constants";
+import { recordUsage } from "../db/usage";
 import {
   type LlmImage,
   type LlmMessage,
@@ -221,6 +222,13 @@ export class BaseAgent {
         if (!signal?.aborted) throw e;
       } finally {
         signal?.removeEventListener("abort", onAbort);
+        if (llmMetrics && ctx.ownerUuid) {
+          try {
+            recordUsage(ctx.ownerUuid, this.model, llmMetrics);
+          } catch (err) {
+            log.error({ err }, "Could not record model usage");
+          }
+        }
       }
 
       if (signal?.aborted) {

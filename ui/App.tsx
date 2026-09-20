@@ -17,6 +17,7 @@ import { SidebarBackdrop } from "./components/SidebarBackdrop";
 import { SidebarToggle } from "./components/SidebarToggle";
 import { StepsModal } from "./components/StepsModal";
 import { TruncateConfirmModal } from "./components/TruncateConfirmModal";
+import { UsagePage } from "./components/UsagePage";
 import { WelcomeHome } from "./components/WelcomeHome";
 import { WorkspaceModal } from "./components/WorkspaceModal";
 import type { RunCommandName } from "./components/runCommands";
@@ -36,6 +37,7 @@ type ChatViewProps = {
   runCommand: (command: RunCommandName) => Promise<void>;
   onCustomization: () => void;
   onSettings: () => void;
+  onUsage: () => void;
 };
 
 const ARTIFACT_STATE_KEY = "euler:artifactSidebarState";
@@ -73,6 +75,7 @@ function ChatView({
   runCommand,
   onCustomization,
   onSettings,
+  onUsage,
 }: ChatViewProps) {
   const workspaceKey = `${app.activeSessionId}:${app.workspace.kind === "local" ? app.workspace.path : "sandbox"}`;
   const [savedArtifacts] = useState(loadArtifactState);
@@ -267,6 +270,7 @@ function ChatView({
             isLoading={app.isLoading}
             onCustomization={onCustomization}
             onSettings={onSettings}
+            onUsage={onUsage}
           />
         </aside>
 
@@ -478,7 +482,9 @@ export default function App() {
           app.noProviderAvailable && "pt-9",
         )}
       >
-        {currentView === "agents" ? (
+        {currentView === "usage" ? (
+          <UsagePage onBack={() => setCurrentView("run")} />
+        ) : currentView === "agents" ? (
           <main className="relative h-full min-h-0 min-w-0 flex-1 bg-background">
             <AgentsPage
               defaultRunAgent={app.serverDefaultRunAgent}
@@ -517,6 +523,7 @@ export default function App() {
             runCommand={runCommand}
             onCustomization={openCustomization}
             onSettings={openSettings}
+            onUsage={() => setCurrentView("usage")}
           />
         )}
 
