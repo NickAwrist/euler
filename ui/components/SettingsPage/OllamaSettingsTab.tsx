@@ -3,16 +3,19 @@ import {
   ConnectionTestFeedback,
   ollamaConnectionFeedback,
 } from "./ConnectionTestFeedback";
-import { hintClass, inputClass, labelClass } from "./constants";
+import { EnvironmentSettingHint } from "./EnvironmentSettingHint";
+import { inputClass, labelClass } from "./constants";
 import type { OllamaTestState } from "./types";
 
 export function OllamaSettingsTab({
+  environmentManaged,
   ollamaUri,
   onOllamaUriInput,
   ollamaConnected,
   testState,
   onTestOllama,
 }: {
+  environmentManaged: boolean | undefined;
   ollamaUri: string;
   onOllamaUriInput: (value: string) => void;
   ollamaConnected: boolean | null;
@@ -31,8 +34,10 @@ export function OllamaSettingsTab({
           <input
             type="text"
             id="ollamaUri"
+            aria-describedby="ollamaUri-environment"
             name="ollamaUri"
             value={ollamaUri}
+            disabled={environmentManaged !== false}
             onChange={(event) => onOllamaUriInput(event.target.value)}
             placeholder="http://127.0.0.1:11434"
             autoComplete="off"
@@ -47,10 +52,13 @@ export function OllamaSettingsTab({
             {testState.status === "loading" ? "Testing..." : "Test connection"}
           </button>
         </div>
-        <p className={hintClass}>
+        <EnvironmentSettingHint
+          id="ollamaUri-environment"
+          managed={environmentManaged}
+        >
           Leave empty to use the default local Ollama address
           (http://127.0.0.1:11434).
-        </p>
+        </EnvironmentSettingHint>
         <ConnectionTestFeedback
           {...ollamaConnectionFeedback(testState, ollamaConnected)}
         />

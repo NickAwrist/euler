@@ -295,7 +295,7 @@ export function installDemoApi() {
           configured = Boolean(body.apiKey?.trim());
           record(configured ? "Demo key configured." : "Demo key removed.");
         }
-        return Response.json({ hasKey: configured });
+        return Response.json({ hasKey: configured, environmentManaged: false });
       }
       if (path === "settings/openrouter/models" && body.route) {
         const model = models.find((entry) => entry.route === body.route);

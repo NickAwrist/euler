@@ -3,6 +3,7 @@ import {
   ConnectionTestFeedback,
   comfyConnectionFeedback,
 } from "./ConnectionTestFeedback";
+import { EnvironmentSettingHint } from "./EnvironmentSettingHint";
 import {
   SIZE_PRESETS,
   hintClass,
@@ -15,6 +16,7 @@ import type { ComfyUITestState } from "./types";
 
 type Props = {
   comfyuiConnected: boolean | null;
+  environmentManaged: boolean | undefined;
   comfyUri: string;
   onComfyUriInput: (v: string) => void;
   comfyTestState: ComfyUITestState;
@@ -30,6 +32,7 @@ type Props = {
 
 export function ImageGenerationTab({
   comfyuiConnected,
+  environmentManaged,
   comfyUri,
   onComfyUriInput,
   comfyTestState,
@@ -54,7 +57,9 @@ export function ImageGenerationTab({
           <input
             type="text"
             id="comfyUri"
+            aria-describedby="comfyUri-environment"
             value={comfyUri}
+            disabled={environmentManaged !== false}
             onChange={(e) => onComfyUriInput(e.target.value)}
             placeholder="http://127.0.0.1:8188"
             autoComplete="off"
@@ -71,10 +76,13 @@ export function ImageGenerationTab({
               : "Test connection"}
           </button>
         </div>
-        <p className={hintClass}>
+        <EnvironmentSettingHint
+          id="comfyUri-environment"
+          managed={environmentManaged}
+        >
           Leave empty to use the default local ComfyUI address
           (http://127.0.0.1:8188).
-        </p>
+        </EnvironmentSettingHint>
         <ConnectionTestFeedback
           {...comfyConnectionFeedback(comfyTestState, comfyuiConnected)}
         />

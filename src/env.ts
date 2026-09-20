@@ -58,3 +58,14 @@ export const envConfig = {
     "EULER_OPENROUTER_API_KEY",
   ]),
 };
+
+/** Only expose ownership flags to the browser, never environment secrets. */
+export function getEnvironmentSettings() {
+  return {
+    ollamaHost: Boolean(envConfig.ollamaHost),
+    comfyuiHost: Boolean(envConfig.comfyuiHost),
+    searxngHost: Boolean(envConfig.searxngHost),
+  };
+}
+
+export type EnvironmentSettings = ReturnType<typeof getEnvironmentSettings>;

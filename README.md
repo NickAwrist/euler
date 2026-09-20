@@ -54,7 +54,11 @@ EULER_COMFYUI_HOST=http://127.0.0.1:8188
 EULER_SEARXNG_HOST=http://127.0.0.1:8080
 ```
 
-If these are omitted, the app keeps its existing defaults. Endpoint values saved in the Settings UI take precedence over `.env` endpoint values.
+Nonempty environment values always take precedence over saved settings and defaults.
+Settings controlled by the environment are disabled in the UI. Remove the environment
+value and restart the server to manage that setting through the UI. API requests that
+change an environment-controlled setting are rejected; saving other settings still works.
+Empty or whitespace-only optional values are treated as unset.
 
 In development, the backend API and Vite UI are separate processes:
 
@@ -80,10 +84,8 @@ primary checkout has no dependencies installed.
 New worktrees copy the primary checkout's SQLite database and retained workspaces.
 The database snapshot includes committed WAL data. Existing destination data is
 preserved, and rerunning setup with an existing `.env` does not copy data again.
-Temporary workspaces and trash are not copied. Saved endpoint settings still take
-precedence over `.env`; clear them in Settings to use your environment values.
-When `.env` supplies an OpenRouter dev key, the initializer removes the saved
-OpenRouter key override from the new database snapshot so the dev key takes effect.
+Temporary workspaces and trash are not copied. Environment values
+in `.env` take precedence over copied Settings values, including in existing worktrees.
 The primary database and existing worktrees are unchanged. Service endpoints,
 environment API keys, and `EULER_HOST_DIRECTORY` are copied unchanged. Open `/` on your configured Vite
 port to use the full app with these settings.
@@ -94,7 +96,8 @@ T3 Code can invoke the same command on worktree creation using its
 checkout creates `.env` from the example if needed.
 
 The `/dev/...` routes are isolated UI examples for automated browser checks.
-Unit tests continue to use an in-memory database and mocked services.
+Both `bun test` and `bun run test` automatically load the test setup, which uses an
+in-memory database and mocked services. Dev instances use your real configuration.
 
 ## Deployment (deployctl)
 

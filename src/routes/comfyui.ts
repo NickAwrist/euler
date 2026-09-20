@@ -17,7 +17,9 @@ import {
   setComfyUIImageSize,
   setComfyUINegativePrompt,
 } from "../db/index";
+import { envConfig } from "../env";
 import { asyncRoute } from "../http/asyncRoute";
+import { canEditEnvironmentSetting } from "../http/environmentSettings";
 import { sendApiError } from "../http/errors";
 import { sendValidationError } from "../http/validation";
 import { logger } from "../logger";
@@ -67,7 +69,9 @@ router.put("/config", (req, res) => {
   }
   const body = parsed.data;
   if (body.host !== undefined) {
-    setComfyUIHost(body.host);
+    if (canEditEnvironmentSetting(envConfig.comfyuiHost, body.host)) {
+      setComfyUIHost(body.host);
+    }
     invalidateComfyUIClient();
   }
   if (body.defaultModel !== undefined) {

@@ -6,6 +6,7 @@ import { NewBadge } from "../ModelPreferenceControls";
 import { ProviderIcon } from "../ModelSelectBar";
 import { RefreshButton } from "../RefreshButton";
 import { providerIcons } from "../modelProviders";
+import { EnvironmentSettingHint } from "./EnvironmentSettingHint";
 import { CatalogStatus, PublisherDialog } from "./OpenRouterPublisherDialog";
 import { inputClass, labelClass } from "./constants";
 import { useOpenRouterCatalog } from "./useOpenRouterCatalog";
@@ -13,6 +14,7 @@ import { useOpenRouterCatalog } from "./useOpenRouterCatalog";
 export function OpenRouterSettingsTab({
   onModelsChanged,
 }: { onModelsChanged: () => Promise<void> }) {
+  const [environmentManaged, setEnvironmentManaged] = useState<boolean>();
   const [hasKey, setHasKey] = useState(false);
   const [keyLoading, setKeyLoading] = useState(true);
   const [editingKey, setEditingKey] = useState(false);
@@ -29,10 +31,24 @@ export function OpenRouterSettingsTab({
   const [dialog, setDialog] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    void modelSettingsRequest<{ hasKey: boolean }>("openrouter")
-      .then((key) => setHasKey(key.hasKey))
-      .catch(() => setError("Could not load API key settings."))
-      .finally(() => setKeyLoading(false));
+    let active = true;
+    void modelSettingsRequest<{ hasKey: boolean; environmentManaged: boolean }>(
+      "openrouter",
+    )
+      .then((key) => {
+        if (!active) return;
+        setHasKey(key.hasKey);
+        setEnvironmentManaged(key.environmentManaged);
+      })
+      .catch(() => {
+        if (active) setError("Could not load API key settings.");
+      })
+      .finally(() => {
+        if (active) setKeyLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
   const mutate = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -73,76 +89,94 @@ export function OpenRouterSettingsTab({
                 : "Not configured"}
           </span>
         </h2>
-        {!keyLoading && hasKey && !editingKey && (
-          <Button variant="secondary" onClick={() => setEditingKey(true)}>
+        {!keyLoading && hasKey && !editingKey && !environmentManaged && (
+          <Button
+            variant="secondary"
+            disabled={environmentManaged !== false}
+            onClick={() => setEditingKey(true)}
+          >
             Update key
           </Button>
         )}
-        {!keyLoading && (!hasKey || editingKey) && (
+        {!keyLoading && (!hasKey || editingKey || environmentManaged) && (
           <>
             <label className={labelClass} htmlFor="openrouter-key">
               API key
             </label>
             <input
               id="openrouter-key"
+              aria-describedby={
+                environmentManaged ? "openrouter-environment" : undefined
+              }
               type="password"
               autoComplete="off"
-              value={apiKey}
+              value={environmentManaged ? "••••••••" : apiKey}
+              disabled={environmentManaged !== false}
               onChange={(event) => setApiKey(event.target.value)}
               placeholder={hasKey ? "Enter a replacement key" : "sk-or-..."}
               className={inputClass}
             />
-            <div className="mt-3 flex gap-2">
-              <Button
-                variant="primary"
-                disabled={busy || !apiKey.trim()}
-                loading={busy}
-                onClick={() =>
-                  void mutate(async () => {
-                    const result = await modelSettingsRequest<{
-                      hasKey: boolean;
-                    }>("openrouter", "PUT", { apiKey });
-                    setHasKey(result.hasKey);
-                    setApiKey("");
-                    setEditingKey(false);
-                  })
-                }
-              >
-                Save key
-              </Button>
-              {hasKey && (
+            {!environmentManaged && (
+              <div className="mt-3 flex gap-2">
                 <Button
-                  variant="secondary"
-                  disabled={busy}
+                  variant="primary"
+                  disabled={
+                    environmentManaged !== false || busy || !apiKey.trim()
+                  }
+                  loading={busy}
                   onClick={() =>
                     void mutate(async () => {
-                      await modelSettingsRequest("openrouter", "PUT", {
-                        apiKey: "",
-                      });
-                      setHasKey(false);
+                      const result = await modelSettingsRequest<{
+                        hasKey: boolean;
+                      }>("openrouter", "PUT", { apiKey });
+                      setHasKey(result.hasKey);
                       setApiKey("");
                       setEditingKey(false);
-                      setDialog(null);
                     })
                   }
                 >
-                  Remove key
+                  Save key
                 </Button>
-              )}
-              {hasKey && (
-                <Button
-                  variant="secondary"
-                  disabled={busy}
-                  onClick={() => {
-                    setApiKey("");
-                    setEditingKey(false);
-                  }}
-                >
-                  Cancel
-                </Button>
-              )}
-            </div>
+                {hasKey && (
+                  <Button
+                    variant="secondary"
+                    disabled={environmentManaged !== false || busy}
+                    onClick={() =>
+                      void mutate(async () => {
+                        await modelSettingsRequest("openrouter", "PUT", {
+                          apiKey: "",
+                        });
+                        setHasKey(false);
+                        setApiKey("");
+                        setEditingKey(false);
+                        setDialog(null);
+                      })
+                    }
+                  >
+                    Remove key
+                  </Button>
+                )}
+                {hasKey && (
+                  <Button
+                    variant="secondary"
+                    disabled={environmentManaged !== false || busy}
+                    onClick={() => {
+                      setApiKey("");
+                      setEditingKey(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+            )}
           </>
+        )}
+        {environmentManaged && (
+          <EnvironmentSettingHint
+            id="openrouter-environment"
+            managed={environmentManaged}
+          />
         )}
       </section>
       {error && (

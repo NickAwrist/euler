@@ -2,6 +2,8 @@ import { Router } from "express";
 import { Ollama } from "ollama";
 import { withContainerLoopbackHint } from "../containerNetworkHint";
 import { setOllamaHost } from "../db/index";
+import { envConfig } from "../env";
+import { canEditEnvironmentSetting } from "../http/environmentSettings";
 import {
   getOllamaClient,
   getOllamaHostConfig,
@@ -30,7 +32,9 @@ ollamaRoutes.get("/config", (_req, res) => {
 ollamaRoutes.put("/config", (req, res) => {
   const body = req.body as { host?: unknown };
   const host = typeof body.host === "string" ? body.host.trim() : "";
-  setOllamaHost(host);
+  if (canEditEnvironmentSetting(envConfig.ollamaHost, host)) {
+    setOllamaHost(host);
+  }
   invalidateOllamaClientCache();
   res.json(getOllamaHostConfig());
 });
