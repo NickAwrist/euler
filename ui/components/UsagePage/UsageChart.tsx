@@ -14,13 +14,11 @@ export function UsageChart({
   buckets,
   metric,
   intervalMs,
-  asOf,
 }: {
   series: Series[];
   buckets: number[];
   metric: "tokens" | "spend";
   intervalMs: number;
-  asOf: number;
 }) {
   const hourly = intervalMs === 3600000;
   const tooltipRef = useRef<HTMLDivElement>(null);

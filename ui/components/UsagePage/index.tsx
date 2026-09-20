@@ -1,6 +1,6 @@
 import { ArrowUp } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { UsageDashboard, UsageQuery } from "../../../src/usage";
+import type { UsageDashboard } from "../../../src/usage";
 import { userScopedFetch } from "../../persist/userIdentity";
 import { BackToChatButton } from "../BackToChatButton";
 import { RefreshButton } from "../RefreshButton";
@@ -18,13 +18,7 @@ import {
 import { type SortRule, changeSorting } from "./sorting";
 import "./usage.css";
 
-export function UsagePage({
-  onBack,
-  loadUsage,
-}: {
-  onBack: () => void;
-  loadUsage?: (query: UsageQuery) => Promise<UsageDashboard>;
-}) {
+export function UsagePage({ onBack }: { onBack: () => void }) {
   const [days, setDays] = useState(7);
   const [data, setData] = useState<UsageDashboard | null>(null);
   const [page, setPage] = useState(0);
@@ -43,14 +37,6 @@ export function UsagePage({
     const controller = new AbortController();
     setLoading(true);
     setError("");
-    const query: UsageQuery = {
-      days,
-      grouping,
-      sorting,
-      page,
-      asOf,
-      providers: selected,
-    };
     const params = new URLSearchParams({
       days: String(days),
       grouping,
@@ -59,14 +45,12 @@ export function UsagePage({
       asOf: String(asOf),
     });
     for (const provider of selected) params.append("providers", provider);
-    const request = loadUsage
-      ? loadUsage(query)
-      : userScopedFetch(`/api/usage?${params}`, {
-          signal: controller.signal,
-        }).then(async (response) => {
-          if (!response.ok) throw new Error("Could not load usage. Try again.");
-          return response.json() as Promise<UsageDashboard>;
-        });
+    const request = userScopedFetch(`/api/usage?${params}`, {
+      signal: controller.signal,
+    }).then(async (response) => {
+      if (!response.ok) throw new Error("Could not load usage. Try again.");
+      return response.json() as Promise<UsageDashboard>;
+    });
     request
       .then((result) => {
         if (!controller.signal.aborted) {
@@ -84,7 +68,7 @@ export function UsagePage({
         }
       });
     return () => controller.abort();
-  }, [days, grouping, sorting, page, asOf, selected, loadUsage]);
+  }, [days, grouping, sorting, page, asOf, selected]);
   const refresh = () => {
     setPage(0);
     setAsOf(Date.now());
@@ -226,7 +210,6 @@ export function UsagePage({
                     buckets={data.chart.buckets}
                     metric={metric}
                     intervalMs={data.chart.intervalMs}
-                    asOf={data.asOf}
                   />
                 ) : (
                   <div className="usage-empty">

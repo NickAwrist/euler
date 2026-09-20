@@ -8,7 +8,6 @@ import {
   type LlmToolCall,
   streamModelChat,
 } from "../llm/index";
-import { logger as usageLogger } from "../logger";
 import { logger } from "../logger";
 import { CORE_DIRECTIVES } from "../prompts/render";
 import {
@@ -227,7 +226,7 @@ export class BaseAgent {
           try {
             recordUsage(ctx.ownerUuid, this.model, llmMetrics);
           } catch (err) {
-            usageLogger.error({ err }, "Could not record model usage");
+            log.error({ err }, "Could not record model usage");
           }
         }
       }

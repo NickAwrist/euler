@@ -26,7 +26,7 @@ test("Ollama reports local tokens and zero API spend to usage tracking", async (
       if (chunk.metrics) recordUsage("local-user", "qwen3:8b", chunk.metrics);
     }
     expect(
-      getUsageDashboard("local-user", UsageQuery.parse({})).models,
+      getUsageDashboard("local-user", UsageQuery.parse({})).breakdown.rows,
     ).toMatchObject([{ key: "qwen3:8b", input: 100, output: 20, cost: 0 }]);
   } finally {
     server.stop(true);

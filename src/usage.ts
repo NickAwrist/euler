@@ -63,8 +63,7 @@ export type UsageDashboard = {
   grouping: "model" | "hour";
   asOf: number;
   totals: UsageTotals;
-  models: UsageGroup[];
-  providers: (UsageGroup & { modelCount: number })[];
+  providers: (UsageTotals & { key: string; modelCount: number })[];
   chart: {
     intervalMs: number;
     buckets: number[];

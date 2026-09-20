@@ -22,7 +22,7 @@ const query = (params: Record<string, unknown> = {}) =>
 
 test("SQL aggregates preserve missing metrics, zero local cost, provider filtering, and user/date boundaries", () => {
   insert("openrouter:a", now - 1000, 100, 0.5, "alice", 80);
-  insert("local", now - 1000, 200, null, "alice", null);
+  insert("local", now - 1000, 200, 0, "alice", null);
   insert("openrouter:a", now - 1000, 999, 999, "bob");
   insert("openrouter:a", now + 1, 999, 999);
   insert("openrouter:a", now - 8 * 86400000, 999, 999);
@@ -38,7 +38,7 @@ test("SQL aggregates preserve missing metrics, zero local cost, provider filteri
     savings: null,
     cacheHitRate: 80,
   });
-  expect(data.models.find((row) => row.key === "local")?.cost).toBe(0);
+  expect(data.breakdown.rows.find((row) => row.key === "local")?.cost).toBe(0);
   expect(
     data.chart.series.flatMap((row) => row.tokens).reduce((a, b) => a + b, 0),
   ).toBe(320);
@@ -48,7 +48,7 @@ test("SQL aggregates preserve missing metrics, zero local cost, provider filteri
     now,
   );
   expect(filtered.totals.calls).toBe(1);
-  expect(filtered.models).toHaveLength(2);
+  expect(filtered.providers).toHaveLength(2);
   expect(filtered.chart.series).toHaveLength(1);
   expect(filtered.breakdown.rows[0]?.tokenShare).toBe(100);
   expect(getUsageDashboard("nobody", query(), now).totals).toMatchObject({
@@ -206,9 +206,9 @@ test("every summary follows the period and all time includes older history with 
     cacheHitRate: 86,
   });
   expect(all.totals.savings).toBeCloseTo(0.6);
-  expect(all.models).toHaveLength(2);
-  expect(week.models[0]?.calls).toBe(2);
-  expect(day.models[0]?.calls).toBe(1);
+  expect(all.chart.series).toHaveLength(2);
+  expect(week.breakdown.rows[0]?.calls).toBe(2);
+  expect(day.breakdown.rows[0]?.calls).toBe(1);
   expect(all.chart.buckets.length).toBeLessThanOrEqual(91);
   expect(all.chart.intervalMs).toBeGreaterThan(86400000);
   expect(

@@ -62,21 +62,13 @@ export function recordUsage(
 }
 
 // Aggregate in SQLite: individual call records never cross the API boundary.
-const BASE = `WITH normalized AS (
-  SELECT CASE WHEN model NOT LIKE 'openrouter:%' AND EXISTS
-    (SELECT 1 FROM openrouter_models WHERE route = usage_events.model)
-    THEN 'openrouter:' || model ELSE model END AS model,
-    timestamp, input, output, cached, savings,
-    CASE WHEN model NOT LIKE 'openrouter:%' AND NOT EXISTS
-      (SELECT 1 FROM openrouter_models WHERE route = usage_events.model)
-      THEN 0 ELSE cost END AS cost
-  FROM usage_events WHERE owner_uuid = ? AND timestamp >= ? AND timestamp <= ?
-), calls AS (
-  SELECT normalized.*, CASE WHEN model LIKE 'openrouter:%'
+const BASE = `WITH calls AS (
+  SELECT usage_events.*, CASE WHEN model LIKE 'openrouter:%'
     THEN CASE WHEN instr(substr(model, 12), '/') > 0
       THEN substr(model, 12, instr(substr(model, 12), '/') - 1)
       ELSE substr(model, 12) END
-    ELSE 'ollama' END AS provider FROM normalized
+    ELSE 'ollama' END AS provider
+  FROM usage_events WHERE owner_uuid = ? AND timestamp >= ? AND timestamp <= ?
 )`;
 const TOTALS = `COUNT(*) AS calls,
   COALESCE(SUM(COALESCE(input, 0) + COALESCE(output, 0)), 0) AS tokens,
@@ -106,16 +98,13 @@ export function getUsageDashboard(
       .get(...filteredArgs) as UsageTotals;
     const models = db
       .query(
-        `${BASE} SELECT model AS key, provider, 0 AS timestamp, ${TOTALS} FROM calls GROUP BY model ORDER BY tokens DESC, model`,
+        `${BASE} SELECT model FROM calls${filter} GROUP BY model ORDER BY SUM(COALESCE(input, 0) + COALESCE(output, 0)) DESC, model`,
       )
-      .all(...args) as (UsageGroup & { provider: string })[];
+      .all(...filteredArgs) as { model: string }[];
     const providers = db
-      .query(`${BASE} SELECT provider AS key, 0 AS timestamp,
+      .query(`${BASE} SELECT provider AS key,
       COUNT(DISTINCT model) AS modelCount, ${TOTALS} FROM calls GROUP BY provider ORDER BY tokens DESC, provider`)
       .all(...args) as UsageDashboard["providers"];
-    const allTokens = models.reduce((sum, model) => sum + model.tokens, 0);
-    for (const model of [...models, ...providers])
-      model.tokenShare = allTokens ? (model.tokens / allTokens) * 100 : 0;
     const group =
       query.grouping === "model" ? "model" : "(timestamp / 3600000) * 3600000";
     const count = db
@@ -187,16 +176,11 @@ export function getUsageDashboard(
       tokens: number;
       spend: number;
     }[];
-    const series = models
-      .filter(
-        (model) =>
-          !query.providers.length || query.providers.includes(model.provider),
-      )
-      .map((model) => ({
-        model: model.key,
-        tokens: Array<number>(bucketCount).fill(0),
-        spend: Array<number>(bucketCount).fill(0),
-      }));
+    const series = models.map(({ model }) => ({
+      model,
+      tokens: Array<number>(bucketCount).fill(0),
+      spend: Array<number>(bucketCount).fill(0),
+    }));
     const byModel = new Map(series.map((item) => [item.model, item]));
     for (const row of chartRows) {
       const item = byModel.get(row.model);
@@ -210,7 +194,6 @@ export function getUsageDashboard(
       grouping: query.grouping,
       asOf,
       totals,
-      models,
       providers,
       chart: { intervalMs: size, buckets, series },
       breakdown: { rows, page, pageSize, totalRows: count.count },
