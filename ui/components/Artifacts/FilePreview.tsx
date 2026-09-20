@@ -39,6 +39,22 @@ const renderers: readonly FileRenderer[] = [
   { matches: (preview) => preview.kind === "image", component: ImagePreview },
   {
     matches: (preview) =>
+      preview.kind === "text" && /\.html?$/i.test(preview.path),
+    component: ({ preview }) =>
+      preview.kind === "text" ? (
+        <iframe
+          title={`HTML preview: ${preview.path}`}
+          sandbox=""
+          referrerPolicy="no-referrer"
+          // Apply policy before any artifact markup. Keep styles inside the
+          // frame and prevent resource requests to the app or external sites.
+          srcDoc={`<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'">${preview.content}`}
+          className="block h-full min-h-80 w-full border-0 bg-white"
+        />
+      ) : null,
+  },
+  {
+    matches: (preview) =>
       preview.kind === "text" && /\.(md|markdown)$/i.test(preview.path),
     component: ({ preview }) =>
       preview.kind === "text" ? (

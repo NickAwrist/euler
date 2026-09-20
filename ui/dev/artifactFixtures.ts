@@ -3,6 +3,38 @@ import type { ArtifactSource } from "../components/Artifacts/api";
 import type { Message } from "../types";
 
 const files: Record<string, string> = {
+  "docs/status.html": `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Queue service status</title>
+  <style>
+    body { margin: 0; padding: 24px; background: #f0f4f8; color: #183153; font-family: system-ui, sans-serif; }
+    main { max-width: 640px; margin: auto; }
+    h1 { font-size: 28px; }
+    .status { display: inline-block; padding: 6px 12px; border-radius: 20px; background: #dcfce7; color: #166534; }
+    .metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 24px 0; }
+    article { padding: 20px; border: 1px solid #cbd5e1; border-radius: 12px; background: white; }
+    strong { display: block; font-size: 32px; }
+    summary { cursor: pointer; font-weight: 600; }
+    @media (max-width: 400px) { .metrics { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <span class="status">All systems operational</span>
+    <h1>Queue service status</h1>
+    <p>An HTML artifact with embedded CSS and responsive layout.</p>
+    <section class="metrics">
+      <article><strong>2,500</strong>Jobs processed</article>
+      <article><strong>82 ms</strong>95th percentile latency</article>
+    </section>
+    <details><summary>Release notes</summary><p>Workers now retry transient failures up to three times.</p></details>
+    <p style="color: #64748b">Use Show source to inspect the HTML and CSS.</p>
+  </main>
+</body>
+</html>`,
   "docs/readme.md":
     "# Workspace notes\n\nA preview with **formatted text**.\n\n## Release checklist\n\n- [x] Add workspace browsing\n- [x] Render Markdown\n- [ ] Review file previews\n\n## Service settings\n\n| Setting | Value |\n| --- | --- |\n| Port | 8080 |\n| Health check | /health |\n\n```sh\ncurl http://localhost:8080/health\n```\n\n> Use the source icon to inspect the original Markdown.",
   "docs/architecture.md":
@@ -124,7 +156,7 @@ export function fixtureMessages(alternate: boolean): Message[] {
             },
           ],
           content:
-            "I've prepared the workspace. Start with [the notes](docs/readme.md), which include a checklist, a settings table, and a shell command.\n\nThe implementation is in [src/server.ts](src/server.ts), and [package.json](package.json) contains the start command. Read [the architecture](docs/architecture.md) for the queue and retry design.",
+            "I've prepared the workspace. Start with [the notes](docs/readme.md), which include a checklist, a settings table, and a shell command.\n\nThe implementation is in [src/server.ts](src/server.ts), and [package.json](package.json) contains the start command. Read [the architecture](docs/architecture.md) for the queue and retry design.\n\nOpen [the HTML status page](docs/status.html) to test rendered HTML with CSS, then switch to source to inspect its code.",
         },
         {
           role: "user",

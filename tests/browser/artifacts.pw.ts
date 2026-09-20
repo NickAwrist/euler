@@ -262,3 +262,70 @@ test("artifacts desktop file cards preview and downloads are explicit", async ({
   expect(large.suggestedFilename()).toBe("large.txt");
   expect((await readFile((await large.path())!)).length).toBe(1024 * 1024 + 1);
 });
+
+for (const size of ["desktop", "mobile"] as const) {
+  test(`artifacts ${size} HTML renders CSS and toggles source`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(
+      size === "desktop"
+        ? { width: 1440, height: 900 }
+        : { width: 390, height: 844 },
+    );
+    await page.goto("/dev/artifacts");
+    await page.getByRole("button", { name: "the HTML status page" }).click();
+    const sidebar = page.getByRole("complementary", { name: "Artifacts" });
+    const iframe = sidebar.locator("iframe");
+    const frame = page.frameLocator(
+      'iframe[title="HTML preview: docs/status.html"]',
+    );
+    await expect(
+      frame.getByRole("heading", { name: "Queue service status" }),
+    ).toBeVisible();
+    await expect(frame.locator("body")).toHaveCSS(
+      "background-color",
+      "rgb(240, 244, 248)",
+    );
+    await expect(frame.locator(".status")).toHaveCSS(
+      "color",
+      "rgb(22, 101, 52)",
+    );
+    await expect(frame.getByText("Use Show source")).toHaveCSS(
+      "color",
+      "rgb(100, 116, 139)",
+    );
+    await expect(iframe).toHaveAttribute("sandbox", "");
+    // Artifact CSS must not change the surrounding app.
+    await expect(sidebar).not.toHaveCSS(
+      "background-color",
+      "rgb(240, 244, 248)",
+    );
+    await frame.getByText("Release notes", { exact: true }).click();
+    await expect(frame.getByText("Workers now retry")).toBeVisible();
+    const bounds = (await iframe.boundingBox())!;
+    expect(bounds.height).toBeGreaterThan(300);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(
+      page.viewportSize()!.width,
+    );
+    await page.screenshot({ path: testInfo.outputPath("html-preview.png") });
+    await page
+      .getByRole("button", { name: "Show source", exact: true })
+      .click();
+    await expect(iframe).toHaveCount(0);
+    await expect(sidebar.locator("pre")).toContainText("<!doctype html>");
+    await expect(sidebar.locator("pre")).toContainText("<style>");
+    await expect(sidebar.locator("code span[style]").first()).toBeVisible();
+    await page.getByRole("button", { name: "Show rendered preview" }).click();
+    await expect(
+      frame.getByRole("heading", { name: "Queue service status" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Refresh preview" }).click();
+    await expect(
+      page.getByRole("button", { name: "Refresh preview" }),
+    ).toBeEnabled();
+    await expect(frame.locator(".status")).toHaveCSS(
+      "color",
+      "rgb(22, 101, 52)",
+    );
+  });
+}
