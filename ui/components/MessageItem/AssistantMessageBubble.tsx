@@ -1,4 +1,4 @@
-import { Check, ChevronRight, Copy, Download, Waypoints } from "lucide-react";
+import { Check, Copy, Download, Waypoints } from "lucide-react";
 import type { CSSProperties } from "react";
 import type { WorkspaceFileAttachment } from "../../../src/attachments/types";
 import { cx } from "../../styles";
@@ -63,14 +63,10 @@ export function AssistantMessageBubble({
                   disabled={!artifacts}
                   aria-label={`Preview ${file.name}`}
                   title={`Preview ${file.path}`}
-                  className="flex max-w-md items-center gap-2 rounded-lg border border-border-subtle bg-muted/40 px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+                  className="flex w-fit max-w-full self-start items-center gap-2 rounded-lg border border-border-subtle bg-muted/40 px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
                 >
                   <FileIcon path={file.path} />
-                  <span className="min-w-0 flex-1 truncate">{file.name}</span>
-                  <ChevronRight
-                    size={14}
-                    className="shrink-0 text-muted-foreground"
-                  />
+                  <span className="min-w-0 truncate">{file.name}</span>
                 </button>
               ))}
             </div>
