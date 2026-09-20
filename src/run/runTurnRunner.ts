@@ -10,6 +10,7 @@ import {
   type SessionRunDeltaEvent,
   type SessionStepEvent,
 } from "../session/AgentSession";
+import { errorMessage } from "../utils/errors";
 import { workspaceService } from "../workspaces/WorkspaceService";
 import type { RunPersistence } from "./runPersistence";
 import type { RunTurnContext } from "./runRequestContext";
@@ -95,7 +96,7 @@ export async function runTurn(
     log.error({ err }, "run failed");
     stream.emit({
       type: "run_error",
-      error: err instanceof Error ? err.message : String(err),
+      error: errorMessage(err),
     });
   } finally {
     session.off("step", onStep);

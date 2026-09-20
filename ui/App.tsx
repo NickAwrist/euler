@@ -75,9 +75,6 @@ function ChatView({
 }: ChatViewProps) {
   const workspaceKey = `${app.activeSessionId}:${app.workspace.kind === "local" ? app.workspace.path : "sandbox"}`;
   const [savedArtifacts] = useState(loadArtifactState);
-  const [artifactWorkspace, setArtifactWorkspace] = useState(
-    savedArtifacts.workspace,
-  );
   const [artifactsOpen, setArtifactsOpen] = useState(savedArtifacts.open);
   const workspaceReady =
     app.sessionLoadState === "loaded" || app.sessionLoadState === "empty";

@@ -1,5 +1,6 @@
 import type { Tool } from "ollama";
 import { envConfig } from "../env";
+import { errorMessage } from "../utils/errors";
 import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
 
 const MAX_CONTENT_LENGTH = 16000;
@@ -71,9 +72,7 @@ export class FetchWebPageTool extends BaseTool {
           : content,
       );
     } catch (error: unknown) {
-      return textToolResult(
-        `Error fetching web page: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      return textToolResult(`Error fetching web page: ${errorMessage(error)}`);
     }
   }
 }

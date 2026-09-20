@@ -1,7 +1,7 @@
 import { KeyRound, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { modelSettingsRequest } from "../../lib/modelSettingsRequest";
-import { primaryButton, secondaryButton } from "../../styles";
+import { Button } from "../Button";
 import { NewBadge } from "../ModelPreferenceControls";
 import { ProviderIcon } from "../ModelSelectBar";
 import { RefreshButton } from "../RefreshButton";
@@ -74,13 +74,9 @@ export function OpenRouterSettingsTab({
           </span>
         </h2>
         {!keyLoading && hasKey && !editingKey && (
-          <button
-            type="button"
-            className={secondaryButton}
-            onClick={() => setEditingKey(true)}
-          >
+          <Button variant="secondary" onClick={() => setEditingKey(true)}>
             Update key
-          </button>
+          </Button>
         )}
         {!keyLoading && (!hasKey || editingKey) && (
           <>
@@ -97,10 +93,10 @@ export function OpenRouterSettingsTab({
               className={inputClass}
             />
             <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                className={primaryButton}
+              <Button
+                variant="primary"
                 disabled={busy || !apiKey.trim()}
+                loading={busy}
                 onClick={() =>
                   void mutate(async () => {
                     const result = await modelSettingsRequest<{
@@ -113,11 +109,10 @@ export function OpenRouterSettingsTab({
                 }
               >
                 Save key
-              </button>
+              </Button>
               {hasKey && (
-                <button
-                  type="button"
-                  className={secondaryButton}
+                <Button
+                  variant="secondary"
                   disabled={busy}
                   onClick={() =>
                     void mutate(async () => {
@@ -132,12 +127,11 @@ export function OpenRouterSettingsTab({
                   }
                 >
                   Remove key
-                </button>
+                </Button>
               )}
               {hasKey && (
-                <button
-                  type="button"
-                  className={secondaryButton}
+                <Button
+                  variant="secondary"
                   disabled={busy}
                   onClick={() => {
                     setApiKey("");
@@ -145,7 +139,7 @@ export function OpenRouterSettingsTab({
                   }}
                 >
                   Cancel
-                </button>
+                </Button>
               )}
             </div>
           </>
@@ -166,15 +160,14 @@ export function OpenRouterSettingsTab({
               disabled={busy}
               onClick={() => void mutate(refresh)}
             />
-            <button
-              type="button"
-              className={primaryButton}
+            <Button
+              variant="primary"
+              icon={Plus}
               disabled={loading || !overview}
               onClick={() => setDialog("add")}
             >
-              <Plus size={15} />
               Add publisher
-            </button>
+            </Button>
           </div>
           <p className="text-sm text-muted-foreground">
             Choose which models appear in the composer.
@@ -187,13 +180,12 @@ export function OpenRouterSettingsTab({
           )}
           {loading && <output>Loading publishers...</output>}
           {!loading && !overview && (
-            <button
-              type="button"
-              className={secondaryButton}
+            <Button
+              variant="secondary"
               onClick={() => void mutate(() => load())}
             >
               Retry settings
-            </button>
+            </Button>
           )}
           <div className="grid gap-x-3 gap-y-5 pt-3 sm:grid-cols-2">
             {overview?.publishers

@@ -9,7 +9,7 @@ import {
 import { useListNavigation } from "../hooks/useListNavigation";
 import { hasConfigurableThinking } from "../lib/thinkingLevel";
 import { type SkillData, fetchSkills } from "../persist/skills";
-import { cx, primaryButton } from "../styles";
+import { cx } from "../styles";
 import type { MessageStep, ModelOption, SessionWorkspace } from "../types";
 import { AgentSelectBar } from "./AgentSelectBar";
 import { IconButton } from "./IconButton";
@@ -392,17 +392,14 @@ export function RunInputDock({
               className="mb-0.5 hover:border-red-500/20 hover:bg-red-500/[0.06] hover:text-red-300"
             />
           ) : (
-            <button
+            <IconButton
               type="submit"
+              variant="primary"
+              icon={ArrowUp}
+              label="Send message"
               disabled={!input.trim() || !canSend}
-              className={cx(
-                primaryButton,
-                "mb-0.5 size-9 shrink-0 justify-center rounded-lg p-0",
-              )}
-              aria-label="Send message"
-            >
-              <ArrowUp size={18} />
-            </button>
+              className="mb-0.5"
+            />
           )}
         </div>
         <div

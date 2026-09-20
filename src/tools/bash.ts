@@ -1,6 +1,7 @@
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
 import { sandboxRunner } from "../sandbox/SandboxRunner";
+import { errorMessage } from "../utils/errors";
 import { filterOutputLines } from "../utils/gitignoreFilter";
 import { loadWorkspaceIgnore } from "../workspaces/WorkspaceIgnore";
 import { workspaceService } from "../workspaces/WorkspaceService";
@@ -71,9 +72,7 @@ export class BashTool extends BaseTool {
       );
     } catch (error) {
       if (ctx?.signal?.aborted) return textToolResult("[command aborted]");
-      return textToolResult(
-        `Error executing command: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      return textToolResult(`Error executing command: ${errorMessage(error)}`);
     }
   }
 }

@@ -9,14 +9,18 @@ export async function getActiveRun(
   sessionId: string,
   signal?: AbortSignal,
 ): Promise<ActiveRunStatus | null> {
-  return apiJson<ActiveRunStatus | null>(
-    `/api/runs/active/${encodeURIComponent(sessionId)}`,
-    {
-      signal,
-      notFound: "null",
-      errorMessage: "Failed to check active run status",
-    },
-  );
+  try {
+    return await apiJson<ActiveRunStatus | null>(
+      `/api/runs/active/${encodeURIComponent(sessionId)}`,
+      {
+        signal,
+        notFound: "null",
+      },
+    );
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new Error("Could not check the active run.");
+  }
 }
 
 export function abortRun(requestId: string): Promise<void> {

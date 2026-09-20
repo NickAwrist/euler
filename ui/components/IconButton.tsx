@@ -3,7 +3,7 @@ import type { ButtonHTMLAttributes, ComponentType, ForwardedRef } from "react";
 import { forwardRef } from "react";
 import { cx } from "../styles";
 
-export type IconButtonVariant = "secondary" | "ghost" | "danger";
+export type IconButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 export type IconButtonSize = "sm" | "md";
 
 export interface IconButtonProps
@@ -16,6 +16,8 @@ export interface IconButtonProps
 }
 
 const variantStyles: Record<IconButtonVariant, string> = {
+  primary:
+    "bg-accent font-semibold text-accent-foreground hover:bg-accent-hover active:scale-[0.985] active:brightness-[0.94]",
   secondary:
     "border border-border-subtle bg-transparent text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground active:scale-[0.96] active:bg-muted/70",
   ghost:
@@ -56,7 +58,7 @@ export const IconButton = forwardRef(function IconButton(
       aria-label={label ?? rest["aria-label"] ?? title}
       title={title ?? label ?? rest["aria-label"]}
       className={cx(
-        "inline-flex items-center justify-center transition-[color,background-color,border-color,transform] duration-150 ease-out disabled:pointer-events-none disabled:opacity-40 disabled:active:scale-100",
+        "inline-flex items-center justify-center transition-[color,background-color,border-color,transform] duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100",
         sizeConfig.box,
         variantStyles[variant],
         className,

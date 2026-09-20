@@ -29,8 +29,8 @@ export const SessionSummaryListSchema = z.object({
 
 export const StoredRunSessionSchema = z.object({
   id: z.string(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
+  createdAt: z.number().default(0),
+  updatedAt: z.number().default(0),
   customTitle: z.string().nullable().optional(),
   history: z.array(WireMessageSchema).default([]),
   modelMessages: z
@@ -44,7 +44,7 @@ export const StoredRunSessionSchema = z.object({
 export type StoredRunSession = z.infer<typeof StoredRunSessionSchema>;
 
 export const CreateSessionBodySchema = z.object({
-  model: z.string().trim().min(1).nullable().optional(),
+  model: z.string().trim().nullable().optional(),
 });
 
 export type CreateSessionBody = z.infer<typeof CreateSessionBodySchema>;
@@ -60,3 +60,9 @@ export const PatchSessionBodySchema = z.object({
 });
 
 export type PatchSessionBody = z.infer<typeof PatchSessionBodySchema>;
+
+export const RevealFileSchema = z.object({
+  path: z.string().trim().min(1, "path is required"),
+});
+
+export type RevealFileBody = z.infer<typeof RevealFileSchema>;

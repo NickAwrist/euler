@@ -3,6 +3,7 @@ import { type Dispatch, type SetStateAction, useRef } from "react";
 import { PROMPT_PLACEHOLDER_LIST } from "../../../src/prompts/render";
 import type { AgentData } from "../../persist/agents";
 import type { SkillData } from "../../persist/skills";
+import { cx, inputClass, textareaClass } from "../../styles";
 import { Button } from "../Button";
 import { MultiSelectChips } from "../MultiSelectChips";
 import { canDeleteAgent } from "./agentsPageUtils";
@@ -110,7 +111,7 @@ export function AgentEditor({
             value={editor.name}
             onChange={(e) => setEditor((p) => ({ ...p, name: e.target.value }))}
             placeholder="my_agent"
-            className="rounded-lg border border-border-subtle bg-background px-3 py-2 text-[0.8125rem] text-foreground outline-none transition-colors focus:border-border placeholder:text-muted-foreground/50"
+            className={cx(inputClass, "h-9 text-[0.8125rem]")}
           />
         </label>
 
@@ -125,7 +126,7 @@ export function AgentEditor({
             }
             placeholder="What this agent does..."
             rows={2}
-            className="rounded-lg border border-border-subtle bg-background px-3 py-2 text-[0.8125rem] text-foreground outline-none transition-colors focus:border-border placeholder:text-muted-foreground/50"
+            className={cx(textareaClass, "text-[0.8125rem]")}
             style={{ resize: "vertical" }}
           />
         </label>
@@ -142,7 +143,7 @@ export function AgentEditor({
             }
             placeholder="Instructions for the agent..."
             rows={6}
-            className="rounded-lg border border-border-subtle bg-background px-3 py-2.5 text-[0.8125rem] leading-[1.6] text-foreground outline-none transition-colors focus:border-border placeholder:text-muted-foreground/50 font-mono"
+            className={cx(textareaClass, "font-mono text-[0.8125rem]")}
             style={{ resize: "vertical" }}
           />
           <div className="mt-1 flex flex-col gap-1.5 rounded-md border border-border-subtle bg-muted/15 px-3 py-2">

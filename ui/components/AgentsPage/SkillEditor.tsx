@@ -1,6 +1,7 @@
 import { Save, Trash2 } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import type { SkillData, SkillWriteBody } from "../../persist/skills";
+import { cx, textareaClass } from "../../styles";
 import { Button } from "../Button";
 
 type Props = {
@@ -94,7 +95,7 @@ export function SkillEditor({
             placeholder="When this skill should be used and what it helps with."
             maxLength={500}
             rows={3}
-            className="rounded-lg border border-border-subtle bg-background px-3 py-2 text-[0.8125rem] leading-[1.5] text-foreground outline-none transition-colors focus:border-border placeholder:text-muted-foreground/50"
+            className={cx(textareaClass, "text-[0.8125rem]")}
             style={{ resize: "vertical" }}
           />
           <span className="text-[0.6875rem] text-muted-foreground">
@@ -118,7 +119,7 @@ export function SkillEditor({
               "# Workflow\n\nDescribe the steps, constraints, and output format for this skill."
             }
             rows={15}
-            className="rounded-lg border border-border-subtle bg-background px-3 py-2.5 font-mono text-[0.8125rem] leading-[1.6] text-foreground outline-none transition-colors focus:border-border placeholder:text-muted-foreground/50"
+            className={cx(textareaClass, "font-mono text-[0.8125rem]")}
             style={{ resize: "vertical" }}
           />
           <span className="text-[0.6875rem] text-muted-foreground">

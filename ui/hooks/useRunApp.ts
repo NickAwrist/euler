@@ -16,8 +16,10 @@ import { useRunStreaming } from "./run/useRunStreaming";
 import { useSearXNGConnection } from "./run/useSearXNGConnection";
 import { useSessionsAndNavigation } from "./run/useSessionsAndNavigation";
 import { useSettings } from "./run/useSettings";
+import { useSidebarState } from "./useSidebarState";
 
 export function useRunApp() {
+  const sidebar = useSidebarState();
   const ollama = useOllamaConnection();
   const comfy = useComfyUIConnection();
   const searxng = useSearXNGConnection();
@@ -77,6 +79,7 @@ export function useRunApp() {
     isEphemeralRef,
     selectedSessionAgentRef,
     runFlightRef,
+    onNavigate: () => sidebar.setSidebarOpen(false),
   });
 
   const selectedModelOption = ollama.ollamaModels.find(
@@ -157,10 +160,10 @@ export function useRunApp() {
     sessionError: sessions.sessionError,
     retrySessionLoad: sessions.retrySessionLoad,
     sessionSendReady: sessions.sessionSendReady,
-    sidebarOpen: sessions.sidebarOpen,
-    setSidebarOpen: sessions.setSidebarOpen,
-    sidebarCollapsed: sessions.sidebarCollapsed,
-    setSidebarCollapsed: sessions.setSidebarCollapsed,
+    sidebarOpen: sidebar.sidebarOpen,
+    setSidebarOpen: sidebar.setSidebarOpen,
+    sidebarCollapsed: sidebar.sidebarCollapsed,
+    setSidebarCollapsed: sidebar.setSidebarCollapsed,
     renameSessionId: sessions.renameSessionId,
     setRenameSessionId: sessions.setRenameSessionId,
     editingUserIndex,

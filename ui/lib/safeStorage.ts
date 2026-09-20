@@ -43,4 +43,32 @@ export const safeStorage = {
       return false;
     }
   },
+
+  session: {
+    getItem(key: string): string | null {
+      try {
+        return sessionStorage.getItem(key);
+      } catch {
+        return null;
+      }
+    },
+
+    setItem(key: string, value: string): boolean {
+      try {
+        sessionStorage.setItem(key, value);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    removeItem(key: string): boolean {
+      try {
+        sessionStorage.removeItem(key);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+  },
 };

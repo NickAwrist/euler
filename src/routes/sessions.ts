@@ -15,8 +15,14 @@ import {
 import { downloadWorkspaceFile } from "../http/downloadWorkspaceFile";
 import { errorMessage, sendApiError } from "../http/errors";
 import { isLoopbackRequest } from "../http/isLoopbackRequest";
+import { sendValidationError } from "../http/validation";
 import { stripReasoningFromModelMessages } from "../llm/reasoningDetails";
 import { revealFileNative } from "../nativeFolderPicker";
+import {
+  CreateSessionBodySchema,
+  PatchSessionBodySchema,
+  RevealFileSchema,
+} from "../schemas/sessions";
 import { SelectDirectorySchema } from "../schemas/workspace";
 import { requireUserId } from "../userIdentity";
 import {
@@ -203,10 +209,12 @@ router.post("/:id/workspace/reveal", async (req, res) => {
     );
     return;
   }
-  const requestedPath =
-    typeof (req.body as { path?: unknown }).path === "string"
-      ? (req.body as { path: string }).path
-      : "";
+  const parsed = RevealFileSchema.safeParse(req.body);
+  if (!parsed.success) {
+    sendValidationError(res, parsed.error);
+    return;
+  }
+  const requestedPath = parsed.data.path;
   try {
     const workspace = await workspaceService.resolveSession(row);
     const path = await workspaceService.resolveExistingPath(
@@ -266,13 +274,14 @@ router.get("/:id", (req, res) => {
 router.post("/", async (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
-  const body = req.body as { model?: unknown };
+  const parsed = CreateSessionBodySchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    sendValidationError(res, parsed.error);
+    return;
+  }
   const id = crypto.randomUUID();
   const now = Date.now();
-  const model =
-    typeof body.model === "string" && body.model.trim()
-      ? body.model.trim()
-      : null;
+  const model = parsed.data.model?.trim() || null;
   createSessionRow(ownerUuid, id, now, model);
   try {
     await workspaceService.provisionRetained(ownerUuid, id);
@@ -292,12 +301,12 @@ router.patch("/:id", (req, res) => {
     sendApiError(res, 404, "NOT_FOUND", "Session not found");
     return;
   }
-  const body = req.body as {
-    customTitle?: unknown;
-    model?: unknown;
-    modelMessages?: unknown;
-    history?: unknown;
-  };
+  const parsed = PatchSessionBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    sendValidationError(res, parsed.error);
+    return;
+  }
+  const body = parsed.data;
   const now = Date.now();
 
   if (Array.isArray(body.history)) {

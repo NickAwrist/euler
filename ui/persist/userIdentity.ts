@@ -65,11 +65,7 @@ export function switchUserId(value: string): boolean {
   const normalized = normalizeUserId(value);
   if (!normalized) return false;
   safeStorage.setItem(USER_ID_STORAGE_KEY, normalized);
-  try {
-    sessionStorage.removeItem("activeSessionId");
-  } catch {
-    // sessionStorage can be restricted
-  }
+  safeStorage.session.removeItem("activeSessionId");
   return true;
 }
 

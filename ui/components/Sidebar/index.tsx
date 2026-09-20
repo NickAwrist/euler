@@ -7,7 +7,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { useState } from "react";
-import { cx, iconButton } from "../../styles";
+import { cx } from "../../styles";
 import { SessionListItem } from "./SessionListItem";
 import type { SidebarProps } from "./types";
 

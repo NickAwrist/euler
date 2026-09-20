@@ -1,6 +1,6 @@
 import { EyeOff, MessageSquarePlus, Sparkles } from "lucide-react";
-import { cx, primaryButton } from "../styles";
 import type { SessionSummary } from "../types";
+import { Button } from "./Button";
 
 type WelcomeHomeProps = {
   sessions: SessionSummary[];
@@ -34,15 +34,14 @@ export function WelcomeHome({
           create a new thread for a clean chat.
         </p>
         <div className="mt-[22px] flex items-center gap-2.5">
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={onNewRun}
             disabled={isLoading}
-            className={cx(primaryButton)}
+            icon={MessageSquarePlus}
           >
-            <MessageSquarePlus size={16} />
             New chat
-          </button>
+          </Button>
           <button
             type="button"
             onClick={onNewEphemeralRun}

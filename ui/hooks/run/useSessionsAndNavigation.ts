@@ -7,6 +7,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { safeStorage } from "../../lib/safeStorage";
+import { getActiveRun } from "../../persist/runs";
 import {
   createSessionApi,
   createTemporarySessionApi,
@@ -16,7 +18,6 @@ import {
   fetchSessionSummaries,
   patchSessionApi,
 } from "../../persist/sessions";
-import { userScopedFetch } from "../../persist/userIdentity";
 import type { UserSettings } from "../../persist/userSettings";
 import type {
   DebugData,
@@ -26,7 +27,6 @@ import type {
   TruncateConfirmState,
 } from "../../types";
 import type { ModelOption } from "../../types";
-import { useSidebarState } from "../useSidebarState";
 import type { RunFlightApi, SessionLoadState } from "./runTypes";
 import { effectiveDefaultRunModel } from "./sessionUtils";
 import { useSessionPreferences } from "./useSessionPreferences";
@@ -76,6 +76,7 @@ type Args = {
   isEphemeralRef: MutableRefObject<boolean>;
   selectedSessionAgentRef: MutableRefObject<string>;
   runFlightRef: MutableRefObject<RunFlightApi | null>;
+  onNavigate?: () => void;
 };
 
 export function useSessionsAndNavigation(p: Args) {
@@ -92,7 +93,6 @@ export function useSessionsAndNavigation(p: Args) {
     "pending" | "resolved" | "error"
   >("pending");
   const statusControllerRef = useRef<AbortController | null>(null);
-  const sidebar = useSidebarState();
 
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null);
   const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<
@@ -222,16 +222,9 @@ export function useSessionsAndNavigation(p: Args) {
       // Run discovery controls sending and stream reconciliation, never history display.
       void (async () => {
         try {
-          const response = await userScopedFetch(
-            `/api/runs/active/${encodeURIComponent(id)}`,
-            { signal: controller.signal },
-          );
-          if (!response.ok) throw new Error("Could not check the active run.");
-          const status = (await response.json()) as {
-            active?: boolean;
-            requestId?: string;
-          };
+          const status = await getActiveRun(id, controller.signal);
           if (
+            !status ||
             typeof status.active !== "boolean" ||
             (status.active && !status.requestId)
           )
@@ -274,7 +267,8 @@ export function useSessionsAndNavigation(p: Args) {
   useEffect(() => {
     void refreshSessions();
     const restoredId =
-      sessionIdFromUrl() || sessionStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
+      sessionIdFromUrl() ||
+      safeStorage.session.getItem(ACTIVE_SESSION_STORAGE_KEY);
     if (restoredId) void loadSession(restoredId);
     restoreDoneRef.current = true;
     return () => {
@@ -290,12 +284,12 @@ export function useSessionsAndNavigation(p: Args) {
 
   useEffect(() => {
     if (activeSessionId && !isEphemeral) {
-      sessionStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
+      safeStorage.session.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
       replaceSessionUrl(activeSessionId);
       return;
     }
     if (!restoreDoneRef.current) return;
-    sessionStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
+    safeStorage.session.removeItem(ACTIVE_SESSION_STORAGE_KEY);
     replaceSessionUrl(null);
   }, [activeSessionId, isEphemeral]);
 
@@ -322,11 +316,13 @@ export function useSessionsAndNavigation(p: Args) {
       setIsEphemeral(false);
       pushSessionUrl(id);
       await loadSession(id);
+      p.onNavigate?.();
     },
     [
       loadSession,
       p.activeSessionIdRef,
       p.isEphemeralRef,
+      p.onNavigate,
       canDiscardEmptySession,
       refreshSessions,
     ],
@@ -365,7 +361,7 @@ export function useSessionsAndNavigation(p: Args) {
       await refreshSessions();
       pushSessionUrl(id);
       await loadSession(id);
-      sidebar.setSidebarOpen(false);
+      p.onNavigate?.();
     } catch (e) {
       console.error(e);
     } finally {
@@ -375,6 +371,7 @@ export function useSessionsAndNavigation(p: Args) {
     loadSession,
     p.activeSessionIdRef,
     p.isEphemeralRef,
+    p.onNavigate,
     canDiscardEmptySession,
     p.ollamaModels,
     p.serverDefaultRunAgent,
@@ -382,7 +379,6 @@ export function useSessionsAndNavigation(p: Args) {
     p.userSettingsRef,
     refreshSessions,
     preferences.setSelectedSessionAgent,
-    sidebar.setSidebarOpen,
   ]);
 
   const createEphemeralSession = useCallback(async () => {
@@ -408,19 +404,19 @@ export function useSessionsAndNavigation(p: Args) {
     resetSessionTransientState();
     setIsEphemeral(true);
     p.modelMessagesRef.current = null;
-    sidebar.setSidebarOpen(false);
+    p.onNavigate?.();
     preferences.setSelectedSessionAgent(p.serverDefaultRunAgent);
     preferences.setWorkspace({ kind: "sandbox" });
     pushSessionUrl(null);
   }, [
     p.activeSessionIdRef,
     p.isEphemeralRef,
+    p.onNavigate,
     canDiscardEmptySession,
     p.modelMessagesRef,
     p.serverDefaultRunAgent,
     resetSessionTransientState,
     refreshSessions,
-    sidebar.setSidebarOpen,
     preferences.setSelectedSessionAgent,
     preferences.setWorkspace,
   ]);
@@ -473,18 +469,18 @@ export function useSessionsAndNavigation(p: Args) {
     setIsEphemeral(false);
     setActiveSessionId(null);
     resetSessionTransientState();
-    sidebar.setSidebarOpen(false);
+    p.onNavigate?.();
     preferences.setSelectedSessionAgent(p.serverDefaultRunAgent);
     preferences.setWorkspace({ kind: "sandbox" });
     pushSessionUrl(null);
   }, [
     p.activeSessionIdRef,
     p.isEphemeralRef,
+    p.onNavigate,
     canDiscardEmptySession,
     p.serverDefaultRunAgent,
     resetSessionTransientState,
     refreshSessions,
-    sidebar.setSidebarOpen,
     preferences.setSelectedSessionAgent,
     preferences.setWorkspace,
   ]);
@@ -587,7 +583,6 @@ export function useSessionsAndNavigation(p: Args) {
     sessionSendReady:
       (sessionLoadState === "loaded" || sessionLoadState === "empty") &&
       runStatusState === "resolved",
-    ...sidebar,
     renameSessionId,
     setRenameSessionId,
     pendingDeleteSessionId,
