@@ -134,14 +134,14 @@ test("snapshots committed WAL data and copies retained workspaces without changi
 
 for (const envName of [
   "OPENROUTER_API_KEY",
-  "AGENTS_OPENROUTER_API_KEY",
+  "EULER_OPENROUTER_API_KEY",
   null,
 ]) {
   test(`copied database respects ${envName ?? "a saved key when no environment key is configured"}`, () => {
     const data = join(primary, "data");
     mkdirSync(data);
     writeFileSync(join(primary, ".env"), envName ? `${envName}=dev-key\n` : "");
-    const source = new Database(join(data, "agents.db"));
+    const source = new Database(join(data, "euler.db"));
     source.run("CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT)");
     source.run(
       "INSERT INTO app_settings VALUES ('openrouter_api_key', 'saved-key'), ('other', 'keep')",
@@ -154,7 +154,7 @@ for (const envName of [
         .get();
     try {
       initializeWorktree(target, primary);
-      const copied = new Database(join(target, "data", "agents.db"));
+      const copied = new Database(join(target, "data", "euler.db"));
       try {
         expect(key(copied)).toEqual(envName ? null : { value: "saved-key" });
         expect(key(source)).toEqual({ value: "saved-key" });

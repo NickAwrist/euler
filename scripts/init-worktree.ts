@@ -53,7 +53,7 @@ export function initializeWorktree(targetDir: string, primaryRoot: string) {
         // Only change the new snapshot, never the primary or an existing worktree.
         if (
           config.OPENROUTER_API_KEY?.trim() ||
-          config.AGENTS_OPENROUTER_API_KEY?.trim()
+          config.EULER_OPENROUTER_API_KEY?.trim()
         ) {
           const copied = new Database(targetDb);
           try {

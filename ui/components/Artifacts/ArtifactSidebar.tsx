@@ -7,7 +7,7 @@ import {
 } from "react";
 import { cx } from "../../styles";
 
-const WIDTH_KEY = "orbis:artifactSidebarWidth";
+const WIDTH_KEY = "euler:artifactSidebarWidth";
 const MIN_WIDTH = 320;
 const maxWidth = () =>
   Math.max(MIN_WIDTH, Math.min(960, window.innerWidth - 600));
