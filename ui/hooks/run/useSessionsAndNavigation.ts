@@ -95,7 +95,20 @@ export function useSessionsAndNavigation(p: Args) {
   >("pending");
   const statusControllerRef = useRef<AbortController | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("euler:sidebarCollapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("euler:sidebarCollapsed", String(sidebarCollapsed));
+    } catch {
+      // Keep the sidebar usable when browser storage is unavailable.
+    }
+  }, [sidebarCollapsed]);
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null);
   const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<
     string | null

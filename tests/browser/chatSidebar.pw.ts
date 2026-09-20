@@ -152,7 +152,7 @@ for (const width of [390, 1024, 1440]) {
   });
 }
 
-test("chat sidebar desktop workspace changes reset artifacts without remounting the chat", async ({
+test("chat sidebar desktop workspace changes refresh open artifacts without remounting the chat", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -257,11 +257,10 @@ test("chat sidebar desktop workspace changes reset artifacts without remounting 
   await expect(
     page.getByRole("dialog", { name: "Choose working directory" }),
   ).toBeHidden();
-  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
   expect(
     await originalComposer!.evaluate((element) => element.isConnected),
   ).toBe(true);
-  await toggle.click();
   await expect(page.getByRole("button", { name: "Back to files" })).toHaveCount(
     0,
   );
@@ -274,4 +273,67 @@ test("chat sidebar desktop workspace changes reset artifacts without remounting 
     page.getByRole("heading", { name: "Local notes" }),
   ).toBeVisible();
   expect(previews).toBe(2);
+});
+
+test("chat sidebar desktop preserves collapsed state on reload", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockApp(page);
+  await page.goto("/");
+  const toggle = page.getByRole("button", {
+    name: "Toggle chats",
+    exact: true,
+  });
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await page.reload();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await toggle.click();
+  await page.reload();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+});
+
+test("chat sidebar desktop restores artifact preview and width on reload", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockApp(page);
+  await page.route("**/artifacts/tree?*", (route) =>
+    route.fulfill({
+      json: {
+        entries: [{ name: "notes.md", path: "notes.md", kind: "file" }],
+      },
+    }),
+  );
+  await page.route("**/artifacts/preview?*", (route) =>
+    route.fulfill({
+      json: {
+        kind: "text",
+        path: "notes.md",
+        content: "# Saved preview",
+      },
+    }),
+  );
+  await page.goto("/run/sidebar-test");
+  const toggle = page.getByRole("button", { name: "Toggle artifacts" });
+  await toggle.click();
+  await page.getByRole("button", { name: "notes.md", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Saved preview" }),
+  ).toBeVisible();
+  const resize = page.getByRole("separator", {
+    name: "Resize artifact sidebar",
+  });
+  await resize.press("ArrowLeft");
+  const width = await resize.getAttribute("aria-valuenow");
+  await page.reload();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    page.getByRole("heading", { name: "Saved preview" }),
+  ).toBeVisible();
+  await expect(resize).toHaveAttribute("aria-valuenow", width!);
+  await toggle.click();
+  await page.reload();
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
 });
