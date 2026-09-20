@@ -57,6 +57,6 @@ test("long thread skips history work during typing and streaming", async ({
   await editor.fill("Draft edit");
   await page.getByRole("button", { name: "Stream token" }).click();
   await expect(editor).toHaveValue("Draft edit");
-  await page.getByRole("button", { name: "Cancel editing" }).click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByText("Question 0", { exact: true })).toBeInViewport();
 });

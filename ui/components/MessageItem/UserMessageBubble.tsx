@@ -1,13 +1,14 @@
-import { Check, Copy, Pencil, RotateCcw, Send, X } from "lucide-react";
+import { Check, Copy, Pencil, RotateCcw } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import type { CSSProperties } from "react";
 import { cx } from "../../styles";
 import type { Message } from "../../types";
+import { Button } from "../Button";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { AttachmentImage } from "./AttachmentImage";
 import { MessageActions } from "./MessageActions";
-import { msgIconBtn, msgIconSize, msgIconStroke } from "./messageItemStyles";
+import { msgIconSize, msgIconStroke } from "./messageItemStyles";
 
 type Props = {
   message: Message;
@@ -15,7 +16,6 @@ type Props = {
   animateEntry: boolean;
   enterStyle: CSSProperties | undefined;
   bubbleRef: RefObject<HTMLDivElement | null>;
-  bubbleEditStyle: CSSProperties | undefined;
   isEditingUser: boolean;
   draft: string;
   setDraft: (v: string) => void;
@@ -34,7 +34,6 @@ export function UserMessageBubble({
   animateEntry,
   enterStyle,
   bubbleRef,
-  bubbleEditStyle,
   isEditingUser,
   draft,
   setDraft,
@@ -63,10 +62,11 @@ export function UserMessageBubble({
           ref={bubbleRef}
           className={cx(
             "rounded-xl border border-border-subtle bg-muted px-[14px] py-2.5",
-            !isEditingUser && "user-message-hold",
-            "max-w-[min(85%,36rem)] min-w-0 max-[640px]:max-w-[92%]",
+            "min-w-0",
+            isEditingUser
+              ? "w-full"
+              : "user-message-hold max-w-[min(85%,36rem)] max-[640px]:max-w-[92%]",
           )}
-          style={bubbleEditStyle}
         >
           {message.attachments && message.attachments.length > 0 && (
             <div className="mb-2 flex flex-wrap justify-end gap-2">
@@ -83,10 +83,11 @@ export function UserMessageBubble({
           {isEditingUser ? (
             <textarea
               ref={editRef}
+              aria-label="Edit message"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               rows={Math.min(12, Math.max(3, draft.split("\n").length))}
-              className="box-border min-h-[4.5rem] w-full max-w-full bg-transparent text-[0.9375rem] leading-[1.5] text-foreground outline-none"
+              className="box-border resize-y min-h-[4.5rem] w-full max-w-full bg-transparent text-[0.9375rem] leading-[1.5] text-foreground outline-none"
               onKeyDown={(e) => {
                 if (e.key === "Escape") {
                   e.preventDefault();
@@ -98,6 +99,28 @@ export function UserMessageBubble({
             <MarkdownMessage className="text-foreground">
               {message.content}
             </MarkdownMessage>
+          )}
+          {isEditingUser && (
+            <div className="mt-2 flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="rounded-full!"
+                disabled={isBusy}
+                onClick={onCancelEditUser}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                className="rounded-full!"
+                disabled={isBusy || !draft.trim()}
+                onClick={() => onRequestEditConfirm(messageIndex, draft.trim())}
+                title="Save edits and retry; later messages will be deleted"
+              >
+                Send
+              </Button>
+            </div>
           )}
         </div>
         {!isEditingUser ? (
@@ -140,30 +163,7 @@ export function UserMessageBubble({
               ]}
             />
           </div>
-        ) : (
-          <div className="mt-1.5 flex max-w-[min(85%,36rem)] flex-wrap justify-end gap-1 self-end max-[640px]:max-w-[92%]">
-            <button
-              type="button"
-              disabled={isBusy}
-              onClick={onCancelEditUser}
-              className={msgIconBtn}
-              title="Cancel editing"
-              aria-label="Cancel editing"
-            >
-              <X size={msgIconSize} strokeWidth={msgIconStroke} />
-            </button>
-            <button
-              type="button"
-              disabled={isBusy || !draft.trim()}
-              onClick={() => onRequestEditConfirm(messageIndex, draft.trim())}
-              className={msgIconBtn}
-              title="Save and retry"
-              aria-label="Save edits and retry; later messages will be deleted"
-            >
-              <Send size={msgIconSize} strokeWidth={msgIconStroke} />
-            </button>
-          </div>
-        )}
+        ) : null}
       </div>
     </div>
   );

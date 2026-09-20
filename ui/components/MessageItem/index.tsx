@@ -20,9 +20,6 @@ export function MessageItem({
   const bubbleRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState(message.content);
   const [copied, setCopied] = useState(false);
-  const [editBubbleWidthPx, setEditBubbleWidthPx] = useState<number | null>(
-    null,
-  );
 
   const isEditingUser =
     message.role === "user" && editingUserIndex === messageIndex;
@@ -30,10 +27,6 @@ export function MessageItem({
   useEffect(() => {
     if (isEditingUser) setDraft(message.content);
   }, [isEditingUser, message.content]);
-
-  useEffect(() => {
-    if (!isEditingUser) setEditBubbleWidthPx(null);
-  }, [isEditingUser]);
 
   const enterStyle: CSSProperties | undefined =
     animDelayMs > 0 ? { animationDelay: `${animDelayMs}ms` } : undefined;
@@ -47,22 +40,8 @@ export function MessageItem({
   };
 
   const beginEdit = () => {
-    const el = bubbleRef.current;
-    if (el) {
-      const w = el.getBoundingClientRect().width;
-      if (w > 0) setEditBubbleWidthPx(Math.round(w));
-    }
     onStartEditUser(messageIndex);
   };
-
-  const bubbleEditStyle: CSSProperties | undefined =
-    isEditingUser && editBubbleWidthPx != null
-      ? {
-          width: editBubbleWidthPx,
-          minWidth: editBubbleWidthPx,
-          boxSizing: "border-box",
-        }
-      : undefined;
 
   if (message.role === "event") {
     return (
@@ -85,7 +64,6 @@ export function MessageItem({
         animateEntry={animateEntry}
         enterStyle={enterStyle}
         bubbleRef={bubbleRef}
-        bubbleEditStyle={bubbleEditStyle}
         isEditingUser={isEditingUser}
         draft={draft}
         setDraft={setDraft}

@@ -106,10 +106,12 @@ test("mobile message actions and code layout", async ({ page }, testInfo) => {
   });
   await sheet.getByRole("button", { name: "Edit message" }).tap();
   await expect(user.getByRole("textbox")).toBeFocused();
+  await assertExpandedEditor(user);
+  await page.screenshot({ path: testInfo.outputPath("mobile-edit.png") });
   await user.getByRole("textbox").fill("Edited greeting");
   await user
     .getByRole("button", {
-      name: "Save edits and retry; later messages will be deleted",
+      name: "Send",
     })
     .tap();
   await page.getByRole("button", { name: "Continue", exact: true }).tap();
@@ -230,6 +232,19 @@ test("desktop hover and keyboard access", async ({ browser }, testInfo) => {
   await expect(user.locator(".message-actions")).toHaveCSS("opacity", "1");
   await page.keyboard.press("Enter");
   await expect(user.getByRole("textbox")).toBeFocused();
+  await assertExpandedEditor(user);
+  await page.screenshot({ path: testInfo.outputPath("desktop-edit.png") });
+  await user.getByRole("textbox").fill("Unsaved draft");
+  await user.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(user).toContainText("Show me a greeting in a code block.");
+  await edit.click();
+  await expect(user.getByRole("textbox")).toHaveValue(
+    "Show me a greeting in a code block.",
+  );
+  await user.getByRole("textbox").fill("   ");
+  await expect(
+    user.getByRole("button", { name: "Send", exact: true }),
+  ).toBeDisabled();
   await page.keyboard.press("Escape");
   await page.getByRole("checkbox", { name: "Simulate busy" }).check();
   await expect(edit).toBeDisabled();
@@ -270,5 +285,20 @@ async function holdMessage(page: Page, bubble: Locator) {
     });
   } finally {
     await session.detach();
+  }
+}
+
+async function assertExpandedEditor(user: Locator) {
+  const editor = user.getByRole("textbox");
+  const bubble = editor.locator("..");
+  const containerBounds = await user.boundingBox();
+  const bubbleBounds = await bubble.boundingBox();
+  if (!containerBounds || !bubbleBounds)
+    throw new Error("Missing editor bounds");
+  expect(bubbleBounds.width).toBeCloseTo(containerBounds.width, 0);
+  for (const name of ["Cancel", "Send"]) {
+    await expect(
+      bubble.getByRole("button", { name, exact: true }),
+    ).toBeVisible();
   }
 }
