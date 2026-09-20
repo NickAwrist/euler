@@ -1,15 +1,5 @@
-import { X } from "lucide-react";
-import type { KeyboardEvent, MouseEvent } from "react";
-import { useEffect, useId, useRef } from "react";
-import {
-  cx,
-  eyebrowText,
-  modalCloseButton,
-  modalHeader,
-  modalShell,
-  primaryButton,
-  secondaryButton,
-} from "../styles";
+import { Button } from "./Button";
+import { Modal } from "./Modal";
 
 export function TruncateConfirmModal({
   title,
@@ -28,97 +18,39 @@ export function TruncateConfirmModal({
   onClose: () => void;
   busy?: boolean;
 }) {
-  const titleId = useId();
-  const dialogRef = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    dialogRef.current?.focus();
-  }, []);
-
-  const handleClose = () => {
-    if (busy) return;
-    onClose();
-  };
-
-  const handleDialogClick = (event: MouseEvent<HTMLDialogElement>) => {
-    if (event.target === event.currentTarget) handleClose();
-  };
-
-  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
-    if (event.key === "Escape") {
-      handleClose();
-      return;
-    }
-    if (event.key === "Enter" && !busy) {
-      event.preventDefault();
-      void Promise.resolve(onConfirm());
-    }
-  };
-
   return (
-    <dialog
-      ref={dialogRef}
-      className={modalShell}
-      aria-labelledby={titleId}
-      open
-      tabIndex={-1}
-      onClick={handleDialogClick}
-      onKeyDown={handleDialogKeyDown}
+    <Modal
+      title={title}
+      eyebrow="Warning"
+      onClose={onClose}
+      busy={busy}
+      maxWidthClass="max-w-[400px]"
+      surfaceClassName="max-h-none grid-rows-1"
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && !busy) {
+          event.preventDefault();
+          void Promise.resolve(onConfirm());
+        }
+      }}
     >
-      <div className="max-h-none w-full max-w-[400px]">
-        <div className="ui-animate-modal-panel grid rounded-xl border border-border-subtle bg-surface">
-          <div className={modalHeader}>
-            <div>
-              <div className={eyebrowText}>Warning</div>
-              <h2
-                id={titleId}
-                className="mt-1 text-[1.0625rem] font-semibold tracking-[-0.02em]"
-              >
-                {title}
-              </h2>
-            </div>
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={busy}
-              className={cx(
-                modalCloseButton,
-                busy && "pointer-events-none opacity-40",
-              )}
-              aria-label="Close"
-            >
-              <X size={18} />
-            </button>
-          </div>
-          <div className="px-[18px] py-4 sm:px-3.5">
-            <p className="m-0 text-[0.875rem] leading-[1.6] text-muted-foreground">
-              {description}
-            </p>
-            <div className="mt-5 flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                onClick={handleClose}
-                disabled={busy}
-                className={secondaryButton}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => void Promise.resolve(onConfirm())}
-                disabled={busy}
-                className={cx(
-                  primaryButton,
-                  "!bg-[#991b1b] hover:!bg-[#b91c1c] !text-white",
-                  busy && "opacity-80",
-                )}
-              >
-                {busy ? busyConfirmLabel : confirmLabel}
-              </button>
-            </div>
-          </div>
+      <div className="px-[18px] py-4 sm:px-3.5">
+        <p className="m-0 text-[0.875rem] leading-[1.6] text-muted-foreground">
+          {description}
+        </p>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <Button variant="secondary" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={() => void Promise.resolve(onConfirm())}
+            disabled={busy}
+            loading={busy}
+          >
+            {busy ? busyConfirmLabel : confirmLabel}
+          </Button>
         </div>
       </div>
-    </dialog>
+    </Modal>
   );
 }

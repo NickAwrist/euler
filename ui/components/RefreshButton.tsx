@@ -1,5 +1,6 @@
 import { RefreshCw } from "lucide-react";
-import { cx, iconButton, secondaryButton } from "../styles";
+import { Button } from "./Button";
+import { IconButton } from "./IconButton";
 
 export function RefreshButton({
   label,
@@ -14,26 +15,28 @@ export function RefreshButton({
   iconOnly?: boolean;
   onClick: () => void;
 }) {
+  if (iconOnly) {
+    return (
+      <IconButton
+        label={label}
+        icon={RefreshCw}
+        iconSize={15}
+        loading={refreshing}
+        disabled={disabled}
+        onClick={onClick}
+      />
+    );
+  }
+
   return (
-    <button
-      type="button"
-      className={cx(
-        iconOnly ? iconButton : secondaryButton,
-        "disabled:pointer-events-none disabled:opacity-45",
-      )}
-      disabled={disabled || refreshing}
-      aria-busy={refreshing}
-      aria-label={label}
-      title={iconOnly ? label : undefined}
+    <Button
+      variant="secondary"
+      icon={RefreshCw}
+      loading={refreshing}
+      disabled={disabled}
       onClick={onClick}
     >
-      <RefreshCw
-        size={15}
-        className={
-          refreshing ? "animate-spin motion-reduce:animate-none" : undefined
-        }
-      />
-      {!iconOnly && label}
-    </button>
+      {label}
+    </Button>
   );
 }

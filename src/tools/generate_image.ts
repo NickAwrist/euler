@@ -7,6 +7,7 @@ import {
   getComfyUIImageSize,
   getComfyUINegativePrompt,
 } from "../db/index";
+import { errorMessage } from "../utils/errors";
 import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
 
 export class GenerateImageTool extends BaseTool {
@@ -88,7 +89,7 @@ export class GenerateImageTool extends BaseTool {
         const queryString = params.toString();
         return `/api/comfyui/view/${img.filename}${queryString ? `?${queryString}` : ""}`;
       } catch (e) {
-        return `Error generating image: ${e instanceof Error ? e.message : String(e)}`;
+        return `Error generating image: ${errorMessage(e)}`;
       }
     }, "generate_image");
     return textToolResult(result);

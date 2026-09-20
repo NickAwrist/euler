@@ -13,10 +13,16 @@ import {
   persistSessionMessages,
 } from "../db/index";
 import { downloadWorkspaceFile } from "../http/downloadWorkspaceFile";
-import { sendApiError } from "../http/errors";
+import { errorMessage, sendApiError } from "../http/errors";
 import { isLoopbackRequest } from "../http/isLoopbackRequest";
+import { sendValidationError } from "../http/validation";
 import { stripReasoningFromModelMessages } from "../llm/reasoningDetails";
 import { revealFileNative } from "../nativeFolderPicker";
+import {
+  CreateSessionBodySchema,
+  PatchSessionBodySchema,
+  RevealFileSchema,
+} from "../schemas/sessions";
 import { SelectDirectorySchema } from "../schemas/workspace";
 import { requireUserId } from "../userIdentity";
 import {
@@ -87,7 +93,7 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
       res,
       e instanceof WorkspaceError ? 400 : 500,
       e instanceof WorkspaceError ? "BAD_REQUEST" : "INTERNAL_ERROR",
-      e instanceof Error ? e.message : "Could not select directory",
+      errorMessage(e) || "Could not select directory",
     );
   }
 });
@@ -139,7 +145,7 @@ router.get("/:id/workspace/files", async (req, res) => {
       res,
       400,
       "BAD_REQUEST",
-      error instanceof Error ? error.message : "Could not list workspace files",
+      errorMessage(error) || "Could not list workspace files",
     );
   }
 });
@@ -172,9 +178,7 @@ router.get("/:id/workspace/file", async (req, res) => {
       res,
       400,
       "BAD_REQUEST",
-      error instanceof Error
-        ? error.message
-        : "Could not download workspace file",
+      errorMessage(error) || "Could not download workspace file",
     );
   }
 });
@@ -205,10 +209,12 @@ router.post("/:id/workspace/reveal", async (req, res) => {
     );
     return;
   }
-  const requestedPath =
-    typeof (req.body as { path?: unknown }).path === "string"
-      ? (req.body as { path: string }).path
-      : "";
+  const parsed = RevealFileSchema.safeParse(req.body);
+  if (!parsed.success) {
+    sendValidationError(res, parsed.error);
+    return;
+  }
+  const requestedPath = parsed.data.path;
   try {
     const workspace = await workspaceService.resolveSession(row);
     const path = await workspaceService.resolveExistingPath(
@@ -222,7 +228,7 @@ router.post("/:id/workspace/reveal", async (req, res) => {
       res,
       400,
       "BAD_REQUEST",
-      error instanceof Error ? error.message : "Could not reveal file",
+      errorMessage(error) || "Could not reveal file",
     );
   }
 });
@@ -268,13 +274,14 @@ router.get("/:id", (req, res) => {
 router.post("/", async (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
-  const body = req.body as { model?: unknown };
+  const parsed = CreateSessionBodySchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    sendValidationError(res, parsed.error);
+    return;
+  }
   const id = crypto.randomUUID();
   const now = Date.now();
-  const model =
-    typeof body.model === "string" && body.model.trim()
-      ? body.model.trim()
-      : null;
+  const model = parsed.data.model?.trim() || null;
   createSessionRow(ownerUuid, id, now, model);
   try {
     await workspaceService.provisionRetained(ownerUuid, id);
@@ -294,12 +301,12 @@ router.patch("/:id", (req, res) => {
     sendApiError(res, 404, "NOT_FOUND", "Session not found");
     return;
   }
-  const body = req.body as {
-    customTitle?: unknown;
-    model?: unknown;
-    modelMessages?: unknown;
-    history?: unknown;
-  };
+  const parsed = PatchSessionBodySchema.safeParse(req.body);
+  if (!parsed.success) {
+    sendValidationError(res, parsed.error);
+    return;
+  }
+  const body = parsed.data;
   const now = Date.now();
 
   if (Array.isArray(body.history)) {

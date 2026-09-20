@@ -40,30 +40,26 @@ type ChatViewProps = {
   onUsage: () => void;
 };
 
+import { safeStorage } from "./lib/safeStorage";
+
 const ARTIFACT_STATE_KEY = "euler:artifactSidebarState";
 function loadArtifactState(): {
   open: boolean;
   workspace: string;
   path: string | null;
 } {
-  try {
-    const value: unknown = JSON.parse(
-      localStorage.getItem(ARTIFACT_STATE_KEY) ?? "null",
-    );
-    if (
-      value &&
-      typeof value === "object" &&
-      "open" in value &&
-      "workspace" in value &&
-      "path" in value &&
-      typeof value.open === "boolean" &&
-      typeof value.workspace === "string" &&
-      (value.path === null || typeof value.path === "string")
-    ) {
-      return { open: value.open, workspace: value.workspace, path: value.path };
-    }
-  } catch {
-    // Storage is optional.
+  const value = safeStorage.getJSON<unknown>(ARTIFACT_STATE_KEY, null);
+  if (
+    value &&
+    typeof value === "object" &&
+    "open" in value &&
+    "workspace" in value &&
+    "path" in value &&
+    typeof value.open === "boolean" &&
+    typeof value.workspace === "string" &&
+    (value.path === null || typeof value.path === "string")
+  ) {
+    return { open: value.open, workspace: value.workspace, path: value.path };
   }
   return { open: false, workspace: "", path: null };
 }
@@ -79,9 +75,6 @@ function ChatView({
 }: ChatViewProps) {
   const workspaceKey = `${app.activeSessionId}:${app.workspace.kind === "local" ? app.workspace.path : "sandbox"}`;
   const [savedArtifacts] = useState(loadArtifactState);
-  const [artifactWorkspace, setArtifactWorkspace] = useState(
-    savedArtifacts.workspace,
-  );
   const [artifactsOpen, setArtifactsOpen] = useState(savedArtifacts.open);
   const workspaceReady =
     app.sessionLoadState === "loaded" || app.sessionLoadState === "empty";
@@ -107,33 +100,34 @@ function ChatView({
     if (mobileLayout) app.setSidebarOpen((value) => !value);
     else app.setSidebarCollapsed((value) => !value);
   };
-  const [selectedFile, setSelectedFile] = useState<string | null>(
-    savedArtifacts.path,
+  const [fileSelection, setFileSelection] = useState<{
+    workspace: string;
+    path: string | null;
+  }>({
+    workspace: savedArtifacts.workspace,
+    path: savedArtifacts.path,
+  });
+  const selectedFile =
+    fileSelection.workspace === workspaceKey ? fileSelection.path : null;
+  const setSelectedFile = useCallback(
+    (path: string | null) => {
+      setFileSelection({ workspace: workspaceKey, path });
+    },
+    [workspaceKey],
   );
-  // Clear the file selection before rendering a different workspace.
-  if (workspaceReady && artifactWorkspace !== workspaceKey) {
-    setArtifactWorkspace(workspaceKey);
-    setSelectedFile(null);
-  }
+
   useEffect(() => {
     if (!workspaceReady || !app.activeSessionId) return;
-    try {
-      localStorage.setItem(
-        ARTIFACT_STATE_KEY,
-        JSON.stringify({
-          open: artifactsOpen,
-          workspace: artifactWorkspace,
-          path: selectedFile,
-        }),
-      );
-    } catch {
-      // Storage is optional.
-    }
+    safeStorage.setJSON(ARTIFACT_STATE_KEY, {
+      open: artifactsOpen,
+      workspace: workspaceKey,
+      path: selectedFile,
+    });
   }, [
     workspaceReady,
     app.activeSessionId,
     artifactsOpen,
-    artifactWorkspace,
+    workspaceKey,
     selectedFile,
   ]);
   const [revision, setRevision] = useState(0);
@@ -144,10 +138,13 @@ function ChatView({
     () => workspaceArtifactSource(app.activeSessionId ?? "", app.isEphemeral),
     [app.activeSessionId, app.isEphemeral],
   );
-  const openFile = useCallback((path: string) => {
-    setSelectedFile(path);
-    setArtifactsOpen(true);
-  }, []);
+  const openFile = useCallback(
+    (path: string) => {
+      setSelectedFile(path);
+      setArtifactsOpen(true);
+    },
+    [setSelectedFile],
+  );
   const artifactContext = useMemo(
     () => ({
       openFile,

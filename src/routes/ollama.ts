@@ -7,6 +7,7 @@ import {
   getOllamaHostConfig,
   invalidateOllamaClientCache,
 } from "../ollamaClient";
+import { errorMessage } from "../utils/errors";
 
 const ollamaRoutes = Router();
 
@@ -17,7 +18,7 @@ ollamaRoutes.get("/health", async (_req, res) => {
   } catch (e) {
     res.json({
       connected: false,
-      error: e instanceof Error ? e.message : String(e),
+      error: errorMessage(e),
     });
   }
 });
@@ -43,7 +44,7 @@ ollamaRoutes.post("/test", async (req, res) => {
   } catch (e) {
     res.json({
       ok: false,
-      error: e instanceof Error ? e.message : String(e),
+      error: errorMessage(e),
     });
     return;
   }
@@ -59,10 +60,7 @@ ollamaRoutes.post("/test", async (req, res) => {
   } catch (e) {
     res.json({
       ok: false,
-      error: withContainerLoopbackHint(
-        e instanceof Error ? e.message : String(e),
-        raw || effectiveHost,
-      ),
+      error: withContainerLoopbackHint(errorMessage(e), raw || effectiveHost),
       effectiveHost,
     });
   }

@@ -5,8 +5,9 @@ import {
   switchUserId,
 } from "../../persist/userIdentity";
 import type { UserSettings } from "../../persist/userSettings";
-import { cx, eyebrowText, secondaryButton } from "../../styles";
+import { cx, eyebrowText } from "../../styles";
 import type { ModelOption } from "../../types";
+import { Button } from "../Button";
 import { hintClass, inputClass, labelClass, selectClass } from "./constants";
 
 type Props = {
@@ -53,18 +54,14 @@ export function GeneralSettingsTab({
               spellCheck={false}
               className={cx(inputClass, "font-mono text-[0.8125rem]")}
             />
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               disabled={!canSwitch}
               onClick={handleSwitchUser}
-              className={cx(
-                secondaryButton,
-                "shrink-0 justify-center",
-                !canSwitch && "opacity-60",
-              )}
+              className="shrink-0 justify-center"
             >
               Switch UUID
-            </button>
+            </Button>
           </div>
           {userIdDraft.trim().length > 0 && normalizedDraft === null && (
             <p className="text-[0.75rem] text-red-400">

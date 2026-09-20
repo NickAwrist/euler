@@ -1,9 +1,9 @@
-import { ArrowLeft, Code, Download, Eye, LoaderCircle } from "lucide-react";
+import { ArrowLeft, Code, Download, Eye } from "lucide-react";
 import { type ComponentType, useEffect, useRef, useState } from "react";
 import type { FilePreview as Preview } from "../../../src/schemas/artifacts";
 import { downloadBlob } from "../../lib/downloadBlob";
-import { iconButton } from "../../styles";
 import { HighlightedCode } from "../HighlightedCode";
+import { IconButton } from "../IconButton";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { RefreshButton } from "../RefreshButton";
 import { ArtifactContext } from "./ArtifactContext";
@@ -133,49 +133,32 @@ export function FilePreview({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="workspace-header gap-2 pl-2 pr-12">
-        <button
-          type="button"
-          className={iconButton}
-          aria-label="Back to files"
+        <IconButton
+          icon={ArrowLeft}
+          label="Back to files"
           title="Back to files"
           onClick={onBack}
-        >
-          <ArrowLeft size={17} />
-        </button>
+        />
         <FileIcon path={path} />
         <span className="min-w-0 flex-1 truncate text-xs" title={path}>
           {path}
         </span>
         {Renderer && preview?.kind === "text" && (
-          <button
-            type="button"
-            className={iconButton}
-            aria-label={raw ? "Show rendered preview" : "Show source"}
+          <IconButton
+            icon={raw ? Eye : Code}
+            label={raw ? "Show rendered preview" : "Show source"}
             title={raw ? "Show rendered preview" : "Show source"}
             aria-pressed={raw}
             onClick={() => setRaw((value) => !value)}
-          >
-            {raw ? <Eye size={16} /> : <Code size={16} />}
-          </button>
+          />
         )}
-        <button
-          type="button"
-          className={`${iconButton} disabled:opacity-45`}
-          aria-label="Download file"
+        <IconButton
+          icon={Download}
+          label="Download file"
           title="Download file"
-          aria-busy={downloading}
-          disabled={downloading}
+          loading={downloading}
           onClick={() => void download()}
-        >
-          {downloading ? (
-            <LoaderCircle
-              size={16}
-              className="animate-spin motion-reduce:animate-none"
-            />
-          ) : (
-            <Download size={16} />
-          )}
-        </button>
+        />
         <RefreshButton
           iconOnly
           label="Refresh preview"

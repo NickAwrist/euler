@@ -3,6 +3,7 @@ import { getComfyUIHost } from "../db/index";
 import { DEFAULT_COMFYUI_HOST } from "../env";
 import { logger } from "../logger";
 import { providerHostConfig } from "../providerHostConfig";
+import { errorMessage } from "../utils/errors";
 
 export type ComfyUIPromptResponse = {
   prompt_id: string;
@@ -114,7 +115,7 @@ export class ComfyUIClient {
     } catch (error) {
       return {
         ok: false,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage(error),
       };
     }
   }

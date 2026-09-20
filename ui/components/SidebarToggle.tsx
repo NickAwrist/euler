@@ -4,7 +4,8 @@ import {
   PanelRight,
   PanelRightClose,
 } from "lucide-react";
-import { cx, iconButton } from "../styles";
+import { cx } from "../styles";
+import { IconButton } from "./IconButton";
 
 // Layout controls sit outside their sliding panels, so their positions stay fixed.
 export function SidebarToggle({
@@ -28,22 +29,19 @@ export function SidebarToggle({
         : PanelRight;
   const name = side === "left" ? "chats" : "files";
   return (
-    <button
-      type="button"
-      className={cx(
-        iconButton,
-        "absolute top-[calc((var(--workspace-header-height)-2.25rem-1px)/2)] z-50",
-        side === "left" ? "left-2" : "right-2",
-        open && "bg-muted text-foreground",
-        className,
-      )}
-      aria-label={side === "left" ? "Toggle chats" : "Toggle artifacts"}
+    <IconButton
+      icon={Icon}
+      label={side === "left" ? "Toggle chats" : "Toggle artifacts"}
       title={`${open ? "Hide" : "Show"} ${name}`}
       aria-expanded={open}
       aria-controls={side === "left" ? "app-sidebar" : "artifact-sidebar"}
       onClick={onToggle}
-    >
-      <Icon size={18} />
-    </button>
+      className={cx(
+        "absolute top-[calc((var(--workspace-header-height)-2.25rem-1px)/2)] z-50",
+        side === "left" ? "left-2" : "right-2",
+        open && "!bg-muted !text-foreground",
+        className,
+      )}
+    />
   );
 }

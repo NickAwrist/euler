@@ -7,6 +7,8 @@ import {
   useRef,
   useState,
 } from "react";
+import { safeStorage } from "../../lib/safeStorage";
+import { getActiveRun } from "../../persist/runs";
 import {
   createSessionApi,
   createTemporarySessionApi,
@@ -15,23 +17,19 @@ import {
   fetchSession,
   fetchSessionSummaries,
   patchSessionApi,
-  selectSessionDirectory,
-  useSessionSandbox,
 } from "../../persist/sessions";
-import { userScopedFetch } from "../../persist/userIdentity";
 import type { UserSettings } from "../../persist/userSettings";
-import { loadUserSettings } from "../../persist/userSettings";
 import type {
   DebugData,
   Message,
   SessionSummary,
-  SessionWorkspace,
   TraceModalSelection,
   TruncateConfirmState,
 } from "../../types";
 import type { ModelOption } from "../../types";
 import type { RunFlightApi, SessionLoadState } from "./runTypes";
 import { effectiveDefaultRunModel } from "./sessionUtils";
+import { useSessionPreferences } from "./useSessionPreferences";
 
 const ACTIVE_SESSION_STORAGE_KEY = "activeSessionId";
 const RUN_PATH_PREFIX = "/run/";
@@ -78,6 +76,7 @@ type Args = {
   isEphemeralRef: MutableRefObject<boolean>;
   selectedSessionAgentRef: MutableRefObject<string>;
   runFlightRef: MutableRefObject<RunFlightApi | null>;
+  onNavigate?: () => void;
 };
 
 export function useSessionsAndNavigation(p: Args) {
@@ -94,46 +93,11 @@ export function useSessionsAndNavigation(p: Args) {
     "pending" | "resolved" | "error"
   >("pending");
   const statusControllerRef = useRef<AbortController | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem("euler:sidebarCollapsed") === "true";
-    } catch {
-      return false;
-    }
-  });
-  useEffect(() => {
-    try {
-      localStorage.setItem("euler:sidebarCollapsed", String(sidebarCollapsed));
-    } catch {
-      // Keep the sidebar usable when browser storage is unavailable.
-    }
-  }, [sidebarCollapsed]);
+
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null);
   const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<
     string | null
   >(null);
-  const [selectedModel, setSelectedModel] = useState(() =>
-    effectiveDefaultRunModel(loadUserSettings(), "gemma4:e4b"),
-  );
-  const [thinkingEffort, setThinkingEffort] = useState<string | null>(null);
-  const [selectedSessionAgent, setSelectedSessionAgent] =
-    useState("general_agent");
-  const [workspace, setWorkspace] = useState<SessionWorkspace>({
-    kind: "sandbox",
-  });
-
-  const [sessionModel, setSessionModel] = useState<string | null>(null);
-
-  const messagesRef = useRef(p.messages);
-  messagesRef.current = p.messages;
-  const loadGenRef = useRef(0);
-  const restoreDoneRef = useRef(false);
-  const returningToSandboxRef = useRef(false);
-
-  p.activeSessionIdRef.current = activeSessionId;
-  p.isEphemeralRef.current = isEphemeral;
-  p.selectedSessionAgentRef.current = selectedSessionAgent;
 
   const refreshSessions = useCallback(async () => {
     try {
@@ -145,74 +109,25 @@ export function useSessionsAndNavigation(p: Args) {
     }
   }, []);
 
-  useEffect(() => {
-    if (!activeSessionId) return;
-    setSelectedModel(
-      sessionModel?.trim() ||
-        effectiveDefaultRunModel(
-          p.userSettingsRef.current,
-          p.serverDefaultModel,
-        ),
-    );
-  }, [
+  const preferences = useSessionPreferences({
     activeSessionId,
-    sessionModel,
-    p.serverDefaultModel,
-    p.userSettingsRef,
-    p.userSettingsDefaultModel,
-  ]);
+    activeSessionIdRef: p.activeSessionIdRef,
+    isEphemeralRef: p.isEphemeralRef,
+    userSettingsRef: p.userSettingsRef,
+    serverDefaultModel: p.serverDefaultModel,
+    userSettingsDefaultModel: p.userSettingsDefaultModel,
+    refreshSessions,
+    setMessages: p.setMessages,
+  });
 
-  const handleSessionAgentChange = useCallback((name: string) => {
-    setSelectedSessionAgent(name);
-  }, []);
+  const messagesRef = useRef(p.messages);
+  messagesRef.current = p.messages;
+  const loadGenRef = useRef(0);
+  const restoreDoneRef = useRef(false);
 
-  const chooseDirectory = useCallback(
-    async (path: string) => {
-      const sid = p.activeSessionIdRef.current;
-      if (!sid) return;
-      const temporary = p.isEphemeralRef.current;
-      const selected = await selectSessionDirectory(sid, path, temporary);
-      if (p.activeSessionIdRef.current === sid) {
-        setWorkspace(selected);
-        if (temporary) {
-          p.setMessages((messages) => [
-            ...messages,
-            {
-              role: "event",
-              content: `Working directory changed to ${selected.kind === "local" ? selected.path : "the private workspace"}`,
-            },
-          ]);
-          return;
-        }
-        const refreshed = await fetchSession(sid);
-        if (refreshed && p.activeSessionIdRef.current === sid)
-          p.setMessages(refreshed.history);
-      }
-    },
-    [p.activeSessionIdRef, p.isEphemeralRef, p.setMessages],
-  );
-
-  const returnToSandbox = useCallback(async () => {
-    const sid = p.activeSessionIdRef.current;
-    if (!sid || workspace.kind !== "local" || returningToSandboxRef.current)
-      return;
-    returningToSandboxRef.current = true;
-    try {
-      const temporary = p.isEphemeralRef.current;
-      setWorkspace(await useSessionSandbox(sid, temporary));
-      if (temporary) {
-        p.setMessages((messages) => [
-          ...messages,
-          { role: "event", content: "Returned to the private workspace" },
-        ]);
-        return;
-      }
-      const refreshed = await fetchSession(sid);
-      if (refreshed) p.setMessages(refreshed.history);
-    } finally {
-      returningToSandboxRef.current = false;
-    }
-  }, [p.activeSessionIdRef, p.isEphemeralRef, p.setMessages, workspace.kind]);
+  p.activeSessionIdRef.current = activeSessionId;
+  p.isEphemeralRef.current = isEphemeral;
+  p.selectedSessionAgentRef.current = preferences.selectedSessionAgent;
 
   const resetSessionTransientState = useCallback(() => {
     p.setMessages([]);
@@ -222,7 +137,7 @@ export function useSessionsAndNavigation(p: Args) {
     p.setStepsModalData(null);
     p.setDebugOpen(false);
     p.setDebugData(null);
-    setThinkingEffort(null);
+    preferences.setThinkingEffort(null);
   }, [
     p.setMessages,
     p.resetStreamingUi,
@@ -231,30 +146,8 @@ export function useSessionsAndNavigation(p: Args) {
     p.setStepsModalData,
     p.setDebugOpen,
     p.setDebugData,
+    preferences.setThinkingEffort,
   ]);
-
-  const handleThinkingEffortChange = useCallback((effort: string) => {
-    setThinkingEffort(effort);
-  }, []);
-
-  const handleModelChange = useCallback(
-    async (model: string) => {
-      setSelectedModel(model);
-      setSessionModel(model);
-      setThinkingEffort(null);
-      if (p.isEphemeralRef.current) return;
-      const sid = p.activeSessionIdRef.current;
-      if (sid) {
-        try {
-          await patchSessionApi(sid, { model });
-          await refreshSessions();
-        } catch (e) {
-          console.error(e);
-        }
-      }
-    },
-    [p.activeSessionIdRef, p.isEphemeralRef, refreshSessions],
-  );
 
   const canDiscardEmptySession =
     p.messages.length === 0 &&
@@ -274,7 +167,7 @@ export function useSessionsAndNavigation(p: Args) {
       setSessionLoadState("loading");
       setSessionError(null);
       setRunStatusState("pending");
-      setThinkingEffort(null);
+      preferences.setThinkingEffort(null);
       const cf = p.runFlightRef.current;
       const preserve = cf?.shouldPreserveMessages(id) ?? false;
       const initialHistory = preserve
@@ -296,8 +189,8 @@ export function useSessionsAndNavigation(p: Args) {
           const stored = await fetchSession(id);
           if (gen !== loadGenRef.current) return;
           if (!stored) throw new Error("Conversation not found.");
-          setSessionModel(stored.model ?? null);
-          setWorkspace(stored.workspace ?? { kind: "sandbox" });
+          preferences.setSessionModel(stored.model ?? null);
+          preferences.setWorkspace(stored.workspace ?? { kind: "sandbox" });
           if (!preserveHistory) {
             // Streaming completion or another writer may have updated history
             // while this snapshot was in flight. Never replace that newer state.
@@ -329,16 +222,9 @@ export function useSessionsAndNavigation(p: Args) {
       // Run discovery controls sending and stream reconciliation, never history display.
       void (async () => {
         try {
-          const response = await userScopedFetch(
-            `/api/runs/active/${encodeURIComponent(id)}`,
-            { signal: controller.signal },
-          );
-          if (!response.ok) throw new Error("Could not check the active run.");
-          const status = (await response.json()) as {
-            active?: boolean;
-            requestId?: string;
-          };
+          const status = await getActiveRun(id, controller.signal);
           if (
+            !status ||
             typeof status.active !== "boolean" ||
             (status.active && !status.requestId)
           )
@@ -372,13 +258,17 @@ export function useSessionsAndNavigation(p: Args) {
       p.setEditingUserIndex,
       p.setTruncateConfirm,
       p.modelMessagesRef,
+      preferences.setThinkingEffort,
+      preferences.setSessionModel,
+      preferences.setWorkspace,
     ],
   );
 
   useEffect(() => {
     void refreshSessions();
     const restoredId =
-      sessionIdFromUrl() || sessionStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
+      sessionIdFromUrl() ||
+      safeStorage.session.getItem(ACTIVE_SESSION_STORAGE_KEY);
     if (restoredId) void loadSession(restoredId);
     restoreDoneRef.current = true;
     return () => {
@@ -394,12 +284,12 @@ export function useSessionsAndNavigation(p: Args) {
 
   useEffect(() => {
     if (activeSessionId && !isEphemeral) {
-      sessionStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
+      safeStorage.session.setItem(ACTIVE_SESSION_STORAGE_KEY, activeSessionId);
       replaceSessionUrl(activeSessionId);
       return;
     }
     if (!restoreDoneRef.current) return;
-    sessionStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
+    safeStorage.session.removeItem(ACTIVE_SESSION_STORAGE_KEY);
     replaceSessionUrl(null);
   }, [activeSessionId, isEphemeral]);
 
@@ -426,11 +316,13 @@ export function useSessionsAndNavigation(p: Args) {
       setIsEphemeral(false);
       pushSessionUrl(id);
       await loadSession(id);
+      p.onNavigate?.();
     },
     [
       loadSession,
       p.activeSessionIdRef,
       p.isEphemeralRef,
+      p.onNavigate,
       canDiscardEmptySession,
       refreshSessions,
     ],
@@ -462,14 +354,14 @@ export function useSessionsAndNavigation(p: Args) {
           ? p.serverDefaultModel
           : (p.ollamaModels[0]?.id ?? modelForNew);
       }
-      setSelectedSessionAgent(agentForNewRun);
+      preferences.setSelectedSessionAgent(agentForNewRun);
       const { id } = await createSessionApi({
         model: modelForNew,
       });
       await refreshSessions();
       pushSessionUrl(id);
       await loadSession(id);
-      setSidebarOpen(false);
+      p.onNavigate?.();
     } catch (e) {
       console.error(e);
     } finally {
@@ -479,12 +371,14 @@ export function useSessionsAndNavigation(p: Args) {
     loadSession,
     p.activeSessionIdRef,
     p.isEphemeralRef,
+    p.onNavigate,
     canDiscardEmptySession,
     p.ollamaModels,
     p.serverDefaultRunAgent,
     p.serverDefaultModel,
     p.userSettingsRef,
     refreshSessions,
+    preferences.setSelectedSessionAgent,
   ]);
 
   const createEphemeralSession = useCallback(async () => {
@@ -510,28 +404,22 @@ export function useSessionsAndNavigation(p: Args) {
     resetSessionTransientState();
     setIsEphemeral(true);
     p.modelMessagesRef.current = null;
-    setSidebarOpen(false);
-    setSelectedSessionAgent(p.serverDefaultRunAgent);
-    setWorkspace({ kind: "sandbox" });
+    p.onNavigate?.();
+    preferences.setSelectedSessionAgent(p.serverDefaultRunAgent);
+    preferences.setWorkspace({ kind: "sandbox" });
     pushSessionUrl(null);
   }, [
     p.activeSessionIdRef,
     p.isEphemeralRef,
+    p.onNavigate,
     canDiscardEmptySession,
     p.modelMessagesRef,
     p.serverDefaultRunAgent,
     resetSessionTransientState,
     refreshSessions,
+    preferences.setSelectedSessionAgent,
+    preferences.setWorkspace,
   ]);
-
-  useEffect(() => {
-    if (!sidebarOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSidebarOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [sidebarOpen]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -549,7 +437,7 @@ export function useSessionsAndNavigation(p: Args) {
         p.activeSessionIdRef.current = null;
         setActiveSessionId(null);
         setIsEphemeral(false);
-        setWorkspace({ kind: "sandbox" });
+        preferences.setWorkspace({ kind: "sandbox" });
         resetSessionTransientState();
       }
     };
@@ -560,6 +448,7 @@ export function useSessionsAndNavigation(p: Args) {
     p.activeSessionIdRef,
     p.isEphemeralRef,
     resetSessionTransientState,
+    preferences.setWorkspace,
   ]);
 
   const goToHome = useCallback(async () => {
@@ -580,17 +469,20 @@ export function useSessionsAndNavigation(p: Args) {
     setIsEphemeral(false);
     setActiveSessionId(null);
     resetSessionTransientState();
-    setSidebarOpen(false);
-    setSelectedSessionAgent(p.serverDefaultRunAgent);
-    setWorkspace({ kind: "sandbox" });
+    p.onNavigate?.();
+    preferences.setSelectedSessionAgent(p.serverDefaultRunAgent);
+    preferences.setWorkspace({ kind: "sandbox" });
     pushSessionUrl(null);
   }, [
     p.activeSessionIdRef,
     p.isEphemeralRef,
+    p.onNavigate,
     canDiscardEmptySession,
     p.serverDefaultRunAgent,
     resetSessionTransientState,
     refreshSessions,
+    preferences.setSelectedSessionAgent,
+    preferences.setWorkspace,
   ]);
 
   const dropSessionFromApp = useCallback(
@@ -605,7 +497,7 @@ export function useSessionsAndNavigation(p: Args) {
         statusControllerRef.current?.abort();
         p.activeSessionIdRef.current = null;
         setActiveSessionId(null);
-        setWorkspace({ kind: "sandbox" });
+        preferences.setWorkspace({ kind: "sandbox" });
         p.setMessages([]);
         p.setDebugOpen(false);
         p.setDebugData(null);
@@ -623,6 +515,7 @@ export function useSessionsAndNavigation(p: Args) {
       p.setMessages,
       p.setTruncateConfirm,
       refreshSessions,
+      preferences.setWorkspace,
     ],
   );
 
@@ -690,24 +583,12 @@ export function useSessionsAndNavigation(p: Args) {
     sessionSendReady:
       (sessionLoadState === "loaded" || sessionLoadState === "empty") &&
       runStatusState === "resolved",
-    sidebarOpen,
-    setSidebarOpen,
-    sidebarCollapsed,
-    setSidebarCollapsed,
     renameSessionId,
     setRenameSessionId,
     pendingDeleteSessionId,
     setPendingDeleteSessionId,
-    selectedModel,
-    thinkingEffort,
-    selectedSessionAgent,
-    workspace,
+    ...preferences,
     refreshSessions,
-    handleSessionAgentChange,
-    handleThinkingEffortChange,
-    chooseDirectory,
-    returnToSandbox,
-    handleModelChange,
     switchToSession,
     createSession,
     createEphemeralSession,

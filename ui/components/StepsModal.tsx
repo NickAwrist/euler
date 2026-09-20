@@ -1,15 +1,6 @@
-import { Check, Coins, Copy, Gauge, Waypoints, X } from "lucide-react";
-import type { KeyboardEvent, MouseEvent } from "react";
+import { Check, Coins, Copy, Gauge, Waypoints } from "lucide-react";
 import { useState } from "react";
 import { copyTextToClipboard } from "../lib/copyTextToClipboard";
-import {
-  cx,
-  iconButton,
-  modalCloseButton,
-  modalHeader,
-  modalShell,
-  modalSurface,
-} from "../styles";
 import type { MessageStep } from "../types";
 import {
   ExecutionTraceList,
@@ -21,6 +12,8 @@ import {
   formatTokensPerSecond,
   summarizeTraceMetrics,
 } from "./ExecutionTrace/traceMetrics";
+import { IconButton } from "./IconButton";
+import { Modal } from "./Modal";
 
 export function StepsModal({
   steps,
@@ -47,111 +40,77 @@ export function StepsModal({
 
   if (traceStepsForDisplay(steps ?? []).length === 0) return null;
 
-  const handleDialogClick = (event: MouseEvent<HTMLDialogElement>) => {
-    if (event.target === event.currentTarget) onClose();
-  };
-
-  const handleDialogKeyDown = (event: KeyboardEvent<HTMLDialogElement>) => {
-    if (event.key === "Escape") onClose();
-  };
-
   return (
-    <dialog
-      className={modalShell}
-      aria-label="Execution Trace"
-      open
-      onClick={handleDialogClick}
-      onKeyDown={handleDialogKeyDown}
+    <Modal
+      title="Execution Trace"
+      icon={Waypoints}
+      ariaLabel="Execution Trace"
+      closeLabel="Close steps viewer"
+      onClose={onClose}
+      maxWidthClass="max-w-[42rem]"
+      headerActions={
+        <IconButton
+          icon={resultsCopied ? Check : Copy}
+          label={resultsCopied ? "Copied" : "Copy trace results"}
+          disabled={!canCopyResults}
+          onClick={() => void copyResults()}
+          title={resultsCopied ? "Copied" : "Copy trace results"}
+        />
+      }
     >
-      <div className="relative max-h-[calc(100vh-32px)] w-full max-w-[42rem]">
-        <div className={modalSurface}>
-          <div className={modalHeader}>
-            <h2 className="flex items-center gap-2 text-[1.0625rem] font-semibold tracking-[-0.02em]">
-              <Waypoints size={18} />
-              Execution Trace
-            </h2>
-            <div className="flex shrink-0 items-center gap-1">
-              <button
-                type="button"
-                disabled={!canCopyResults}
-                onClick={() => void copyResults()}
-                className={cx(
-                  iconButton,
-                  "disabled:pointer-events-none disabled:opacity-40",
-                )}
-                title={resultsCopied ? "Copied" : "Copy trace results"}
-                aria-label={resultsCopied ? "Copied" : "Copy trace results"}
-              >
-                {resultsCopied ? <Check size={18} /> : <Copy size={18} />}
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className={modalCloseButton}
-                aria-label="Close steps viewer"
-              >
-                <X size={18} />
-              </button>
+      <div className="flex min-h-0 flex-col overflow-y-auto px-[18px] pb-5 pt-4 sm:px-3.5 sm:pb-3.5 sm:pt-3.5">
+        {metrics &&
+          (metrics.inputTokens !== undefined ||
+            metrics.outputTokens !== undefined ||
+            metrics.tokensPerSecond !== undefined ||
+            metrics.cost !== undefined) && (
+            <div
+              className="mb-4 grid grid-cols-2 gap-2 rounded-xl border border-border-subtle bg-muted/25 p-2.5 sm:grid-cols-4"
+              aria-label="Execution metrics"
+            >
+              <TraceMetric
+                label="Input"
+                value={
+                  metrics.inputTokens !== undefined
+                    ? metrics.inputTokens.toLocaleString()
+                    : "—"
+                }
+                suffix="tokens"
+              />
+              <TraceMetric
+                label="Output"
+                value={
+                  metrics.outputTokens !== undefined
+                    ? metrics.outputTokens.toLocaleString()
+                    : "—"
+                }
+                suffix="tokens"
+              />
+              <TraceMetric
+                icon={<Gauge size={13} />}
+                label="Speed"
+                value={
+                  metrics.tokensPerSecond !== undefined
+                    ? formatTokensPerSecond(metrics.tokensPerSecond)
+                    : "—"
+                }
+                suffix="tok/s"
+              />
+              <TraceMetric
+                icon={<Coins size={13} />}
+                label="Cost"
+                value={
+                  metrics.cost !== undefined ? formatCost(metrics.cost) : "—"
+                }
+              />
             </div>
-          </div>
-
-          <div className="flex min-h-0 flex-col overflow-y-auto px-[18px] pb-5 pt-4 sm:px-3.5 sm:pb-3.5 sm:pt-3.5">
-            {metrics &&
-              (metrics.inputTokens !== undefined ||
-                metrics.outputTokens !== undefined ||
-                metrics.tokensPerSecond !== undefined ||
-                metrics.cost !== undefined) && (
-                <div
-                  className="mb-4 grid grid-cols-2 gap-2 rounded-xl border border-border-subtle bg-muted/25 p-2.5 sm:grid-cols-4"
-                  aria-label="Execution metrics"
-                >
-                  <TraceMetric
-                    label="Input"
-                    value={
-                      metrics.inputTokens !== undefined
-                        ? metrics.inputTokens.toLocaleString()
-                        : "—"
-                    }
-                    suffix="tokens"
-                  />
-                  <TraceMetric
-                    label="Output"
-                    value={
-                      metrics.outputTokens !== undefined
-                        ? metrics.outputTokens.toLocaleString()
-                        : "—"
-                    }
-                    suffix="tokens"
-                  />
-                  <TraceMetric
-                    icon={<Gauge size={13} />}
-                    label="Speed"
-                    value={
-                      metrics.tokensPerSecond !== undefined
-                        ? formatTokensPerSecond(metrics.tokensPerSecond)
-                        : "—"
-                    }
-                    suffix="tok/s"
-                  />
-                  <TraceMetric
-                    icon={<Coins size={13} />}
-                    label="Cost"
-                    value={
-                      metrics.cost !== undefined
-                        ? formatCost(metrics.cost)
-                        : "—"
-                    }
-                  />
-                </div>
-              )}
-            <ExecutionTraceList
-              steps={steps}
-              streamingThinking={streamingThinking}
-            />
-          </div>
-        </div>
+          )}
+        <ExecutionTraceList
+          steps={steps}
+          streamingThinking={streamingThinking}
+        />
       </div>
-    </dialog>
+    </Modal>
   );
 }
 

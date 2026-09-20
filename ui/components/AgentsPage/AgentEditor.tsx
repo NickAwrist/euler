@@ -3,7 +3,9 @@ import { type Dispatch, type SetStateAction, useRef } from "react";
 import { PROMPT_PLACEHOLDER_LIST } from "../../../src/prompts/render";
 import type { AgentData } from "../../persist/agents";
 import type { SkillData } from "../../persist/skills";
-import { cx, primaryButton, secondaryButton } from "../../styles";
+import { cx, inputClass, textareaClass } from "../../styles";
+import { Button } from "../Button";
+import { MultiSelectChips } from "../MultiSelectChips";
 import { canDeleteAgent } from "./agentsPageUtils";
 import type { AgentEditorState } from "./types";
 
@@ -85,15 +87,17 @@ export function AgentEditor({
           {isNew ? "New Agent" : `Edit: ${selectedAgent?.name ?? ""}`}
         </h2>
         {selectedAgent && canDeleteAgent(selectedAgent) && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => onRequestDeleteAgent(selectedAgent)}
             disabled={deleting}
-            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[0.75rem] text-red-400 transition-colors hover:bg-red-400/10 hover:text-red-300 disabled:pointer-events-none disabled:opacity-50"
+            loading={deleting}
+            icon={Trash2}
+            className="text-red-400 hover:bg-red-400/10 hover:text-red-300"
           >
-            <Trash2 size={14} />
             Delete
-          </button>
+          </Button>
         )}
       </div>
 
@@ -107,7 +111,7 @@ export function AgentEditor({
             value={editor.name}
             onChange={(e) => setEditor((p) => ({ ...p, name: e.target.value }))}
             placeholder="my_agent"
-            className="rounded-lg border border-border-subtle bg-background px-3 py-2 text-[0.8125rem] text-foreground outline-none transition-colors focus:border-border placeholder:text-muted-foreground/50"
+            className={cx(inputClass, "h-9 text-[0.8125rem]")}
           />
         </label>
 
@@ -122,7 +126,7 @@ export function AgentEditor({
             }
             placeholder="What this agent does..."
             rows={2}
-            className="rounded-lg border border-border-subtle bg-background px-3 py-2 text-[0.8125rem] text-foreground outline-none transition-colors focus:border-border placeholder:text-muted-foreground/50"
+            className={cx(textareaClass, "text-[0.8125rem]")}
             style={{ resize: "vertical" }}
           />
         </label>
@@ -139,7 +143,7 @@ export function AgentEditor({
             }
             placeholder="Instructions for the agent..."
             rows={6}
-            className="rounded-lg border border-border-subtle bg-background px-3 py-2.5 text-[0.8125rem] leading-[1.6] text-foreground outline-none transition-colors focus:border-border placeholder:text-muted-foreground/50 font-mono"
+            className={cx(textareaClass, "font-mono text-[0.8125rem]")}
             style={{ resize: "vertical" }}
           />
           <div className="mt-1 flex flex-col gap-1.5 rounded-md border border-border-subtle bg-muted/15 px-3 py-2">
@@ -172,112 +176,52 @@ export function AgentEditor({
           </div>
         </div>
 
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 flex items-center gap-1.5 text-[0.75rem] font-medium text-muted-foreground">
-            <Wrench size={13} />
-            Tools
-          </legend>
-          <div className="flex flex-wrap gap-2">
-            {builtinTools.map((tool) => {
-              const active = editor.tools.includes(tool);
-              return (
-                <button
-                  key={tool}
-                  type="button"
-                  onClick={() => onToggleTool(tool)}
-                  className={cx(
-                    "rounded-md border px-2.5 py-1 text-[0.75rem] font-medium transition-colors duration-150",
-                    active
-                      ? "border-accent/30 bg-accent-soft-strong text-foreground"
-                      : "border-border-subtle bg-transparent text-muted-foreground hover:border-border hover:text-foreground",
-                  )}
-                >
-                  {tool}
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
+        <MultiSelectChips
+          label="Tools"
+          icon={Wrench}
+          items={builtinTools}
+          selected={editor.tools}
+          getId={(tool) => tool}
+          getLabel={(tool) => tool}
+          onToggle={onToggleTool}
+        />
 
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 flex items-center gap-1.5 text-[0.75rem] font-medium text-muted-foreground">
-            <BookOpen size={13} />
-            Skills
-          </legend>
-          <div className="flex flex-wrap gap-2">
-            {skills.map((skill) => {
-              const active = editor.skill_ids.includes(skill.id);
-              return (
-                <button
-                  key={skill.id}
-                  type="button"
-                  onClick={() => onToggleSkill(skill.id)}
-                  className={cx(
-                    "rounded-md border px-2.5 py-1 text-[0.75rem] font-medium transition-colors duration-150",
-                    active
-                      ? "border-accent/30 bg-accent-soft-strong text-foreground"
-                      : "border-border-subtle bg-transparent text-muted-foreground hover:border-border hover:text-foreground",
-                  )}
-                >
-                  ${skill.name}
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-[0.6875rem] leading-snug text-muted-foreground">
-            This agent sees and can load only the selected skills.
-          </p>
-        </fieldset>
+        <MultiSelectChips
+          label="Skills"
+          icon={BookOpen}
+          items={skills}
+          selected={editor.skill_ids}
+          getId={(skill) => skill.id}
+          getLabel={(skill) => `$${skill.name}`}
+          onToggle={onToggleSkill}
+          helpText="This agent sees and can load only the selected skills."
+        />
 
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-1 flex items-center gap-1.5 text-[0.75rem] font-medium text-muted-foreground">
-            <Bot size={13} />
-            Delegation routes
-          </legend>
-          <div className="flex flex-wrap gap-2">
-            {otherAgents.map((agent) => {
-              const active = editor.delegate_agent_ids.includes(agent.id);
-              return (
-                <button
-                  key={agent.id}
-                  type="button"
-                  onClick={() => onToggleDelegation(agent.id)}
-                  className={cx(
-                    "rounded-md border px-2.5 py-1 text-[0.75rem] font-medium transition-colors duration-150",
-                    active
-                      ? "border-accent/30 bg-accent-soft-strong text-foreground"
-                      : "border-border-subtle bg-transparent text-muted-foreground hover:border-border hover:text-foreground",
-                  )}
-                >
-                  {agent.name}
-                </button>
-              );
-            })}
-          </div>
-          <p className="text-[0.6875rem] leading-snug text-muted-foreground">
-            Selected agents appear to the model as callable delegation tools.
-          </p>
-        </fieldset>
+        <MultiSelectChips
+          label="Delegation routes"
+          icon={Bot}
+          items={otherAgents}
+          selected={editor.delegate_agent_ids}
+          getId={(agent) => agent.id}
+          getLabel={(agent) => agent.name}
+          onToggle={onToggleDelegation}
+          helpText="Selected agents appear to the model as callable delegation tools."
+        />
 
         <div className="flex items-center gap-3 pt-2">
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={onSave}
             disabled={saveDisabled}
-            aria-busy={saving}
-            className={cx(primaryButton, saveDisabled && "opacity-60")}
+            loading={saving}
+            icon={Save}
           >
-            <Save size={15} />
             Save
-          </button>
+          </Button>
           {!isNew && (
-            <button
-              type="button"
-              onClick={onCancelEdit}
-              className={secondaryButton}
-            >
+            <Button variant="secondary" onClick={onCancelEdit}>
               Cancel
-            </button>
+            </Button>
           )}
         </div>
       </div>

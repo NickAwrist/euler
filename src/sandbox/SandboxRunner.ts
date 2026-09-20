@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
+import { errorMessage } from "../utils/errors";
 import type { Workspace } from "../workspaces/WorkspaceService";
 
 export type SandboxRunOptions = {
@@ -187,7 +188,7 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
     } catch (error) {
       return {
         available: false,
-        diagnostic: `Shell tools are disabled because bubblewrap cannot create a sandbox: ${error instanceof Error ? error.message : String(error)}`,
+        diagnostic: `Shell tools are disabled because bubblewrap cannot create a sandbox: ${errorMessage(error)}`,
       };
     }
   }

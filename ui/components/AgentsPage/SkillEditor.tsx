@@ -1,7 +1,8 @@
 import { Save, Trash2 } from "lucide-react";
 import type { Dispatch, SetStateAction } from "react";
 import type { SkillData, SkillWriteBody } from "../../persist/skills";
-import { cx, primaryButton, secondaryButton } from "../../styles";
+import { cx, textareaClass } from "../../styles";
+import { Button } from "../Button";
 
 type Props = {
   isNew: boolean;
@@ -35,15 +36,16 @@ export function SkillEditor({
           {isNew ? "New skill" : `Edit: $${skill?.name ?? ""}`}
         </h2>
         {skill && (
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={Trash2}
+            loading={deleting}
             onClick={() => onDelete(skill)}
-            disabled={deleting}
-            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[0.75rem] text-red-400 transition-colors hover:bg-red-400/10 hover:text-red-300 disabled:pointer-events-none disabled:opacity-50"
+            className="text-red-400 hover:bg-red-400/10 hover:text-red-300"
           >
-            <Trash2 size={14} />
             Delete
-          </button>
+          </Button>
         )}
       </div>
       <p className="mb-6 max-w-xl text-[0.8125rem] leading-[1.55] text-muted-foreground">
@@ -94,7 +96,7 @@ export function SkillEditor({
             placeholder="When this skill should be used and what it helps with."
             maxLength={500}
             rows={3}
-            className="rounded-lg border border-border-subtle bg-background px-3 py-2 text-[0.8125rem] leading-[1.5] text-foreground outline-none transition-colors focus:border-border placeholder:text-muted-foreground/50"
+            className={cx(textareaClass, "text-[0.8125rem]")}
             style={{ resize: "vertical" }}
           />
           <span className="text-[0.6875rem] text-muted-foreground">
@@ -118,7 +120,7 @@ export function SkillEditor({
               "# Workflow\n\nDescribe the steps, constraints, and output format for this skill."
             }
             rows={15}
-            className="rounded-lg border border-border-subtle bg-background px-3 py-2.5 font-mono text-[0.8125rem] leading-[1.6] text-foreground outline-none transition-colors focus:border-border placeholder:text-muted-foreground/50"
+            className={cx(textareaClass, "font-mono text-[0.8125rem]")}
             style={{ resize: "vertical" }}
           />
           <span className="text-[0.6875rem] text-muted-foreground">
@@ -128,24 +130,19 @@ export function SkillEditor({
         </label>
 
         <div className="flex items-center gap-3 pt-2">
-          <button
-            type="button"
-            onClick={onSave}
+          <Button
+            variant="primary"
+            icon={Save}
+            loading={saving}
             disabled={saveDisabled}
-            aria-busy={saving}
-            className={cx(primaryButton, saveDisabled && "opacity-60")}
+            onClick={onSave}
           >
-            <Save size={15} />
             Save
-          </button>
+          </Button>
           {!isNew && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className={secondaryButton}
-            >
+            <Button variant="secondary" onClick={onCancel}>
               Cancel
-            </button>
+            </Button>
           )}
         </div>
       </div>

@@ -11,16 +11,15 @@ const WIDTH_KEY = "euler:artifactSidebarWidth";
 const MIN_WIDTH = 320;
 const maxWidth = () =>
   Math.max(MIN_WIDTH, Math.min(960, window.innerWidth - 600));
+import { safeStorage } from "../../lib/safeStorage";
+
 const clampWidth = (width: number) =>
   Math.min(maxWidth(), Math.max(MIN_WIDTH, width));
 const defaultWidth = () => clampWidth(Math.min(window.innerWidth * 0.42, 560));
 function initialWidth() {
-  try {
-    const stored = Number(localStorage.getItem(WIDTH_KEY));
-    if (stored >= MIN_WIDTH && Number.isFinite(stored))
-      return clampWidth(stored);
-  } catch {
-    /* Storage can be disabled. */
+  const stored = Number(safeStorage.getItem(WIDTH_KEY));
+  if (stored >= MIN_WIDTH && Number.isFinite(stored)) {
+    return clampWidth(stored);
   }
   return defaultWidth();
 }
@@ -74,12 +73,9 @@ export function ArtifactSidebar({
   }, []);
   useEffect(() => {
     if (resizing) return;
-    try {
-      localStorage.setItem(WIDTH_KEY, String(width));
-    } catch {
-      /* Optional preference. */
-    }
+    safeStorage.setItem(WIDTH_KEY, String(width));
   }, [width, resizing]);
+
   useEffect(() => {
     if (!resizing) return;
     const { cursor, userSelect } = document.body.style;

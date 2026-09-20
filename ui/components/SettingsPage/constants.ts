@@ -19,9 +19,9 @@ export function parseSize(key: string): { width: number; height: number } {
   return { width: 1440, height: 1440 };
 }
 
-export const inputClass =
-  "flex h-10 w-full rounded-lg border border-border-subtle bg-surface px-3 py-2 text-[0.875rem] text-foreground placeholder:text-muted-foreground transition-colors focus:border-border focus:outline-none";
-export const selectClass =
-  "flex h-10 w-full rounded-lg border border-border-subtle bg-surface px-3 py-2 text-[0.875rem] text-foreground transition-colors focus:border-border focus:outline-none";
-export const hintClass = "text-[0.75rem] text-muted-foreground";
-export const labelClass = "block text-[0.875rem] font-medium text-foreground";
+export {
+  hintClass,
+  inputClass,
+  labelClass,
+  selectClass,
+} from "../../styles";

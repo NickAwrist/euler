@@ -59,9 +59,7 @@ export function sendApiError(
     .json(apiErrorBody(new ApiError(status, code, message, details)));
 }
 
-export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+export { errorMessage } from "../utils/errors";
 
 export function errorHandler(
   err: unknown,

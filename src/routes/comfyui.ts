@@ -18,7 +18,7 @@ import {
   setComfyUINegativePrompt,
 } from "../db/index";
 import { asyncRoute } from "../http/asyncRoute";
-import { errorMessage, sendApiError } from "../http/errors";
+import { sendApiError } from "../http/errors";
 import { sendValidationError } from "../http/validation";
 import { logger } from "../logger";
 import {
@@ -26,6 +26,7 @@ import {
   ComfyUITestBodySchema,
   ComfyUIViewQuerySchema,
 } from "../schemas/comfyui";
+import { errorMessage } from "../utils/errors";
 
 const router = Router();
 const log = logger.child({ route: "comfyui" });
@@ -40,7 +41,7 @@ router.get("/health", async (_req, res) => {
     log.error({ err: e }, "comfyui health");
     res.json({
       connected: false,
-      error: e instanceof Error ? e.message : String(e),
+      error: errorMessage(e),
     });
   }
 });
@@ -115,7 +116,7 @@ router.get("/models", async (_req, res) => {
     res.json({ models });
   } catch (e) {
     log.error({ err: e }, "comfyui models");
-    res.json({ models: [], error: e instanceof Error ? e.message : String(e) });
+    res.json({ models: [], error: errorMessage(e) });
   }
 });
 

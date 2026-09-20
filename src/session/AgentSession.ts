@@ -11,6 +11,7 @@ import type { LlmImage, LlmMessage } from "../llm/index";
 import { stripReasoningFromModelMessages } from "../llm/reasoningDetails";
 import { logger } from "../logger";
 import type { PromptContext } from "../prompts/render";
+import { errorMessage } from "../utils/errors";
 import type { Workspace } from "../workspaces/WorkspaceService";
 
 const log = logger.child({ component: "AgentSession" });
@@ -256,7 +257,7 @@ export class AgentSession extends EventEmitter {
           { err: e, sessionId: this.sessionId },
           "AgentSession error",
         );
-        result = `Error: ${e instanceof Error ? e.message : String(e)}`;
+        result = `Error: ${errorMessage(e)}`;
         ctx.failLastRunningStep(result);
       }
     } finally {

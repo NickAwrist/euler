@@ -9,9 +9,10 @@ import {
   useState,
 } from "react";
 import type { ImageAttachment } from "../../../src/attachments/types";
+import { abortRun } from "../../persist/runs";
 import { patchSessionApi } from "../../persist/sessions";
-import { userScopedFetch } from "../../persist/userIdentity";
 import type { UserSettings } from "../../persist/userSettings";
+
 import type {
   DebugData,
   Message,
@@ -102,6 +103,7 @@ export function useRunStreaming(p: Args) {
       setMessages: p.setMessages,
       refreshSessions: p.refreshSessions,
       streamBufferRef,
+      clearStreamingUi,
       setStreamingStep,
       setStreamingSteps,
       setStreamingContent,
@@ -196,11 +198,7 @@ export function useRunStreaming(p: Args) {
     const sessionId = inFlightSessionIdRef.current;
     const ephemeral = inFlightEphemeralRef.current;
     if (requestId) {
-      void userScopedFetch("/api/runs/abort", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestId }),
-      }).catch(() => {});
+      void abortRun(requestId).catch(() => {});
     }
 
     controller.abort();

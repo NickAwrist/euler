@@ -1,13 +1,4 @@
-import {
-  ArrowUp,
-  BookOpen,
-  Command,
-  Folder,
-  ImagePlus,
-  Square,
-  Upload,
-  X,
-} from "lucide-react";
+import { ArrowUp, Folder, ImagePlus, Square, Upload, X } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -15,12 +6,16 @@ import {
   useRef,
   useState,
 } from "react";
+import { useListNavigation } from "../hooks/useListNavigation";
 import { hasConfigurableThinking } from "../lib/thinkingLevel";
 import { type SkillData, fetchSkills } from "../persist/skills";
-import { cx, iconButton, primaryButton } from "../styles";
+import { cx } from "../styles";
 import type { MessageStep, ModelOption, SessionWorkspace } from "../types";
 import { AgentSelectBar } from "./AgentSelectBar";
+import { IconButton } from "./IconButton";
 import { ModelSelectBar } from "./ModelSelectBar";
+import { CommandPicker } from "./RunArea/CommandPicker";
+import { SkillPicker } from "./RunArea/SkillPicker";
 import { ThinkingLevelBar } from "./ThinkingLevelBar";
 import {
   type RunCommandName,
@@ -103,9 +98,7 @@ export function RunInputDock({
   const [isFileDragActive, setIsFileDragActive] = useState(false);
   const [skills, setSkills] = useState<SkillData[]>([]);
   const [caretIndex, setCaretIndex] = useState(input.length);
-  const [selectedSkillIndex, setSelectedSkillIndex] = useState(0);
   const [skillPickerDismissed, setSkillPickerDismissed] = useState(false);
-  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const isBusy =
     runPending || streamingStep !== null || streamingSteps.length > 0;
   const currentModelOption = ollamaModels.find(
@@ -126,37 +119,14 @@ export function RunInputDock({
 
   const runCommand = (command: RunCommandName) => {
     setInput("");
-    setSelectedCommandIndex(0);
     void onRunCommand(command);
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    void fetchSkills()
-      .then((availableSkills) => {
-        if (!cancelled) setSkills(availableSkills);
-      })
-      .catch(() => {
-        if (!cancelled) setSkills([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    setSelectedSkillIndex(0);
-  }, [activeSkillToken?.query]);
-
-  useEffect(() => {
-    if (selectedSkillIndex < matchingSkills.length) return;
-    setSelectedSkillIndex(Math.max(0, matchingSkills.length - 1));
-  }, [matchingSkills.length, selectedSkillIndex]);
-
-  useEffect(() => {
-    if (selectedCommandIndex < matchingCommands.length) return;
-    setSelectedCommandIndex(Math.max(0, matchingCommands.length - 1));
-  }, [matchingCommands.length, selectedCommandIndex]);
+  const commandNav = useListNavigation({
+    items: matchingCommands,
+    onSelect: (command) => runCommand(command.name),
+    onDismiss: () => setInput(""),
+  });
 
   const selectSkill = (skill: SkillData) => {
     if (!activeSkillToken) return;
@@ -171,6 +141,27 @@ export function RunInputDock({
       textarea.setSelectionRange(completed.caret, completed.caret);
     });
   };
+
+  const skillNav = useListNavigation({
+    items: matchingSkills,
+    onSelect: selectSkill,
+    onDismiss: () => setSkillPickerDismissed(true),
+    resetKey: activeSkillToken?.query,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchSkills()
+      .then((availableSkills) => {
+        if (!cancelled) setSkills(availableSkills);
+      })
+      .catch(() => {
+        if (!cancelled) setSkills([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const syncInputHeight = useCallback(() => {
     const el = inputRef.current;
@@ -259,71 +250,20 @@ export function RunInputDock({
         )}
       >
         {commandPickerOpen && (
-          <div
-            id="command-picker"
-            className="ui-animate-slide-up absolute inset-x-0 bottom-[calc(100%+8px)] z-40 overflow-hidden rounded-xl border border-border-subtle bg-surface p-1.5 shadow-[0_14px_36px_rgba(0,0,0,0.42)]"
-            aria-label="Chat commands"
-          >
-            {matchingCommands.map((command, index) => (
-              <button
-                key={command.name}
-                type="button"
-                aria-current={index === selectedCommandIndex}
-                onMouseDown={(event) => event.preventDefault()}
-                onMouseEnter={() => setSelectedCommandIndex(index)}
-                onClick={() => runCommand(command.name)}
-                className={cx(
-                  "flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-left",
-                  index === selectedCommandIndex
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                )}
-              >
-                <Command size={14} className="shrink-0" />
-                <span className="font-mono text-[0.8125rem] text-foreground">
-                  /{command.name}
-                </span>
-                <span className="truncate text-xs">{command.description}</span>
-              </button>
-            ))}
-          </div>
+          <CommandPicker
+            commands={matchingCommands}
+            selectedIndex={commandNav.selectedIndex}
+            onSelectIndex={commandNav.setSelectedIndex}
+            onSelectCommand={runCommand}
+          />
         )}
         {skillPickerOpen && (
-          <div
-            id="skill-picker"
-            className="ui-animate-slide-up absolute inset-x-0 bottom-[calc(100%+8px)] z-30 overflow-hidden rounded-xl border border-border-subtle bg-surface shadow-[0_14px_36px_rgba(0,0,0,0.42)]"
-            aria-label="Available skills"
-          >
-            <div className="flex items-center gap-2 border-b border-border-subtle px-3 py-2 text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-              <BookOpen size={13} />
-              Skills
-            </div>
-            <div className="max-h-64 overflow-y-auto p-1.5">
-              {matchingSkills.map((skill, index) => (
-                <button
-                  key={skill.id}
-                  type="button"
-                  aria-current={index === selectedSkillIndex}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onMouseEnter={() => setSelectedSkillIndex(index)}
-                  onClick={() => selectSkill(skill)}
-                  className={cx(
-                    "flex w-full min-w-0 items-start gap-3 rounded-lg px-2.5 py-2 text-left transition-colors",
-                    index === selectedSkillIndex
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                  )}
-                >
-                  <span className="shrink-0 font-mono text-[0.8125rem] font-medium text-foreground">
-                    ${skill.name}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-[0.75rem] leading-[1.45]">
-                    {skill.description}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
+          <SkillPicker
+            skills={matchingSkills}
+            selectedIndex={skillNav.selectedIndex}
+            onSelectIndex={skillNav.setSelectedIndex}
+            onSelectSkill={selectSkill}
+          />
         )}
         <div
           aria-hidden={!isFileDragActive}
@@ -383,19 +323,15 @@ export function RunInputDock({
                   e.target.value = "";
                 }}
               />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
+              <IconButton
+                variant="ghost"
+                icon={ImagePlus}
                 disabled={isBusy || !canAttachImages}
-                className={cx(
-                  iconButton,
-                  "mb-0.5 size-9 shrink-0 border-transparent p-0",
-                )}
+                onClick={() => fileInputRef.current?.click()}
                 title={attachImageDisabledReason ?? "Add images"}
-                aria-label={attachImageDisabledReason ?? "Add images"}
-              >
-                <ImagePlus size={17} />
-              </button>
+                label={attachImageDisabledReason ?? "Add images"}
+                className="mb-0.5 border-transparent"
+              />
             </>
           )}
           <textarea
@@ -419,57 +355,11 @@ export function RunInputDock({
               }
             }}
             onKeyDown={(e) => {
-              if (commandPickerOpen) {
-                if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-                  e.preventDefault();
-                  const direction = e.key === "ArrowDown" ? 1 : -1;
-                  setSelectedCommandIndex(
-                    (current) =>
-                      (current + direction + matchingCommands.length) %
-                      matchingCommands.length,
-                  );
-                  return;
-                }
-                if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
-                  e.preventDefault();
-                  const command = matchingCommands[selectedCommandIndex];
-                  if (command) runCommand(command.name);
-                  return;
-                }
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  setInput("");
-                  return;
-                }
+              if (commandPickerOpen && commandNav.onKeyDown(e)) {
+                return;
               }
-              if (skillPickerOpen) {
-                if (e.key === "ArrowDown") {
-                  e.preventDefault();
-                  setSelectedSkillIndex(
-                    (current) => (current + 1) % matchingSkills.length,
-                  );
-                  return;
-                }
-                if (e.key === "ArrowUp") {
-                  e.preventDefault();
-                  setSelectedSkillIndex(
-                    (current) =>
-                      (current - 1 + matchingSkills.length) %
-                      matchingSkills.length,
-                  );
-                  return;
-                }
-                if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
-                  e.preventDefault();
-                  const skill = matchingSkills[selectedSkillIndex];
-                  if (skill) selectSkill(skill);
-                  return;
-                }
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  setSkillPickerDismissed(true);
-                  return;
-                }
+              if (skillPickerOpen && skillNav.onKeyDown(e)) {
+                return;
               }
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -491,33 +381,27 @@ export function RunInputDock({
             rows={1}
           />
           {isBusy ? (
-            <button
-              type="button"
+            <IconButton
+              variant="danger"
+              icon={Square}
+              label="Stop generation"
+              iconSize={12}
+              iconProps={{ strokeWidth: 2.25 }}
               onClick={(event) => {
-                // Stopping can turn this same DOM button into the submit button.
                 event.preventDefault();
                 onStopGeneration();
               }}
-              className={cx(
-                iconButton,
-                "mb-0.5 size-9 shrink-0 p-0 hover:border-red-500/20 hover:bg-red-500/[0.06] hover:text-red-300",
-              )}
-              aria-label="Stop generation"
-            >
-              <Square size={12} strokeWidth={2.25} className="shrink-0" />
-            </button>
+              className="mb-0.5 hover:border-red-500/20 hover:bg-red-500/[0.06] hover:text-red-300"
+            />
           ) : (
-            <button
+            <IconButton
               type="submit"
+              variant="primary"
+              icon={ArrowUp}
+              label="Send message"
               disabled={!input.trim() || !canSend}
-              className={cx(
-                primaryButton,
-                "mb-0.5 size-9 shrink-0 justify-center rounded-lg p-0",
-              )}
-              aria-label="Send message"
-            >
-              <ArrowUp size={18} />
-            </button>
+              className="mb-0.5"
+            />
           )}
         </div>
         <div

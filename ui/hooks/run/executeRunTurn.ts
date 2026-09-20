@@ -5,6 +5,7 @@ import type {
 } from "../../../src/attachments/types";
 import { readApiError } from "../../lib/readApiError";
 import { readSseBlocks } from "../../lib/readSseBlocks";
+import { getActiveRun } from "../../persist/runs";
 import { fetchSession, patchSessionApi } from "../../persist/sessions";
 import { userScopedFetch } from "../../persist/userIdentity";
 import { buildRunMetadata } from "../../persist/userSettings";
@@ -191,17 +192,8 @@ export async function executeRunTurn(
     }
 
     const recoverPersistentStream = async () => {
-      const statusResponse = await userScopedFetch(
-        `/api/runs/active/${encodeURIComponent(turnSessionId)}`,
-      );
-      if (!statusResponse.ok) {
-        throw new Error(await readApiError(statusResponse));
-      }
-      const status = (await statusResponse.json()) as {
-        active?: boolean;
-        requestId?: string;
-      };
-      if (status.active && status.requestId) {
+      const status = await getActiveRun(turnSessionId);
+      if (status?.active && status.requestId) {
         reconnectAfterCleanup.current = {
           sessionId: turnSessionId,
           requestId: status.requestId,

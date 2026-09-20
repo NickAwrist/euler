@@ -1,61 +1,37 @@
-import { readApiError } from "../lib/readApiError";
-import { userScopedFetch } from "./userIdentity";
+import type { SkillData, SkillWriteBody } from "../../src/schemas/skills";
+import { apiJson, apiVoid } from "../lib/api";
 
-export type SkillData = {
-  id: string;
-  name: string;
-  description: string;
-  instructions: string;
-  created_at: number;
-  updated_at: number;
-};
-
-export type SkillWriteBody = Pick<
-  SkillData,
-  "name" | "description" | "instructions"
->;
+export type { SkillData, SkillWriteBody };
 
 export async function fetchSkills(): Promise<SkillData[]> {
-  const response = await userScopedFetch("/api/skills");
-  if (!response.ok) {
-    throw new Error(await readApiError(response, "Failed to fetch skills"));
-  }
-  const data = (await response.json()) as { skills?: SkillData[] };
+  const data = await apiJson<{ skills?: SkillData[] }>("/api/skills", {
+    errorMessage: "Failed to fetch skills",
+  });
   return data.skills ?? [];
 }
 
-export async function createSkillApi(body: SkillWriteBody): Promise<SkillData> {
-  const response = await userScopedFetch("/api/skills", {
+export function createSkillApi(body: SkillWriteBody): Promise<SkillData> {
+  return apiJson<SkillData>("/api/skills", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    json: body,
+    errorMessage: "Failed to create skill",
   });
-  if (!response.ok) {
-    throw new Error(await readApiError(response, "Failed to create skill"));
-  }
-  return response.json();
 }
 
-export async function updateSkillApi(
+export function updateSkillApi(
   id: string,
   body: SkillWriteBody,
 ): Promise<SkillData> {
-  const response = await userScopedFetch(`/api/skills/${id}`, {
+  return apiJson<SkillData>(`/api/skills/${id}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    json: body,
+    errorMessage: "Failed to update skill",
   });
-  if (!response.ok) {
-    throw new Error(await readApiError(response, "Failed to update skill"));
-  }
-  return response.json();
 }
 
-export async function deleteSkillApi(id: string): Promise<void> {
-  const response = await userScopedFetch(`/api/skills/${id}`, {
+export function deleteSkillApi(id: string): Promise<void> {
+  return apiVoid(`/api/skills/${id}`, {
     method: "DELETE",
+    errorMessage: "Failed to delete skill",
   });
-  if (!response.ok) {
-    throw new Error(await readApiError(response, "Failed to delete skill"));
-  }
 }

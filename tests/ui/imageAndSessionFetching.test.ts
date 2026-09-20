@@ -163,3 +163,33 @@ test("stream completion requests fresh history without losing deduplication when
   );
   expect((await completion)?.history).toHaveLength(1);
 });
+
+test("fetchSessionSummaries parses valid sessions using SessionSummaryListSchema and sorts by updatedAt desc", async () => {
+  const { fetchSessionSummaries } = await import("../../ui/persist/sessions");
+  fetchSpy.mockResolvedValue(
+    Response.json({
+      sessions: [
+        { id: "s1", createdAt: 100, updatedAt: 200, preview: "Chat 1" },
+        { id: "s2", createdAt: 100, updatedAt: 500, preview: "Chat 2" },
+      ],
+    }),
+  );
+
+  const summaries = await fetchSessionSummaries();
+  expect(summaries).toEqual([
+    { id: "s2", createdAt: 100, updatedAt: 500, preview: "Chat 2" },
+    { id: "s1", createdAt: 100, updatedAt: 200, preview: "Chat 1" },
+  ]);
+});
+
+test("fetchSessionSummaries returns empty array when schema parsing fails", async () => {
+  const { fetchSessionSummaries } = await import("../../ui/persist/sessions");
+  fetchSpy.mockResolvedValue(
+    Response.json({
+      sessions: "not-an-array",
+    }),
+  );
+
+  const summaries = await fetchSessionSummaries();
+  expect(summaries).toEqual([]);
+});

@@ -1,40 +1,27 @@
-import { readApiError } from "../lib/readApiError";
-import type {
-  Message,
-  SessionSummary,
-  SessionWorkspace,
-  WorkspaceFile,
-} from "../types";
-import { userScopedFetch } from "./userIdentity";
+import {
+  type StoredRunSession as SchemaStoredRunSession,
+  type SessionSummary,
+  SessionSummaryListSchema,
+  type SessionWorkspace,
+  StoredRunSessionSchema,
+} from "../../src/schemas/sessions";
+import { apiBlob, apiJson, apiVoid } from "../lib/api";
+import type { Message, WorkspaceFile } from "../types";
 
-export type StoredRunSession = {
-  id: string;
-  createdAt: number;
-  updatedAt: number;
-  customTitle?: string | null;
+export type StoredRunSession = Omit<
+  SchemaStoredRunSession,
+  "history" | "workspace"
+> & {
   history: Message[];
-  modelMessages?: Array<Record<string, unknown>> | null;
-  model?: string | null;
   workspace?: SessionWorkspace;
 };
+export type { SessionSummary, SessionWorkspace };
 
 export async function fetchSessionSummaries(): Promise<SessionSummary[]> {
-  const res = await userScopedFetch("/api/sessions");
-  if (!res.ok) throw new Error(await readApiError(res));
-  const data = (await res.json()) as { sessions?: unknown };
-  const raw = Array.isArray(data.sessions) ? data.sessions : [];
-  return raw
-    .filter(
-      (s): s is Record<string, unknown> => s != null && typeof s === "object",
-    )
-    .map((s) => ({
-      id: String(s.id ?? ""),
-      createdAt: Number(s.createdAt) || 0,
-      updatedAt: Number(s.updatedAt) || 0,
-      preview: String(s.preview ?? "New chat"),
-    }))
-    .filter((s) => s.id.length > 0)
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+  const data = await apiJson<unknown>("/api/sessions");
+  const parsed = SessionSummaryListSchema.safeParse(data);
+  if (!parsed.success) return [];
+  return [...parsed.data.sessions].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 const inFlightSessionFetches = new Map<
@@ -58,34 +45,40 @@ export function fetchSession(
 }
 
 async function fetchSessionData(id: string): Promise<StoredRunSession | null> {
-  const res = await userScopedFetch(`/api/sessions/${encodeURIComponent(id)}`);
-  if (res.status === 404) return null;
-  if (!res.ok) throw new Error(await readApiError(res));
-  const s = (await res.json()) as Record<string, unknown>;
-  return {
-    id: String(s.id ?? ""),
-    createdAt: Number(s.createdAt) || 0,
-    updatedAt: Number(s.updatedAt) || 0,
-    customTitle: s.customTitle == null ? null : String(s.customTitle),
-    history: Array.isArray(s.history) ? (s.history as Message[]) : [],
-    modelMessages:
-      s.modelMessages === null || s.modelMessages === undefined
-        ? null
-        : Array.isArray(s.modelMessages)
-          ? (s.modelMessages as Array<Record<string, unknown>>)
-          : null,
-    model: s.model == null ? null : String(s.model),
-    workspace:
-      s.workspace &&
-      typeof s.workspace === "object" &&
-      (s.workspace as { kind?: unknown }).kind === "local"
-        ? {
-            kind: "local",
-            path: String((s.workspace as { path?: unknown }).path ?? ""),
-            label: String((s.workspace as { label?: unknown }).label ?? ""),
-          }
-        : { kind: "sandbox" },
-  };
+  const s = await apiJson<unknown>(`/api/sessions/${encodeURIComponent(id)}`, {
+    notFound: "null",
+  });
+  if (!s) return null;
+  const parsed = StoredRunSessionSchema.safeParse(s);
+  if (parsed.success) return parsed.data as StoredRunSession;
+  if (typeof s === "object" && s !== null) {
+    const raw = s as Record<string, unknown>;
+    return {
+      id: String(raw.id ?? ""),
+      createdAt: Number(raw.createdAt) || 0,
+      updatedAt: Number(raw.updatedAt) || 0,
+      customTitle: raw.customTitle == null ? null : String(raw.customTitle),
+      history: Array.isArray(raw.history) ? (raw.history as Message[]) : [],
+      modelMessages:
+        raw.modelMessages === null || raw.modelMessages === undefined
+          ? null
+          : Array.isArray(raw.modelMessages)
+            ? (raw.modelMessages as Array<Record<string, unknown>>)
+            : null,
+      model: raw.model == null ? null : String(raw.model),
+      workspace:
+        raw.workspace &&
+        typeof raw.workspace === "object" &&
+        (raw.workspace as { kind?: unknown }).kind === "local"
+          ? {
+              kind: "local",
+              path: String((raw.workspace as { path?: unknown }).path ?? ""),
+              label: String((raw.workspace as { label?: unknown }).label ?? ""),
+            }
+          : { kind: "sandbox" },
+    };
+  }
+  return null;
 }
 
 export async function createSessionApi(opts?: {
@@ -97,13 +90,10 @@ export async function createSessionApi(opts?: {
 }> {
   const body: Record<string, string> = {};
   if (opts?.model?.trim()) body.model = opts.model.trim();
-  const res = await userScopedFetch("/api/sessions", {
+  const j = await apiJson<Record<string, unknown>>("/api/sessions", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    json: body,
   });
-  if (!res.ok) throw new Error(await readApiError(res));
-  const j = (await res.json()) as Record<string, unknown>;
   return {
     id: String(j.id ?? ""),
     createdAt: Number(j.createdAt) || Date.now(),
@@ -111,23 +101,21 @@ export async function createSessionApi(opts?: {
   };
 }
 
-export async function patchSessionApi(
+export function patchSessionApi(
   id: string,
   body: Record<string, unknown>,
 ): Promise<void> {
-  const res = await userScopedFetch(`/api/sessions/${encodeURIComponent(id)}`, {
+  return apiVoid(`/api/sessions/${encodeURIComponent(id)}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    json: body,
   });
-  if (!res.ok) throw new Error(await readApiError(res));
 }
 
-export async function deleteSessionApi(id: string): Promise<void> {
-  const res = await userScopedFetch(`/api/sessions/${encodeURIComponent(id)}`, {
+export function deleteSessionApi(id: string): Promise<void> {
+  return apiVoid(`/api/sessions/${encodeURIComponent(id)}`, {
     method: "DELETE",
+    notFound: "null",
   });
-  if (!res.ok && res.status !== 404) throw new Error(await readApiError(res));
 }
 
 export async function selectSessionDirectory(
@@ -136,18 +124,13 @@ export async function selectSessionDirectory(
   temporary = false,
 ): Promise<SessionWorkspace> {
   const base = temporary ? "/api/temporary-sessions" : "/api/sessions";
-  const res = await userScopedFetch(
+  const data = await apiJson<{ workspace: SessionWorkspace }>(
     `${base}/${encodeURIComponent(id)}/workspace/select-directory`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ path }),
+      json: { path },
     },
   );
-  if (!res.ok) throw new Error(await readApiError(res));
-  const data = (await res.json()) as {
-    workspace: SessionWorkspace;
-  };
   return data.workspace;
 }
 
@@ -156,11 +139,9 @@ export async function useSessionSandbox(
   temporary = false,
 ): Promise<SessionWorkspace> {
   const base = temporary ? "/api/temporary-sessions" : "/api/sessions";
-  const res = await userScopedFetch(
-    `${base}/${encodeURIComponent(id)}/workspace/use-sandbox`,
-    { method: "POST" },
-  );
-  if (!res.ok) throw new Error(await readApiError(res));
+  await apiVoid(`${base}/${encodeURIComponent(id)}/workspace/use-sandbox`, {
+    method: "POST",
+  });
   return { kind: "sandbox" };
 }
 
@@ -171,25 +152,46 @@ export async function fetchWorkspaceFiles(
   const path = temporary
     ? `/api/temporary-sessions/${encodeURIComponent(id)}/files`
     : `/api/sessions/${encodeURIComponent(id)}/workspace/files`;
-  const res = await userScopedFetch(path);
-  if (!res.ok) throw new Error(await readApiError(res));
-  const data = (await res.json()) as { files?: WorkspaceFile[] };
+  const data = await apiJson<{ files?: WorkspaceFile[] }>(path);
   return Array.isArray(data.files) ? data.files : [];
 }
 
+export async function downloadWorkspaceFile(
+  sessionId: string,
+  filePath: string,
+  temporary = false,
+): Promise<Blob> {
+  const path = temporary
+    ? `/api/temporary-sessions/${encodeURIComponent(sessionId)}/file?path=${encodeURIComponent(filePath)}`
+    : `/api/sessions/${encodeURIComponent(sessionId)}/workspace/file?path=${encodeURIComponent(filePath)}`;
+  return apiBlob(path);
+}
+
+export function revealWorkspaceFile(
+  sessionId: string,
+  filePath: string,
+  temporary = false,
+): Promise<void> {
+  const base = temporary
+    ? `/api/temporary-sessions/${encodeURIComponent(sessionId)}`
+    : `/api/sessions/${encodeURIComponent(sessionId)}/workspace`;
+  return apiVoid(`${base}/reveal`, {
+    method: "POST",
+    json: { path: filePath },
+  });
+}
+
 export async function createTemporarySessionApi(): Promise<{ id: string }> {
-  const res = await userScopedFetch("/api/temporary-sessions", {
+  const data = await apiJson<{ id?: unknown }>("/api/temporary-sessions", {
     method: "POST",
   });
-  if (!res.ok) throw new Error(await readApiError(res));
-  const data = (await res.json()) as { id?: unknown };
   return { id: String(data.id ?? "") };
 }
 
-export async function deleteTemporarySessionApi(id: string): Promise<void> {
-  const res = await userScopedFetch(
-    `/api/temporary-sessions/${encodeURIComponent(id)}`,
-    { method: "DELETE", keepalive: true },
-  );
-  if (!res.ok && res.status !== 404) throw new Error(await readApiError(res));
+export function deleteTemporarySessionApi(id: string): Promise<void> {
+  return apiVoid(`/api/temporary-sessions/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    keepalive: true,
+    notFound: "null",
+  });
 }

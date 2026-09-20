@@ -1,7 +1,8 @@
 import { Save } from "lucide-react";
 import { useState } from "react";
-import { cx, primaryButton } from "../../styles";
+import { cx } from "../../styles";
 import { BackToChatButton } from "../BackToChatButton";
+import { Button } from "../Button";
 import { GeneralSettingsTab } from "./GeneralSettingsTab";
 import { ImageGenerationTab } from "./ImageGenerationTab";
 import { OllamaSettingsTab } from "./OllamaSettingsTab";
@@ -151,19 +152,15 @@ export function SettingsPage(props: SettingsPageProps) {
 
           {p.tab !== "openrouter" && (
             <div className="flex justify-end border-t border-border-subtle pt-6">
-              <button
-                type="button"
+              <Button
+                variant="primary"
                 disabled={!p.isDirty || p.isSaving}
-                aria-busy={p.isSaving}
+                loading={p.isSaving}
+                icon={Save}
                 onClick={() => void p.handleSubmit()}
-                className={cx(
-                  primaryButton,
-                  (!p.isDirty || p.isSaving) && "opacity-60",
-                )}
               >
-                <Save size={15} />
                 Save settings
-              </button>
+              </Button>
             </div>
           )}
         </div>

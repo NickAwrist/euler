@@ -1,5 +1,6 @@
 import type { Tool } from "ollama";
 import { getSearXNGClient } from "../searxng/client";
+import { errorMessage } from "../utils/errors";
 import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
 
 export class WebSearchTool extends BaseTool {
@@ -60,9 +61,7 @@ export class WebSearchTool extends BaseTool {
           .join("\n\n---\n\n"),
       );
     } catch (e: unknown) {
-      return textToolResult(
-        `Error performing web search: ${e instanceof Error ? e.message : String(e)}`,
-      );
+      return textToolResult(`Error performing web search: ${errorMessage(e)}`);
     }
   }
 }

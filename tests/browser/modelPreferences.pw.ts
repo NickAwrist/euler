@@ -461,3 +461,98 @@ for (const device of ["desktop", "mobile"] as const) {
     }
   });
 }
+
+for (const device of ["desktop", "mobile"] as const) {
+  test(`model preferences ${device}: long catalog keeps dialog controls clear of scrolling lists`, async ({
+    browser,
+  }, testInfo) => {
+    const page = await browser.newPage({
+      viewport:
+        device === "desktop"
+          ? { width: 1280, height: 800 }
+          : { width: 390, height: 844 },
+      isMobile: device === "mobile",
+      hasTouch: device === "mobile",
+    });
+    try {
+      await page.goto("/dev/model-playground");
+      await page
+        .getByRole("button", { name: "Large catalog", exact: true })
+        .click();
+      const settings = page.getByRole("region", {
+        name: "OpenRouter settings",
+      });
+      await settings.getByRole("button", { name: /^Anthropic,/ }).click();
+      for (const name of ["Anthropic", "Add publisher"]) {
+        const dialog = page.getByRole("dialog", { name, exact: true });
+        await expect(dialog).toBeVisible();
+        await dialog.evaluate(async (element) => {
+          await Promise.all(
+            element
+              .getAnimations({ subtree: true })
+              .map((animation) => animation.finished),
+          );
+        });
+        const search = dialog.getByRole("searchbox");
+        const controls = search.locator("..");
+        const list = controls.locator("xpath=following-sibling::div[1]");
+        const first =
+          name === "Anthropic"
+            ? list.locator("article").first()
+            : list.getByRole("button").first();
+        await expect(first).toBeVisible();
+        const controlBounds = await controls.boundingBox();
+        const searchBounds = await search.boundingBox();
+        const firstBounds = await first.boundingBox();
+        expect(controlBounds).not.toBeNull();
+        expect(searchBounds).not.toBeNull();
+        expect(firstBounds).not.toBeNull();
+        expect(searchBounds!.y + searchBounds!.height).toBeLessThanOrEqual(
+          controlBounds!.y + controlBounds!.height,
+        );
+        expect(firstBounds!.y).toBeGreaterThanOrEqual(
+          controlBounds!.y + controlBounds!.height,
+        );
+        if (name === "Anthropic") {
+          const footerBounds = await dialog.locator("footer").boundingBox();
+          const listBounds = await list.boundingBox();
+          expect(listBounds!.y + listBounds!.height).toBeLessThanOrEqual(
+            footerBounds!.y,
+          );
+        }
+        expect(
+          await list.evaluate(
+            (element) => element.scrollHeight > element.clientHeight,
+          ),
+        ).toBe(true);
+        await list.evaluate((element) => {
+          element.scrollTop = element.scrollHeight;
+        });
+        expect(
+          await list.evaluate((element) => element.scrollTop),
+        ).toBeGreaterThan(0);
+        expect(await search.boundingBox()).toEqual(searchBounds);
+        await page.screenshot({
+          path: testInfo.outputPath(`${name}-scrolled.png`),
+        });
+        await search.fill(name === "Anthropic" ? "demo-sonnet" : "cohere");
+        await expect(
+          name === "Anthropic"
+            ? list.locator("article")
+            : list.getByRole("button"),
+        ).toHaveCount(1);
+        await page.screenshot({
+          path: testInfo.outputPath(`${name}-filtered.png`),
+        });
+        await page.keyboard.press("Escape");
+        if (name === "Anthropic") {
+          await settings
+            .getByRole("button", { name: "Add publisher", exact: true })
+            .click();
+        }
+      }
+    } finally {
+      await page.close();
+    }
+  });
+}
