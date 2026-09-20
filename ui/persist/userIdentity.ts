@@ -1,5 +1,7 @@
-const USER_ID_STORAGE_KEY = "euler:userUuid";
-const USER_ID_HEADER = "X-Euler-User-ID";
+import { safeStorage } from "../lib/safeStorage";
+
+export const USER_ID_STORAGE_KEY = "euler:userUuid";
+export const USER_ID_HEADER = "X-Euler-User-ID";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -51,22 +53,33 @@ export function createBrowserUuid(
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-import { safeStorage } from "../lib/safeStorage";
+let fallbackUserId: string | null = null;
 
 export function getOrCreateUserId(): string {
   const stored = normalizeUserId(safeStorage.getItem(USER_ID_STORAGE_KEY));
-  if (stored) return stored;
-  const created = createBrowserUuid();
-  safeStorage.setItem(USER_ID_STORAGE_KEY, created);
-  return created;
+  if (stored) {
+    fallbackUserId = stored;
+    return stored;
+  }
+
+  if (fallbackUserId) return fallbackUserId;
+
+  fallbackUserId = createBrowserUuid();
+  safeStorage.setItem(USER_ID_STORAGE_KEY, fallbackUserId);
+  return fallbackUserId;
 }
 
 export function switchUserId(value: string): boolean {
   const normalized = normalizeUserId(value);
   if (!normalized) return false;
+  fallbackUserId = normalized;
   safeStorage.setItem(USER_ID_STORAGE_KEY, normalized);
   safeStorage.session.removeItem("activeSessionId");
   return true;
+}
+
+export function resetFallbackUserIdForTests(): void {
+  fallbackUserId = null;
 }
 
 export function userScopedFetch(

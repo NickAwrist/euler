@@ -28,7 +28,7 @@ export default defineConfig({
     },
     {
       name: "desktop",
-      grep: /usage desktop|chat sidebar desktop|artifacts desktop|long thread|desktop hover|attachment image loading|session loading|composer selectors desktop|model preferences desktop/,
+      grep: /usage desktop|chat sidebar desktop|artifacts desktop|long thread|desktop hover|attachment image loading|session loading|composer selectors desktop|model preferences desktop|modal desktop/,
     },
   ],
   webServer: {

@@ -37,11 +37,12 @@ export function SkillEditor({
         </h2>
         {skill && (
           <Button
-            variant="danger"
+            variant="ghost"
             size="sm"
             icon={Trash2}
             loading={deleting}
             onClick={() => onDelete(skill)}
+            className="text-red-400 hover:bg-red-400/10 hover:text-red-300"
           >
             Delete
           </Button>

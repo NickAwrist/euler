@@ -9,10 +9,12 @@ export type IconButtonSize = "sm" | "md";
 export interface IconButtonProps
   extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon: ComponentType<{ size?: number; className?: string }>;
-  label?: string;
+  label: string;
   loading?: boolean;
   variant?: IconButtonVariant;
   size?: IconButtonSize;
+  iconSize?: number;
+  iconProps?: Record<string, unknown>;
 }
 
 const variantStyles: Record<IconButtonVariant, string> = {
@@ -39,6 +41,8 @@ export const IconButton = forwardRef(function IconButton(
     disabled = false,
     variant = "secondary",
     size = "md",
+    iconSize,
+    iconProps,
     type = "button",
     title,
     className,
@@ -48,6 +52,7 @@ export const IconButton = forwardRef(function IconButton(
 ) {
   const isDisabled = disabled || loading;
   const sizeConfig = sizeStyles[size];
+  const effectiveIconSize = iconSize ?? sizeConfig.icon;
 
   return (
     <button
@@ -55,8 +60,8 @@ export const IconButton = forwardRef(function IconButton(
       type={type}
       disabled={isDisabled}
       aria-busy={loading ? true : undefined}
-      aria-label={label ?? rest["aria-label"] ?? title}
-      title={title ?? label ?? rest["aria-label"]}
+      aria-label={label}
+      title={title ?? label}
       className={cx(
         "inline-flex items-center justify-center transition-[color,background-color,border-color,transform] duration-150 ease-out disabled:cursor-not-allowed disabled:opacity-45 disabled:active:scale-100",
         sizeConfig.box,
@@ -67,11 +72,11 @@ export const IconButton = forwardRef(function IconButton(
     >
       {loading ? (
         <Loader2
-          size={sizeConfig.icon}
+          size={effectiveIconSize}
           className="animate-spin motion-reduce:animate-none shrink-0"
         />
       ) : (
-        <Icon size={sizeConfig.icon} />
+        <Icon size={effectiveIconSize} {...iconProps} />
       )}
     </button>
   );

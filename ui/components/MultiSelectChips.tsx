@@ -38,6 +38,7 @@ export function MultiSelectChips<T>({
             <button
               key={id}
               type="button"
+              aria-pressed={active}
               onClick={() => onToggle(id)}
               className={cx(
                 "rounded-md border px-2.5 py-1 text-[0.75rem] font-medium transition-colors duration-150",

@@ -1,37 +1,27 @@
+import {
+  type StoredRunSession as SchemaStoredRunSession,
+  type SessionSummary,
+  SessionSummaryListSchema,
+  type SessionWorkspace,
+  StoredRunSessionSchema,
+} from "../../src/schemas/sessions";
 import { apiBlob, apiJson, apiVoid } from "../lib/api";
-import type {
-  Message,
-  SessionSummary,
-  SessionWorkspace,
-  WorkspaceFile,
-} from "../types";
+import type { Message, WorkspaceFile } from "../types";
 
-export type StoredRunSession = {
-  id: string;
-  createdAt: number;
-  updatedAt: number;
-  customTitle?: string | null;
+export type StoredRunSession = Omit<
+  SchemaStoredRunSession,
+  "history" | "workspace"
+> & {
   history: Message[];
-  modelMessages?: Array<Record<string, unknown>> | null;
-  model?: string | null;
   workspace?: SessionWorkspace;
 };
+export type { SessionSummary, SessionWorkspace };
 
 export async function fetchSessionSummaries(): Promise<SessionSummary[]> {
-  const data = await apiJson<{ sessions?: unknown }>("/api/sessions");
-  const raw = Array.isArray(data.sessions) ? data.sessions : [];
-  return raw
-    .filter(
-      (s): s is Record<string, unknown> => s != null && typeof s === "object",
-    )
-    .map((s) => ({
-      id: String(s.id ?? ""),
-      createdAt: Number(s.createdAt) || 0,
-      updatedAt: Number(s.updatedAt) || 0,
-      preview: String(s.preview ?? "New chat"),
-    }))
-    .filter((s) => s.id.length > 0)
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+  const data = await apiJson<unknown>("/api/sessions");
+  const parsed = SessionSummaryListSchema.safeParse(data);
+  if (!parsed.success) return [];
+  return [...parsed.data.sessions].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 const inFlightSessionFetches = new Map<
@@ -55,35 +45,40 @@ export function fetchSession(
 }
 
 async function fetchSessionData(id: string): Promise<StoredRunSession | null> {
-  const s = await apiJson<Record<string, unknown> | null>(
-    `/api/sessions/${encodeURIComponent(id)}`,
-    { notFound: "null" },
-  );
+  const s = await apiJson<unknown>(`/api/sessions/${encodeURIComponent(id)}`, {
+    notFound: "null",
+  });
   if (!s) return null;
-  return {
-    id: String(s.id ?? ""),
-    createdAt: Number(s.createdAt) || 0,
-    updatedAt: Number(s.updatedAt) || 0,
-    customTitle: s.customTitle == null ? null : String(s.customTitle),
-    history: Array.isArray(s.history) ? (s.history as Message[]) : [],
-    modelMessages:
-      s.modelMessages === null || s.modelMessages === undefined
-        ? null
-        : Array.isArray(s.modelMessages)
-          ? (s.modelMessages as Array<Record<string, unknown>>)
-          : null,
-    model: s.model == null ? null : String(s.model),
-    workspace:
-      s.workspace &&
-      typeof s.workspace === "object" &&
-      (s.workspace as { kind?: unknown }).kind === "local"
-        ? {
-            kind: "local",
-            path: String((s.workspace as { path?: unknown }).path ?? ""),
-            label: String((s.workspace as { label?: unknown }).label ?? ""),
-          }
-        : { kind: "sandbox" },
-  };
+  const parsed = StoredRunSessionSchema.safeParse(s);
+  if (parsed.success) return parsed.data as StoredRunSession;
+  if (typeof s === "object" && s !== null) {
+    const raw = s as Record<string, unknown>;
+    return {
+      id: String(raw.id ?? ""),
+      createdAt: Number(raw.createdAt) || 0,
+      updatedAt: Number(raw.updatedAt) || 0,
+      customTitle: raw.customTitle == null ? null : String(raw.customTitle),
+      history: Array.isArray(raw.history) ? (raw.history as Message[]) : [],
+      modelMessages:
+        raw.modelMessages === null || raw.modelMessages === undefined
+          ? null
+          : Array.isArray(raw.modelMessages)
+            ? (raw.modelMessages as Array<Record<string, unknown>>)
+            : null,
+      model: raw.model == null ? null : String(raw.model),
+      workspace:
+        raw.workspace &&
+        typeof raw.workspace === "object" &&
+        (raw.workspace as { kind?: unknown }).kind === "local"
+          ? {
+              kind: "local",
+              path: String((raw.workspace as { path?: unknown }).path ?? ""),
+              label: String((raw.workspace as { label?: unknown }).label ?? ""),
+            }
+          : { kind: "sandbox" },
+    };
+  }
+  return null;
 }
 
 export async function createSessionApi(opts?: {

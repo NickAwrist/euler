@@ -20,6 +20,7 @@ export function RefreshButton({
       <IconButton
         label={label}
         icon={RefreshCw}
+        iconSize={15}
         loading={refreshing}
         disabled={disabled}
         onClick={onClick}

@@ -385,6 +385,8 @@ export function RunInputDock({
               variant="danger"
               icon={Square}
               label="Stop generation"
+              iconSize={12}
+              iconProps={{ strokeWidth: 2.25 }}
               onClick={(event) => {
                 event.preventDefault();
                 onStopGeneration();

@@ -51,10 +51,10 @@ export function StepsModal({
       headerActions={
         <IconButton
           icon={resultsCopied ? Check : Copy}
+          label={resultsCopied ? "Copied" : "Copy trace results"}
           disabled={!canCopyResults}
           onClick={() => void copyResults()}
           title={resultsCopied ? "Copied" : "Copy trace results"}
-          aria-label={resultsCopied ? "Copied" : "Copy trace results"}
         />
       }
     >
