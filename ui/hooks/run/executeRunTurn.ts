@@ -91,6 +91,12 @@ export async function executeRunTurn(
   };
   const nextHistory = [...priorMessages, userMessage];
 
+  abortControllerRef.current?.abort();
+  const controller = new AbortController();
+  abortControllerRef.current = controller;
+  activeRequestIdRef.current = null;
+  const ownsStream = () => abortControllerRef.current === controller;
+
   inFlightSessionIdRef.current = turnSessionId;
   inFlightEphemeralRef.current = ephemeral;
   turnRootAgentNameRef.current = p.selectedSessionAgentRef.current;
@@ -101,7 +107,8 @@ export async function executeRunTurn(
   setRunPending(true);
   clearStreamingUi();
 
-  const viewingThisTurn = () => p.activeSessionIdRef.current === turnSessionId;
+  const viewingThisTurn = () =>
+    ownsStream() && p.activeSessionIdRef.current === turnSessionId;
   if (viewingThisTurn()) p.setMessages(nextHistory);
 
   const failWithAssistantError = async (errorText: string) => {
@@ -139,8 +146,6 @@ export async function executeRunTurn(
   const modelMessagesPayload = options.rebuildModelMessages
     ? null
     : p.modelMessagesRef.current;
-  const controller = new AbortController();
-  abortControllerRef.current = controller;
   const reconnectAfterCleanup: {
     current: { sessionId: string; requestId: string } | null;
   } = { current: null };
@@ -214,6 +219,7 @@ export async function executeRunTurn(
 
     try {
       await readSseBlocks(reader, async (data) => {
+        if (!ownsStream() || controller.signal.aborted) return;
         if (data.type === "run_started") {
           if (typeof data.requestId === "string") {
             activeRequestIdRef.current = data.requestId;
@@ -357,23 +363,31 @@ export async function executeRunTurn(
           await recoverPersistentStream();
         } catch (reconnectError) {
           console.error("run stream detached", reconnectError);
+          if (activeRequestIdRef.current && ownsStream()) {
+            reconnectAfterCleanup.current = {
+              sessionId: turnSessionId,
+              requestId: activeRequestIdRef.current,
+            };
+          }
         }
       }
     }
   } finally {
-    abortControllerRef.current = null;
-    activeRequestIdRef.current = null;
-    inFlightSessionIdRef.current = null;
-    inFlightEphemeralRef.current = false;
-    rawRunPendingRef.current = false;
-    streamBufferRef.current = createEmptyStreamBuffer();
-    turnMessagesSnapshotRef.current = null;
-    setInFlightSessionId(null);
-    setRunPending(false);
-    if (viewingThisTurn()) clearStreamingUi();
+    if (ownsStream()) {
+      const wasViewing = viewingThisTurn();
+      abortControllerRef.current = null;
+      activeRequestIdRef.current = null;
+      inFlightSessionIdRef.current = null;
+      inFlightEphemeralRef.current = false;
+      rawRunPendingRef.current = false;
+      streamBufferRef.current = createEmptyStreamBuffer();
+      turnMessagesSnapshotRef.current = null;
+      setInFlightSessionId(null);
+      setRunPending(false);
+      if (wasViewing) clearStreamingUi();
+    }
   }
-
-  if (reconnectAfterCleanup.current) {
+  if (reconnectAfterCleanup.current && !controller.signal.aborted) {
     reconnectToStream(
       reconnectAfterCleanup.current.sessionId,
       reconnectAfterCleanup.current.requestId,

@@ -66,12 +66,8 @@ export function useRunStreaming(p: Args) {
   const rawRunPendingRef = useRef(false);
   const inFlightSessionIdRef = useRef<string | null>(null);
   const inFlightEphemeralRef = useRef(false);
-  const {
-    streamBufferRef,
-    turnMessagesSnapshotRef,
-    turnRootAgentNameRef,
-    resetStreamBuffers,
-  } = useTurnBuffer();
+  const { streamBufferRef, turnMessagesSnapshotRef, turnRootAgentNameRef } =
+    useTurnBuffer();
 
   p.debugOpenRef.current = p.debugOpen;
 
@@ -83,11 +79,8 @@ export function useRunStreaming(p: Args) {
   }, []);
 
   useLayoutEffect(() => {
-    p.bindStreamingReset(() => {
-      clearStreamingUi();
-      resetStreamBuffers();
-    });
-  }, [p.bindStreamingReset, clearStreamingUi, resetStreamBuffers]);
+    p.bindStreamingReset(clearStreamingUi);
+  }, [p.bindStreamingReset, clearStreamingUi]);
 
   const {
     abortControllerRef,
@@ -119,6 +112,7 @@ export function useRunStreaming(p: Args) {
 
   useRunResume({
     abortControllerRef,
+    activeRequestIdRef,
     activeSessionIdRef: p.activeSessionIdRef,
     isEphemeralRef: p.isEphemeralRef,
     modelMessagesRef: p.modelMessagesRef,

@@ -52,7 +52,14 @@ export function useRunFlight(
 
   const reconnectToStream = useCallback(
     (sessionId: string, _requestId: string) => {
-      if (rawRunPendingRef.current) return;
+      if (
+        rawRunPendingRef.current &&
+        inFlightSessionIdRef.current === sessionId
+      )
+        return;
+
+      // Disconnect the previous viewer; the server keeps its generation running.
+      abortControllerRef.current?.abort();
 
       const d = depsRef.current;
       const controller = new AbortController();
@@ -61,6 +68,7 @@ export function useRunFlight(
       inFlightSessionIdRef.current = sessionId;
       inFlightEphemeralRef.current = false;
       rawRunPendingRef.current = true;
+      turnMessagesSnapshotRef.current = null;
       d.streamBufferRef.current = createEmptyStreamBuffer();
 
       setInFlightSessionId(sessionId);
@@ -68,7 +76,9 @@ export function useRunFlight(
       d.clearStreamingUi();
 
       const rootAgent = d.selectedSessionAgentRef.current;
-      const viewing = () => d.activeSessionIdRef.current === sessionId;
+      const ownsStream = () => abortControllerRef.current === controller;
+      const viewing = () =>
+        ownsStream() && d.activeSessionIdRef.current === sessionId;
 
       void (async () => {
         let terminalEventReceived = false;
@@ -80,7 +90,7 @@ export function useRunFlight(
               signal: controller.signal,
             },
           );
-          if (!res.ok || !res.body) return;
+          if (!res.ok || !res.body) throw new Error("Run stream unavailable.");
           const reader = res.body.getReader();
           const finalizeReconnect = async () => {
             if (viewing()) {
@@ -107,6 +117,7 @@ export function useRunFlight(
           };
 
           await readSseBlocks(reader, async (data) => {
+            if (!ownsStream() || controller.signal.aborted) return;
             if (data.type === "run_started") {
               if (typeof data.requestId === "string") {
                 activeRequestIdRef.current = data.requestId;
@@ -182,23 +193,35 @@ export function useRunFlight(
             }
           } catch (recoveryError) {
             console.error("reconnect recovery error", recoveryError);
+            retryRequestId = _requestId;
           }
         } finally {
-          abortControllerRef.current = null;
-          activeRequestIdRef.current = null;
-          inFlightSessionIdRef.current = null;
-          inFlightEphemeralRef.current = false;
-          rawRunPendingRef.current = false;
-          depsRef.current.streamBufferRef.current = createEmptyStreamBuffer();
-          turnMessagesSnapshotRef.current = null;
-          setInFlightSessionId(null);
-          depsRef.current.setRunPending(false);
-          if (viewing()) {
-            depsRef.current.clearStreamingUi();
+          if (ownsStream()) {
+            const wasViewing = viewing();
+            abortControllerRef.current = null;
+            activeRequestIdRef.current = null;
+            inFlightSessionIdRef.current = null;
+            inFlightEphemeralRef.current = false;
+            rawRunPendingRef.current = false;
+            depsRef.current.streamBufferRef.current = createEmptyStreamBuffer();
+            turnMessagesSnapshotRef.current = null;
+            setInFlightSessionId(null);
+            depsRef.current.setRunPending(false);
+            if (wasViewing) {
+              depsRef.current.clearStreamingUi();
+            }
           }
         }
-        if (retryRequestId) {
-          reconnectToStreamRef.current(sessionId, retryRequestId);
+        if (retryRequestId && !controller.signal.aborted) {
+          const requestId = retryRequestId;
+          window.setTimeout(() => {
+            if (
+              !controller.signal.aborted &&
+              abortControllerRef.current === null &&
+              depsRef.current.activeSessionIdRef.current === sessionId
+            )
+              reconnectToStreamRef.current(sessionId, requestId);
+          }, 1000);
         }
       })();
     },

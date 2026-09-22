@@ -220,7 +220,8 @@ export function useSessionsAndNavigation(p: Args) {
       })();
 
       // Run discovery controls sending and stream reconciliation, never history display.
-      void (async () => {
+      let statusError: string | null = null;
+      const discoverRun = async () => {
         try {
           const status = await getActiveRun(id, controller.signal);
           if (
@@ -238,16 +239,25 @@ export function useSessionsAndNavigation(p: Args) {
             p.runFlightRef.current?.reconnectToStream(id, status.requestId);
           }
           setRunStatusState("resolved");
+          setSessionError((current) =>
+            current === statusError ? null : current,
+          );
         } catch (error) {
           if (gen !== loadGenRef.current || controller.signal.aborted) return;
           setRunStatusState("error");
-          setSessionError(
+          statusError =
             error instanceof Error
               ? error.message
-              : "Could not check the active run.",
-          );
+              : "Could not check the active run.";
+          setSessionError(statusError);
+          window.setTimeout(() => {
+            if (gen === loadGenRef.current && !controller.signal.aborted) {
+              void discoverRun();
+            }
+          }, 1000);
         }
-      })();
+      };
+      void discoverRun();
       await historyRequest;
     },
     [

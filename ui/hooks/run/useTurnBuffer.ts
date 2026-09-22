@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useRef } from "react";
 import type { Message } from "../../types";
 import { createEmptyStreamBuffer } from "./streamBuffer";
 
@@ -8,14 +8,9 @@ export function useTurnBuffer() {
   const turnMessagesSnapshotRef = useRef<Message[] | null>(null);
   const turnRootAgentNameRef = useRef("");
 
-  const resetStreamBuffers = useCallback(() => {
-    streamBufferRef.current = createEmptyStreamBuffer();
-  }, []);
-
   return {
     streamBufferRef,
     turnMessagesSnapshotRef,
     turnRootAgentNameRef,
-    resetStreamBuffers,
   };
 }
