@@ -4,7 +4,7 @@ import {
   agentManager,
   buildServerRunPromptContext,
 } from "../agents/agentManager";
-import { type SessionRow, getAgentByName, getSessionById } from "../db/index";
+import { type SessionRow, getSessionById } from "../db/index";
 import { sendApiError } from "../http/errors";
 import { sendValidationError } from "../http/validation";
 import { handleRun } from "../run/runController";
@@ -59,26 +59,12 @@ router.post("/debug-prompt", async (req, res) => {
     return;
   }
 
-  const requestedAgentName =
-    body.agentName?.trim() || persistedSession?.agent_name || "general_agent";
-  const agentConfig = getAgentByName(ownerUuid, requestedAgentName);
-
-  if (!agentConfig) {
-    sendApiError(
-      res,
-      404,
-      "NOT_FOUND",
-      `Agent not found: ${requestedAgentName}`,
-    );
-    return;
-  }
-
   const promptContext = buildServerRunPromptContext({
     metadata: body.metadata,
     toolSessionDir: workspace?.displayPath ?? "/workspace",
   });
 
-  const agent = agentManager.createAgent(agentConfig.name, {
+  const agent = agentManager.createAgent({
     promptContext,
     toolSessionDir: workspace?.hostPath,
     ownerUuid,

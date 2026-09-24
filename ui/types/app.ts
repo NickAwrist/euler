@@ -1,4 +1,4 @@
-export type AppView = "run" | "agents" | "settings" | "usage";
+export type AppView = "run" | "customization" | "settings" | "usage";
 
 export type SessionWorkspace =
   | { kind: "sandbox" }

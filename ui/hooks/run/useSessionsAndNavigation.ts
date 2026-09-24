@@ -60,7 +60,6 @@ function replaceSessionUrl(id: string | null) {
 type Args = {
   ollamaModels: ModelOption[];
   serverDefaultModel: string;
-  serverDefaultRunAgent: string;
   userSettingsRef: MutableRefObject<UserSettings>;
   userSettingsDefaultModel: string;
   messages: Message[];
@@ -74,7 +73,6 @@ type Args = {
   modelMessagesRef: MutableRefObject<Array<Record<string, unknown>> | null>;
   activeSessionIdRef: MutableRefObject<string | null>;
   isEphemeralRef: MutableRefObject<boolean>;
-  selectedSessionAgentRef: MutableRefObject<string>;
   runFlightRef: MutableRefObject<RunFlightApi | null>;
   onNavigate?: () => void;
 };
@@ -127,7 +125,6 @@ export function useSessionsAndNavigation(p: Args) {
 
   p.activeSessionIdRef.current = activeSessionId;
   p.isEphemeralRef.current = isEphemeral;
-  p.selectedSessionAgentRef.current = preferences.selectedSessionAgent;
 
   const resetSessionTransientState = useCallback(() => {
     p.setMessages([]);
@@ -353,7 +350,6 @@ export function useSessionsAndNavigation(p: Args) {
         }
       }
       setIsEphemeral(false);
-      const agentForNewRun = p.serverDefaultRunAgent;
       const names = new Set(p.ollamaModels.map((m) => m.id));
       let modelForNew = effectiveDefaultRunModel(
         p.userSettingsRef.current,
@@ -364,7 +360,6 @@ export function useSessionsAndNavigation(p: Args) {
           ? p.serverDefaultModel
           : (p.ollamaModels[0]?.id ?? modelForNew);
       }
-      preferences.setSelectedSessionAgent(agentForNewRun);
       const { id } = await createSessionApi({
         model: modelForNew,
       });
@@ -384,11 +379,9 @@ export function useSessionsAndNavigation(p: Args) {
     p.onNavigate,
     canDiscardEmptySession,
     p.ollamaModels,
-    p.serverDefaultRunAgent,
     p.serverDefaultModel,
     p.userSettingsRef,
     refreshSessions,
-    preferences.setSelectedSessionAgent,
   ]);
 
   const createEphemeralSession = useCallback(async () => {
@@ -415,7 +408,6 @@ export function useSessionsAndNavigation(p: Args) {
     setIsEphemeral(true);
     p.modelMessagesRef.current = null;
     p.onNavigate?.();
-    preferences.setSelectedSessionAgent(p.serverDefaultRunAgent);
     preferences.setWorkspace({ kind: "sandbox" });
     pushSessionUrl(null);
   }, [
@@ -424,10 +416,8 @@ export function useSessionsAndNavigation(p: Args) {
     p.onNavigate,
     canDiscardEmptySession,
     p.modelMessagesRef,
-    p.serverDefaultRunAgent,
     resetSessionTransientState,
     refreshSessions,
-    preferences.setSelectedSessionAgent,
     preferences.setWorkspace,
   ]);
 
@@ -480,7 +470,6 @@ export function useSessionsAndNavigation(p: Args) {
     setActiveSessionId(null);
     resetSessionTransientState();
     p.onNavigate?.();
-    preferences.setSelectedSessionAgent(p.serverDefaultRunAgent);
     preferences.setWorkspace({ kind: "sandbox" });
     pushSessionUrl(null);
   }, [
@@ -488,10 +477,8 @@ export function useSessionsAndNavigation(p: Args) {
     p.isEphemeralRef,
     p.onNavigate,
     canDiscardEmptySession,
-    p.serverDefaultRunAgent,
     resetSessionTransientState,
     refreshSessions,
-    preferences.setSelectedSessionAgent,
     preferences.setWorkspace,
   ]);
 

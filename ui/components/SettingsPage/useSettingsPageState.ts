@@ -230,6 +230,7 @@ export function useSettingsPageState({
 
   const isDirty = useMemo(() => {
     if (
+      settings.systemPrompt !== currentSettings.systemPrompt ||
       settings.name !== currentSettings.name ||
       settings.preferredFormats !== currentSettings.preferredFormats ||
       settings.location !== currentSettings.location ||

@@ -1,4 +1,5 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import { MAIN_AGENT_NAME } from "../../../src/agents/agentNames";
 import type {
   ImageAttachment,
   MessageAttachment,
@@ -16,7 +17,6 @@ import { type StreamBuffer, createEmptyStreamBuffer } from "./streamBuffer";
 type AppDeps = {
   activeSessionIdRef: MutableRefObject<string | null>;
   isEphemeralRef: MutableRefObject<boolean>;
-  selectedSessionAgentRef: MutableRefObject<string>;
   userSettingsRef: MutableRefObject<UserSettings>;
   modelMessagesRef: MutableRefObject<Array<Record<string, unknown>> | null>;
   debugOpenRef: MutableRefObject<boolean>;
@@ -33,7 +33,6 @@ type RuntimeDeps = {
   inFlightSessionIdRef: MutableRefObject<string | null>;
   inFlightEphemeralRef: MutableRefObject<boolean>;
   rawRunPendingRef: MutableRefObject<boolean>;
-  turnRootAgentNameRef: MutableRefObject<string>;
   streamBufferRef: MutableRefObject<StreamBuffer>;
   turnMessagesSnapshotRef: MutableRefObject<Message[] | null>;
   setInFlightSessionId: Dispatch<SetStateAction<string | null>>;
@@ -68,7 +67,6 @@ export async function executeRunTurn(
     inFlightSessionIdRef,
     inFlightEphemeralRef,
     rawRunPendingRef,
-    turnRootAgentNameRef,
     streamBufferRef,
     turnMessagesSnapshotRef,
     setInFlightSessionId,
@@ -99,7 +97,6 @@ export async function executeRunTurn(
 
   inFlightSessionIdRef.current = turnSessionId;
   inFlightEphemeralRef.current = ephemeral;
-  turnRootAgentNameRef.current = p.selectedSessionAgentRef.current;
   streamBufferRef.current = createEmptyStreamBuffer();
   turnMessagesSnapshotRef.current = nextHistory;
   rawRunPendingRef.current = true;
@@ -162,7 +159,6 @@ export async function executeRunTurn(
         model: p.selectedModel,
         ...(p.reasoningEffort ? { reasoningEffort: p.reasoningEffort } : {}),
         modelMessages: modelMessagesPayload,
-        agentName: p.selectedSessionAgentRef.current,
         ...(attachments.length > 0
           ? { attachmentIds: attachments.map((attachment) => attachment.id) }
           : {}),
@@ -233,11 +229,11 @@ export async function executeRunTurn(
             typeof data.agentName === "string" ? data.agentName : "";
           const buffer = streamBufferRef.current;
           if (thinkingDelta) buffer.thinking += thinkingDelta;
-          if (contentDelta && agentName === turnRootAgentNameRef.current) {
+          if (contentDelta && agentName === MAIN_AGENT_NAME) {
             buffer.content += contentDelta;
           }
           if (!viewingThisTurn()) return;
-          if (contentDelta && agentName === turnRootAgentNameRef.current) {
+          if (contentDelta && agentName === MAIN_AGENT_NAME) {
             setStreamingContent((current) => current + contentDelta);
           }
           if (thinkingDelta) {

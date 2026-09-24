@@ -15,7 +15,6 @@ export const DATA_ROOT =
       ? join(tmpdir(), `euler-test-${process.pid}`)
       : dirname(DB_PATH));
 
-export const DEFAULT_RUN_AGENT_KEY = "default_run_agent";
 export const LEGACY_USER_DATA_CLAIMED_BY_KEY = "legacy_user_data_claimed_by";
 export const OLLAMA_HOST_KEY = "ollama_host";
 export const COMFYUI_HOST_KEY = "comfyui_host";

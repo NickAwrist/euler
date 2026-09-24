@@ -1,5 +1,4 @@
 import { DEFAULT_SEARXNG_HOST, envConfig } from "../env";
-import { agentNameExistsInDb } from "./agents/helpers";
 import { getDb } from "./connection";
 import {
   COMFYUI_DEFAULT_HEIGHT_KEY,
@@ -8,30 +7,10 @@ import {
   COMFYUI_HOST_KEY,
   COMFYUI_NEGATIVE_PROMPT_KEY,
   DEFAULT_COMFYUI_NEGATIVE_PROMPT,
-  DEFAULT_RUN_AGENT_KEY,
   OLLAMA_HOST_KEY,
   OPENROUTER_API_KEY_KEY,
   SEARXNG_HOST_KEY,
 } from "./constants";
-
-export function getDefaultRunAgent(ownerUuid: string): string {
-  const row = getDb()
-    .query("SELECT value FROM user_settings WHERE owner_uuid = ? AND key = ?")
-    .get(ownerUuid, DEFAULT_RUN_AGENT_KEY) as { value: string } | null;
-  const v = row?.value?.trim();
-  if (v && agentNameExistsInDb(ownerUuid, v)) return v;
-  return "general_agent";
-}
-
-export function setDefaultRunAgent(ownerUuid: string, name: string): boolean {
-  const t = name.trim();
-  if (!t || !agentNameExistsInDb(ownerUuid, t)) return false;
-  getDb().run(
-    "INSERT INTO user_settings (owner_uuid, key, value) VALUES (?, ?, ?) ON CONFLICT(owner_uuid, key) DO UPDATE SET value = excluded.value",
-    [ownerUuid, DEFAULT_RUN_AGENT_KEY, t],
-  );
-  return true;
-}
 
 /** Explicit environment configuration takes precedence over saved UI settings. */
 export function getOllamaHost(): string {

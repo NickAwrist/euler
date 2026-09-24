@@ -11,7 +11,6 @@ import type {
 import type { RunFlightApi } from "./run/runTypes";
 import { useComfyUIConnection } from "./run/useComfyUIConnection";
 import { useOllamaConnection } from "./run/useOllamaConnection";
-import { useRunAgentsBootstrap } from "./run/useRunAgentsBootstrap";
 import { useRunStreaming } from "./run/useRunStreaming";
 import { useSearXNGConnection } from "./run/useSearXNGConnection";
 import { useSessionsAndNavigation } from "./run/useSessionsAndNavigation";
@@ -23,11 +22,9 @@ export function useRunApp() {
   const ollama = useOllamaConnection();
   const comfy = useComfyUIConnection();
   const searxng = useSearXNGConnection();
-  const agents = useRunAgentsBootstrap();
 
   const activeSessionIdRef = useRef<string | null>(null);
   const isEphemeralRef = useRef(false);
-  const selectedSessionAgentRef = useRef("general_agent");
   const modelMessagesRef = useRef<Array<Record<string, unknown>> | null>(null);
   const debugOpenRef = useRef(false);
   const resetStreamingUiRef = useRef<() => void>(() => {});
@@ -63,7 +60,6 @@ export function useRunApp() {
   const sessions = useSessionsAndNavigation({
     ollamaModels: ollama.ollamaModels,
     serverDefaultModel: ollama.serverDefaultModel,
-    serverDefaultRunAgent: agents.serverDefaultRunAgent,
     userSettingsRef: settings.userSettingsRef,
     userSettingsDefaultModel: settings.userSettings.defaultModel,
     messages,
@@ -77,7 +73,6 @@ export function useRunApp() {
     modelMessagesRef,
     activeSessionIdRef,
     isEphemeralRef,
-    selectedSessionAgentRef,
     runFlightRef,
     onNavigate: () => sidebar.setSidebarOpen(false),
   });
@@ -114,7 +109,6 @@ export function useRunApp() {
     activeSessionIdRef,
     isEphemeralRef,
     userSettingsRef: settings.userSettingsRef,
-    selectedSessionAgentRef,
     modelMessagesRef,
     debugOpenRef,
     debugOpen,
@@ -176,15 +170,9 @@ export function useRunApp() {
     ollamaModels: ollama.ollamaModels,
     modelsLoadError: ollama.modelsLoadError,
     selectedModel: sessions.selectedModel,
-    runAgents: agents.runAgents,
-    serverDefaultRunAgent: agents.serverDefaultRunAgent,
-    setServerDefaultRunAgent: agents.setServerDefaultRunAgent,
-    selectedSessionAgent: sessions.selectedSessionAgent,
     workspace: sessions.workspace,
     chooseDirectory: sessions.chooseDirectory,
     returnToSandbox: sessions.returnToSandbox,
-    handleSessionAgentChange: sessions.handleSessionAgentChange,
-    refreshAgentDefaults: agents.refreshAgentDefaults,
     ollamaConnected: ollama.ollamaConnected,
     noProviderAvailable,
     modelSendReady: modelSendReady && sessions.sessionSendReady,

@@ -1,46 +1,8 @@
 import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
-import {
-  migrateAgentsInlinePlaceholders,
-  migrateAgentsOwnerColumn,
-  runMigrations,
-} from "../../src/db/migrations";
+import { runMigrations } from "../../src/db/migrations";
 
-test("inline placeholder migration supports a partially upgraded agents table", () => {
-  const db = new Database(":memory:");
-  db.run(`
-    CREATE TABLE agents (
-      id TEXT PRIMARY KEY,
-      owner_uuid TEXT,
-      name TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
-      system_prompt TEXT NOT NULL DEFAULT '',
-      is_default INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      include_personalization INTEGER NOT NULL DEFAULT 1,
-      UNIQUE(owner_uuid, name)
-    )
-  `);
-  db.run(
-    "INSERT INTO agents (id, name, system_prompt, created_at, updated_at) VALUES ('agent-1', 'general_agent', 'Base prompt', 1, 1)",
-  );
-
-  migrateAgentsInlinePlaceholders(db);
-
-  expect(db.query("SELECT system_prompt FROM agents").get()).toEqual({
-    system_prompt: "Base prompt\n\n{{PERSONALIZATION}}",
-  });
-  const columns = db.query("PRAGMA table_info(agents)").all() as Array<{
-    name: string;
-  }>;
-  expect(
-    columns.some((column) => column.name.startsWith("include_")),
-  ).toBeFalse();
-  db.close();
-});
-
-test("ownership migration preserves legacy sessions, agents, and tools", () => {
+test("migrations remove legacy agents while preserving sessions", () => {
   const db = new Database(":memory:");
   db.run("PRAGMA foreign_keys = ON");
   db.run(`
@@ -58,9 +20,6 @@ test("ownership migration preserves legacy sessions, agents, and tools", () => {
     CREATE TABLE agents (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL UNIQUE,
-      description TEXT NOT NULL DEFAULT '',
-      system_prompt TEXT NOT NULL DEFAULT '',
-      is_default INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )
@@ -69,64 +28,50 @@ test("ownership migration preserves legacy sessions, agents, and tools", () => {
     CREATE TABLE agent_tools (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-      tool_name TEXT NOT NULL,
-      position INTEGER NOT NULL DEFAULT 0,
-      UNIQUE(agent_id, tool_name)
+      tool_name TEXT NOT NULL
+    )
+  `);
+  db.run(`
+    CREATE TABLE user_settings (
+      owner_uuid TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value TEXT NOT NULL,
+      PRIMARY KEY(owner_uuid, key)
     )
   `);
   db.run(
-    "INSERT INTO sessions (id, created_at, updated_at) VALUES ('session-1', 1, 1)",
+    "INSERT INTO sessions (id, created_at, updated_at, agent_name) VALUES ('session-1', 1, 1, 'system_agent')",
   );
   db.run(
-    "INSERT INTO agents (id, name, description, system_prompt, is_default, created_at, updated_at) VALUES ('agent-1', 'general_agent', '', '', 1, 1, 1)",
+    "INSERT INTO agents (id, name, created_at, updated_at) VALUES ('agent-1', 'general_agent', 1, 1)",
   );
   db.run(
-    "INSERT INTO agent_tools (agent_id, tool_name, position) VALUES ('agent-1', 'bash', 0)",
+    "INSERT INTO agent_tools (agent_id, tool_name) VALUES ('agent-1', 'bash')",
   );
 
   runMigrations(db);
 
-  const session = db.query("SELECT id, owner_uuid FROM sessions").get() as {
-    id: string;
-    owner_uuid: string | null;
-  };
-  const agent = db.query("SELECT id, owner_uuid FROM agents").get() as {
-    id: string;
-    owner_uuid: string | null;
-  };
-  expect(session).toEqual({ id: "session-1", owner_uuid: null });
-  expect(agent).toEqual({ id: "agent-1", owner_uuid: null });
-  expect(db.query("SELECT tool_name FROM agent_tools").get()).toEqual({
-    tool_name: "bash",
+  expect(db.query("SELECT id, owner_uuid FROM sessions").get()).toEqual({
+    id: "session-1",
+    owner_uuid: null,
   });
+  const sessionColumns = db.query("PRAGMA table_info(sessions)").all() as {
+    name: string;
+  }[];
+  expect(sessionColumns.map((column) => column.name)).not.toContain(
+    "agent_name",
+  );
+  expect(
+    db
+      .query(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND (name LIKE 'agent%' OR name = 'user_settings')",
+      )
+      .all(),
+  ).toEqual([]);
   expect(db.query("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(
     (db.query("PRAGMA foreign_keys").get() as { foreign_keys: number })
       .foreign_keys,
   ).toBe(1);
-  db.close();
-});
-
-test("ownership migration preserves a disabled foreign-key setting", () => {
-  const db = new Database(":memory:");
-  db.run("PRAGMA foreign_keys = OFF");
-  db.run(`
-    CREATE TABLE agents (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
-      description TEXT NOT NULL DEFAULT '',
-      system_prompt TEXT NOT NULL DEFAULT '',
-      is_default INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    )
-  `);
-
-  migrateAgentsOwnerColumn(db);
-
-  expect(
-    (db.query("PRAGMA foreign_keys").get() as { foreign_keys: number })
-      .foreign_keys,
-  ).toBe(0);
   db.close();
 });

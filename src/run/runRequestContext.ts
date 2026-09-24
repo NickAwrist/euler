@@ -4,7 +4,6 @@ import { DEFAULT_RUN_MODEL } from "../constants";
 import type { AttachmentRow } from "../db/index";
 import {
   type SessionRow,
-  getAgentByName,
   getOpenRouterApiKey,
   getSessionAttachments,
   getSessionById,
@@ -27,7 +26,6 @@ export type RunTurnContext = {
   sessionId: string;
   model: string;
   reasoningEffort?: string;
-  agentName: string;
   toolSessionDir?: string;
   workspace: Workspace;
   promptContext: PromptContext;
@@ -38,7 +36,7 @@ export type RunTurnContext = {
 
 /**
  * Parse + validate `req.body` and resolve everything downstream needs
- * (persisted session, effective agent, tool dir, model). Writes a 4xx
+ * (persisted session, tool dir, model). Writes a 4xx
  * response and returns `null` on failure so the caller can early-return.
  */
 export async function buildTurnContext(
@@ -67,12 +65,6 @@ export async function buildTurnContext(
       sendApiError(res, 404, "NOT_FOUND", "Session not found");
       return null;
     }
-  }
-
-  const agentName = body.agentName.trim();
-  if (!getAgentByName(ownerUuid, agentName)) {
-    sendApiError(res, 400, "BAD_REQUEST", `Unknown agent: ${agentName}`);
-    return null;
   }
 
   const model = body.model?.trim() || DEFAULT_RUN_MODEL;
@@ -150,7 +142,6 @@ export async function buildTurnContext(
     sessionId,
     model,
     reasoningEffort: body.reasoningEffort ?? undefined,
-    agentName,
     toolSessionDir,
     workspace,
     promptContext: buildServerRunPromptContext({

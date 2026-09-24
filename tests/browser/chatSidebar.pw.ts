@@ -39,13 +39,11 @@ async function mockApp(page: Page) {
               }
             : path.endsWith("/health")
               ? { connected: true }
-              : path === "/api/agents"
-                ? { agents: [] }
-                : path.startsWith("/api/runs/active/")
-                  ? { active: false }
-                  : path.endsWith("/artifacts/tree")
-                    ? { entries: [] }
-                    : {};
+              : path.startsWith("/api/runs/active/")
+                ? { active: false }
+                : path.endsWith("/artifacts/tree")
+                  ? { entries: [] }
+                  : {};
     await route.fulfill({ json });
   });
 }

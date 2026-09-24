@@ -18,6 +18,7 @@ export type WireMessageInput = z.infer<typeof WireMessageSchema>;
 const ModelMessageSchema = z.record(z.string(), z.unknown());
 
 export const RunMetadataSchema = z.object({
+  systemPrompt: z.string().optional(),
   name: z.string().optional(),
   location: z.string().optional(),
   preferredFormats: z.string().optional(),
@@ -32,7 +33,6 @@ export const RunBodySchema = z.object({
   reasoningEffort: z.string().trim().min(1).nullish(),
   modelMessages: z.array(ModelMessageSchema).nullable().optional(),
   ephemeral: z.boolean().optional(),
-  agentName: z.string().min(1),
   metadata: RunMetadataSchema.optional(),
   attachmentIds: z.array(z.uuid()).max(MAX_IMAGES_PER_MESSAGE).optional(),
 });
@@ -48,7 +48,6 @@ export type AbortRunBody = z.infer<typeof AbortRunBodySchema>;
 /** Preview using current configuration, optionally including a draft message. */
 export const DebugPromptBodySchema = z.object({
   sessionId: z.string().trim().min(1).optional(),
-  agentName: z.string().trim().min(1).optional(),
   metadata: RunMetadataSchema.optional(),
   ephemeral: z.boolean().optional(),
   message: z.string().optional(),

@@ -35,7 +35,6 @@ type Args = {
   activeSessionIdRef: MutableRefObject<string | null>;
   isEphemeralRef: MutableRefObject<boolean>;
   userSettingsRef: MutableRefObject<UserSettings>;
-  selectedSessionAgentRef: MutableRefObject<string>;
   modelMessagesRef: MutableRefObject<Array<Record<string, unknown>> | null>;
   debugOpenRef: MutableRefObject<boolean>;
   debugOpen: boolean;
@@ -66,8 +65,7 @@ export function useRunStreaming(p: Args) {
   const rawRunPendingRef = useRef(false);
   const inFlightSessionIdRef = useRef<string | null>(null);
   const inFlightEphemeralRef = useRef(false);
-  const { streamBufferRef, turnMessagesSnapshotRef, turnRootAgentNameRef } =
-    useTurnBuffer();
+  const { streamBufferRef, turnMessagesSnapshotRef } = useTurnBuffer();
 
   p.debugOpenRef.current = p.debugOpen;
 
@@ -92,7 +90,6 @@ export function useRunStreaming(p: Args) {
     {
       activeSessionIdRef: p.activeSessionIdRef,
       modelMessagesRef: p.modelMessagesRef,
-      selectedSessionAgentRef: p.selectedSessionAgentRef,
       setMessages: p.setMessages,
       refreshSessions: p.refreshSessions,
       streamBufferRef,
@@ -125,7 +122,6 @@ export function useRunStreaming(p: Args) {
   });
 
   const fetchDebugData = useRunDebug({
-    selectedSessionAgentRef: p.selectedSessionAgentRef,
     userSettingsRef: p.userSettingsRef,
     isEphemeralRef: p.isEphemeralRef,
     setDebugData: p.setDebugData,
@@ -148,7 +144,6 @@ export function useRunStreaming(p: Args) {
       {
         activeSessionIdRef: p.activeSessionIdRef,
         isEphemeralRef: p.isEphemeralRef,
-        selectedSessionAgentRef: p.selectedSessionAgentRef,
         userSettingsRef: p.userSettingsRef,
         modelMessagesRef: p.modelMessagesRef,
         debugOpenRef: p.debugOpenRef,
@@ -164,7 +159,6 @@ export function useRunStreaming(p: Args) {
         inFlightSessionIdRef,
         inFlightEphemeralRef,
         rawRunPendingRef,
-        turnRootAgentNameRef,
         streamBufferRef,
         turnMessagesSnapshotRef,
         setInFlightSessionId,

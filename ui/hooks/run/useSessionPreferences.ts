@@ -44,8 +44,6 @@ export function useSessionPreferences({
   );
   const [sessionModel, setSessionModel] = useState<string | null>(null);
   const [thinkingEffort, setThinkingEffort] = useState<string | null>(null);
-  const [selectedSessionAgent, setSelectedSessionAgent] =
-    useState("general_agent");
   const [workspace, setWorkspace] = useState<SessionWorkspace>({
     kind: "sandbox",
   });
@@ -64,10 +62,6 @@ export function useSessionPreferences({
     userSettingsRef,
     userSettingsDefaultModel,
   ]);
-
-  const handleSessionAgentChange = useCallback((name: string) => {
-    setSelectedSessionAgent(name);
-  }, []);
 
   const handleThinkingEffortChange = useCallback((effort: string) => {
     setThinkingEffort(effort);
@@ -148,11 +142,8 @@ export function useSessionPreferences({
     setSessionModel,
     thinkingEffort,
     setThinkingEffort,
-    selectedSessionAgent,
-    setSelectedSessionAgent,
     workspace,
     setWorkspace,
-    handleSessionAgentChange,
     handleThinkingEffortChange,
     handleModelChange,
     chooseDirectory,

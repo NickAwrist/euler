@@ -3,33 +3,11 @@ import type { RunContext, Step } from "../RunContext";
 import { agentManager } from "../agents/agentManager";
 import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
 
-export type AgentToolTarget = {
-  id: string;
-  name: string;
-  description: string;
-};
-
-export function delegationToolName(
-  target: Pick<AgentToolTarget, "id" | "name">,
-) {
-  const normalizedName =
-    target.name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .replace(/^_+|_+$/g, "")
-      .slice(0, 18) || "agent";
-  const stableId = target.id
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "")
-    .slice(0, 32);
-  return `delegate_to_${normalizedName}_${stableId || "unknown"}`;
-}
-
-export class AgentTool extends BaseTool {
-  constructor(readonly target: AgentToolTarget) {
+export class RunSubagentTool extends BaseTool {
+  constructor() {
     super(
-      delegationToolName(target),
-      `Delegate to ${target.name}: ${target.description || "No description provided."}`,
+      "run_subagent",
+      "Run a subagent with your tools and instructions in a fresh context, and receive its final response. Use it for self-contained work that would otherwise fill your context, such as broad searches or reading many files. The subagent cannot see this conversation, so include all relevant context, file paths, and exact success criteria in the task.",
     );
   }
 
@@ -77,11 +55,7 @@ export class AgentTool extends BaseTool {
     if (!ctx || !parentToolStep) {
       return textToolResult("Error: missing context for sub-agent invocation");
     }
-    const agent = agentManager.createAgentByIdForContext(
-      this.target.id,
-      ctx,
-      task,
-    );
+    const agent = agentManager.createSubagentForContext(ctx, task);
     const childCtx = ctx.createChild(agent, task, parentToolStep);
     return textToolResult(await agent.run(task, childCtx));
   }

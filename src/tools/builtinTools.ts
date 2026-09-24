@@ -11,7 +11,3 @@ export const BUILTIN_TOOLS = [
   "bash",
   "generate_image",
 ] as const;
-
-export function isBuiltinToolName(toolName: string): boolean {
-  return (BUILTIN_TOOLS as readonly string[]).includes(toolName);
-}

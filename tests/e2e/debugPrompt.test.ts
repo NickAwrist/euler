@@ -1,10 +1,6 @@
 import "../setup";
 import { expect, test } from "bun:test";
-import {
-  createAgentRow,
-  createSkillRow,
-  setOpenRouterApiKey,
-} from "../../src/db";
+import { createSkillRow, setOpenRouterApiKey } from "../../src/db";
 import { workspaceService } from "../../src/workspaces/WorkspaceService";
 import { getOpenRouterRequests } from "../helpers/mockOpenRouter";
 import { TEST_USER_ID, startTestServer, userHeaders } from "../helpers/server";
@@ -18,9 +14,7 @@ test("POST /api/runs/debug-prompt returns the server-rendered system prompt", as
       headers: userHeaders(undefined, {
         "Content-Type": "application/json",
       }),
-      body: JSON.stringify({
-        agentName: "general_agent",
-      }),
+      body: JSON.stringify({}),
     });
     expect(res1.status).toBe(200);
     const data1 = (await res1.json()) as { systemPrompt: string };
@@ -36,7 +30,6 @@ test("POST /api/runs/debug-prompt returns the server-rendered system prompt", as
         "Content-Type": "application/json",
       }),
       body: JSON.stringify({
-        agentName: "general_agent",
         metadata: {
           includeCurrentDate: false,
         },
@@ -54,7 +47,6 @@ test("POST /api/runs/debug-prompt returns the server-rendered system prompt", as
         "Content-Type": "application/json",
       }),
       body: JSON.stringify({
-        agentName: "general_agent",
         metadata: {
           name: "Alice",
           location: "Wonderland",
@@ -76,8 +68,8 @@ test("POST /api/runs/debug-prompt returns the server-rendered system prompt", as
   }
 });
 
-for (const metadata of [undefined, { includeCurrentDate: false }]) {
-  test(`run sends the same prompt as the preview with date ${metadata ? "disabled" : "defaulted"}`, async () => {
+for (const includeCurrentDate of [undefined, false]) {
+  test(`run sends the same custom prompt as the preview with date ${includeCurrentDate === false ? "disabled" : "defaulted"}`, async () => {
     const { url, close } = await startTestServer();
     setOpenRouterApiKey("sk-or-prompt-test");
     const lease = await workspaceService.createTemporary(TEST_USER_ID);
@@ -87,21 +79,15 @@ for (const metadata of [undefined, { includeCurrentDate: false }]) {
         description: "Check prompts",
         instructions: "Verify every instruction.",
       });
-      const agent = createAgentRow(TEST_USER_ID, {
-        name: "prompt-agent",
-        description: "Prompt test",
-        system_prompt:
-          "Follow these instructions.\n{{PERSONALIZATION}}\n{{SESSION_DIRECTORY}}\n{{OS}}",
-        tools: [],
-        skill_ids: [skill.id],
-        delegate_agent_ids: [],
-      });
       const input = {
         sessionId: lease.id,
         ephemeral: true,
-        agentName: agent.name,
         message: "Use $prompt-check",
-        metadata,
+        metadata: {
+          systemPrompt:
+            "Follow these instructions.\n{{PERSONALIZATION}}\n{{SESSION_DIRECTORY}}\n{{OS}}",
+          includeCurrentDate,
+        },
       };
       const preview = await fetch(`${url}/api/runs/debug-prompt`, {
         method: "POST",
@@ -114,9 +100,9 @@ for (const metadata of [undefined, { includeCurrentDate: false }]) {
       };
       expect(systemPrompt).toContain(skill.instructions);
       expect(systemPrompt.includes("Current date:")).toBe(
-        metadata === undefined,
+        includeCurrentDate === undefined,
       );
-      expect(systemPrompt).toContain("Follow these instructions.");
+      expect(systemPrompt).toStartWith("Follow these instructions.");
       expect(systemPrompt).toContain("<tool_format>");
       const run = await fetch(`${url}/api/runs`, {
         method: "POST",
@@ -142,11 +128,10 @@ for (const metadata of [undefined, { includeCurrentDate: false }]) {
   });
 }
 
-test("debug preview rejects invalid agents, sessions, and expired workspaces", async () => {
+test("debug preview rejects invalid sessions and expired workspaces", async () => {
   const { url, close } = await startTestServer();
   try {
     for (const [body, status] of [
-      [{ agentName: "missing-agent" }, 404],
       [{ sessionId: "missing-session" }, 404],
       [{ sessionId: "expired-lease", ephemeral: true }, 400],
       [{ metadata: { includeCurrentDate: "false" } }, 400],

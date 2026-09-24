@@ -6,14 +6,12 @@ import type { UserSettings } from "../../persist/userSettings";
 import type { DebugData } from "../../types";
 
 type Args = {
-  selectedSessionAgentRef: MutableRefObject<string>;
   userSettingsRef: MutableRefObject<UserSettings>;
   isEphemeralRef: MutableRefObject<boolean>;
   setDebugData: (data: DebugData | null) => void;
 };
 
 export function useRunDebug({
-  selectedSessionAgentRef,
   userSettingsRef,
   isEphemeralRef,
   setDebugData,
@@ -30,7 +28,6 @@ export function useRunDebug({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               sessionId,
-              agentName: selectedSessionAgentRef.current,
               metadata,
               message,
               ephemeral: isEphemeralRef.current,
@@ -64,6 +61,6 @@ export function useRunDebug({
         });
       }
     },
-    [isEphemeralRef, selectedSessionAgentRef, setDebugData, userSettingsRef],
+    [isEphemeralRef, setDebugData, userSettingsRef],
   );
 }

@@ -24,7 +24,6 @@ const runBody = (model: string) => ({
   message: "Hello",
   history: [],
   model,
-  agentName: "general_agent",
 });
 
 describe("OpenRouter API integration", () => {
@@ -341,7 +340,6 @@ describe("OpenRouter API integration", () => {
           message: "Keep going in the background",
           history: [],
           model,
-          agentName: "general_agent",
           sessionId,
         }),
       });

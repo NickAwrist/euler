@@ -29,7 +29,6 @@ export function getDb(): Database {
       title TEXT,
       model TEXT,
       model_messages TEXT,
-      agent_name TEXT,
       session_directory TEXT,
       workspace_kind TEXT NOT NULL DEFAULT 'sandbox'
     );
@@ -65,29 +64,6 @@ export function getDb(): Database {
   );
 
   db.run(`
-    CREATE TABLE IF NOT EXISTS agents (
-      id TEXT PRIMARY KEY,
-      owner_uuid TEXT NOT NULL,
-      name TEXT NOT NULL,
-      description TEXT NOT NULL DEFAULT '',
-      system_prompt TEXT NOT NULL DEFAULT '',
-      is_default INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      UNIQUE(owner_uuid, name)
-    );
-  `);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS agent_tools (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-      tool_name TEXT NOT NULL,
-      position INTEGER NOT NULL DEFAULT 0,
-      UNIQUE(agent_id, tool_name)
-    );
-  `);
-
-  db.run(`
     CREATE TABLE IF NOT EXISTS skills (
       id TEXT PRIMARY KEY,
       owner_uuid TEXT NOT NULL,
@@ -104,15 +80,6 @@ export function getDb(): Database {
     CREATE TABLE IF NOT EXISTS app_settings (
       key TEXT PRIMARY KEY NOT NULL,
       value TEXT NOT NULL
-    );
-  `);
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS user_settings (
-      owner_uuid TEXT NOT NULL,
-      key TEXT NOT NULL,
-      value TEXT NOT NULL,
-      PRIMARY KEY(owner_uuid, key)
     );
   `);
 

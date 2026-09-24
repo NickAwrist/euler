@@ -1,11 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import {
-  getDefaultRunAgent,
-  getOpenRouterApiKey,
-  setDefaultRunAgent,
-  setOpenRouterApiKey,
-} from "../db/index";
+import { getOpenRouterApiKey, setOpenRouterApiKey } from "../db/index";
 import {
   getOpenRouterModelByRoute,
   listOpenRouterPublishers,
@@ -34,24 +29,6 @@ const settingsRoutes = Router();
 
 settingsRoutes.get("/environment", (_req, res) => {
   res.json(getEnvironmentSettings());
-});
-
-settingsRoutes.get("/default-run-agent", (req, res) => {
-  const ownerUuid = requireUserId(req, res);
-  if (!ownerUuid) return;
-  res.json({ agentName: getDefaultRunAgent(ownerUuid) });
-});
-
-settingsRoutes.put("/default-run-agent", (req, res) => {
-  const ownerUuid = requireUserId(req, res);
-  if (!ownerUuid) return;
-  const raw = (req.body as { agentName?: unknown }).agentName;
-  const name = typeof raw === "string" ? raw.trim() : "";
-  if (!name || !setDefaultRunAgent(ownerUuid, name)) {
-    sendApiError(res, 400, "BAD_REQUEST", "Invalid agent name");
-    return;
-  }
-  res.json({ ok: true, agentName: getDefaultRunAgent(ownerUuid) });
 });
 
 settingsRoutes.get("/openrouter", (_req, res) => {
