@@ -1,6 +1,5 @@
 /**
- * Pure, browser-safe system-prompt renderer. Stored agent templates may
- * contain `{{PERSONALIZATION}}`, `{{SESSION_DIRECTORY}}`, `{{OS}}` tokens;
+ * Pure, browser-safe system-prompt renderer. Templates may contain `{{PERSONALIZATION}}`, `{{SESSION_DIRECTORY}}`, `{{OS}}` tokens;
  * missing values cause the token (and its surrounding blank line) to be
  * removed from the output.
  */
@@ -16,6 +15,8 @@ export type PersonalizationFields = {
 };
 
 export type PromptContext = {
+  /** User's system prompt template; empty uses the default template. */
+  systemPrompt?: string;
   personalization?: PersonalizationFields;
   sessionDirectory?: string;
   os?: string;
@@ -24,7 +25,7 @@ export type PromptContext = {
 /**
  * Invariant suffix appended to every agent's final system prompt. These
  * directives must always be present regardless of the user-authored template.
- * Appended by BaseAgent after rendering the template and assigned skills.
+ * Appended by BaseAgent after rendering the template and skills.
  */
 export const CORE_DIRECTIVES = [
   "<tool_format>",

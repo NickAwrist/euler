@@ -51,7 +51,7 @@ export function getSessionById(
 ): SessionRow | null {
   const row = getDb()
     .query(
-      "SELECT id, owner_uuid, created_at, updated_at, title, model, model_messages, agent_name, session_directory, workspace_kind FROM sessions WHERE owner_uuid = ? AND id = ?",
+      "SELECT id, owner_uuid, created_at, updated_at, title, model, model_messages, session_directory, workspace_kind FROM sessions WHERE owner_uuid = ? AND id = ?",
     )
     .get(ownerUuid, id) as SessionRow | null;
   return row ?? null;
@@ -147,7 +147,7 @@ export function createSessionRow(
 ): SessionRow {
   const db = getDb();
   db.run(
-    "INSERT INTO sessions (id, owner_uuid, created_at, updated_at, title, model, model_messages, agent_name) VALUES (?, ?, ?, ?, NULL, ?, NULL, NULL)",
+    "INSERT INTO sessions (id, owner_uuid, created_at, updated_at, title, model, model_messages) VALUES (?, ?, ?, ?, NULL, ?, NULL)",
     [id, ownerUuid, now, now, model],
   );
   return {
@@ -158,7 +158,6 @@ export function createSessionRow(
     title: null,
     model,
     model_messages: null,
-    agent_name: null,
     session_directory: null,
     workspace_kind: "sandbox",
   };
@@ -180,7 +179,6 @@ export function patchSessionRow(
     title?: string | null;
     model?: string | null;
     model_messages?: Array<Record<string, unknown>> | null;
-    agent_name?: string | null;
     session_directory?: string | null;
     workspace_kind?: "sandbox" | "local";
     updated_at?: number;
@@ -191,8 +189,6 @@ export function patchSessionRow(
 
   const title = patch.title !== undefined ? patch.title : existing.title;
   const model = patch.model !== undefined ? patch.model : existing.model;
-  const agentName =
-    patch.agent_name !== undefined ? patch.agent_name : existing.agent_name;
   const sessionDirectory =
     patch.session_directory !== undefined
       ? patch.session_directory
@@ -208,12 +204,11 @@ export function patchSessionRow(
   const updatedAt = patch.updated_at ?? Date.now();
 
   getDb().run(
-    "UPDATE sessions SET title = ?, model = ?, model_messages = ?, agent_name = ?, session_directory = ?, workspace_kind = ?, updated_at = ? WHERE owner_uuid = ? AND id = ?",
+    "UPDATE sessions SET title = ?, model = ?, model_messages = ?, session_directory = ?, workspace_kind = ?, updated_at = ? WHERE owner_uuid = ? AND id = ?",
     [
       title,
       model,
       modelMessagesJson,
-      agentName,
       sessionDirectory,
       workspaceKind,
       updatedAt,

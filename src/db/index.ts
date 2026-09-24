@@ -1,17 +1,5 @@
 export { DEFAULT_COMFYUI_NEGATIVE_PROMPT } from "./constants";
 export { getDb, resetDbConnection } from "./connection";
-export type { AgentData, AgentRow, AgentWriteData } from "./agents/types";
-export {
-  AgentCapabilityValidationError,
-  createAgentRow,
-  deleteAgentRow,
-  getAgentById,
-  getAgentByName,
-  listAssignedSkills,
-  listAgents,
-  listDelegationTargets,
-  updateAgentRow,
-} from "./agents/queries";
 export type { SkillRow } from "./skills/types";
 export {
   createSkillRow,
@@ -41,7 +29,6 @@ export type {
   OpenRouterModel,
 } from "./types";
 export {
-  getDefaultRunAgent,
   getComfyUIDefaultModel,
   getComfyUIHost,
   getComfyUIImageSize,
@@ -53,7 +40,6 @@ export {
   setComfyUIHost,
   setComfyUIImageSize,
   setComfyUINegativePrompt,
-  setDefaultRunAgent,
   setOllamaHost,
   setSearXNGHost,
   setOpenRouterApiKey,

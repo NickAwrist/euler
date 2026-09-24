@@ -3,6 +3,8 @@ import type { RunBody } from "../../src/schemas/run";
 const STORAGE_KEY = "euler:userSettings";
 
 export interface UserSettings {
+  /** Custom system prompt template; `null` follows the default. */
+  systemPrompt: string | null;
   name: string;
   preferredFormats: string;
   location: string;
@@ -12,6 +14,7 @@ export interface UserSettings {
 }
 
 const DEFAULT_SETTINGS: UserSettings = {
+  systemPrompt: null,
   name: "",
   preferredFormats: "",
   location: "",
@@ -30,6 +33,8 @@ export function loadUserSettings(): UserSettings {
   if (!parsed) return DEFAULT_SETTINGS;
 
   return {
+    systemPrompt:
+      typeof parsed.systemPrompt === "string" ? parsed.systemPrompt : null,
     name: parsed.name || "",
     preferredFormats: parsed.preferredFormats || "",
     location: parsed.location || "",
@@ -41,6 +46,7 @@ export function loadUserSettings(): UserSettings {
 
 function saveUserSettings(settings: UserSettings): void {
   const toSave: UserSettings = {
+    systemPrompt: settings.systemPrompt,
     name: settings.name || "",
     preferredFormats: settings.preferredFormats || "",
     location: settings.location || "",
@@ -64,6 +70,7 @@ export function buildRunMetadata(
   settings: UserSettings,
 ): NonNullable<RunBody["metadata"]> {
   return {
+    systemPrompt: settings.systemPrompt?.trim() || undefined,
     name: settings.name.trim() || undefined,
     location: settings.location.trim() || undefined,
     preferredFormats: settings.preferredFormats.trim() || undefined,

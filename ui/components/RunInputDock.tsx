@@ -11,7 +11,6 @@ import { hasConfigurableThinking } from "../lib/thinkingLevel";
 import { type SkillData, fetchSkills } from "../persist/skills";
 import { cx } from "../styles";
 import type { MessageStep, ModelOption, SessionWorkspace } from "../types";
-import { AgentSelectBar } from "./AgentSelectBar";
 import { IconButton } from "./IconButton";
 import { ModelSelectBar } from "./ModelSelectBar";
 import { CommandPicker } from "./RunArea/CommandPicker";
@@ -22,11 +21,7 @@ import {
   exactRunCommand,
   matchingRunCommands,
 } from "./runCommands";
-import {
-  completeSkillToken,
-  filterAssignedSkills,
-  findActiveSkillToken,
-} from "./skillPicker";
+import { completeSkillToken, findActiveSkillToken } from "./skillPicker";
 
 export function RunInputDock({
   ollamaModels,
@@ -36,9 +31,6 @@ export function RunInputDock({
   onModelChange,
   thinkingEffort,
   onThinkingEffortChange,
-  runAgents,
-  selectedSessionAgent,
-  onSessionAgentChange,
   input,
   setInput,
   onSendMessage,
@@ -55,7 +47,6 @@ export function RunInputDock({
   canAttachImages,
   attachImageDisabledReason,
   attachmentsSendReady,
-  assignedSkillIds,
   workspace,
   onRunCommand,
   onFooterHeightChange,
@@ -67,9 +58,6 @@ export function RunInputDock({
   onModelChange: (model: string) => void;
   thinkingEffort?: string | null;
   onThinkingEffortChange?: (effort: string) => void;
-  runAgents: { name: string }[];
-  selectedSessionAgent: string;
-  onSessionAgentChange: (name: string) => void;
   input: string;
   setInput: (v: string) => void;
   onSendMessage: (e: React.FormEvent) => void;
@@ -86,7 +74,6 @@ export function RunInputDock({
   canAttachImages: boolean;
   attachImageDisabledReason?: string;
   attachmentsSendReady: boolean;
-  assignedSkillIds: string[];
   workspace: SessionWorkspace;
   onRunCommand: (command: RunCommandName) => void | Promise<void>;
   onFooterHeightChange: (heightPx: number) => void;
@@ -109,7 +96,7 @@ export function RunInputDock({
     ? null
     : findActiveSkillToken(input, caretIndex);
   const matchingSkills = activeSkillToken
-    ? filterAssignedSkills(skills, assignedSkillIds)
+    ? skills
         .filter((skill) => skill.name.startsWith(activeSkillToken.query))
         .slice(0, 8)
     : [];
@@ -432,16 +419,6 @@ export function RunInputDock({
                 />
               </>
             )}
-          <span
-            className="mx-1 h-4 w-px shrink-0 bg-border-subtle"
-            aria-hidden
-          />
-          <AgentSelectBar
-            agents={runAgents}
-            selectedAgent={selectedSessionAgent}
-            onAgentChange={onSessionAgentChange}
-            disabled={isBusy}
-          />
         </div>
       </form>
     </div>

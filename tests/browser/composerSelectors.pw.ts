@@ -46,7 +46,7 @@ for (const device of ["desktop", "mobile"] as const) {
     let sessionModel = "openrouter:anthropic/claude-sonnet";
     let catalog = models;
     let sessionReads = 0;
-    const runs: { model: string; agentName: string; message: string }[] = [];
+    const runs: { model: string; message: string }[] = [];
     const finishRun = Promise.withResolvers<void>();
     await page.route("**/api/**", async (route) => {
       const path = new URL(route.request().url()).pathname;
@@ -104,28 +104,11 @@ for (const device of ["desktop", "mobile"] as const) {
                     },
                   ],
                 }
-              : path === "/api/agents"
-                ? {
-                    agents: ["General", "Engineer"].map((name) => ({
-                      id: name,
-                      name,
-                      description: "",
-                      system_prompt: "",
-                      is_default: 0,
-                      tools: [],
-                      skill_ids: [],
-                      delegate_agent_ids: [],
-                      created_at: 1,
-                      updated_at: 1,
-                    })),
-                  }
-                : path === "/api/settings/default-run-agent"
-                  ? { agentName: "General" }
-                  : path.startsWith("/api/runs/active/")
-                    ? { active: false }
-                    : path.endsWith("/health")
-                      ? { connected: true }
-                      : {};
+              : path.startsWith("/api/runs/active/")
+                ? { active: false }
+                : path.endsWith("/health")
+                  ? { connected: true }
+                  : {};
       await route.fulfill({ json });
     });
     // Exercise icon failure without depending on an external service.
@@ -133,17 +116,12 @@ for (const device of ["desktop", "mobile"] as const) {
     try {
       await page.goto("/run/selector");
       const model = page.getByRole("button", { name: /^Model:/ });
-      const agent = page.getByRole("combobox", { name: "Agent", exact: true });
       const input = page.getByPlaceholder("Send a message...");
       await input.fill("Keep this draft");
       const modelBounds = await model.boundingBox();
       const inputBounds = await input.boundingBox();
-      const agentBounds = await agent.boundingBox();
       expect(modelBounds!.y).toBeGreaterThan(
         inputBounds!.y + inputBounds!.height,
-      );
-      expect(agentBounds!.x).toBeGreaterThan(
-        modelBounds!.x + modelBounds!.width,
       );
       if (device === "mobile") await model.tap();
       else {
@@ -185,8 +163,6 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect(menu.getByRole("searchbox")).toHaveValue("");
       await menu.getByRole("button", { name: "GPT OpenRouter" }).click();
       await expect(model).toHaveAccessibleName("Model: GPT");
-      await agent.selectOption("Engineer");
-      await expect(agent).toHaveValue("Engineer");
       expect(runs).toHaveLength(0);
       await model.click();
       await page.keyboard.press("Escape");
@@ -232,11 +208,9 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect.poll(() => runs.length).toBe(1);
       expect(runs[0]).toMatchObject({
         model: "gemma4:e4b",
-        agentName: "Engineer",
         message: "Keep this draft",
       });
       await expect(model).toBeDisabled();
-      await expect(agent).toBeDisabled();
       await page.getByRole("button", { name: "Stop generation" }).click();
       await expect(model).toBeEnabled();
       finishRun.resolve();

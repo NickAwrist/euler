@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { MAIN_AGENT_NAME, SUBAGENT_NAME } from "../../src/agents/agentNames";
 import { getLiveStepMeta } from "../../ui/components/RunArea/liveStepMeta";
 
 const llmStep = {
   kind: "llm_call",
   status: "running",
-  agentName: "general_agent",
+  agentName: MAIN_AGENT_NAME,
 };
 
 describe("live step metadata", () => {
@@ -22,8 +23,8 @@ describe("live step metadata", () => {
       {
         kind: "tool_call",
         status: "running",
-        toolName: "delegate_to_reviewer_a1b2c3d4",
-        childRun: { agentName: "reviewer", steps: [] },
+        toolName: "run_subagent",
+        childRun: { agentName: SUBAGENT_NAME, steps: [] },
       },
       2,
       "",
@@ -31,5 +32,12 @@ describe("live step metadata", () => {
     );
 
     expect(result.label).toBe("Agent");
+  });
+
+  test("labels subagent model calls but not the main agent's", () => {
+    expect(
+      getLiveStepMeta({ ...llmStep, agentName: SUBAGENT_NAME }, 3, "", ""),
+    ).toEqual({ label: "Agent", detail: "Subagent" });
+    expect(getLiveStepMeta(llmStep, 3, "", "").detail).toBeNull();
   });
 });

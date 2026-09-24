@@ -64,7 +64,6 @@ describe("image attachments", () => {
           message: "What is in this image?",
           history: [],
           model: "llama3:latest",
-          agentName: "general_agent",
           attachmentIds: [attachment.id],
         }),
       });

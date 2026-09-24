@@ -148,7 +148,6 @@ function buildSession(ctx: RunTurnContext): AgentSession {
   const session = new AgentSession(crypto.randomUUID(), {
     model: ctx.model,
     reasoningEffort: ctx.reasoningEffort,
-    agentName: ctx.agentName,
     promptContext: ctx.promptContext,
     toolSessionDir: ctx.toolSessionDir,
     workspace: ctx.workspace,

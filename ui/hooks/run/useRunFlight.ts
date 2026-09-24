@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { MAIN_AGENT_NAME } from "../../../src/agents/agentNames";
 import { readSseBlocks } from "../../lib/readSseBlocks";
 import { getActiveRun } from "../../persist/runs";
 import { fetchSession } from "../../persist/sessions";
@@ -18,7 +19,6 @@ import { type StreamBuffer, createEmptyStreamBuffer } from "./streamBuffer";
 type FlightDeps = {
   activeSessionIdRef: MutableRefObject<string | null>;
   modelMessagesRef: MutableRefObject<Array<Record<string, unknown>> | null>;
-  selectedSessionAgentRef: MutableRefObject<string>;
   setMessages: Dispatch<SetStateAction<Message[]>>;
   refreshSessions: () => Promise<void>;
   streamBufferRef: MutableRefObject<StreamBuffer>;
@@ -75,7 +75,6 @@ export function useRunFlight(
       d.setRunPending(true);
       d.clearStreamingUi();
 
-      const rootAgent = d.selectedSessionAgentRef.current;
       const ownsStream = () => abortControllerRef.current === controller;
       const viewing = () =>
         ownsStream() && d.activeSessionIdRef.current === sessionId;
@@ -133,9 +132,9 @@ export function useRunFlight(
                 typeof data.agentName === "string" ? data.agentName : "";
               const buf = d.streamBufferRef.current;
               if (td) buf.thinking += td;
-              if (cd && agent === rootAgent) buf.content += cd;
+              if (cd && agent === MAIN_AGENT_NAME) buf.content += cd;
               if (!viewing()) return;
-              if (cd && agent === rootAgent)
+              if (cd && agent === MAIN_AGENT_NAME)
                 d.setStreamingContent((prev) => prev + cd);
               if (td) d.setStreamingThinking((prev) => prev + td);
             } else if (data.type === "run_step") {

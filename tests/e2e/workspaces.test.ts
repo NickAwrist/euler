@@ -341,7 +341,6 @@ test("an ephemeral run without an ID holds its generated lease lock until comple
         message: "Hello",
         history: [],
         model: "llama3:latest",
-        agentName: "general_agent",
       }),
     });
     expect(response.status).toBe(200);

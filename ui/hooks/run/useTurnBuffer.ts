@@ -6,11 +6,9 @@ import { createEmptyStreamBuffer } from "./streamBuffer";
 export function useTurnBuffer() {
   const streamBufferRef = useRef(createEmptyStreamBuffer());
   const turnMessagesSnapshotRef = useRef<Message[] | null>(null);
-  const turnRootAgentNameRef = useRef("");
 
   return {
     streamBufferRef,
     turnMessagesSnapshotRef,
-    turnRootAgentNameRef,
   };
 }

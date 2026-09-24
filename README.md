@@ -2,7 +2,9 @@
 
 A local-first agent runtime with a run UI, powered by [Ollama](https://ollama.com/).
 
-Build custom agents directly from the UI. Each agent can have its own system prompt and a configurable set of tools, letting you tailor behavior to specific tasks without touching code.
+Every chat uses one agent with all built-in tools. It can hand self-contained
+work to subagents, which share its tools and instructions but run in a fresh
+context. Customize the system prompt under **Settings > General**.
 
 Custom skills live under **Customization > Skills**. A skill follows the
 `SKILL.md` shape: a lowercase hyphenated name, a description that tells agents

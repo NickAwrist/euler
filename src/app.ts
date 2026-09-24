@@ -5,7 +5,6 @@ import express from "express";
 import { getDb } from "./db/index";
 import { envConfig } from "./env";
 import { errorHandler, sendApiError } from "./http/errors";
-import agentsRoutes from "./routes/agents";
 import attachmentsRoutes from "./routes/attachments";
 import comfyuiRoutes from "./routes/comfyui";
 import directoriesRoutes from "./routes/directories";
@@ -17,7 +16,6 @@ import sessionRoutes from "./routes/sessions";
 import settingsRoutes from "./routes/settings";
 import skillsRoutes from "./routes/skills";
 import temporarySessionRoutes from "./routes/temporarySessions";
-import toolsRoutes from "./routes/tools";
 import usageRoutes from "./routes/usage";
 import { workspaceService } from "./workspaces/WorkspaceService";
 
@@ -42,10 +40,8 @@ app.use(
 );
 app.use(express.json({ limit: "10mb" }));
 app.use("/api/usage", usageRoutes);
-app.use("/api/tools", toolsRoutes);
 app.use("/api/directories", directoriesRoutes);
 app.use("/api/settings", settingsRoutes);
-app.use("/api/agents", agentsRoutes);
 app.use("/api/skills", skillsRoutes);
 app.use("/api/attachments", attachmentsRoutes);
 app.use("/api/comfyui", comfyuiRoutes);

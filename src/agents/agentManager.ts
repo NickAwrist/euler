@@ -1,24 +1,21 @@
 import os from "node:os";
 import type { RunContext } from "../RunContext";
 import { DEFAULT_RUN_MODEL } from "../constants";
-import {
-  type AgentData,
-  getAgentById,
-  getAgentByName,
-  listAssignedSkills,
-  listDelegationTargets,
-} from "../db/index";
+import { listSkills } from "../db/index";
 import {
   type PersonalizationFields,
   type PromptContext,
   renderSystemPrompt,
 } from "../prompts/render";
+import {
+  DEFAULT_SYSTEM_PROMPT,
+  SUBAGENT_DIRECTIVES,
+} from "../prompts/systemPrompt";
 import { renderSkillsPrompt } from "../skills/runtime";
-import { AgentTool } from "../tools/AgentTool";
 import type { BaseTool } from "../tools/BaseTool";
 import { ApplyPatchTool } from "../tools/apply_patch";
 import { BashTool } from "../tools/bash";
-import { isBuiltinToolName } from "../tools/builtinTools";
+import { BUILTIN_TOOLS } from "../tools/builtinTools";
 import { CreateFileTool } from "../tools/create_file";
 import { DeleteFileTool } from "../tools/delete_file";
 import { FetchWebPageTool } from "../tools/fetch_web_page";
@@ -28,16 +25,16 @@ import { ListFilesTool } from "../tools/list_files";
 import { LoadSkillTool } from "../tools/load_skill";
 import { ModifyPlan } from "../tools/modify_plan";
 import { ReadFileTool } from "../tools/read_file";
+import { RunSubagentTool } from "../tools/run_subagent";
 import { WebSearchTool } from "../tools/web_search";
 import { BaseAgent } from "./BaseAgent";
+import { MAIN_AGENT_NAME, SUBAGENT_NAME } from "./agentNames";
 
 export type CreateAgentOptions = {
   ownerUuid: string;
-  /** Pre-rendered prompt for a root run. Stored templates render on the server. */
-  systemPrompt?: string;
   /** Resolved absolute directory tools use; also drives `{{SESSION_DIRECTORY}}`. */
   toolSessionDir?: string;
-  /** Values to fill `{{PLACEHOLDERS}}` when `systemPrompt` is not provided. */
+  /** System prompt template and values to fill its `{{PLACEHOLDERS}}`. */
   promptContext?: PromptContext;
   /** Current user task, used to activate explicit `$skill-name` references. */
   userPrompt?: string;
@@ -49,6 +46,7 @@ function serverPromptContext(
   toolSessionDir: string | undefined,
 ): PromptContext {
   return {
+    systemPrompt: base?.systemPrompt,
     personalization: base?.personalization ?? {},
     sessionDirectory: base?.sessionDirectory ?? toolSessionDir,
     os: base?.os ?? `${os.platform()} ${os.arch()} (${os.release()})`,
@@ -58,6 +56,7 @@ function serverPromptContext(
 /** Prompt context for run turns, with server OS and session directory values. */
 export function buildServerRunPromptContext(opts: {
   metadata?: {
+    systemPrompt?: string | undefined;
     name?: string | undefined;
     location?: string | undefined;
     preferredFormats?: string | undefined;
@@ -77,7 +76,13 @@ export function buildServerRunPromptContext(opts: {
       personalization.includeCurrentDate = opts.metadata.includeCurrentDate;
     }
   }
-  return serverPromptContext({ personalization }, opts.toolSessionDir);
+  return serverPromptContext(
+    {
+      systemPrompt: opts.metadata?.systemPrompt?.trim() || undefined,
+      personalization,
+    },
+    opts.toolSessionDir,
+  );
 }
 
 function createBuiltinTool(toolName: string): BaseTool {
@@ -109,43 +114,38 @@ function createBuiltinTool(toolName: string): BaseTool {
   }
 }
 
-function buildAgent(config: AgentData, opts: CreateAgentOptions): BaseAgent {
-  const renderedAgentPrompt =
-    typeof opts.systemPrompt === "string" && opts.systemPrompt.length > 0
-      ? opts.systemPrompt
-      : renderSystemPrompt(
-          config.system_prompt,
-          serverPromptContext(opts.promptContext, opts.toolSessionDir),
-        );
-  const skills = listAssignedSkills(opts.ownerUuid, config.id);
-  const skillsPrompt = renderSkillsPrompt(skills, opts.userPrompt ?? "");
-  const finalPrompt = [renderedAgentPrompt, skillsPrompt]
+function buildAgent(
+  name: typeof MAIN_AGENT_NAME | typeof SUBAGENT_NAME,
+  opts: CreateAgentOptions,
+): BaseAgent {
+  const promptContext = serverPromptContext(
+    opts.promptContext,
+    opts.toolSessionDir,
+  );
+  const isSubagent = name === SUBAGENT_NAME;
+  const skills = listSkills(opts.ownerUuid);
+  const finalPrompt = [
+    renderSystemPrompt(
+      promptContext.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT,
+      promptContext,
+    ),
+    isSubagent ? SUBAGENT_DIRECTIVES : "",
+    renderSkillsPrompt(skills, opts.userPrompt ?? ""),
+  ]
     .filter((part) => part.length > 0)
     .join("\n\n");
 
   const agent = new BaseAgent(
-    config.name,
-    config.description,
+    name,
+    isSubagent ? "Subagent" : "Main agent",
     undefined,
     undefined,
     finalPrompt,
   );
-  agent.addTools(
-    config.tools
-      .filter(isBuiltinToolName)
-      .map((tool) => createBuiltinTool(tool)),
-  );
-  const delegationTargets = listDelegationTargets(opts.ownerUuid, config.id);
-  agent.addTools(
-    delegationTargets.map(
-      (target) =>
-        new AgentTool({
-          id: target.id,
-          name: target.name,
-          description: target.description,
-        }),
-    ),
-  );
+  agent.addTools(BUILTIN_TOOLS.map((tool) => createBuiltinTool(tool)));
+  if (!isSubagent) {
+    agent.addTool(new RunSubagentTool());
+  }
   if (skills.length > 0) {
     agent.addTool(new LoadSkillTool(skills));
   }
@@ -155,80 +155,26 @@ function buildAgent(config: AgentData, opts: CreateAgentOptions): BaseAgent {
   return agent;
 }
 
-function inheritParentModel(agent: BaseAgent, ctx?: RunContext): BaseAgent {
-  const parentModel = ctx?.agentInstance?.model;
-  agent.model =
-    typeof parentModel === "string" && parentModel.length > 0
-      ? parentModel
-      : DEFAULT_RUN_MODEL;
-  agent.reasoningEffort = ctx?.agentInstance?.reasoningEffort;
-  return agent;
-}
-
-function contextOptions(
-  ctx?: RunContext,
-  userPrompt?: string,
-): CreateAgentOptions {
-  return {
-    ownerUuid: ctx?.ownerUuid ?? "",
-    toolSessionDir: ctx?.sessionDir,
-    promptContext: ctx?.promptContext,
-    userPrompt,
-  };
-}
-
 export const agentManager = {
-  /** Build a subagent by name that inherits its parent run context and model. */
-  createAgentForContext(
-    agentName: string,
-    ctx?: RunContext,
-    userPrompt?: string,
-  ): BaseAgent {
-    return inheritParentModel(
-      this.createAgent(agentName, contextOptions(ctx, userPrompt)),
-      ctx,
-    );
+  createAgent(opts: CreateAgentOptions): BaseAgent {
+    return buildAgent(MAIN_AGENT_NAME, opts);
   },
 
-  /** Build a subagent by stable ID that inherits its parent run context and model. */
-  createAgentByIdForContext(
-    agentId: string,
-    ctx?: RunContext,
-    userPrompt?: string,
-  ): BaseAgent {
-    return inheritParentModel(
-      this.createAgentById(agentId, contextOptions(ctx, userPrompt)),
-      ctx,
-    );
-  },
-
-  createAgent(agentName: string, opts?: CreateAgentOptions): BaseAgent {
-    const ownerUuid = opts?.ownerUuid ?? "";
-    const config = getAgentByName(ownerUuid, agentName);
-    if (!config) {
-      throw new Error(
-        `Agent configuration for '${agentName}' not found in database`,
-      );
-    }
-    return buildAgent(config, opts ?? { ownerUuid });
-  },
-
-  createAgentById(agentId: string, opts?: CreateAgentOptions): BaseAgent {
-    const ownerUuid = opts?.ownerUuid ?? "";
-    const config = getAgentById(ownerUuid, agentId);
-    if (!config) {
-      throw new Error(
-        `Agent configuration for ID '${agentId}' not found in database`,
-      );
-    }
-    return buildAgent(config, opts ?? { ownerUuid });
+  /** Build a subagent that inherits its parent's run context and model. */
+  createSubagentForContext(ctx: RunContext, task: string): BaseAgent {
+    const parent = ctx.agentInstance;
+    const agent = buildAgent(SUBAGENT_NAME, {
+      ownerUuid: ctx.ownerUuid,
+      toolSessionDir: ctx.sessionDir,
+      promptContext: ctx.promptContext,
+      userPrompt: task,
+    });
+    agent.model = parent.model || DEFAULT_RUN_MODEL;
+    agent.reasoningEffort = parent.reasoningEffort;
+    return agent;
   },
 
   getToolInstance(toolName: string): BaseTool {
     return createBuiltinTool(toolName);
-  },
-
-  isToolEnabled(toolName: string): boolean {
-    return isBuiltinToolName(toolName);
   },
 };

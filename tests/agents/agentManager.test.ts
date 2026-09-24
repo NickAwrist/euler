@@ -6,178 +6,139 @@ import {
   agentManager,
   buildServerRunPromptContext,
 } from "../../src/agents/agentManager";
+import { SUBAGENT_NAME } from "../../src/agents/agentNames";
+import { createSkillRow, ensureUserData } from "../../src/db";
 import {
-  createAgentRow,
-  createSkillRow,
-  ensureUserData,
-  getAgentByName,
-  updateAgentRow,
-} from "../../src/db";
-import { AgentTool, delegationToolName } from "../../src/tools/AgentTool";
+  DEFAULT_SYSTEM_PROMPT,
+  SUBAGENT_DIRECTIVES,
+} from "../../src/prompts/systemPrompt";
+import { BUILTIN_TOOLS } from "../../src/tools/builtinTools";
+import { RunSubagentTool } from "../../src/tools/run_subagent";
 
 const RUNTIME_USER_ID = "33333333-3333-4333-8333-333333333333";
+const OTHER_USER_ID = "44444444-4444-4444-8444-444444444444";
 
-describe("agent capability runtime", () => {
-  test("enables page fetching for newly seeded general agents", () => {
-    ensureUserData(RUNTIME_USER_ID);
-    const agent = agentManager.createAgent("general_agent", {
-      ownerUuid: RUNTIME_USER_ID,
-    });
-    expect(agent.TOOL_MAP.fetch_web_page?.toTool().function.name).toBe(
-      "fetch_web_page",
-    );
-  });
+function contextFor(agent: BaseAgent, promptContext = {}) {
+  return new RunContext(
+    agent,
+    "Parent task",
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    promptContext,
+    RUNTIME_USER_ID,
+  );
+}
 
-  test("uses only the active agent's skills, built-in tools, and delegation routes", async () => {
+describe("agent runtime", () => {
+  test("gives the main agent every built-in tool, subagents, and the owner's skills", async () => {
     ensureUserData(RUNTIME_USER_ID);
     const releaseSkill = createSkillRow(RUNTIME_USER_ID, {
       name: "manager-release-notes",
       description: "Write release notes.",
       instructions: "Release instructions only.",
     });
-    const privateSkill = createSkillRow(RUNTIME_USER_ID, {
+    const otherUserSkill = createSkillRow(OTHER_USER_ID, {
       name: "private-skill",
       description: "Private metadata.",
       instructions: "Private instructions.",
     });
-    const auditSkill = createSkillRow(RUNTIME_USER_ID, {
-      name: "audit",
-      description: "Audit changes.",
-      instructions: "Audit instructions only.",
-    });
-    const reviewer = createAgentRow(RUNTIME_USER_ID, {
-      name: "reviewer",
-      description: "Reviews a proposed change.",
-      system_prompt: "Review the work.",
-      tools: [],
-      skill_ids: [auditSkill.id],
-      delegate_agent_ids: [],
-    });
-    const general = getAgentByName(RUNTIME_USER_ID, "general_agent");
-    expect(general).not.toBeNull();
-    updateAgentRow(RUNTIME_USER_ID, general!.id, {
-      name: general!.name,
-      description: general!.description,
-      system_prompt: general!.system_prompt,
-      tools: ["web_search"],
-      skill_ids: [releaseSkill.id],
-      delegate_agent_ids: [reviewer.id],
-    });
 
-    const parent = agentManager.createAgent("general_agent", {
+    const agent = agentManager.createAgent({
       ownerUuid: RUNTIME_USER_ID,
-      userPrompt: "Use $manager-release-notes and $private-skill.",
+      userPrompt: "Use $manager-release-notes.",
     });
-    expect(parent.systemPrompt).toContain(releaseSkill.description);
-    expect(parent.systemPrompt).toContain(releaseSkill.instructions);
-    expect(parent.systemPrompt).not.toContain(privateSkill.description);
-    expect(parent.systemPrompt).not.toContain(privateSkill.instructions);
-    expect(parent.systemPrompt).not.toContain(auditSkill.description);
-    expect(parent.TOOL_MAP.web_search).toBeDefined();
-    expect(parent.TOOL_MAP.load_skill).toBeDefined();
 
-    const delegationTools = parent.tools.filter(
-      (tool): tool is AgentTool => tool instanceof AgentTool,
-    );
-    expect(delegationTools).toHaveLength(1);
-    expect(delegationTools[0]!.target.id).toBe(reviewer.id);
-    expect(delegationTools[0]!.toTool().function.name).toStartWith(
-      "delegate_to_reviewer_",
-    );
+    for (const tool of BUILTIN_TOOLS) {
+      expect(agent.TOOL_MAP[tool]).toBeDefined();
+    }
+    expect(agent.TOOL_MAP.run_subagent).toBeInstanceOf(RunSubagentTool);
+    expect(agent.systemPrompt).toContain(releaseSkill.instructions);
+    expect(agent.systemPrompt).not.toContain(otherUserSkill.description);
     expect(
-      (await parent.TOOL_MAP.load_skill!.execute({ name: privateSkill.name }))
+      (await agent.TOOL_MAP.load_skill!.execute({ name: otherUserSkill.name }))
         .text,
-    ).toBe(`Error: skill '${privateSkill.name}' not found`);
-
-    parent.model = "parent-model";
-    const parentContext = new RunContext(
-      parent,
-      "Parent task",
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      RUNTIME_USER_ID,
-    );
-    const child = agentManager.createAgentByIdForContext(
-      reviewer.id,
-      parentContext,
-      "Use $audit.",
-    );
-    expect(child.model).toBe("parent-model");
-    expect(child.systemPrompt).toContain(auditSkill.description);
-    expect(child.systemPrompt).toContain(auditSkill.instructions);
-    expect(child.systemPrompt).not.toContain(releaseSkill.description);
+    ).toBe(`Error: skill '${otherUserSkill.name}' not found`);
   });
 
-  test("does not expose a target without a configured route", () => {
-    ensureUserData(RUNTIME_USER_ID);
-    createAgentRow(RUNTIME_USER_ID, {
-      name: "unrouted",
-      description: "Not available to the parent.",
-      system_prompt: "Wait.",
-      tools: [],
-      skill_ids: [],
-      delegate_agent_ids: [],
-    });
-
-    const parent = agentManager.createAgent("general_agent", {
+  test("uses the default prompt unless the user provides one", () => {
+    const standard = agentManager.createAgent({
       ownerUuid: RUNTIME_USER_ID,
+      promptContext: buildServerRunPromptContext({
+        metadata: { systemPrompt: "   " },
+      }),
     });
-    expect(
-      parent.tools.some(
-        (tool) => tool instanceof AgentTool && tool.target.name === "unrouted",
-      ),
-    ).toBeFalse();
+    expect(standard.systemPrompt).toContain(
+      DEFAULT_SYSTEM_PROMPT.split("\n")[0]!,
+    );
+
+    const custom = agentManager.createAgent({
+      ownerUuid: RUNTIME_USER_ID,
+      promptContext: buildServerRunPromptContext({
+        metadata: {
+          systemPrompt: "Talk like a pirate.\n\n{{PERSONALIZATION}}",
+          name: "Alice",
+        },
+      }),
+    });
+    expect(custom.systemPrompt).toStartWith("Talk like a pirate.");
+    expect(custom.systemPrompt).toContain("User name: Alice");
+    expect(custom.systemPrompt).not.toContain(
+      DEFAULT_SYSTEM_PROMPT.split("\n")[0]!,
+    );
+    expect(custom.systemPrompt).toContain("<tool_format>");
+  });
+
+  test("builds subagents from the parent's prompt, model, and effort without nesting", () => {
+    ensureUserData(RUNTIME_USER_ID);
+    const promptContext = buildServerRunPromptContext({
+      metadata: { systemPrompt: "Custom instructions." },
+    });
+    const parent = agentManager.createAgent({
+      ownerUuid: RUNTIME_USER_ID,
+      promptContext,
+      reasoningEffort: "high",
+    });
+    parent.model = "parent-model";
+
+    const subagent = agentManager.createSubagentForContext(
+      contextFor(parent, promptContext),
+      "Find the config",
+    );
+
+    expect(subagent.name).toBe(SUBAGENT_NAME);
+    expect(subagent.model).toBe("parent-model");
+    expect(subagent.reasoningEffort).toBe("high");
+    expect(subagent.systemPrompt).toStartWith("Custom instructions.");
+    expect(subagent.systemPrompt).toContain(SUBAGENT_DIRECTIVES);
+    expect(parent.systemPrompt).not.toContain(SUBAGENT_DIRECTIVES);
+    expect(subagent.TOOL_MAP.bash).toBeDefined();
+    expect(subagent.TOOL_MAP.run_subagent).toBeUndefined();
   });
 
   test("buildServerRunPromptContext includes current date by default when metadata is omitted", () => {
-    ensureUserData(RUNTIME_USER_ID);
-    const ctx = buildServerRunPromptContext({});
-    const agent = agentManager.createAgent("general_agent", {
+    const agent = agentManager.createAgent({
       ownerUuid: RUNTIME_USER_ID,
-      promptContext: ctx,
+      promptContext: buildServerRunPromptContext({}),
     });
     expect(agent.systemPrompt).toContain("Current date:");
   });
 
   test("buildServerRunPromptContext respects includeCurrentDate: false", () => {
-    ensureUserData(RUNTIME_USER_ID);
-    const ctx = buildServerRunPromptContext({
-      metadata: { includeCurrentDate: false },
-    });
-    const agent = agentManager.createAgent("general_agent", {
+    const agent = agentManager.createAgent({
       ownerUuid: RUNTIME_USER_ID,
-      promptContext: ctx,
+      promptContext: buildServerRunPromptContext({
+        metadata: { includeCurrentDate: false },
+      }),
     });
     expect(agent.systemPrompt).not.toContain("Current date:");
   });
 });
 
-describe("AgentTool", () => {
-  test("builds function-safe names that differ for normalized name collisions", () => {
-    const first = delegationToolName({
-      id: "a1b2c3d4-1111",
-      name: "Code Reviewer",
-    });
-    const second = delegationToolName({
-      id: "e5f6a7b8-2222",
-      name: "code--reviewer",
-    });
-
-    expect(first).toMatch(/^[a-z0-9_]+$/);
-    expect(second).toMatch(/^[a-z0-9_]+$/);
-    expect(first).not.toBe(second);
-  });
-
-  test("executes the configured target by ID and returns its final text", async () => {
-    const target = {
-      id: "target-id",
-      name: "renamed reviewer",
-      description: "Reviews changes.",
-    };
-    const tool = new AgentTool(target);
+describe("RunSubagentTool", () => {
+  test("runs the task in a child context and returns its final text", async () => {
+    const tool = new RunSubagentTool();
     const parent = new BaseAgent("parent", "Parent");
     const context = new RunContext(parent, "Parent task");
     const parentStep = context.beginStep({
@@ -185,10 +146,10 @@ describe("AgentTool", () => {
       turnIndex: 0,
       toolName: tool.name,
     });
-    const original = agentManager.createAgentByIdForContext;
-    let receivedId = "";
-    agentManager.createAgentByIdForContext = (agentId) => {
-      receivedId = agentId;
+    const original = agentManager.createSubagentForContext;
+    let receivedTask = "";
+    agentManager.createSubagentForContext = (_ctx, task) => {
+      receivedTask = task;
       const child = new BaseAgent("child", "Child");
       child.run = async () => "Nested final text";
       return child;
@@ -196,38 +157,25 @@ describe("AgentTool", () => {
 
     try {
       expect(
-        (await tool.execute({ task: "Review this" }, context, parentStep)).text,
+        (
+          await tool.execute(
+            { task_lines: ["Review", "this"] },
+            context,
+            parentStep,
+          )
+        ).text,
       ).toBe("Nested final text");
-      expect(receivedId).toBe(target.id);
+      expect(receivedTask).toBe("Review\nthis");
       expect(parentStep.childContext?.agentName).toBe("child");
     } finally {
-      agentManager.createAgentByIdForContext = original;
+      agentManager.createSubagentForContext = original;
     }
   });
 
-  test("configures and inherits reasoning effort on agents", () => {
-    ensureUserData(RUNTIME_USER_ID);
-    const parent = agentManager.createAgent("general_agent", {
-      ownerUuid: RUNTIME_USER_ID,
-      reasoningEffort: "high",
-    });
-    expect(parent.reasoningEffort).toBe("high");
-
-    const context = new RunContext(
-      parent,
-      "Sub task",
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      RUNTIME_USER_ID,
+  test("rejects an empty task", async () => {
+    expect((await new RunSubagentTool().execute({})).text).toBe(
+      "Error: you must provide a task or task_lines",
     );
-    const subagent = agentManager.createAgentForContext(
-      "general_agent",
-      context,
-    );
-    expect(subagent.reasoningEffort).toBe("high");
   });
 });
 

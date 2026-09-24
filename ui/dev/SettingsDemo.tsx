@@ -5,6 +5,7 @@ import type { UserSettings } from "../persist/userSettings";
 // Browser tests intercept every API request; this route never seeds app data.
 export default function SettingsDemo() {
   const [settings, setSettings] = useState<UserSettings>({
+    systemPrompt: null,
     name: "",
     preferredFormats: "",
     location: "",

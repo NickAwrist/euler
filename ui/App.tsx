@@ -1,9 +1,9 @@
 import { Bug, EyeOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AgentsPage } from "./components/AgentsPage";
 import { ArtifactContext } from "./components/Artifacts/ArtifactContext";
 import { WorkspaceArtifacts } from "./components/Artifacts/WorkspaceArtifacts";
 import { workspaceArtifactSource } from "./components/Artifacts/api";
+import { CustomizationPage } from "./components/CustomizationPage";
 import { DebugModal } from "./components/DebugModal";
 import { DirectoryModal } from "./components/DirectoryModal";
 import { shouldShowStepsModal } from "./components/ExecutionTrace";
@@ -363,9 +363,6 @@ function ChatView({
               onModelChange={app.handleModelChange}
               thinkingEffort={app.thinkingEffort}
               onThinkingEffortChange={app.handleThinkingEffortChange}
-              runAgents={app.runAgents}
-              selectedSessionAgent={app.selectedSessionAgent}
-              onSessionAgentChange={app.handleSessionAgentChange}
               input={app.input}
               setInput={app.setInput}
               onSendMessage={app.sendMessage}
@@ -382,11 +379,6 @@ function ChatView({
               canAttachImages={app.canAttachImages}
               attachImageDisabledReason={app.attachImageDisabledReason}
               attachmentsSendReady={app.attachmentsSendReady}
-              assignedSkillIds={
-                app.runAgents.find(
-                  (agent) => agent.name === app.selectedSessionAgent,
-                )?.skill_ids ?? []
-              }
               workspace={app.workspace}
               onRunCommand={runCommand}
               onFooterHeightChange={setRunFooterInset}
@@ -437,7 +429,7 @@ export default function App() {
   const openCustomization = () => {
     app.setSidebarOpen(false);
     app.setSidebarCollapsed(true);
-    setCurrentView("agents");
+    setCurrentView("customization");
   };
 
   const openSettings = () => {
@@ -481,16 +473,9 @@ export default function App() {
       >
         {currentView === "usage" ? (
           <UsagePage onBack={() => setCurrentView("run")} />
-        ) : currentView === "agents" ? (
+        ) : currentView === "customization" ? (
           <main className="relative h-full min-h-0 min-w-0 flex-1 bg-background">
-            <AgentsPage
-              defaultRunAgent={app.serverDefaultRunAgent}
-              onDefaultRunAgentChange={app.setServerDefaultRunAgent}
-              onBack={() => {
-                void app.refreshAgentDefaults();
-                setCurrentView("run");
-              }}
-            />
+            <CustomizationPage onBack={() => setCurrentView("run")} />
           </main>
         ) : currentView === "settings" ? (
           <main className="relative h-full min-h-0 min-w-0 flex-1 bg-background">

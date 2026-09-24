@@ -8,6 +8,7 @@ import type { UserSettings } from "../../persist/userSettings";
 import { cx, eyebrowText } from "../../styles";
 import type { ModelOption } from "../../types";
 import { Button } from "../Button";
+import { SystemPromptField } from "./SystemPromptField";
 import { hintClass, inputClass, labelClass, selectClass } from "./constants";
 
 type Props = {
@@ -69,7 +70,7 @@ export function GeneralSettingsTab({
             </p>
           )}
           <p className={hintClass}>
-            Chats and agents are loaded for this UUID. Change it and switch to
+            Chats and skills are loaded for this UUID. Change it and switch to
             load another UUID&apos;s data.
           </p>
         </div>
@@ -155,6 +156,16 @@ export function GeneralSettingsTab({
             </p>
           </div>
         </div>
+      </div>
+
+      <hr className="border-border-subtle" />
+
+      <div>
+        <h2 className={cx(eyebrowText, "mb-4")}>Agent</h2>
+        <SystemPromptField
+          value={settings.systemPrompt}
+          onChange={(value) => onFieldChange("systemPrompt", value)}
+        />
       </div>
 
       <hr className="border-border-subtle" />

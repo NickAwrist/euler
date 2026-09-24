@@ -1,4 +1,5 @@
 import { Bot, Wrench } from "lucide-react";
+import { MAIN_AGENT_NAME } from "../../../src/agents/agentNames";
 import { cx, debugBlock, eyebrowText } from "../../styles";
 import type { MessageStep, SubagentRun } from "../../types";
 import { traceStepsForDisplay } from "./normalizeTrace";
@@ -114,7 +115,7 @@ export function TraceStepBody({
             {step.toolName}
           </span>
         )}
-        {step.agentName && step.agentName !== "general_agent" ? (
+        {step.agentName && step.agentName !== MAIN_AGENT_NAME ? (
           <span className="rounded-md border border-border-subtle bg-transparent px-2 py-[3px] text-[0.6875rem] font-medium text-muted-foreground">
             {step.agentName}
           </span>

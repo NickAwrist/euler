@@ -1,18 +1,10 @@
+import { SUBAGENT_NAME } from "../../../src/agents/agentNames";
 import type { MessageStep } from "../../types";
 
 function startCase(value: string) {
   return value
     .replace(/_/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function formatAgentName(name?: string) {
-  if (!name) return null;
-  if (name === "general_agent") return "Main agent";
-  if (name === "coding_agent") return "Coding agent";
-  if (name === "system_agent") return "System agent";
-  if (name === "code_discovery_agent") return "Code discovery agent";
-  return startCase(name);
 }
 
 export function getLiveStepMeta(
@@ -32,7 +24,6 @@ export function getLiveStepMeta(
   }
 
   const toolName = step.toolName ? startCase(step.toolName) : null;
-  const agentName = formatAgentName(step.agentName);
   const isSubagentTool =
     step.kind === "tool_call" && step.childRun !== undefined;
 
@@ -50,14 +41,10 @@ export function getLiveStepMeta(
     };
   }
 
-  if (
-    step.kind === "llm_call" &&
-    agentName &&
-    step.agentName !== "general_agent"
-  ) {
+  if (step.kind === "llm_call" && step.agentName === SUBAGENT_NAME) {
     return {
       label: "Agent",
-      detail: agentName,
+      detail: "Subagent",
     };
   }
 
@@ -81,6 +68,6 @@ export function getLiveStepMeta(
       : isThinking
         ? "Thinking"
         : "Initializing",
-    detail: agentName && step.agentName !== "general_agent" ? agentName : null,
+    detail: null,
   };
 }
