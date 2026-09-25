@@ -1,6 +1,8 @@
 import { createContext, useContext } from "react";
+import type { SessionWorkspace } from "../../types";
 export const ArtifactContext = createContext<{
   openFile: (path: string) => void;
+  workspaceKind: SessionWorkspace["kind"];
   localPath?: string;
 } | null>(null);
 export const useArtifacts = () => useContext(ArtifactContext);

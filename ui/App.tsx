@@ -156,6 +156,7 @@ function ChatView({
   const artifactContext = useMemo(
     () => ({
       openFile,
+      workspaceKind: app.workspace.kind,
       localPath:
         app.workspace.kind === "local" ? app.workspace.path : undefined,
     }),

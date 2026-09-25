@@ -431,6 +431,15 @@ export class WorkspaceService {
         `/proc/self/fd/${directory.fd}/${parts.at(-1)}`,
         flags | constants.O_NOFOLLOW | constants.O_NONBLOCK,
       );
+    } catch (error) {
+      // Raw errors expose the internal /proc path instead of the requested one.
+      if (
+        error instanceof Error &&
+        "code" in error &&
+        (error.code === "ENOENT" || error.code === "ENOTDIR")
+      )
+        throw new WorkspaceError(`Path does not exist: ${path}`);
+      throw error;
     } finally {
       await directory.close();
     }
