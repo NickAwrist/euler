@@ -4,6 +4,7 @@ import {
   type DirectoryListing,
   fetchDirectories,
 } from "../persist/directories";
+import { cx, inputClass } from "../styles";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
 
@@ -112,7 +113,7 @@ export function DirectoryModal({
           }
         }}
       >
-        <div className="flex items-center gap-2 border-b border-border-subtle p-1">
+        <div className="flex items-center gap-2 border-b border-border-subtle px-3 py-2">
           <input
             id="directory-path"
             ref={inputRef}
@@ -127,7 +128,7 @@ export function DirectoryModal({
             spellCheck={false}
             aria-label="Folder path"
             aria-invalid={error !== null}
-            className="min-w-0 flex-1 rounded-md bg-transparent px-2 py-2 text-sm text-foreground outline-none focus-visible:ring-1 focus-visible:ring-accent"
+            className={cx(inputClass, "min-w-0 flex-1 font-mono")}
           />
           <Button
             type="submit"
