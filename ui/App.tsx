@@ -25,7 +25,10 @@ import { useAppKeybinds } from "./hooks/useAppKeybinds";
 import { useMobileLayout } from "./hooks/useMobileLayout";
 import { useRunApp } from "./hooks/useRunApp";
 import { downloadBlob } from "./lib/downloadBlob";
-import { formatRunTranscript } from "./lib/formatRunTranscript";
+import {
+  formatRunTranscript,
+  transcriptFileName,
+} from "./lib/formatRunTranscript";
 import {
   NAVIGATION_EVENT,
   navigate,
@@ -253,20 +256,24 @@ function ChatView({
                 id === app.activeSessionId &&
                 (app.sessionLoadState === "loaded" ||
                   app.sessionLoadState === "empty");
-              const stored = useCurrent
-                ? null
-                : await fetchSession(id, { fresh: true });
-              const messages = useCurrent ? app.messages : stored?.history;
-              if (!messages) throw new Error("Conversation not found.");
+              const stored = await fetchSession(id, { fresh: true });
+              if (!stored) throw new Error("Conversation not found.");
+              const title =
+                app.sessions.find((s) => s.id === id)?.preview ?? "Chat";
               const transcript = formatRunTranscript(
-                messages,
-                useCurrent
-                  ? { streamingAssistant: app.streamingContent }
-                  : undefined,
+                useCurrent ? app.messages : stored.history,
+                {
+                  title,
+                  exportedAt: new Date(),
+                  model: stored.model,
+                  streamingAssistant: useCurrent
+                    ? app.streamingContent
+                    : undefined,
+                },
               );
               downloadBlob(
                 new Blob([transcript], { type: "text/markdown;charset=utf-8" }),
-                `chat-${id}.md`,
+                transcriptFileName(title),
               );
             }}
             onDeleteSession={app.requestDeleteSession}
@@ -533,7 +540,12 @@ export default function App() {
         )}
         {app.renameSessionId && (
           <RenameSessionModal
-            initialTitle={app.renameTarget?.preview ?? ""}
+            initialTitle={app.renameTarget?.customTitle ?? ""}
+            placeholder={
+              app.renameTarget?.customTitle
+                ? undefined
+                : app.renameTarget?.preview
+            }
             onSave={app.saveSessionTitle}
             onClose={() => app.setRenameSessionId(null)}
           />

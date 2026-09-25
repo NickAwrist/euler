@@ -23,6 +23,7 @@ export type SessionSummaryRow = {
   id: string;
   created_at: number;
   updated_at: number;
+  title: string | null;
   preview: string;
 };
 

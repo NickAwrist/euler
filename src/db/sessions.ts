@@ -40,6 +40,7 @@ export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
       id: s.id,
       created_at: s.created_at,
       updated_at: s.updated_at,
+      title: s.title,
       preview: previewFromTitleAndFirstUser(s.title, fu?.content ?? null),
     };
   });

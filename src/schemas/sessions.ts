@@ -18,6 +18,7 @@ export const SessionSummarySchema = z.object({
   id: z.string(),
   createdAt: z.number(),
   updatedAt: z.number(),
+  customTitle: z.string().nullable().optional(),
   preview: z.string(),
 });
 
