@@ -202,3 +202,35 @@ test("view navigation desktop keeps settings open when Save and leave fails", as
     .click();
   await expect(page.getByText("Failed to save Ollama URL")).toBeVisible();
 });
+
+test("view navigation desktop remembers General after Choose models and preserves a collapsed sidebar", async ({
+  page,
+}) => {
+  await mockApp(page);
+  await page.goto("/run/a");
+  await page.getByRole("button", { name: "Toggle chats" }).click();
+  await expect(
+    page.getByRole("button", { name: "Toggle chats" }),
+  ).toHaveAttribute("aria-expanded", "false");
+  await page.getByRole("button", { name: "Model: Test", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Choose models", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/settings\/openrouter$/);
+  await expect(
+    page.getByRole("heading", { name: /OpenRouter API key/ }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "General", exact: true }).click();
+  await expect(page).toHaveURL(/\/settings\/general$/);
+  await page.reload();
+  await expect(page).toHaveURL(/\/settings\/general$/);
+  await expect(page.getByPlaceholder("Enter your name")).toBeVisible();
+  await page.getByRole("button", { name: "Back to chat" }).click();
+  await expect(page.getByText("Stored a", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Toggle chats" }),
+  ).toHaveAttribute("aria-expanded", "false");
+  expect(
+    await page.evaluate(() => localStorage.getItem("euler:sidebarCollapsed")),
+  ).toBe("true");
+});

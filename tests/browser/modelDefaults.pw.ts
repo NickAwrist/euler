@@ -74,6 +74,15 @@ test("model defaults desktop: unavailable preference matches settings, new chats
   page,
 }) => {
   const created = await mockApp(page, "removed", async () => models);
+  const deletedTemporarySessions: string[] = [];
+  page.on("request", (request) => {
+    if (
+      request.method() === "DELETE" &&
+      new URL(request.url()).pathname.startsWith("/api/temporary-sessions/")
+    ) {
+      deletedTemporarySessions.push(request.url());
+    }
+  });
   await page.goto("/");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(
@@ -105,6 +114,15 @@ test("model defaults desktop: unavailable preference matches settings, new chats
   await expect(
     page.getByRole("button", { name: "Model: Local", exact: true }),
   ).toBeVisible();
+  await page.getByPlaceholder("Send a message...").fill("Ephemeral draft");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(page).toHaveURL(/\/settings\/general$/);
+  await page.goBack();
+  await expect(page.getByText("Ephemeral", { exact: true })).toBeVisible();
+  await expect(page.getByPlaceholder("Send a message...")).toHaveValue(
+    "Ephemeral draft",
+  );
+  expect(deletedTemporarySessions).toEqual([]);
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Model: Local", exact: true }).click();
   await page.getByRole("tab", { name: "Test" }).click();
@@ -119,6 +137,11 @@ test("model defaults desktop: unavailable preference matches settings, new chats
     page.getByRole("button", { name: "Save settings", exact: true }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Back to chat" }).click();
+  await expect(page.getByText("Ephemeral", { exact: true })).toBeVisible();
+  await expect(page.getByPlaceholder("Send a message...")).toHaveValue(
+    "Ephemeral draft",
+  );
+  expect(deletedTemporarySessions).toEqual([]);
   await page
     .getByRole("button", { name: "New chat", exact: true })
     .first()
