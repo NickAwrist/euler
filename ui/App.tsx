@@ -182,6 +182,7 @@ function ChatView({
       Boolean(app.renameSessionId) ||
       app.truncateConfirm != null ||
       Boolean(app.pendingDeleteSessionId) ||
+      app.ephemeralExitPromptOpen ||
       directoryOpen ||
       app.debugOpen ||
       stepsModalOpen,
@@ -303,8 +304,9 @@ function ChatView({
           )}
           {app.isEphemeral && (
             <span
+              title="Not saved. Messages and files are deleted when you leave."
               className={cx(
-                "pointer-events-none absolute left-14 top-4 z-10 inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-background px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-amber-400",
+                "absolute left-14 top-4 z-10 inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-background px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-amber-400",
                 !app.sidebarCollapsed &&
                   !artifactsOpen &&
                   "min-[1320px]:left-[calc(260px+1rem)]",
@@ -551,6 +553,15 @@ export default function App() {
             confirmLabel="Delete"
             onClose={() => app.setPendingDeleteSessionId(null)}
             onConfirm={app.performDeleteSession}
+          />
+        )}
+        {app.ephemeralExitPromptOpen && (
+          <TruncateConfirmModal
+            title="Discard this ephemeral chat?"
+            description="This chat is not saved. Its messages and files will be permanently deleted. This cannot be undone."
+            confirmLabel="Discard"
+            onClose={() => app.resolveEphemeralExit(false)}
+            onConfirm={() => app.resolveEphemeralExit(true)}
           />
         )}
         {directoryOpen && (

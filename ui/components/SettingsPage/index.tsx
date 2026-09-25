@@ -1,6 +1,6 @@
 import { Save } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { setNavigationGuard } from "../../lib/navigation";
+import { addNavigationGuard } from "../../lib/navigation";
 import { cx } from "../../styles";
 import type { SettingsTab } from "../../types";
 import { BackToChatButton } from "../BackToChatButton";
@@ -30,7 +30,7 @@ export function SettingsPage(props: SettingsPageProps) {
     });
   useEffect(() => {
     if (!p.isDirty) return;
-    const removeGuard = setNavigationGuard((path) =>
+    const removeGuard = addNavigationGuard((path) =>
       path.startsWith("/settings/") || allowLeave.current
         ? Promise.resolve(true)
         : requestLeave(),

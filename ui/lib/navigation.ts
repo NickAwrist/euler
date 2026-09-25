@@ -1,8 +1,11 @@
 import type { SettingsTab } from "../types";
 
 export const NAVIGATION_EVENT = "euler:navigate";
-export type NavigationGuard = (path: string) => Promise<boolean>;
-let guard: NavigationGuard | null = null;
+export type NavigationGuard = (
+  path: string,
+  historyTraversal: boolean,
+) => Promise<boolean>;
+const guards = new Set<NavigationGuard>();
 let index = 0;
 let listening = false;
 let pending = false;
@@ -56,6 +59,13 @@ export function sessionPath(id: string | null) {
   return id ? `/run/${encodeURIComponent(id)}` : "/";
 }
 
+async function approve(path: string, historyTraversal: boolean) {
+  for (const guard of guards) {
+    if (!(await guard(path, historyTraversal))) return false;
+  }
+  return true;
+}
+
 function notify(historyTraversal = false) {
   const previousPath = currentPath;
   currentPath = window.location.pathname;
@@ -106,7 +116,7 @@ export function initializeNavigation() {
       return;
     }
     const path = window.location.pathname;
-    if (guard && nextIndex !== index) {
+    if (guards.size > 0 && nextIndex !== index) {
       const delta = nextIndex - index;
       const alreadyPending = pending;
       pending = true;
@@ -115,7 +125,7 @@ export function initializeNavigation() {
         window.history.go(-delta);
       });
       if (alreadyPending) return;
-      const approved = await guard(path);
+      const approved = await approve(path, true);
       pending = false;
       if (approved) {
         approvedIndex = nextIndex;
@@ -128,19 +138,19 @@ export function initializeNavigation() {
   });
 }
 
-export function setNavigationGuard(next: NavigationGuard) {
-  guard = next;
+export function addNavigationGuard(next: NavigationGuard) {
+  guards.add(next);
   return () => {
-    if (guard === next) guard = null;
+    guards.delete(next);
   };
 }
 
 export async function navigate(path: string) {
   initializeNavigation();
   if (pending || window.location.pathname === path) return;
-  if (guard) {
+  if (guards.size > 0) {
     pending = true;
-    const approved = await guard(path);
+    const approved = await approve(path, false);
     pending = false;
     if (!approved) return;
   }

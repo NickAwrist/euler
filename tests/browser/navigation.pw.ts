@@ -315,3 +315,77 @@ test("view navigation desktop restores the saved chat when loading Home", async 
   await expect(page).toHaveURL(/\/run\/b$/);
   await expect(page.getByText("Stored b", { exact: true })).toBeVisible();
 });
+
+test("view navigation desktop confirms before discarding a nonempty ephemeral chat", async ({
+  page,
+}) => {
+  await mockApp(page);
+  const deleted: string[] = [];
+  await page.route("**/api/temporary-sessions**", (route) => {
+    if (route.request().method() === "DELETE")
+      deleted.push(route.request().url());
+    return route.fulfill({ json: { id: "temporary" } });
+  });
+  await page.route("**/api/runs", (route) =>
+    route.fulfill({
+      contentType: "text/event-stream",
+      body: 'data: {"type":"run_done","result":"Ephemeral reply"}\n\n',
+    }),
+  );
+  const startEphemeral = () =>
+    page.getByTitle("Ephemeral chat - not saved").click();
+  const dialog = page.getByRole("dialog", {
+    name: "Discard this ephemeral chat?",
+  });
+  const badge = page.getByText("Ephemeral", { exact: true });
+
+  await page.goto("/run/a");
+  await startEphemeral();
+  await expect(badge).toHaveAccessibleDescription(
+    "Not saved. Messages and files are deleted when you leave.",
+  );
+  // An empty ephemeral chat has nothing to lose, so it leaves immediately.
+  await page.getByRole("button", { name: /Conversation b/ }).click();
+  await expect(page.getByText("Stored b", { exact: true })).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+  await expect.poll(() => deleted.length).toBe(1);
+
+  await startEphemeral();
+  await expect(badge).toBeVisible();
+  await page.getByPlaceholder("Send a message...").fill("Keep me");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByText("Ephemeral reply")).toBeVisible();
+
+  const leaveAttempts = [
+    () => page.getByRole("button", { name: /Conversation a/ }).click(),
+    () => page.getByRole("button", { name: "New chat", exact: true }).click(),
+    startEphemeral,
+    () => page.keyboard.press("Control+Shift+H"),
+    () => page.goBack(),
+  ];
+  for (const leave of leaveAttempts) {
+    await leave();
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(page).toHaveURL(/\/$/);
+    await expect(badge).toBeVisible();
+    await expect(page.getByText("Ephemeral reply")).toBeVisible();
+  }
+  expect(deleted).toHaveLength(1);
+
+  // Dirty settings add and remove their own guard without dropping this one.
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByPlaceholder("Enter your name").fill("Unsaved");
+  await page.goBack();
+  await page.getByRole("button", { name: "Discard changes" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByText("Ephemeral reply")).toBeVisible();
+
+  await page.goBack();
+  await dialog.getByRole("button", { name: "Discard" }).click();
+  await expect(page).toHaveURL(/\/run\/b$/);
+  await expect(page.getByText("Stored b", { exact: true })).toBeVisible();
+  await expect(badge).toHaveCount(0);
+  await expect.poll(() => deleted.length).toBe(2);
+});
