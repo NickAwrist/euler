@@ -1,7 +1,7 @@
 Really want
 
 - MCPs
-- Artifacts: file tree, Markdown, highlighted source, and image previews implemented. Remaining: HTML and interactive charts.
+- Artifacts: interactive charts.
 
 Low priority / Nice to have
 
