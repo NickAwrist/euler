@@ -242,6 +242,7 @@ router.get("/", (req, res) => {
       id: r.id,
       createdAt: r.created_at,
       updatedAt: r.updated_at,
+      customTitle: r.title,
       preview: r.preview,
     })),
   });

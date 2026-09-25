@@ -41,12 +41,7 @@ export type TruncateConfirmState =
   | { kind: "retry"; userIndex: number }
   | null;
 
-export interface SessionSummary {
-  id: string;
-  createdAt: number;
-  updatedAt: number;
-  preview: string;
-}
+export type { SessionSummary } from "../../src/schemas/sessions";
 
 export interface DebugData {
   error?: string;

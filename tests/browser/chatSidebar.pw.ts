@@ -335,6 +335,26 @@ test("chat sidebar desktop restores artifact preview and width on reload", async
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
 });
 
+test("chat sidebar desktop rename starts empty and ignores unchanged saves", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockApp(page);
+  const patches: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "PATCH") patches.push(request.url());
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Chat options" }).click();
+  await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
+  const input = page.getByLabel("Display name");
+  await expect(input).toHaveValue("");
+  await expect(input).toHaveAttribute("placeholder", "Sidebar test chat");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(input).toHaveCount(0);
+  expect(patches).toEqual([]);
+});
+
 test("chat sidebar desktop export and opt-in debug access", async ({
   page,
 }, testInfo) => {
@@ -350,11 +370,13 @@ test("chat sidebar desktop export and opt-in debug access", async ({
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("menuitem", { name: "Export", exact: true }).click();
   const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe("chat-sidebar-test.md");
+  expect(download.suggestedFilename()).toBe("sidebar-test-chat.md");
   const stream = await download.createReadStream();
   let transcript = "";
   for await (const chunk of stream) transcript += chunk.toString();
-  expect(transcript).toBe("USER\n===\nCheck the sidebar controls.");
+  expect(transcript).toMatch(
+    /^# Sidebar test chat\n\n- Exported: .+\n- Model: test\n\nUSER\n===\nCheck the sidebar controls\.$/,
+  );
   expect(new URL(page.url()).pathname).toBe("/");
   await page
     .locator("#app-sidebar")

@@ -4,10 +4,12 @@ import { Modal } from "./Modal";
 
 export function RenameSessionModal({
   initialTitle,
+  placeholder,
   onSave,
   onClose,
 }: {
   initialTitle: string;
+  placeholder?: string;
   onSave: (title: string) => void;
   onClose: () => void;
 }) {
@@ -37,7 +39,9 @@ export function RenameSessionModal({
         className="flex flex-col gap-2 px-[18px] pb-[18px] pt-0"
         onSubmit={(e) => {
           e.preventDefault();
-          onSave(value.trim());
+          const title = value.trim();
+          if (title === initialTitle) onClose();
+          else onSave(title);
         }}
       >
         <label
@@ -52,11 +56,11 @@ export function RenameSessionModal({
           className="w-full rounded-lg border border-border-subtle bg-background px-3 py-2.5 text-[0.9375rem] text-foreground outline-none focus:border-accent focus:shadow-[0_0_0_1px_var(--color-accent-ring)]"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="Uses last user message if empty"
+          placeholder={placeholder}
           autoComplete="off"
         />
         <p className="m-0 text-[0.75rem] leading-[1.45] text-muted-foreground">
-          Leave empty to show the latest user message as the title.
+          Leave empty to use the first message as the title.
         </p>
         <div className="mt-[14px] flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>
