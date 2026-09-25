@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
 
@@ -18,6 +19,7 @@ export function TruncateConfirmModal({
   onClose: () => void;
   busy?: boolean;
 }) {
+  const confirmRef = useRef<HTMLButtonElement>(null);
   return (
     <Modal
       title={title}
@@ -26,8 +28,14 @@ export function TruncateConfirmModal({
       busy={busy}
       maxWidthClass="max-w-[400px]"
       surfaceClassName="max-h-none grid-rows-1"
+      initialFocusRef={confirmRef}
       onKeyDown={(event) => {
-        if (event.key === "Enter" && !busy) {
+        // Focused buttons, including Cancel and Close, handle Enter themselves.
+        if (
+          event.key === "Enter" &&
+          !busy &&
+          !(event.target instanceof HTMLButtonElement)
+        ) {
           event.preventDefault();
           void Promise.resolve(onConfirm());
         }
@@ -42,6 +50,7 @@ export function TruncateConfirmModal({
             Cancel
           </Button>
           <Button
+            ref={confirmRef}
             variant="danger"
             onClick={() => void Promise.resolve(onConfirm())}
             disabled={busy}

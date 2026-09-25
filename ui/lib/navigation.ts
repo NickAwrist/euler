@@ -138,10 +138,20 @@ export function initializeNavigation() {
   });
 }
 
+function blockUnload(event: BeforeUnloadEvent) {
+  event.preventDefault();
+  event.returnValue = "";
+}
+
+// Guards protect unsaved state, so leaving the page asks too while any exist.
 export function addNavigationGuard(next: NavigationGuard) {
   guards.add(next);
+  window.addEventListener("beforeunload", blockUnload);
   return () => {
     guards.delete(next);
+    if (guards.size === 0) {
+      window.removeEventListener("beforeunload", blockUnload);
+    }
   };
 }
 
@@ -165,4 +175,5 @@ export function replaceNavigation(path: string) {
     "",
     path,
   );
+  currentPath = window.location.pathname;
 }

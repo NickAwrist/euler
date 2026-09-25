@@ -30,20 +30,13 @@ export function SettingsPage(props: SettingsPageProps) {
     });
   useEffect(() => {
     if (!p.isDirty) return;
-    const removeGuard = addNavigationGuard((path) =>
-      path.startsWith("/settings/") || allowLeave.current
-        ? Promise.resolve(true)
-        : requestLeave(),
-    );
-    const beforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-      event.returnValue = "";
-    };
-    window.addEventListener("beforeunload", beforeUnload);
-    return () => {
-      removeGuard();
-      window.removeEventListener("beforeunload", beforeUnload);
-    };
+    return addNavigationGuard(async (path) => {
+      if (path.startsWith("/settings/")) return true;
+      const approved = allowLeave.current || (await requestLeave());
+      // Approval applies to this attempt; another guard may still cancel it.
+      allowLeave.current = false;
+      return approved;
+    });
   }, [p.isDirty]);
   const resolveLeave = (approved: boolean) => {
     allowLeave.current = approved;

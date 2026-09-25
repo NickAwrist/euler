@@ -316,10 +316,7 @@ test("view navigation desktop restores the saved chat when loading Home", async 
   await expect(page.getByText("Stored b", { exact: true })).toBeVisible();
 });
 
-test("view navigation desktop confirms before discarding a nonempty ephemeral chat", async ({
-  page,
-}) => {
-  await mockApp(page);
+async function mockEphemeral(page: Page) {
   const deleted: string[] = [];
   await page.route("**/api/temporary-sessions**", (route) => {
     if (route.request().method() === "DELETE")
@@ -332,6 +329,14 @@ test("view navigation desktop confirms before discarding a nonempty ephemeral ch
       body: 'data: {"type":"run_done","result":"Ephemeral reply"}\n\n',
     }),
   );
+  return deleted;
+}
+
+test("view navigation desktop confirms before discarding a nonempty ephemeral chat", async ({
+  page,
+}) => {
+  await mockApp(page);
+  const deleted = await mockEphemeral(page);
   const startEphemeral = () =>
     page.getByTitle("Ephemeral chat - not saved").click();
   const dialog = page.getByRole("dialog", {
@@ -366,13 +371,22 @@ test("view navigation desktop confirms before discarding a nonempty ephemeral ch
   for (const leave of leaveAttempts) {
     await leave();
     await expect(dialog).toBeVisible();
-    await page.keyboard.press("Escape");
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).focus();
+    await page.keyboard.press("Enter");
     await expect(dialog).toHaveCount(0);
     await expect(page).toHaveURL(/\/$/);
     await expect(badge).toBeVisible();
     await expect(page.getByText("Ephemeral reply")).toBeVisible();
   }
   expect(deleted).toHaveLength(1);
+
+  // Reload remains protected even after dirty settings remove their guard.
+  const unloadBlocked = () =>
+    page.evaluate(
+      () =>
+        !window.dispatchEvent(new Event("beforeunload", { cancelable: true })),
+    );
+  expect(await unloadBlocked()).toBe(true);
 
   // Dirty settings add and remove their own guard without dropping this one.
   await page.getByRole("button", { name: "Settings", exact: true }).click();
@@ -381,6 +395,7 @@ test("view navigation desktop confirms before discarding a nonempty ephemeral ch
   await page.getByRole("button", { name: "Discard changes" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText("Ephemeral reply")).toBeVisible();
+  expect(await unloadBlocked()).toBe(true);
 
   await page.goBack();
   await dialog.getByRole("button", { name: "Discard" }).click();
@@ -388,4 +403,67 @@ test("view navigation desktop confirms before discarding a nonempty ephemeral ch
   await expect(page.getByText("Stored b", { exact: true })).toBeVisible();
   await expect(badge).toHaveCount(0);
   await expect.poll(() => deleted.length).toBe(2);
+  expect(await unloadBlocked()).toBe(false);
+});
+
+test("view navigation desktop protects ephemeral history after deleting the open saved chat", async ({
+  page,
+}) => {
+  await mockApp(page);
+  const deleted = await mockEphemeral(page);
+  await page.goto("/run/a");
+  await page.getByTitle("Ephemeral chat - not saved").click();
+  await page.getByRole("button", { name: /Conversation a/ }).click();
+  await expect(page.getByText("Stored a", { exact: true })).toBeVisible();
+  await expect.poll(() => deleted.length).toBe(1);
+  await page.getByRole("button", { name: "Chat options" }).first().click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Delete", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.getByTitle("Ephemeral chat - not saved").click();
+  await page.getByPlaceholder("Send a message...").fill("Keep me");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByText("Ephemeral reply")).toBeVisible();
+  // Deleting the saved chat replaced its URL with Home. Back to the preceding
+  // Home entry must not act as a conversation switch and silently delete it.
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByText("Ephemeral reply")).toBeVisible();
+  expect(deleted).toHaveLength(1);
+  await page.goBack();
+  const dialog = page.getByRole("dialog", {
+    name: "Discard this ephemeral chat?",
+  });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByText("Ephemeral reply")).toBeVisible();
+  expect(deleted).toHaveLength(1);
+});
+
+test("view navigation desktop expires settings approval when a later guard cancels", async ({
+  page,
+}) => {
+  await mockApp(page);
+  await page.goto("/run/a");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByPlaceholder("Enter your name").fill("Unsaved");
+  // A second owner of unsaved state can reject an otherwise approved exit.
+  await page.evaluate(async () => {
+    const modulePath = "/ui/lib/navigation.ts";
+    const { addNavigationGuard } = await import(modulePath);
+    addNavigationGuard(async () => false);
+  });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await page.goBack();
+    await page.getByRole("button", { name: "Discard changes" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page).toHaveURL(/\/settings\/general$/);
+    await expect(page.getByPlaceholder("Enter your name")).toHaveValue(
+      "Unsaved",
+    );
+  }
 });
