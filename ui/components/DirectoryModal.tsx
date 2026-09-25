@@ -144,6 +144,7 @@ export function DirectoryModal({
           <input
             type="checkbox"
             checked={showHidden}
+            disabled={pending}
             onChange={(event) => setShowHidden(event.target.checked)}
             className="h-3.5 w-3.5"
           />
@@ -195,7 +196,9 @@ export function DirectoryModal({
           ))}
           {directories?.length === 0 && (
             <output className="px-3 py-3 text-sm text-muted-foreground">
-              No folders found.
+              {listing?.directories.length
+                ? "Only hidden folders here."
+                : "No folders found."}
             </output>
           )}
         </div>
