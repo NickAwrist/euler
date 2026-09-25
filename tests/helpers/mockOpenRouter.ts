@@ -3,6 +3,7 @@ export type OpenRouterScenario =
   | "reasoning"
   | "thinking-tags"
   | "tool-loop"
+  | "tool-outputs"
   | "delayed-stream"
   | "unauthorized"
   | "rate-limit"
@@ -218,6 +219,34 @@ export async function handleOpenRouterRequest(
   }
   if (scenario === "tool-loop") {
     return sse([chunk({ content: "Finished after tool." }, "stop"), "[DONE]"]);
+  }
+  if (scenario === "tool-outputs" && requests.length === 1) {
+    // The repeated search returns the same source to exercise deduplication.
+    const calls = [
+      ["generate_image", { prompt: "A lighthouse" }],
+      ["web_search", { query: "lighthouses" }],
+      ["web_search", { query: "lighthouses" }],
+    ] as const;
+    return sse([
+      chunk(
+        {
+          tool_calls: calls.map(([name, args], index) => ({
+            index,
+            id: `call_output_${index}`,
+            type: "function",
+            function: { name, arguments: JSON.stringify(args) },
+          })),
+        },
+        "tool_calls",
+      ),
+      "[DONE]",
+    ]);
+  }
+  if (scenario === "tool-outputs") {
+    return sse([
+      chunk({ content: "Here is the lighthouse and my sources." }, "stop"),
+      "[DONE]",
+    ]);
   }
 
   return sse([

@@ -1,4 +1,8 @@
 import type { Tool } from "ollama";
+import {
+  type WebSourceAttachment,
+  WebSourceAttachmentSchema,
+} from "../attachments/types";
 import { getSearXNGClient } from "../searxng/client";
 import { errorMessage } from "../utils/errors";
 import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
@@ -49,8 +53,8 @@ export class WebSearchTool extends BaseTool {
         return textToolResult("No results found.");
       }
 
-      return textToolResult(
-        results
+      return {
+        text: results
           .map((r, i) => {
             const parts = [`Result ${i + 1} (${r.title}):`];
             if (r.url) parts.push(r.url);
@@ -59,7 +63,15 @@ export class WebSearchTool extends BaseTool {
             return parts.join("\n");
           })
           .join("\n\n---\n\n"),
-      );
+        attachments: results.flatMap((r): WebSourceAttachment[] => {
+          const source = WebSourceAttachmentSchema.safeParse({
+            kind: "web_source",
+            title: r.title,
+            url: r.url,
+          });
+          return source.success ? [source.data] : [];
+        }),
+      };
     } catch (e: unknown) {
       return textToolResult(`Error performing web search: ${errorMessage(e)}`);
     }

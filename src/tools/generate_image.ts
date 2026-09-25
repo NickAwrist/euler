@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { Tool } from "ollama";
+import { COMFYUI_VIEW_PREFIX } from "../attachments/types";
 import { getComfyUIClient } from "../comfyui/client";
 import { buildImageWorkflow } from "../comfyui/workflows";
 import {
@@ -47,10 +48,12 @@ export class GenerateImageTool extends BaseTool {
 
     const client = getComfyUIClient();
 
-    const result = await client.runSerialized(async () => {
+    return client.runSerialized(async (): Promise<ToolResult> => {
       const health = await client.healthCheck();
       if (!health.ok) {
-        return `Error: ComfyUI is not reachable - ${health.error ?? "unknown error"}`;
+        return textToolResult(
+          `Error: ComfyUI is not reachable - ${health.error ?? "unknown error"}`,
+        );
       }
 
       const defaultModel = getComfyUIDefaultModel();
@@ -58,7 +61,7 @@ export class GenerateImageTool extends BaseTool {
       if (!checkpointName) {
         const models = await client.getModels();
         if (models.length === 0) {
-          return "Error: No models available in ComfyUI";
+          return textToolResult("Error: No models available in ComfyUI");
         }
         checkpointName = models[0]!;
       }
@@ -81,17 +84,22 @@ export class GenerateImageTool extends BaseTool {
 
         const img = images[0];
         if (!img) {
-          return "Error: Image generation completed but no images were produced";
+          return textToolResult(
+            "Error: Image generation completed but no images were produced",
+          );
         }
 
         const params = new URLSearchParams({ type: img.type });
         if (img.subfolder) params.set("subfolder", img.subfolder);
         const queryString = params.toString();
-        return `/api/comfyui/view/${img.filename}${queryString ? `?${queryString}` : ""}`;
+        const url = `${COMFYUI_VIEW_PREFIX}${img.filename}${queryString ? `?${queryString}` : ""}`;
+        return {
+          text: url,
+          attachments: [{ kind: "generated_image", url }],
+        };
       } catch (e) {
-        return `Error generating image: ${errorMessage(e)}`;
+        return textToolResult(`Error generating image: ${errorMessage(e)}`);
       }
     }, "generate_image");
-    return textToolResult(result);
   }
 }

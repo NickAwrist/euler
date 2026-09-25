@@ -495,3 +495,58 @@ test("session loading retries failed run discovery and restores sending", async 
     page.getByText("Could not check the active run.", { exact: true }),
   ).toHaveCount(0);
 });
+
+test("session loading keeps valid tool attachments when completion reload fails", async ({
+  page,
+}) => {
+  await mockApp(page);
+  let completed = false;
+  await page.route("**/api/sessions/a", (route) =>
+    completed
+      ? route.fulfill({ status: 503, json: { error: "unavailable" } })
+      : route.fulfill({ json: stored("a", "Draw a lighthouse") }),
+  );
+  await page.route("**/api/comfyui/view/**", (route) =>
+    route.fulfill({
+      contentType: "image/png",
+      body: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    }),
+  );
+  await page.route("**/api/runs", (route) => {
+    completed = true;
+    return route.fulfill({
+      contentType: "text/event-stream",
+      body: `data: ${JSON.stringify({
+        type: "run_done",
+        result: "Here is the result.",
+        steps: [],
+        attachments: [
+          { kind: "generated_image", url: "/api/comfyui/view/result.png" },
+          { kind: "web_source", url: "javascript:alert(1)", title: "Invalid" },
+          {
+            kind: "web_source",
+            url: "https://example.com",
+            title: "Valid source",
+          },
+        ],
+      })}\n\n`,
+    });
+  });
+  await page.goto("/run/a");
+  await expect(
+    page.getByText("Draw a lighthouse", { exact: true }),
+  ).toBeVisible();
+  await page.getByPlaceholder("Send a message...").fill("Generate it");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await expect(
+    page.getByText("Here is the result.", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByAltText("Generated image", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: /Valid source/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Invalid/ })).toHaveCount(0);
+});

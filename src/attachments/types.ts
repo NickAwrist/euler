@@ -41,15 +41,35 @@ export const WorkspaceFileAttachmentSchema = z.object({
   temporary: z.boolean(),
 });
 
+export const COMFYUI_VIEW_PREFIX = "/api/comfyui/view/";
+
+export const GeneratedImageAttachmentSchema = z.object({
+  kind: z.literal("generated_image"),
+  url: z.string().startsWith(COMFYUI_VIEW_PREFIX),
+});
+
+export const WebSourceAttachmentSchema = z.object({
+  kind: z.literal("web_source"),
+  title: z.string().min(1),
+  url: z.url({ protocol: /^https?$/ }),
+});
+
 export const MessageAttachmentSchema = z.discriminatedUnion("kind", [
   ImageAttachmentSchema,
   WorkspaceFileAttachmentSchema,
+  GeneratedImageAttachmentSchema,
+  WebSourceAttachmentSchema,
 ]);
 
 export type MessageAttachment = z.infer<typeof MessageAttachmentSchema>;
 export type WorkspaceFileAttachment = z.infer<
   typeof WorkspaceFileAttachmentSchema
 >;
+export type WebSourceAttachment = z.infer<typeof WebSourceAttachmentSchema>;
+/** Output a tool attaches to the assistant reply, independent of the reply text. */
+export type ToolOutputAttachment =
+  | z.infer<typeof GeneratedImageAttachmentSchema>
+  | WebSourceAttachment;
 
 export function imageUrl(attachmentId: string): string {
   return `/api/attachments/${encodeURIComponent(attachmentId)}`;

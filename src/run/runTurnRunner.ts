@@ -76,7 +76,10 @@ export async function runTurn(
     const changedFiles = await changedFileAttachments(ctx, filesBefore);
     const assistantMessage = session.history[session.history.length - 1];
     if (assistantMessage && changedFiles.length > 0) {
-      assistantMessage.attachments = changedFiles;
+      assistantMessage.attachments = [
+        ...(assistantMessage.attachments ?? []),
+        ...changedFiles,
+      ];
     }
     const stepsSnapshot =
       (session.history[session.history.length - 1]?.steps as
@@ -88,7 +91,7 @@ export async function runTurn(
       type: "run_done",
       result,
       steps: stepsSnapshot,
-      attachments: changedFiles,
+      attachments: assistantMessage?.attachments ?? [],
       ...(ctx.ephemeral ? { modelMessages } : {}),
     });
   } catch (err) {

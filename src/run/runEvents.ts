@@ -1,8 +1,5 @@
 import type { Response } from "express";
-import type {
-  MessageAttachment,
-  WorkspaceFileAttachment,
-} from "../attachments/types";
+import type { MessageAttachment } from "../attachments/types";
 import { logger } from "../logger";
 import type { HistoryWireStep } from "../session/AgentSession";
 
@@ -24,7 +21,7 @@ export type RunEvent =
       result: string;
       steps: HistoryWireStep[];
       modelMessages?: Array<Record<string, unknown>>;
-      attachments?: WorkspaceFileAttachment[];
+      attachments?: MessageAttachment[];
     }
   | {
       type: "run_aborted";

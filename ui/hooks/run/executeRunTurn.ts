@@ -1,8 +1,8 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { MAIN_AGENT_NAME } from "../../../src/agents/agentNames";
-import type {
-  ImageAttachment,
-  MessageAttachment,
+import {
+  type ImageAttachment,
+  MessageAttachmentSchema,
 } from "../../../src/attachments/types";
 import { readApiError } from "../../lib/readApiError";
 import { readSseBlocks } from "../../lib/readSseBlocks";
@@ -261,28 +261,26 @@ export async function executeRunTurn(
           }
         } else if (data.type === "run_done") {
           terminalEventReceived = true;
+          const outputAttachments = Array.isArray(data.attachments)
+            ? data.attachments.flatMap((value) => {
+                const result = MessageAttachmentSchema.safeParse(value);
+                return result.success ? [result.data] : [];
+              })
+            : [];
+          const assistantMessage: Message = {
+            role: "assistant",
+            content: typeof data.result === "string" ? data.result : "",
+            steps: (Array.isArray(data.steps)
+              ? data.steps
+              : []) as MessageStep[],
+            ...(outputAttachments.length > 0
+              ? { attachments: outputAttachments }
+              : {}),
+          };
           if (ephemeral) {
-            if (viewingThisTurn()) clearStreamingUi();
-            const assistantContent =
-              typeof data.result === "string" ? data.result : "";
-            const steps = (
-              Array.isArray(data.steps) ? data.steps : []
-            ) as MessageStep[];
-            const outputAttachments = Array.isArray(data.attachments)
-              ? (data.attachments as MessageAttachment[])
-              : undefined;
             if (viewingThisTurn()) {
-              p.setMessages([
-                ...nextHistory,
-                {
-                  role: "assistant",
-                  content: assistantContent,
-                  steps,
-                  ...(outputAttachments?.length
-                    ? { attachments: outputAttachments }
-                    : {}),
-                },
-              ]);
+              clearStreamingUi();
+              p.setMessages([...nextHistory, assistantMessage]);
               if (Array.isArray(data.modelMessages)) {
                 p.modelMessagesRef.current = data.modelMessages as Array<
                   Record<string, unknown>
@@ -299,17 +297,9 @@ export async function executeRunTurn(
               }
             } catch (error) {
               console.error(error);
-              if (viewingThisTurn()) clearStreamingUi();
-              const assistantContent =
-                typeof data.result === "string" ? data.result : "";
-              const steps = (
-                Array.isArray(data.steps) ? data.steps : []
-              ) as MessageStep[];
               if (viewingThisTurn()) {
-                p.setMessages([
-                  ...nextHistory,
-                  { role: "assistant", content: assistantContent, steps },
-                ]);
+                clearStreamingUi();
+                p.setMessages([...nextHistory, assistantMessage]);
               }
             }
             await p.refreshSessions();

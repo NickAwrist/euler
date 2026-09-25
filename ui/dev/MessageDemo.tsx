@@ -42,6 +42,26 @@ const markdownMessages: Message[] = [
     content:
       "```\nUnlabeled code\nwith two lines\n```\n\nLocal weights awaken,\nCode flows through the quiet night,\nThinking whispers softly.\n\n3. First step\n4. Second step\n   - Nested bullet\n\n- First bullet\n- Second bullet\n\n[External docs](https://example.com/docs) and [Protocol relative](//example.com/docs).\n\n[Jump](#details) and [Email](mailto:hello@example.com).\n\n| Name | Value |\n| --- | --- |\n| Answer | 42 |",
   },
+  {
+    role: "assistant",
+    content:
+      "Here is the lighthouse:\n\n![Lighthouse](/api/comfyui/view/echoed.png)",
+    attachments: [
+      {
+        kind: "generated_image",
+        url: "/api/comfyui/view/echoed.png?type=output",
+      },
+      {
+        kind: "generated_image",
+        url: "/api/comfyui/view/omitted.png?type=output",
+      },
+      {
+        kind: "web_source",
+        title: "Lighthouse history",
+        url: "https://www.example.com/lighthouses",
+      },
+    ],
+  },
 ];
 
 export default function MessageDemo() {
