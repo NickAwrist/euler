@@ -123,6 +123,20 @@ test("SQL multi-column sorting resolves ties and keeps unknown costs last in eit
   );
 });
 
+test("default spend sorting ranks equal-spend rows by tokens", () => {
+  for (const [model, input] of [
+    ["a", 10],
+    ["b", 500],
+    ["c", 100],
+  ] as const)
+    insert(model, now, input, 0);
+  expect(
+    getUsageDashboard("alice", query(), now).breakdown.rows.map(
+      (row) => row.key,
+    ),
+  ).toEqual(["b", "c", "a"]);
+});
+
 test("invalid metrics remain unknown and cache counts cannot exceed input", () => {
   recordUsage("alice", "openrouter:test/model", {
     promptTokens: 10,

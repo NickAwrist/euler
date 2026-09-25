@@ -10,10 +10,10 @@ import { UsageChart } from "./UsageChart";
 import {
   ModelLabel,
   ProviderLabel,
-  color,
   money,
   number,
   providerColor,
+  seriesColor,
 } from "./display";
 import { type SortRule, changeSorting } from "./sorting";
 import "./usage.css";
@@ -75,10 +75,31 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
   };
   const totals = data?.totals;
   const series =
-    data?.chart.series.map((item) => ({
+    data?.chart.series.map((item, i) => ({
       model: item.model,
+      color: seriesColor(i),
       values: metric === "tokens" ? item.tokens : item.spend,
     })) ?? [];
+  const modelColors = new Map(series.map((item) => [item.model, item.color]));
+  const tiles = totals
+    ? (
+        [
+          ["Total spend", totals.cost, money],
+          ["Cached input", totals.cached, number],
+          ["Uncached input", totals.uncached, number],
+          ["Output", totals.output, number],
+          ["Cache savings, estimated", totals.savings, money],
+          [
+            "Cache hit rate",
+            totals.cacheHitRate,
+            (rate: number) => `${rate.toFixed(1)}%`,
+          ],
+        ] as const
+      ).flatMap(([name, value, format]) =>
+        // Hide metrics no provider reported rather than filling tiles with gaps.
+        value === null ? [] : [{ name, value: format(value) }],
+      )
+    : [];
   return (
     <main className="usage-page">
       <header className="usage-header flex shrink-0 flex-wrap items-center gap-3 border-b border-border-subtle bg-background px-5 py-3">
@@ -219,26 +240,16 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
                 )}
               </div>
             </section>
-            <section className="usage-totals" aria-label="Totals">
-              {[
-                ["Total spend", money(totals.cost)],
-                ["Cached input", number(totals.cached)],
-                ["Uncached input", number(totals.uncached)],
-                ["Output", number(totals.output)],
-                ["Cache savings, estimated", money(totals.savings)],
-                [
-                  "Cache hit rate",
-                  totals.cacheHitRate !== null
-                    ? `${totals.cacheHitRate.toFixed(1)}%`
-                    : "Not reported",
-                ],
-              ].map(([name, value]) => (
-                <div key={name}>
-                  <p>{name}</p>
-                  <strong>{value}</strong>
-                </div>
-              ))}
-            </section>
+            {tiles.length > 0 && (
+              <section className="usage-totals" aria-label="Totals">
+                {tiles.map(({ name, value }) => (
+                  <div key={name}>
+                    <p>{name}</p>
+                    <strong>{value}</strong>
+                  </div>
+                ))}
+              </section>
+            )}
             <section>
               <div className="usage-section-title">
                 <h2>Breakdown</h2>
@@ -363,7 +374,7 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
                                   width: `${item.tokenShare}%`,
                                   background:
                                     data.grouping === "model"
-                                      ? color(key)
+                                      ? modelColors.get(key)
                                       : "#999",
                                 }}
                               />
@@ -413,10 +424,11 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
             <p className="usage-footnote">
               Usage is tracked from when this feature is enabled, including
               subagent calls. Totals include reported values only; missing
-              metrics are not treated as zero. Spend is provider-reported USD.
-              Cache savings estimate read discounts using catalog rates at the
-              time of the call, excluding cache write fees. Local model calls
-              and tokens are included with $0 API spend.
+              metrics are not treated as zero, and metrics no call reported are
+              hidden. Spend is provider-reported USD. Cache savings estimate
+              read discounts using catalog rates at the time of the call,
+              excluding cache write fees. Local model calls and tokens are
+              included with $0 API spend.
             </p>
           </>
         ) : null}

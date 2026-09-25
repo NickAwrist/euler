@@ -114,7 +114,16 @@ const filtered: UsageDashboard = {
     cost: 1.2,
     savings: 2.4,
   },
-  chart: { ...sample.chart, series: sample.chart.series.slice(1, 3) },
+  // Two buckets: tick labels must not repeat.
+  chart: {
+    ...sample.chart,
+    buckets: sample.chart.buckets.slice(1),
+    series: sample.chart.series.slice(1, 3).map((item) => ({
+      ...item,
+      tokens: item.tokens.slice(1),
+      spend: item.spend.slice(1),
+    })),
+  },
   breakdown: {
     ...sample.breakdown,
     rows: rows.slice(1, 3).map((row) => ({ ...row, tokenShare: 50 })),
@@ -192,11 +201,21 @@ for (const mode of ["desktop", "mobile"]) {
     await expect(page.locator("tbody tr")).toHaveCount(2);
     expect(params.getAll("providers")).toEqual(["anthropic"]);
     expect(params.get("asOf")).toBe(initialCutoff);
-    await expect(page.locator(".usage-plot polyline")).toHaveCount(2);
-    await expect(page.locator(".usage-plot polyline").nth(1)).toHaveAttribute(
-      "stroke-dasharray",
-      "6 4",
-    );
+    await expect(
+      page.getByRole("list", { name: "Models" }).getByRole("listitem"),
+    ).toHaveText(["anthropic/claude-sonnet-4.6", "anthropic/claude-opus-4.6"]);
+    await expect(page.locator(".usage-plot polyline")).toHaveCount(0);
+    expect(
+      await page
+        .locator(".usage-plot rect")
+        .evaluateAll((nodes) => [
+          ...new Set(nodes.map((node) => node.getAttribute("fill"))),
+        ]),
+    ).toEqual(["#3987e5", "#d95926"]);
+    await expect(page.locator(".usage-plot svg > text")).toHaveText([
+      /Sep 1[78]/,
+      /Sep 1[89]/,
+    ]);
     await openai.click({ modifiers: ["Shift"] });
     await expect
       .poll(() => params.getAll("providers"))
@@ -370,11 +389,14 @@ for (const mode of ["desktop", "mobile"]) {
       chart: {
         ...sample.chart,
         intervalMs: 3600000,
-        buckets: [
-          Date.UTC(2026, 8, 18, 21),
-          Date.UTC(2026, 8, 18, 22),
-          Date.UTC(2026, 8, 18, 23),
-        ],
+        buckets: [18, 19, 20, 21, 22, 23].map((hour) =>
+          Date.UTC(2026, 8, 18, hour),
+        ),
+        series: sample.chart.series.map((item) => ({
+          ...item,
+          tokens: [...item.tokens, ...item.tokens],
+          spend: [...item.spend, ...item.spend],
+        })),
       },
     };
     await page.getByLabel("Date range").selectOption("1");
@@ -382,6 +404,7 @@ for (const mode of ["desktop", "mobile"]) {
     await expect(
       page.getByRole("heading", { name: "Hourly spend" }),
     ).toBeVisible();
+    await expect(page.locator(".usage-plot polyline")).toHaveCount(8);
     await page.screenshot({ path: `.cache/usage-${mode}.png`, fullPage: true });
     expect(
       await page.evaluate(
@@ -392,6 +415,7 @@ for (const mode of ["desktop", "mobile"]) {
     response = empty;
     await page.getByRole("button", { name: "Refresh usage" }).click();
     await expect(page.getByText("No usage recorded yet")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Totals" })).toHaveCount(0);
     expect(Number(params.get("asOf"))).toBeGreaterThan(Number(previousCutoff));
   });
 }

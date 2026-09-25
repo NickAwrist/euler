@@ -259,6 +259,20 @@
     5 5, crosshair;
   margin: 0;
 }
+.usage-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 12px;
+  padding-left: 8.42%;
+  color: var(--color-muted-foreground);
+  font-size: 12px;
+}
+.usage-chart-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .usage-plot:has(.usage-chart-cursor:focus-visible) {
   outline: 2px solid var(--color-muted-foreground);
   outline-offset: 4px;
