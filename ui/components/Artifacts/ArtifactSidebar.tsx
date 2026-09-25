@@ -35,8 +35,6 @@ export function ArtifactSidebar({
   const [resizing, setResizing] = useState(false);
   const drag = useRef<{ x: number; width: number } | null>(null);
   const panel = useRef<HTMLElement>(null);
-  const close = useRef(onClose);
-  close.current = onClose;
   useEffect(() => {
     if (!open) return;
     const previous = document.activeElement;
@@ -50,15 +48,7 @@ export function ArtifactSidebar({
     ) {
       panel.current?.focus({ preventScroll: true });
     }
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        close.current();
-      }
-    };
-    document.addEventListener("keydown", onKey);
     return () => {
-      document.removeEventListener("keydown", onKey);
       if (previous instanceof HTMLElement && previous.isConnected)
         previous.focus({ preventScroll: true });
     };
@@ -94,6 +84,13 @@ export function ArtifactSidebar({
       aria-label="Artifacts"
       aria-hidden={!open}
       inert={!open}
+      // Escape dismisses only while focus is in the panel, not from the chat.
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && !event.defaultPrevented) {
+          event.preventDefault();
+          onClose();
+        }
+      }}
       style={{ "--artifact-width": `${width}px` } as CSSProperties}
       className={cx(
         "relative z-20 flex h-full outline-none w-[var(--artifact-width)] shrink-0 flex-col border-l border-border-subtle bg-background transition-[margin-right,translate] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
