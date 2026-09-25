@@ -8,7 +8,10 @@ const ROLE_LABELS = {
   event: "EVENT",
 } as const satisfies Record<Message["role"], string>;
 
-function block(roleLabel: string, content: string): string {
+function block(
+  roleLabel: (typeof ROLE_LABELS)[Message["role"]],
+  content: string,
+): string {
   return `${roleLabel}\n===\n${content}`;
 }
 
