@@ -1,14 +1,26 @@
-import { Check, Copy, Download, Waypoints } from "lucide-react";
+import { Check, Copy, Download, Globe, Waypoints } from "lucide-react";
 import type { CSSProperties } from "react";
-import type { WorkspaceFileAttachment } from "../../../src/attachments/types";
+import type {
+  WebSourceAttachment,
+  WorkspaceFileAttachment,
+} from "../../../src/attachments/types";
 import { cx } from "../../styles";
 import type { Message } from "../../types";
 import { useArtifacts } from "../Artifacts/ArtifactContext";
 import { FileIcon } from "../Artifacts/FileIcon";
 import { traceStepsForDisplay } from "../ExecutionTrace";
-import { MarkdownMessage, extractComfyUIImageUrls } from "../MarkdownMessage";
+import {
+  ComfyUIImageCard,
+  MarkdownMessage,
+  extractComfyUIImageUrls,
+} from "../MarkdownMessage";
 import { MessageActions } from "./MessageActions";
-import { msgIconBtn, msgIconSize, msgIconStroke } from "./messageItemStyles";
+import {
+  msgIconBtn,
+  msgIconSize,
+  msgIconStroke,
+  msgOutputChip,
+} from "./messageItemStyles";
 
 type Props = {
   message: Message;
@@ -28,12 +40,24 @@ export function AssistantMessageBubble({
   onViewSteps,
 }: Props) {
   const artifacts = useArtifacts();
-  const comfyImageUrls = extractComfyUIImageUrls(message.content);
-  const outputFiles =
-    message.attachments?.filter(
-      (attachment): attachment is WorkspaceFileAttachment =>
-        attachment.kind === "file",
-    ) ?? [];
+  const attachments = message.attachments ?? [];
+  const markdownImageUrls = extractComfyUIImageUrls(message.content);
+  // Tool results keep generated images visible when the reply omits their URLs.
+  const generatedImageUrls = attachments.flatMap((attachment) =>
+    attachment.kind === "generated_image" &&
+    !markdownImageUrls.includes(attachment.url)
+      ? [attachment.url]
+      : [],
+  );
+  const comfyImageUrls = [...markdownImageUrls, ...generatedImageUrls];
+  const outputFiles = attachments.filter(
+    (attachment): attachment is WorkspaceFileAttachment =>
+      attachment.kind === "file",
+  );
+  const sources = attachments.filter(
+    (attachment): attachment is WebSourceAttachment =>
+      attachment.kind === "web_source",
+  );
   return (
     <div
       className={cx(
@@ -53,6 +77,13 @@ export function AssistantMessageBubble({
           <MarkdownMessage className="text-foreground">
             {message.content}
           </MarkdownMessage>
+          {generatedImageUrls.length > 0 && (
+            <div className="flex flex-wrap gap-x-3">
+              {generatedImageUrls.map((src) => (
+                <ComfyUIImageCard key={src} src={src} />
+              ))}
+            </div>
+          )}
           {outputFiles.length > 0 && (
             <div className="mt-3 flex flex-col gap-1.5">
               {outputFiles.map((file) => (
@@ -63,11 +94,37 @@ export function AssistantMessageBubble({
                   disabled={!artifacts}
                   aria-label={`Preview ${file.name}`}
                   title={`Preview ${file.path}`}
-                  className="flex w-fit max-w-full self-start items-center gap-2 rounded-lg border border-border-subtle bg-muted/40 px-3 py-2 text-left text-sm text-foreground hover:bg-muted"
+                  className={msgOutputChip}
                 >
                   <FileIcon path={file.path} />
                   <span className="min-w-0 truncate">{file.name}</span>
                 </button>
+              ))}
+            </div>
+          )}
+          {sources.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {sources.map((source) => (
+                <a
+                  key={source.url}
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={source.url}
+                  className={msgOutputChip}
+                >
+                  <Globe
+                    size={16}
+                    aria-hidden="true"
+                    className="shrink-0 text-muted-foreground"
+                  />
+                  <span className="min-w-0 max-w-64 truncate">
+                    {source.title}
+                  </span>
+                  <span className="shrink-0 text-muted-foreground">
+                    {sourceDomain(source.url)}
+                  </span>
+                </a>
               ))}
             </div>
           )}
@@ -131,4 +188,8 @@ export function AssistantMessageBubble({
       </div>
     </div>
   );
+}
+
+function sourceDomain(url: string): string {
+  return new URL(url).hostname.replace(/^www\./, "");
 }

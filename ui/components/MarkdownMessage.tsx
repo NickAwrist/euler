@@ -12,6 +12,7 @@ import ReactMarkdown, {
 } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import { COMFYUI_VIEW_PREFIX } from "../../src/attachments/types";
 import { copyTextToClipboard } from "../lib/copyTextToClipboard";
 import { cx } from "../styles";
 import { artifactPath, useArtifacts } from "./Artifacts/ArtifactContext";
@@ -134,8 +135,6 @@ function MarkdownPre({
   );
 }
 
-const COMFYUI_VIEW_PREFIX = "/api/comfyui/view/";
-
 function isComfyUIImage(src: string | undefined): boolean {
   return typeof src === "string" && src.startsWith(COMFYUI_VIEW_PREFIX);
 }
@@ -158,7 +157,7 @@ export function extractComfyUIImageUrls(markdown: string): string[] {
   return out;
 }
 
-function ComfyUIImageCard({ src, alt }: { src: string; alt?: string }) {
+export function ComfyUIImageCard({ src, alt }: { src: string; alt?: string }) {
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string>("");

@@ -301,6 +301,7 @@ export class BaseAgent {
             turnIndex,
           );
           ctx.endStep(toolStep, result.text);
+          if (result.attachments) ctx.addOutputAttachments(result.attachments);
 
           this.history.push({
             role: "tool",

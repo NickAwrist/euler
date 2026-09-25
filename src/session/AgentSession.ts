@@ -269,6 +269,9 @@ export class AgentSession extends EventEmitter {
       role: "assistant",
       content: result,
       steps: ctx.wireSteps(),
+      ...(ctx.outputAttachments.length > 0
+        ? { attachments: [...ctx.outputAttachments] }
+        : {}),
     });
 
     if (aborted) {

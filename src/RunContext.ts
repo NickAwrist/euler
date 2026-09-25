@@ -1,4 +1,5 @@
 import type { BaseAgent } from "./agents/BaseAgent";
+import type { ToolOutputAttachment } from "./attachments/types";
 import type { PromptContext } from "./prompts/render";
 import type { Workspace } from "./workspaces/WorkspaceService";
 
@@ -50,6 +51,8 @@ export class RunContext {
   readonly ownerUuid: string;
   readonly workspace?: Workspace;
   private _steps: Step[] = [];
+  /** Shared with child contexts so subagent tool outputs reach the reply. */
+  private _outputAttachments: ToolOutputAttachment[] = [];
   private _onChange?: OnStepChange;
   private _onStreamDelta?: OnStreamDelta;
 
@@ -157,10 +160,24 @@ export class RunContext {
       this.ownerUuid,
       this.workspace,
     );
+    child._outputAttachments = this._outputAttachments;
     if (parentStep.status === "running") {
       parentStep.childContext = child;
     }
     return child;
+  }
+
+  /** Record tool outputs for the reply, skipping URLs already recorded. */
+  addOutputAttachments(attachments: readonly ToolOutputAttachment[]): void {
+    for (const attachment of attachments) {
+      if (!this._outputAttachments.some((a) => a.url === attachment.url)) {
+        this._outputAttachments.push(attachment);
+      }
+    }
+  }
+
+  get outputAttachments(): readonly ToolOutputAttachment[] {
+    return this._outputAttachments;
   }
 
   /** The currently active step (last step with status "running"), or null. */

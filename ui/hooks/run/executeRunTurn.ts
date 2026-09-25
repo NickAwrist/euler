@@ -1,8 +1,8 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { MAIN_AGENT_NAME } from "../../../src/agents/agentNames";
-import type {
-  ImageAttachment,
-  MessageAttachment,
+import {
+  type ImageAttachment,
+  MessageAttachmentSchema,
 } from "../../../src/attachments/types";
 import { readApiError } from "../../lib/readApiError";
 import { readSseBlocks } from "../../lib/readSseBlocks";
@@ -268,9 +268,9 @@ export async function executeRunTurn(
             const steps = (
               Array.isArray(data.steps) ? data.steps : []
             ) as MessageStep[];
-            const outputAttachments = Array.isArray(data.attachments)
-              ? (data.attachments as MessageAttachment[])
-              : undefined;
+            const outputAttachments = MessageAttachmentSchema.array().safeParse(
+              data.attachments,
+            ).data;
             if (viewingThisTurn()) {
               p.setMessages([
                 ...nextHistory,

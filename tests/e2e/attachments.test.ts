@@ -1,6 +1,9 @@
 import "../setup";
 import { describe, expect, test } from "bun:test";
-import type { MessageAttachment } from "../../src/attachments/types";
+import type {
+  ImageAttachment,
+  MessageAttachment,
+} from "../../src/attachments/types";
 import { startTestServer, userHeaders } from "../helpers/server";
 
 const OTHER_USER = "22222222-2222-4222-8222-222222222222";
@@ -32,7 +35,7 @@ describe("image attachments", () => {
       });
       expect(upload.status).toBe(201);
       const { attachment } = (await upload.json()) as {
-        attachment: MessageAttachment;
+        attachment: ImageAttachment;
       };
       expect(attachment).toMatchObject({
         kind: "image",
