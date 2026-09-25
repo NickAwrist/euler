@@ -165,6 +165,8 @@ export function useRunApp() {
     setTruncateConfirm,
     pendingDeleteSessionId: sessions.pendingDeleteSessionId,
     setPendingDeleteSessionId: sessions.setPendingDeleteSessionId,
+    ephemeralExitPromptOpen: sessions.ephemeralExitPromptOpen,
+    resolveEphemeralExit: sessions.resolveEphemeralExit,
     runPending: stream.runPending,
     ollamaModels: ollama.ollamaModels,
     catalogLoaded: ollama.catalogLoaded,
