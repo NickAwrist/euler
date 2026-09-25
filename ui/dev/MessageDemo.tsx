@@ -36,8 +36,20 @@ const initialMessages: Message[] = [
   },
 ];
 
+const markdownMessages: Message[] = [
+  {
+    role: "assistant",
+    content:
+      "```\nUnlabeled code\nwith two lines\n```\n\nLocal weights awaken,\nCode flows through the quiet night,\nThinking whispers softly.\n\n3. First step\n4. Second step\n   - Nested bullet\n\n- First bullet\n- Second bullet\n\n[External docs](https://example.com/docs) and [Protocol relative](//example.com/docs).\n\n[Jump](#details) and [Email](mailto:hello@example.com).\n\n| Name | Value |\n| --- | --- |\n| Answer | 42 |",
+  },
+];
+
 export default function MessageDemo() {
-  const [messages, setMessages] = useState(initialMessages);
+  const [messages, setMessages] = useState(
+    new URLSearchParams(window.location.search).has("markdown")
+      ? markdownMessages
+      : initialMessages,
+  );
   const [editing, setEditing] = useState<number | null>(null);
   const [trace, setTrace] = useState<MessageStep[] | null>(null);
   const [confirm, setConfirm] = useState<TruncateConfirmState>(null);
