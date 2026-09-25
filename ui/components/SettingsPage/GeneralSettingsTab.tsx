@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { effectiveDefaultRunModel } from "../../lib/defaultModel";
 import {
   getOrCreateUserId,
   normalizeUserId,
@@ -8,8 +9,9 @@ import type { UserSettings } from "../../persist/userSettings";
 import { cx, eyebrowText } from "../../styles";
 import type { ModelOption } from "../../types";
 import { Button } from "../Button";
+import { ModelSelectBar } from "../ModelSelectBar";
 import { SystemPromptField } from "./SystemPromptField";
-import { hintClass, inputClass, labelClass, selectClass } from "./constants";
+import { hintClass, inputClass, labelClass } from "./constants";
 
 type Props = {
   settings: UserSettings;
@@ -18,13 +20,19 @@ type Props = {
     value: UserSettings[K],
   ) => void;
   availableModels: ModelOption[];
+  catalogLoaded: boolean;
 };
 
 export function GeneralSettingsTab({
   settings,
   onFieldChange,
   availableModels,
+  catalogLoaded,
 }: Props) {
+  const effectiveModel = effectiveDefaultRunModel(
+    settings.defaultModel,
+    availableModels,
+  );
   const [currentUserId] = useState(getOrCreateUserId);
   const [userIdDraft, setUserIdDraft] = useState(currentUserId);
   const normalizedDraft = normalizeUserId(userIdDraft);
@@ -173,42 +181,35 @@ export function GeneralSettingsTab({
       <div className="space-y-2">
         <h2 className={cx(eyebrowText, "mb-2")}>Chat Defaults</h2>
         <div className="space-y-2">
-          <label htmlFor="defaultModel" className={labelClass}>
+          <label htmlFor="run-model" className={labelClass}>
             Default Model
           </label>
-          <select
-            id="defaultModel"
-            value={settings.defaultModel}
-            onChange={(e) => onFieldChange("defaultModel", e.target.value)}
-            className={selectClass}
-          >
-            <option value="">Select a default model</option>
-            {(["ollama", "openrouter"] as const).map((provider) => {
-              const models = availableModels.filter(
-                (model) => model.provider === provider,
-              );
-              if (models.length === 0) return null;
-              return (
-                <optgroup
-                  key={provider}
-                  label={provider === "ollama" ? "Ollama" : "OpenRouter"}
-                >
-                  {models.map((model) => (
-                    <option
-                      key={model.id}
-                      value={model.id}
-                      disabled={
-                        model.provider === "openrouter" &&
-                        model.configured === false
-                      }
-                    >
-                      {model.name}
-                    </option>
-                  ))}
-                </optgroup>
-              );
-            })}
-          </select>
+          <ModelSelectBar
+            ollamaModels={availableModels}
+            ollamaConnected={catalogLoaded ? true : null}
+            modelsLoadError={null}
+            selectedModel={effectiveModel}
+            onModelChange={(model) => onFieldChange("defaultModel", model)}
+            disabled={!catalogLoaded || !effectiveModel}
+          />
+          {settings.defaultModel && (
+            <Button
+              variant="ghost"
+              onClick={() => onFieldChange("defaultModel", "")}
+            >
+              Use first available model
+            </Button>
+          )}
+          <p className={hintClass}>
+            {!catalogLoaded
+              ? "Loading models..."
+              : !effectiveModel
+                ? "No models available. Connect a provider and enable a model to start chatting."
+                : settings.defaultModel &&
+                    settings.defaultModel !== effectiveModel
+                  ? `Saved model ${settings.defaultModel} is unavailable. New chats will use the model shown above.`
+                  : "New chats will use this model."}
+          </p>
         </div>
       </div>
       <details className="border-t border-border-subtle pt-4">

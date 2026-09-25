@@ -1,5 +1,3 @@
-export type AppView = "run" | "customization" | "settings" | "usage";
-
 export type SessionWorkspace =
   | { kind: "sandbox" }
   | { kind: "local"; path: string; label: string };

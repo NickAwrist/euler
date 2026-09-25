@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { SettingsPage } from "../components/SettingsPage";
 import type { UserSettings } from "../persist/userSettings";
+import type { SettingsTab } from "../types";
 
 // Browser tests intercept every API request; this route never seeds app data.
 export default function SettingsDemo() {
+  const [tab, setTab] = useState<SettingsTab>("general");
   const [settings, setSettings] = useState<UserSettings>({
     systemPrompt: null,
     name: "",
@@ -16,6 +18,9 @@ export default function SettingsDemo() {
   return (
     <div className="h-dvh">
       <SettingsPage
+        tab={tab}
+        onTabChange={setTab}
+        catalogLoaded={true}
         currentSettings={settings}
         ollamaModels={[]}
         ollamaHost="http://ollama.test"

@@ -10,7 +10,6 @@ import type {
   ComfyUITestState,
   OllamaTestState,
   SearXNGTestState,
-  SettingsTab,
 } from "./types";
 
 type Args = {
@@ -49,9 +48,6 @@ export function useSettingsPageState({
   searxngConnected,
   onSave,
 }: Args) {
-  const [tab, setTab] = useState<SettingsTab>(() =>
-    window.location.hash === "#settings/openrouter" ? "openrouter" : "general",
-  );
   const [settings, setSettings] = useState<UserSettings>(currentSettings);
   const [ollamaUri, setOllamaUri] = useState(ollamaHost);
   const [isSaving, setIsSaving] = useState(false);
@@ -324,8 +320,6 @@ export function useSettingsPageState({
   }, []);
 
   return {
-    tab,
-    setTab,
     settings,
     ollamaUri,
     onOllamaUriInput,

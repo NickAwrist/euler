@@ -2,6 +2,7 @@ import { Check, ChevronDown, Search, Star } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { compareModels } from "../../src/modelSort";
 import { modelSettingsRequest } from "../lib/modelSettingsRequest";
+import { navigate } from "../lib/navigation";
 import { cx } from "../styles";
 import type { ModelOption } from "../types";
 import { AnchoredPopover } from "./AnchoredPopover";
@@ -404,12 +405,7 @@ export function ModelSelectBar({
                 className="block rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-accent-ring"
                 onClick={() => {
                   close();
-                  window.history.replaceState(
-                    window.history.state,
-                    "",
-                    "#settings/openrouter",
-                  );
-                  window.dispatchEvent(new HashChangeEvent("hashchange"));
+                  void navigate("/settings/openrouter");
                 }}
               >
                 Choose models

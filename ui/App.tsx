@@ -26,9 +26,14 @@ import { useMobileLayout } from "./hooks/useMobileLayout";
 import { useRunApp } from "./hooks/useRunApp";
 import { downloadBlob } from "./lib/downloadBlob";
 import { formatRunTranscript } from "./lib/formatRunTranscript";
+import {
+  NAVIGATION_EVENT,
+  navigate,
+  parseRoute,
+  sessionPath,
+} from "./lib/navigation";
 import { fetchSession } from "./persist/sessions";
 import { cx } from "./styles";
-import type { AppView } from "./types";
 
 type ChatViewProps = {
   app: ReturnType<typeof useRunApp>;
@@ -407,17 +412,16 @@ function ChatView({
 
 export default function App() {
   const app = useRunApp();
-  const [currentView, setCurrentView] = useState<AppView>("run");
-
+  const [path, setPath] = useState(() => window.location.pathname);
+  const route = parseRoute(path);
   useEffect(() => {
-    const navigate = () => {
-      if (window.location.hash === "#settings/openrouter")
-        setCurrentView("settings");
-    };
-    navigate();
-    window.addEventListener("hashchange", navigate);
-    return () => window.removeEventListener("hashchange", navigate);
+    const update = () => setPath(window.location.pathname);
+    window.addEventListener(NAVIGATION_EVENT, update);
+    return () => window.removeEventListener(NAVIGATION_EVENT, update);
   }, []);
+  const backToChat = () => {
+    void navigate(sessionPath(app.isEphemeral ? null : app.activeSessionId));
+  };
 
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [directorySessionId, setDirectorySessionId] = useState<string | null>(
@@ -428,14 +432,12 @@ export default function App() {
 
   const openCustomization = () => {
     app.setSidebarOpen(false);
-    app.setSidebarCollapsed(true);
-    setCurrentView("customization");
+    void navigate("/customization");
   };
 
   const openSettings = () => {
     app.setSidebarOpen(false);
-    app.setSidebarCollapsed(true);
-    setCurrentView("settings");
+    void navigate("/settings/general");
   };
 
   const runCommand = async (command: RunCommandName) => {
@@ -471,15 +473,18 @@ export default function App() {
           app.noProviderAvailable && "pt-9",
         )}
       >
-        {currentView === "usage" ? (
-          <UsagePage onBack={() => setCurrentView("run")} />
-        ) : currentView === "customization" ? (
+        {route.view === "usage" ? (
+          <UsagePage onBack={backToChat} />
+        ) : route.view === "customization" ? (
           <main className="relative h-full min-h-0 min-w-0 flex-1 bg-background">
-            <CustomizationPage onBack={() => setCurrentView("run")} />
+            <CustomizationPage onBack={backToChat} />
           </main>
-        ) : currentView === "settings" ? (
+        ) : route.view === "settings" ? (
           <main className="relative h-full min-h-0 min-w-0 flex-1 bg-background">
             <SettingsPage
+              tab={route.tab}
+              onTabChange={(tab) => void navigate(`/settings/${tab}`)}
+              catalogLoaded={app.catalogLoaded}
               ollamaModels={app.ollamaModels}
               currentSettings={app.userSettings}
               ollamaHost={app.ollamaHost}
@@ -494,7 +499,7 @@ export default function App() {
               searxngConnected={app.searxngConnected}
               onSave={app.saveUserSettings}
               onModelsChanged={() => app.refreshModels(true)}
-              onBack={() => setCurrentView("run")}
+              onBack={backToChat}
             />
           </main>
         ) : (
@@ -505,7 +510,7 @@ export default function App() {
             runCommand={runCommand}
             onCustomization={openCustomization}
             onSettings={openSettings}
-            onUsage={() => setCurrentView("usage")}
+            onUsage={() => void navigate("/usage")}
           />
         )}
 

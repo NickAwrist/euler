@@ -26,7 +26,6 @@ async function mockApp(page: Page) {
             }
           : path === "/api/models"
             ? {
-                defaultModel: "test",
                 models: [
                   {
                     id: "test",

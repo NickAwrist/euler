@@ -4,7 +4,7 @@ Reviewed September 24, 2026 against `main` at `910e6c94ceb5cd94d690feb7d538f8197
 
 The review covered all 32 open issues, their comments, and relevant source code. Twelve issues were labeled bugs, and there were no open pull requests. This is a source-based triage, not a browser reproduction pass. Counts and priorities are a snapshot.
 
-Address model defaults, navigation, missing tool outputs, and ephemeral-chat loss. Group work by shared behavior and code ownership.
+Address missing tool outputs and ephemeral-chat loss next. Group work by shared behavior and code ownership.
 
 ## Priorities
 
@@ -14,14 +14,17 @@ Address model defaults, navigation, missing tool outputs, and ephemeral-chat los
 
 Size estimates describe implementation scope, not elapsed time.
 
+## Implemented, awaiting merge
+
+- Model defaults, [#20](https://github.com/NickAwrist/euler/issues/20): Settings and new chats share catalog-based defaults, including loading, unavailable saved models, and empty catalogs.
+- View navigation, [#14](https://github.com/NickAwrist/euler/issues/14) and [#15](https://github.com/NickAwrist/euler/issues/15): views and Settings tabs have URLs, browser history preserves unsaved-settings prompts, and view changes preserve the sidebar preference.
+
 ## Recommended branch groups
 
 Each row is suitable for one agent working on one branch, within the stated scope.
 
 | Priority | Branch and issues | Deliverable and rationale | Size |
 | --- | --- | --- | --- |
-| P1 | `fix/model-defaults`: [#20](https://github.com/NickAwrist/euler/issues/20) | Make Settings and new chats agree on the effective model. Cover unavailable saved models, loading catalogs, and no available models. Standalone fix. | Medium |
-| P1 | `fix/view-navigation`: [#14](https://github.com/NickAwrist/euler/issues/14), [#15](https://github.com/NickAwrist/euler/issues/15) | Represent views and tabs in navigation, restore Back/reload behavior, and preserve sidebar preferences. Both involve `ui/App.tsx` and navigation state. Preserve unsaved-settings prompts. | Medium to large |
 | P1 | `fix/tool-output-display`: [#13](https://github.com/NickAwrist/euler/issues/13), [#31](https://github.com/NickAwrist/euler/issues/31) | Display generated images and search sources directly from tool results. Both currently depend on the model repeating output correctly. Sources must open in a new tab, per the issue comment. Verify persistence across reload and avoid duplicate images. | Large |
 | P1 | `fix/ephemeral-exit`: protection portion of [#30](https://github.com/NickAwrist/euler/issues/30) | Confirm before deleting a nonempty ephemeral chat, explain the badge, and cover chat selection, Home, New chat, and browser Back. Ship protection separately from saving an ephemeral chat. | Medium |
 | P2 | `fix/chat-titles-export`: [#18](https://github.com/NickAwrist/euler/issues/18), [#19](https://github.com/NickAwrist/euler/issues/19) | Distinguish actual custom titles from sidebar previews, fix rename behavior, and use proper titles, metadata, and event labels in exports. Shared session metadata makes this a sensible pair. | Medium |
