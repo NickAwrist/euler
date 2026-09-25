@@ -89,10 +89,8 @@ modelsRoutes.get(
           }))
       : [];
 
-    const models = [...ollamaModels, ...openRouterModels];
     res.json({
-      defaultModel: models[0]?.id ?? null,
-      models,
+      models: [...ollamaModels, ...openRouterModels],
       providers: {
         ollama: { connected: ollamaError === null, error: ollamaError },
         openrouter: { configured: openrouterConfigured },

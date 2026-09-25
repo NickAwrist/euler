@@ -3,14 +3,8 @@ import type {
   ComfyUIConfigPayload,
   ModelOption,
   SearXNGConfigPayload,
+  SettingsTab,
 } from "../../types";
-
-export type SettingsTab =
-  | "general"
-  | "ollama"
-  | "openrouter"
-  | "image-generation"
-  | "web-search";
 
 export type ComfyUITestState =
   | { status: "idle" }
@@ -35,10 +29,10 @@ export type SearXNGTestState =
   | { status: "err"; message: string };
 
 export type SettingsPageProps = {
-  tab?: SettingsTab;
-  onTabChange?: (tab: SettingsTab) => void;
+  tab: SettingsTab;
+  onTabChange: (tab: SettingsTab) => void;
   ollamaModels: ModelOption[];
-  catalogLoaded?: boolean;
+  catalogLoaded: boolean;
   currentSettings: UserSettings;
   ollamaHost: string;
   ollamaConnected: boolean | null;

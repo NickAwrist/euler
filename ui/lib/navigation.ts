@@ -1,4 +1,4 @@
-import type { SettingsTab } from "../components/SettingsPage/types";
+import type { SettingsTab } from "../types";
 
 export const NAVIGATION_EVENT = "euler:navigate";
 export type NavigationGuard = (path: string) => Promise<boolean>;
@@ -10,7 +10,7 @@ let restore: (() => void) | null = null;
 let approvedIndex: number | null = null;
 let currentPath = "";
 
-export function settingsTab(path = window.location.pathname): SettingsTab {
+function settingsTab(path: string): SettingsTab {
   const tab = path.split("/")[2];
   return tab === "ollama" ||
     tab === "openrouter" ||
@@ -20,8 +20,36 @@ export function settingsTab(path = window.location.pathname): SettingsTab {
     : "general";
 }
 
+type AppRoute =
+  | { view: "run"; sessionId: string | null }
+  | { view: "settings"; tab: SettingsTab }
+  | { view: "customization" | "usage" };
+
+export function parseRoute(path = window.location.pathname): AppRoute {
+  if (path === "/settings" || path.startsWith("/settings/")) {
+    return { view: "settings", tab: settingsTab(path) };
+  }
+  if (path === "/customization" || path === "/usage") {
+    return { view: path === "/usage" ? "usage" : "customization" };
+  }
+  let sessionId: string | null = null;
+  if (path.startsWith("/run/")) {
+    try {
+      sessionId = decodeURIComponent(path.slice("/run/".length)) || null;
+    } catch {
+      // A malformed link should still allow returning to Home.
+    }
+  }
+  return { view: "run", sessionId };
+}
+
 export function isChatPath(path = window.location.pathname) {
-  return path === "/" || path.startsWith("/run/");
+  return parseRoute(path).view === "run";
+}
+
+export function sessionIdFromUrl() {
+  const route = parseRoute();
+  return route.view === "run" ? route.sessionId : null;
 }
 
 export function sessionPath(id: string | null) {
@@ -57,7 +85,20 @@ export function initializeNavigation() {
       done();
       return;
     }
-    const nextIndex = window.history.state?.navigationIndex ?? 0;
+    let nextIndex = window.history.state?.navigationIndex;
+    if (typeof nextIndex !== "number") {
+      // Native fragment links create same-document entries without our state.
+      // Count and stamp them when created so later Back/Forward deltas stay valid.
+      nextIndex = index + 1;
+      window.history.replaceState(
+        { ...window.history.state, navigationIndex: nextIndex },
+        "",
+      );
+    }
+    if (window.location.pathname === currentPath) {
+      index = nextIndex;
+      return;
+    }
     if (approvedIndex === nextIndex) {
       approvedIndex = null;
       index = nextIndex;

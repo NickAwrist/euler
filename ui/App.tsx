@@ -28,10 +28,9 @@ import { downloadBlob } from "./lib/downloadBlob";
 import { formatRunTranscript } from "./lib/formatRunTranscript";
 import {
   NAVIGATION_EVENT,
-  initializeNavigation,
   navigate,
+  parseRoute,
   sessionPath,
-  settingsTab,
 } from "./lib/navigation";
 import { fetchSession } from "./persist/sessions";
 import { cx } from "./styles";
@@ -412,16 +411,9 @@ function ChatView({
 }
 
 export default function App() {
-  initializeNavigation();
   const app = useRunApp();
   const [path, setPath] = useState(() => window.location.pathname);
-  const currentView = path.startsWith("/settings")
-    ? "settings"
-    : path === "/customization"
-      ? "customization"
-      : path === "/usage"
-        ? "usage"
-        : "run";
+  const route = parseRoute(path);
   useEffect(() => {
     const update = () => setPath(window.location.pathname);
     window.addEventListener(NAVIGATION_EVENT, update);
@@ -481,16 +473,16 @@ export default function App() {
           app.noProviderAvailable && "pt-9",
         )}
       >
-        {currentView === "usage" ? (
+        {route.view === "usage" ? (
           <UsagePage onBack={backToChat} />
-        ) : currentView === "customization" ? (
+        ) : route.view === "customization" ? (
           <main className="relative h-full min-h-0 min-w-0 flex-1 bg-background">
             <CustomizationPage onBack={backToChat} />
           </main>
-        ) : currentView === "settings" ? (
+        ) : route.view === "settings" ? (
           <main className="relative h-full min-h-0 min-w-0 flex-1 bg-background">
             <SettingsPage
-              tab={settingsTab(path)}
+              tab={route.tab}
               onTabChange={(tab) => void navigate(`/settings/${tab}`)}
               catalogLoaded={app.catalogLoaded}
               ollamaModels={app.ollamaModels}

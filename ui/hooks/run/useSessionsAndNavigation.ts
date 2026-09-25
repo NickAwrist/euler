@@ -13,6 +13,7 @@ import {
   isChatPath,
   navigate,
   replaceNavigation,
+  sessionIdFromUrl,
   sessionPath,
 } from "../../lib/navigation";
 import { safeStorage } from "../../lib/safeStorage";
@@ -39,20 +40,16 @@ import type { RunFlightApi, SessionLoadState } from "./runTypes";
 import { useSessionPreferences } from "./useSessionPreferences";
 
 const ACTIVE_SESSION_STORAGE_KEY = "activeSessionId";
-const RUN_PATH_PREFIX = "/run/";
-
-function sessionIdFromUrl(): string | null {
-  const { pathname } = window.location;
-  if (pathname.startsWith(RUN_PATH_PREFIX)) {
-    const id = decodeURIComponent(pathname.slice(RUN_PATH_PREFIX.length));
-    return id || null;
-  }
-  return null;
+function initialSessionId() {
+  return (
+    sessionIdFromUrl() ||
+    safeStorage.session.getItem(ACTIVE_SESSION_STORAGE_KEY)
+  );
 }
 
 function pushSessionUrl(id: string | null) {
   // Session actions already update their state; only history needs changing.
-  void navigate(sessionPath(id));
+  if (isChatPath()) void navigate(sessionPath(id));
 }
 
 function replaceSessionUrl(id: string | null) {
@@ -81,11 +78,7 @@ type Args = {
 export function useSessionsAndNavigation(p: Args) {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
-    () =>
-      sessionIdFromUrl() ||
-      (!isChatPath()
-        ? safeStorage.session.getItem(ACTIVE_SESSION_STORAGE_KEY)
-        : null),
+    initialSessionId,
   );
   const [isEphemeral, setIsEphemeral] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -278,11 +271,7 @@ export function useSessionsAndNavigation(p: Args) {
 
   useEffect(() => {
     void refreshSessions();
-    const restoredId =
-      sessionIdFromUrl() ||
-      (!isChatPath()
-        ? safeStorage.session.getItem(ACTIVE_SESSION_STORAGE_KEY)
-        : null);
+    const restoredId = initialSessionId();
     if (restoredId) void loadSession(restoredId);
     restoreDoneRef.current = true;
     return () => {

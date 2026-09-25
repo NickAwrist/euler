@@ -20,14 +20,14 @@ type Props = {
     value: UserSettings[K],
   ) => void;
   availableModels: ModelOption[];
-  catalogLoaded?: boolean;
+  catalogLoaded: boolean;
 };
 
 export function GeneralSettingsTab({
   settings,
   onFieldChange,
   availableModels,
-  catalogLoaded = true,
+  catalogLoaded,
 }: Props) {
   const effectiveModel = effectiveDefaultRunModel(
     settings.defaultModel,

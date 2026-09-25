@@ -2,6 +2,7 @@ import { Save } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { setNavigationGuard } from "../../lib/navigation";
 import { cx } from "../../styles";
+import type { SettingsTab } from "../../types";
 import { BackToChatButton } from "../BackToChatButton";
 import { Button } from "../Button";
 import { GeneralSettingsTab } from "./GeneralSettingsTab";
@@ -11,7 +12,6 @@ import { OpenRouterSettingsTab } from "./OpenRouterSettingsTab";
 import { UnsavedChangesModal } from "./UnsavedChangesModal";
 import { WebSearchTab } from "./WebSearchTab";
 import type { SettingsPageProps } from "./types";
-import type { SettingsTab } from "./types";
 import { useEnvironmentSettings } from "./useEnvironmentSettings";
 import { useSettingsPageState } from "./useSettingsPageState";
 
@@ -20,9 +20,7 @@ export function SettingsPage(props: SettingsPageProps) {
   const environment = useEnvironmentSettings();
   const [leavePromptOpen, setLeavePromptOpen] = useState(false);
 
-  const [localTab, setLocalTab] = useState<SettingsTab>("general");
-  const tab = props.tab ?? localTab;
-  const setTab = props.onTabChange ?? setLocalTab;
+  const { tab, onTabChange: setTab } = props;
   const allowLeave = useRef(false);
   const pendingLeave = useRef<((approved: boolean) => void) | null>(null);
   const requestLeave = () =>

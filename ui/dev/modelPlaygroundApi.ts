@@ -369,7 +369,6 @@ export function installDemoApi() {
       }
       if (path === "models")
         return Response.json({
-          defaultModel: "local-model",
           models: [
             ...(scenario === "empty"
               ? []
