@@ -221,6 +221,7 @@ export async function handleOpenRouterRequest(
     return sse([chunk({ content: "Finished after tool." }, "stop"), "[DONE]"]);
   }
   if (scenario === "tool-outputs" && requests.length === 1) {
+    // The repeated search returns the same source to exercise deduplication.
     const calls = [
       ["generate_image", { prompt: "A lighthouse" }],
       ["web_search", { query: "lighthouses" }],

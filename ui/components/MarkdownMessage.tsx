@@ -1,4 +1,5 @@
 import { Check, Copy } from "lucide-react";
+import type { Root, RootContent } from "mdast";
 import {
   type ComponentPropsWithoutRef,
   isValidElement,
@@ -12,6 +13,8 @@ import ReactMarkdown, {
 } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
+import remarkParse from "remark-parse";
+import { unified } from "unified";
 import { COMFYUI_VIEW_PREFIX } from "../../src/attachments/types";
 import { copyTextToClipboard } from "../lib/copyTextToClipboard";
 import { cx } from "../styles";
@@ -135,26 +138,59 @@ function MarkdownPre({
   );
 }
 
+// The prefix has no regex metacharacters, so the patterns embed it directly.
+const VIEW_URL = COMFYUI_VIEW_PREFIX;
+const JSON_WRAPPED_VIEW_URL = new RegExp(
+  String.raw`\{\s*"[^"]*"\s*:\s*"(${VIEW_URL}[^"]+)"\s*\}`,
+  "g",
+);
+const QUOTED_VIEW_URL = new RegExp(
+  String.raw`(?<!\]\()"(${VIEW_URL}[^"]+)"`,
+  "g",
+);
+// Trailing sentence punctuation is not part of a bare URL.
+const BARE_VIEW_URL = new RegExp(
+  String.raw`(?<!\]\()(?<!\()(${VIEW_URL}[^\s"')>\]]*[^\s"')>\].,;:!?])`,
+  "g",
+);
+const markdownParser = unified().use(remarkParse).use(remarkGfm);
+
 function isComfyUIImage(src: string | undefined): boolean {
   return typeof src === "string" && src.startsWith(COMFYUI_VIEW_PREFIX);
 }
 
-/** ComfyUI image URLs as they appear in markdown after {@link convertComfyUIUrls}, in order (deduped). */
+/** ComfyUI image URLs rendered as images (not code) after {@link convertComfyUIUrls}, in order (deduped). */
 export function extractComfyUIImageUrls(markdown: string): string[] {
   const source = convertComfyUIUrls(normalizeFlattenedPipeTables(markdown));
-  const seen = new Set<string>();
-  const out: string[] = [];
-  const re = /!\[[^\]]*\]\((\/api\/comfyui\/view\/[^)]+)\)/g;
-  let m = re.exec(source);
-  while (m !== null) {
-    const u = m[1];
-    if (u && !seen.has(u)) {
-      seen.add(u);
-      out.push(u);
+  const tree = markdownParser.parse(source);
+  const definitions = new Map<string, string>();
+  const images: Extract<RootContent, { type: "image" | "imageReference" }>[] =
+    [];
+  function collect(node: Root | RootContent): void {
+    if (node.type === "definition" && !definitions.has(node.identifier)) {
+      definitions.set(node.identifier, node.url);
+    } else if (node.type === "image" || node.type === "imageReference") {
+      images.push(node);
     }
-    m = re.exec(source);
+    if ("children" in node) node.children.forEach(collect);
   }
-  return out;
+  collect(tree);
+  const urls = images.flatMap((node) => {
+    const url =
+      node.type === "image" ? node.url : definitions.get(node.identifier);
+    return url && isComfyUIImage(url) ? [url] : [];
+  });
+  return [...new Set(urls)];
+}
+
+/** Identifies the image a view URL loads; the view route defaults `type` to "output". */
+export function comfyUIImageKey(url: string): string {
+  const { pathname, searchParams } = new URL(url, "http://localhost");
+  return [
+    pathname,
+    searchParams.get("type") || "output",
+    searchParams.get("subfolder") ?? "",
+  ].join("\n");
 }
 
 export function ComfyUIImageCard({ src, alt }: { src: string; alt?: string }) {
@@ -230,24 +266,21 @@ function MarkdownImg({
 function convertComfyUIUrls(markdown: string): string {
   // 1. Replace full JSON object wrappers like { "image_url": "..." }
   let result = markdown.replace(
-    /\{\s*"[^"]*"\s*:\s*"(\/api\/comfyui\/view\/[^"]+)"\s*\}/g,
+    JSON_WRAPPED_VIEW_URL,
     (_match, url) => `![Generated Image](${url})`,
   );
 
   // 2. Replace quoted URLs not already inside markdown image syntax
   result = result.replace(
-    /(?<!\]\()"(\/api\/comfyui\/view\/[^"]+)"/g,
+    QUOTED_VIEW_URL,
     (_match, url) => `![Generated Image](${url})`,
   );
 
   // 3. Replace remaining bare URLs (exclude quotes, parens, brackets, whitespace)
-  result = result.replace(
-    /(?<!\]\()(?<!\()(\/api\/comfyui\/view\/[^\s"')>\]]+)/g,
-    (match) => {
-      if (result.includes(`](${match})`)) return match;
-      return `![Generated Image](${match})`;
-    },
-  );
+  result = result.replace(BARE_VIEW_URL, (match) => {
+    if (result.includes(`](${match})`)) return match;
+    return `![Generated Image](${match})`;
+  });
 
   return result;
 }

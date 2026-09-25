@@ -1,5 +1,5 @@
 import { Check, Copy, Download, Globe, Waypoints } from "lucide-react";
-import type { CSSProperties } from "react";
+import { type CSSProperties, useMemo } from "react";
 import type {
   WebSourceAttachment,
   WorkspaceFileAttachment,
@@ -12,6 +12,7 @@ import { traceStepsForDisplay } from "../ExecutionTrace";
 import {
   ComfyUIImageCard,
   MarkdownMessage,
+  comfyUIImageKey,
   extractComfyUIImageUrls,
 } from "../MarkdownMessage";
 import { MessageActions } from "./MessageActions";
@@ -41,11 +42,15 @@ export function AssistantMessageBubble({
 }: Props) {
   const artifacts = useArtifacts();
   const attachments = message.attachments ?? [];
-  const markdownImageUrls = extractComfyUIImageUrls(message.content);
+  const markdownImageUrls = useMemo(
+    () => extractComfyUIImageUrls(message.content),
+    [message.content],
+  );
+  const markdownImageKeys = new Set(markdownImageUrls.map(comfyUIImageKey));
   // Tool results keep generated images visible when the reply omits their URLs.
   const generatedImageUrls = attachments.flatMap((attachment) =>
     attachment.kind === "generated_image" &&
-    !markdownImageUrls.includes(attachment.url)
+    !markdownImageKeys.has(comfyUIImageKey(attachment.url))
       ? [attachment.url]
       : [],
   );

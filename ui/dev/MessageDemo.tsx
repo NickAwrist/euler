@@ -45,7 +45,7 @@ const markdownMessages: Message[] = [
   {
     role: "assistant",
     content:
-      "Here is the lighthouse:\n\n![Lighthouse](/api/comfyui/view/echoed.png?type=output)",
+      "Here is the lighthouse:\n\n![Lighthouse](/api/comfyui/view/echoed.png)",
     attachments: [
       {
         kind: "generated_image",

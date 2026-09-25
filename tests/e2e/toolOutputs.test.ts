@@ -68,6 +68,7 @@ describe("tool outputs", () => {
         .map((line) => JSON.parse(line.slice(6)) as Record<string, unknown>)
         .find((event) => event.type === "run_done");
 
+      // The scenario searches twice for the same query; its source is kept once.
       const expected: MessageAttachment[] = [
         {
           kind: "generated_image",
@@ -90,9 +91,8 @@ describe("tool outputs", () => {
       const followUp = await run(sessionId, "Thanks", history);
       expect(followUp.status).toBe(200);
       expect(await followUp.text()).toContain('"type":"run_done"');
-      expect((await storedHistory(sessionId))[1]?.attachments).toEqual(
-        expected,
-      );
+      const [, firstReply] = await storedHistory(sessionId);
+      expect(firstReply?.attachments).toEqual(expected);
     } finally {
       connect.mockRestore();
       wait.mockRestore();

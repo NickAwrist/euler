@@ -65,13 +65,10 @@ export type MessageAttachment = z.infer<typeof MessageAttachmentSchema>;
 export type WorkspaceFileAttachment = z.infer<
   typeof WorkspaceFileAttachmentSchema
 >;
-export type GeneratedImageAttachment = z.infer<
-  typeof GeneratedImageAttachmentSchema
->;
 export type WebSourceAttachment = z.infer<typeof WebSourceAttachmentSchema>;
 /** Output a tool attaches to the assistant reply, independent of the reply text. */
 export type ToolOutputAttachment =
-  | GeneratedImageAttachment
+  | z.infer<typeof GeneratedImageAttachmentSchema>
   | WebSourceAttachment;
 
 export function imageUrl(attachmentId: string): string {

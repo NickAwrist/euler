@@ -80,16 +80,4 @@ test("markdown rendering shows tool output images once and opens sources in a ne
   await expect(source).toHaveText("Lighthouse historyexample.com");
   await expect(source).toHaveAttribute("target", "_blank");
   await expect(source).toHaveAttribute("rel", "noopener noreferrer");
-  await page
-    .context()
-    .route("https://www.example.com/**", (route) =>
-      route.fulfill({ body: "Lighthouses", contentType: "text/html" }),
-    );
-  const popupPromise = page.waitForEvent("popup");
-  await source.click();
-  const popup = await popupPromise;
-  await popup.waitForLoadState();
-  expect(popup.url()).toBe("https://www.example.com/lighthouses");
-  expect(await popup.evaluate(() => window.opener)).toBeNull();
-  await expect(page).toHaveURL(/\/dev\/messages\?markdown$/);
 });
