@@ -4,7 +4,7 @@ Reviewed September 24, 2026 against `main` at `910e6c94ceb5cd94d690feb7d538f8197
 
 The review covered all 32 open issues, their comments, and relevant source code. Twelve issues were labeled bugs, and there were no open pull requests. This is a source-based triage, not a browser reproduction pass. Counts and priorities are a snapshot.
 
-Tool-output display and ephemeral-exit protection shipped in PRs #46 and #45. The remaining work is grouped below by shared behavior and code ownership.
+Tool-output display, ephemeral-exit protection, and chat titles/export shipped in PRs #46, #45, and #47. The remaining work is grouped below by shared behavior and code ownership.
 
 ## Priorities
 
@@ -20,7 +20,6 @@ Each row is suitable for one agent working on one branch, within the stated scop
 
 | Priority | Branch and issues | Deliverable and rationale | Size |
 | --- | --- | --- | --- |
-| P2 | `fix/chat-titles-export`: [#18](https://github.com/NickAwrist/euler/issues/18), [#19](https://github.com/NickAwrist/euler/issues/19) | Distinguish actual custom titles from sidebar previews, fix rename behavior, and use proper titles, metadata, and event labels in exports. Shared session metadata makes this a sensible pair. | Medium |
 | P2 | `fix/workspace-feedback`: [#17](https://github.com/NickAwrist/euler/issues/17), [#29](https://github.com/NickAwrist/euler/issues/29) | Handle stale file references and file errors clearly; improve folder-dialog wording and hidden-folder behavior. Keep folder switching in slash commands, as requested in the comment. Accurate messages about a file's original workspace require actual workspace provenance. | Medium |
 | P2 | `fix/usage-display`: [#16](https://github.com/NickAwrist/euler/issues/16), [#41](https://github.com/NickAwrist/euler/issues/41) | Fix duplicate ticks alongside sparse-data presentation, missing-data tiles, model colors and legend, sorting, and consistent numbers. One bounded Usage-page branch. | Medium |
 | P2 | `fix/chat-layout`: [#21](https://github.com/NickAwrist/euler/issues/21), layout portions of [#38](https://github.com/NickAwrist/euler/issues/38) | Fix mobile header overlap, add jump-to-latest, handle empty files panels and Escape focus correctly, and update the browser title. Move halted-response actions to response-actions work and the empty-chat hint to #28. | Medium |
