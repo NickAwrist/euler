@@ -14,10 +14,11 @@ Address missing tool outputs and ephemeral-chat loss next. Group work by shared 
 
 Size estimates describe implementation scope, not elapsed time.
 
-## Implemented, awaiting merge
+## Merged into main
 
-- Model defaults, [#20](https://github.com/NickAwrist/euler/issues/20): Settings and new chats share catalog-based defaults, including loading, unavailable saved models, and empty catalogs.
-- View navigation, [#14](https://github.com/NickAwrist/euler/issues/14) and [#15](https://github.com/NickAwrist/euler/issues/15): views and Settings tabs have URLs, browser history preserves unsaved-settings prompts, and view changes preserve the sidebar preference.
+- First merge, [#10](https://github.com/NickAwrist/euler/issues/10), [#11](https://github.com/NickAwrist/euler/issues/11), and [#22](https://github.com/NickAwrist/euler/issues/22): list markers, single line breaks, and external reply links. Merged in [PR #43](https://github.com/NickAwrist/euler/pull/43), commit `217ea6d`.
+- Model defaults, [#20](https://github.com/NickAwrist/euler/issues/20): Settings and new chats share catalog-based defaults, including loading, unavailable saved models, and empty catalogs. Merged in [PR #44](https://github.com/NickAwrist/euler/pull/44), commit `71b4004`.
+- View navigation, [#14](https://github.com/NickAwrist/euler/issues/14) and [#15](https://github.com/NickAwrist/euler/issues/15): views and Settings tabs have URLs, browser history preserves unsaved-settings prompts, and view changes preserve the sidebar preference. Merged in [PR #44](https://github.com/NickAwrist/euler/pull/44), commit `71b4004`.
 
 ## Recommended branch groups
 
@@ -36,7 +37,7 @@ Each row is suitable for one agent working on one branch, within the stated scop
 | P2 | `fix/draft-during-run`: [#23](https://github.com/NickAwrist/euler/issues/23) | Allow drafting while running, preserve drafts when the run completes, and keep submission disabled. Message queuing is a separate feature. Standalone fix. | Small to medium |
 | P2 | `fix/skill-validation`: validation portion of [#36](https://github.com/NickAwrist/euler/issues/36) | Reuse the existing shared skill schema for inline validation and name normalization. Separate the larger import/runtime additions. | Small |
 
-If a grouped branch is delayed, #16's tick deduplication and #15's sidebar preference fix can ship independently without waiting for the larger changes.
+If the Usage branch is delayed, #16's tick deduplication can ship independently.
 
 ## Separate feature branches and scope splits
 
@@ -58,14 +59,13 @@ An issue split across multiple merges should remain open until its agreed scope 
 
 ## Agent scheduling and merge order
 
-The initial parallel batch can be model defaults and Usage fixes. These have relatively little overlap.
+Model defaults and view navigation have merged. Tool-output display and Usage fixes can proceed independently of the remaining navigation work.
 
 Give one agent ownership of the navigation sequence:
 
-1. #14 and #15: view navigation and sidebar preferences.
-2. #30: ephemeral-exit protection.
-3. #34: settings save/discard behavior.
-4. #28: home composer and session creation.
+1. #30: ephemeral-exit protection.
+2. #34: settings save/discard behavior.
+3. #28: home composer and session creation.
 
 These touch the same navigation and exit behavior. Parallel branches would create avoidable conflicts.
 
@@ -73,7 +73,6 @@ Sequence tool-output work before response-version work because both affect messa
 
 ## Findings to verify before implementation
 
-- **#20 is partly overstated.** New-chat creation already falls back to an available model when the catalog is populated in `ui/hooks/run/useSessionsAndNavigation.ts`. Hardcoded defaults and misleading Settings remain, but reproduce the failing paths first.
 - **#28 already has empty-session cleanup on several navigation paths** in the same hook. Find the missing cases before adding another cleanup mechanism.
 - **Tool results currently contain text only** in `src/tools/BaseTool.ts`. Images and search sources need reliable extraction or structured metadata that survives the full message lifecycle.
 - **Skill invocation flags extend the current data model.** Inspect `src/schemas/skills.ts`, `src/db/skills/types.ts`, and `src/skills/runtime.ts` together when implementing the remainder of #36.
@@ -82,4 +81,4 @@ Sequence tool-output work before response-version work because both affect messa
 
 For each implementation branch, follow `AGENTS.md`: run affected tests, type checking, and lint. Run the UI build for UI changes and browser tests for interaction changes. Focus regression coverage on the behavior changed, including reload/navigation, persistence, and failure paths where relevant.
 
-No implementation tests or browser reproductions were run for this triage document.
+The original triage was source-based. The merged fixes above have regression coverage; PR #44 passed 239 unit tests and 56 browser tests, plus type checking, lint, and the UI build. Two existing sandbox tests were skipped.
