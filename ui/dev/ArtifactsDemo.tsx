@@ -16,7 +16,7 @@ function DemoWorkspace({ alternate }: { alternate: boolean }) {
     setOpen(true);
   };
   return (
-    <ArtifactContext.Provider value={{ openFile }}>
+    <ArtifactContext.Provider value={{ openFile, workspaceKind: "sandbox" }}>
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <SidebarToggle
           side="right"

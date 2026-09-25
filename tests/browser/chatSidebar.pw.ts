@@ -167,6 +167,18 @@ test("chat sidebar desktop workspace changes refresh open artifacts without remo
             role: "assistant",
             content:
               "Open [notes](docs/notes.md). These are code: `foo.bar`, `v1.2`, `a/b`.",
+            attachments: [
+              {
+                id: "30a14710-74b8-4aa0-aa40-90e9b5ac606e",
+                kind: "file",
+                name: "fib.py",
+                path: "fib.py",
+                size: 10,
+                sessionId: "sidebar-test",
+                workspaceKind: "sandbox",
+                temporary: false,
+              },
+            ],
           },
         ],
       },
@@ -178,7 +190,10 @@ test("chat sidebar desktop workspace changes refresh open artifacts without remo
         path: "/demo/local",
         exact: true,
         parent: null,
-        directories: [],
+        directories: [
+          { name: ".cache", path: "/demo/local/.cache" },
+          { name: "src", path: "/demo/local/src" },
+        ],
       },
     }),
   );
@@ -247,13 +262,26 @@ test("chat sidebar desktop workspace changes refresh open artifacts without remo
     "true",
   );
   expect(previews).toBe(1);
+  const fileChip = page.getByRole("button", { name: "Preview fib.py" });
+  await expect(fileChip).toBeEnabled();
   await composer.fill("/directory");
   await composer.press("Enter");
+  const directoryDialog = page.getByRole("dialog", {
+    name: "Choose working directory",
+  });
+  await expect(directoryDialog.getByText("src", { exact: true })).toBeVisible();
+  await expect(directoryDialog.getByText(".cache")).toHaveCount(0);
+  await directoryDialog.getByLabel("Show hidden folders").check();
+  await expect(directoryDialog.getByText(".cache")).toBeVisible();
   await page.getByRole("textbox", { name: "Folder path" }).fill("/demo/local");
-  await page.getByRole("button", { name: "Confirm directory" }).click();
+  await page.getByRole("button", { name: "Use this folder" }).click();
+  await expect(directoryDialog).toBeHidden();
+  await expect(fileChip).toBeDisabled();
   await expect(
-    page.getByRole("dialog", { name: "Choose working directory" }),
-  ).toBeHidden();
+    page.getByText(
+      "Created in this chat's private workspace. Run /sandbox to view.",
+    ),
+  ).toBeVisible();
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
   expect(
     await originalComposer!.evaluate((element) => element.isConnected),

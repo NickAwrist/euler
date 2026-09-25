@@ -59,6 +59,10 @@ export function AssistantMessageBubble({
     (attachment): attachment is WorkspaceFileAttachment =>
       attachment.kind === "file",
   );
+  // Files from a previous workspace no longer resolve against the current one.
+  const isOtherWorkspace = (file: WorkspaceFileAttachment) =>
+    artifacts !== null && file.workspaceKind !== artifacts.workspaceKind;
+  const otherWorkspaceKind = outputFiles.find(isOtherWorkspace)?.workspaceKind;
   const sources = attachments.filter(
     (attachment): attachment is WebSourceAttachment =>
       attachment.kind === "web_source",
@@ -96,7 +100,7 @@ export function AssistantMessageBubble({
                   key={file.id}
                   type="button"
                   onClick={() => artifacts?.openFile(file.path)}
-                  disabled={!artifacts}
+                  disabled={!artifacts || isOtherWorkspace(file)}
                   aria-label={`Preview ${file.name}`}
                   title={`Preview ${file.path}`}
                   className={msgOutputChip}
@@ -105,6 +109,13 @@ export function AssistantMessageBubble({
                   <span className="min-w-0 truncate">{file.name}</span>
                 </button>
               ))}
+              {otherWorkspaceKind && (
+                <p className="m-0 text-xs text-muted-foreground">
+                  {otherWorkspaceKind === "sandbox"
+                    ? "Created in this chat's private workspace. Run /sandbox to view."
+                    : "Created in a local folder. Run /directory and choose that folder to view."}
+                </p>
+              )}
             </div>
           )}
           {sources.length > 0 && (

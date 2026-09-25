@@ -81,6 +81,13 @@ for (const temporary of [false, true]) {
         headers: userHeaders(),
       });
       expect(traversal.status).toBe(400);
+      const missing = await fetch(`${base}/preview?path=docs/missing.md`, {
+        headers: userHeaders(),
+      });
+      expect(missing.status).toBe(400);
+      expect(await missing.json()).toMatchObject({
+        error: { message: "Path does not exist: docs/missing.md" },
+      });
       const invalidDownload = await fetch(`${base}/download?path=../outside`, {
         headers: userHeaders(),
       });

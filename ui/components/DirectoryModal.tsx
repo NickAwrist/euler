@@ -4,6 +4,7 @@ import {
   type DirectoryListing,
   fetchDirectories,
 } from "../persist/directories";
+import { cx, inputClass } from "../styles";
 import { Button } from "./Button";
 import { Modal } from "./Modal";
 
@@ -22,6 +23,7 @@ export function DirectoryModal({
   const [listing, setListing] = useState<DirectoryListing | null>(null);
   const [browseError, setBrowseError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showHidden, setShowHidden] = useState(false);
   const resolvedPathRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -64,6 +66,14 @@ export function DirectoryModal({
     };
   }, [path]);
 
+  // Typing a partial name (for example `.co`) already filters explicitly.
+  const directories =
+    listing?.exact && !showHidden
+      ? listing.directories.filter(
+          (directory) => !directory.name.startsWith("."),
+        )
+      : listing?.directories;
+
   function navigate(nextPath: string) {
     setPath(nextPath);
     setError(null);
@@ -72,7 +82,8 @@ export function DirectoryModal({
 
   return (
     <Modal
-      ariaLabel="Choose working directory"
+      title="Choose working directory"
+      subtitle="The agent can read, edit, and run commands in this folder."
       onClose={onClose}
       closeDisabled={pending}
       hideCloseButton
@@ -102,7 +113,7 @@ export function DirectoryModal({
           }
         }}
       >
-        <div className="flex items-center gap-2 border-b border-border-subtle p-1">
+        <div className="flex items-center gap-2 border-b border-border-subtle px-3 py-2">
           <input
             id="directory-path"
             ref={inputRef}
@@ -117,19 +128,28 @@ export function DirectoryModal({
             spellCheck={false}
             aria-label="Folder path"
             aria-invalid={error !== null}
-            className="min-w-0 flex-1 rounded-md bg-transparent px-2 py-2 text-sm text-foreground outline-none focus-visible:ring-1 focus-visible:ring-accent"
+            className={cx(inputClass, "min-w-0 flex-1 font-mono")}
           />
           <Button
             type="submit"
             size="sm"
             disabled={pending || !path.trim()}
             loading={pending}
-            aria-label={pending ? "Selecting directory" : "Confirm directory"}
             className="shrink-0"
           >
-            {pending ? "…" : "OK"}
+            Use this folder
           </Button>
         </div>
+        <label className="flex items-center gap-2 border-b border-border-subtle px-3 py-2 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={showHidden}
+            disabled={pending}
+            onChange={(event) => setShowHidden(event.target.checked)}
+            className="h-3.5 w-3.5"
+          />
+          Show hidden folders
+        </label>
         {error && (
           <p role="alert" className="px-3 py-2 text-sm text-red-400">
             {error}
@@ -162,7 +182,7 @@ export function DirectoryModal({
               {browseError}
             </p>
           )}
-          {listing?.directories.map((directory) => (
+          {directories?.map((directory) => (
             <button
               key={directory.path}
               type="button"
@@ -174,9 +194,11 @@ export function DirectoryModal({
               <span className="truncate">{directory.name}</span>
             </button>
           ))}
-          {listing?.directories.length === 0 && (
+          {directories?.length === 0 && (
             <output className="px-3 py-3 text-sm text-muted-foreground">
-              No folders found.
+              {listing?.directories.length
+                ? "Only hidden folders here."
+                : "No folders found."}
             </output>
           )}
         </div>
