@@ -59,7 +59,6 @@ export function useRunApp() {
 
   const sessions = useSessionsAndNavigation({
     ollamaModels: ollama.ollamaModels,
-    serverDefaultModel: ollama.serverDefaultModel,
     userSettingsRef: settings.userSettingsRef,
     userSettingsDefaultModel: settings.userSettings.defaultModel,
     messages,
@@ -168,6 +167,7 @@ export function useRunApp() {
     setPendingDeleteSessionId: sessions.setPendingDeleteSessionId,
     runPending: stream.runPending,
     ollamaModels: ollama.ollamaModels,
+    catalogLoaded: ollama.catalogLoaded,
     modelsLoadError: ollama.modelsLoadError,
     selectedModel: sessions.selectedModel,
     workspace: sessions.workspace,

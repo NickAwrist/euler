@@ -1,5 +1,4 @@
 export type {
-  AppView,
   SessionWorkspace,
   WorkspaceFile,
 } from "./app";

@@ -72,7 +72,6 @@ export function useOllamaConnection() {
   const [ollamaModels, setOllamaModels] = useState<ModelOption[]>([]);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [modelsLoadError, setModelsLoadError] = useState<string | null>(null);
-  const [serverDefaultModel, setServerDefaultModel] = useState("gemma4:e4b");
   const [ollamaHost, setOllamaHost] = useState("");
   const [ollamaConnected, setOllamaConnected] = useState<boolean | null>(null);
 
@@ -119,16 +118,12 @@ export function useOllamaConnection() {
       }
       const data = (await res.json()) as {
         models?: unknown;
-        defaultModel?: string;
       };
       if (requestId !== modelRequestId.current) return;
       setModelsLoadError(null);
       const list = mapModelOptions(data.models);
       setOllamaModels(list);
       setCatalogLoaded(true);
-      if (typeof data.defaultModel === "string" && data.defaultModel.trim()) {
-        setServerDefaultModel(data.defaultModel.trim());
-      }
     } catch (e) {
       if (requestId !== modelRequestId.current) return;
       setModelsLoadError(e instanceof Error ? e.message : String(e));
@@ -169,7 +164,6 @@ export function useOllamaConnection() {
     ollamaModels,
     catalogLoaded,
     modelsLoadError,
-    serverDefaultModel,
     ollamaHost,
     setOllamaHost,
     ollamaConnected,

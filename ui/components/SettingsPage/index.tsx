@@ -1,5 +1,6 @@
 import { Save } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { setNavigationGuard } from "../../lib/navigation";
 import { cx } from "../../styles";
 import { BackToChatButton } from "../BackToChatButton";
 import { Button } from "../Button";
@@ -19,30 +20,50 @@ export function SettingsPage(props: SettingsPageProps) {
   const environment = useEnvironmentSettings();
   const [leavePromptOpen, setLeavePromptOpen] = useState(false);
 
-  const leave = () => {
-    if (window.location.hash === "#settings/openrouter")
-      history.replaceState(
-        window.history.state,
-        "",
-        window.location.pathname + window.location.search,
-      );
-    props.onBack();
-  };
-  const handleBack = () => {
-    if (p.isDirty) {
+  const [localTab, setLocalTab] = useState<SettingsTab>("general");
+  const tab = props.tab ?? localTab;
+  const setTab = props.onTabChange ?? setLocalTab;
+  const allowLeave = useRef(false);
+  const pendingLeave = useRef<((approved: boolean) => void) | null>(null);
+  const requestLeave = () =>
+    new Promise<boolean>((resolve) => {
+      pendingLeave.current = resolve;
       setLeavePromptOpen(true);
-      return;
-    }
-    leave();
+    });
+  useEffect(() => {
+    if (!p.isDirty) return;
+    const removeGuard = setNavigationGuard((path) =>
+      path.startsWith("/settings/") || allowLeave.current
+        ? Promise.resolve(true)
+        : requestLeave(),
+    );
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => {
+      removeGuard();
+      window.removeEventListener("beforeunload", beforeUnload);
+    };
+  }, [p.isDirty]);
+  const resolveLeave = (approved: boolean) => {
+    allowLeave.current = approved;
+    pendingLeave.current?.(approved);
+    pendingLeave.current = null;
+    setLeavePromptOpen(false);
+  };
+  const handleBack = async () => {
+    if (!p.isDirty || (await requestLeave())) props.onBack();
   };
   const handleSaveAndLeave = async () => {
-    if (await p.handleSubmit()) leave();
+    if (await p.handleSubmit()) resolveLeave(true);
   };
 
   const tabButtonClass = (t: SettingsTab) =>
     cx(
       "rounded-t-md border-b-2 px-4 py-2 text-[0.8125rem] font-medium transition-colors",
-      p.tab === t
+      tab === t
         ? "border-foreground text-foreground"
         : "border-transparent text-muted-foreground hover:text-foreground",
     );
@@ -61,35 +82,35 @@ export function SettingsPage(props: SettingsPageProps) {
         <button
           type="button"
           className={tabButtonClass("general")}
-          onClick={() => p.setTab("general")}
+          onClick={() => setTab("general")}
         >
           General
         </button>
         <button
           type="button"
           className={tabButtonClass("ollama")}
-          onClick={() => p.setTab("ollama")}
+          onClick={() => setTab("ollama")}
         >
           Ollama
         </button>
         <button
           type="button"
           className={tabButtonClass("openrouter")}
-          onClick={() => p.setTab("openrouter")}
+          onClick={() => setTab("openrouter")}
         >
           OpenRouter
         </button>
         <button
           type="button"
           className={tabButtonClass("image-generation")}
-          onClick={() => p.setTab("image-generation")}
+          onClick={() => setTab("image-generation")}
         >
           Image Generation
         </button>
         <button
           type="button"
           className={tabButtonClass("web-search")}
-          onClick={() => p.setTab("web-search")}
+          onClick={() => setTab("web-search")}
         >
           Web Search
         </button>
@@ -103,15 +124,16 @@ export function SettingsPage(props: SettingsPageProps) {
             </div>
           )}
 
-          {p.tab === "general" && (
+          {tab === "general" && (
             <GeneralSettingsTab
               settings={p.settings}
               onFieldChange={p.handleChange}
               availableModels={p.availableModels}
+              catalogLoaded={props.catalogLoaded}
             />
           )}
 
-          {p.tab === "ollama" && (
+          {tab === "ollama" && (
             <OllamaSettingsTab
               environmentManaged={environment.settings?.ollamaHost}
               ollamaUri={p.ollamaUri}
@@ -122,7 +144,7 @@ export function SettingsPage(props: SettingsPageProps) {
             />
           )}
 
-          {p.tab === "image-generation" && (
+          {tab === "image-generation" && (
             <ImageGenerationTab
               environmentManaged={environment.settings?.comfyuiHost}
               comfyuiConnected={props.comfyuiConnected}
@@ -140,11 +162,11 @@ export function SettingsPage(props: SettingsPageProps) {
             />
           )}
 
-          {p.tab === "openrouter" && (
+          {tab === "openrouter" && (
             <OpenRouterSettingsTab onModelsChanged={props.onModelsChanged} />
           )}
 
-          {p.tab === "web-search" && (
+          {tab === "web-search" && (
             <WebSearchTab
               environmentManaged={environment.settings?.searxngHost}
               searxngConnected={props.searxngConnected}
@@ -155,7 +177,7 @@ export function SettingsPage(props: SettingsPageProps) {
             />
           )}
 
-          {p.tab !== "openrouter" && (
+          {tab !== "openrouter" && (
             <div className="flex justify-end border-t border-border-subtle pt-6">
               <Button
                 variant="primary"
@@ -174,8 +196,8 @@ export function SettingsPage(props: SettingsPageProps) {
       {leavePromptOpen && (
         <UnsavedChangesModal
           saving={p.isSaving}
-          onStay={() => setLeavePromptOpen(false)}
-          onDiscard={leave}
+          onStay={() => resolveLeave(false)}
+          onDiscard={() => resolveLeave(true)}
           onSaveAndLeave={() => void handleSaveAndLeave()}
         />
       )}

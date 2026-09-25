@@ -35,7 +35,10 @@ export type SearXNGTestState =
   | { status: "err"; message: string };
 
 export type SettingsPageProps = {
+  tab?: SettingsTab;
+  onTabChange?: (tab: SettingsTab) => void;
   ollamaModels: ModelOption[];
+  catalogLoaded?: boolean;
   currentSettings: UserSettings;
   ollamaHost: string;
   ollamaConnected: boolean | null;

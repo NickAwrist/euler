@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { effectiveDefaultRunModel } from "../../lib/defaultModel";
 import {
   fetchSession,
   patchSessionApi,
@@ -14,16 +15,14 @@ import {
   useSessionSandbox,
 } from "../../persist/sessions";
 import type { UserSettings } from "../../persist/userSettings";
-import { loadUserSettings } from "../../persist/userSettings";
-import type { Message, SessionWorkspace } from "../../types";
-import { effectiveDefaultRunModel } from "./sessionUtils";
+import type { Message, ModelOption, SessionWorkspace } from "../../types";
 
 export interface UseSessionPreferencesOptions {
   activeSessionId: string | null;
   activeSessionIdRef: MutableRefObject<string | null>;
   isEphemeralRef: MutableRefObject<boolean>;
   userSettingsRef: MutableRefObject<UserSettings>;
-  serverDefaultModel: string;
+  ollamaModels: ModelOption[];
   userSettingsDefaultModel: string;
   refreshSessions: () => Promise<void>;
   setMessages: Dispatch<SetStateAction<Message[]>>;
@@ -34,13 +33,16 @@ export function useSessionPreferences({
   activeSessionIdRef,
   isEphemeralRef,
   userSettingsRef,
-  serverDefaultModel,
+  ollamaModels,
   userSettingsDefaultModel,
   refreshSessions,
   setMessages,
 }: UseSessionPreferencesOptions) {
   const [selectedModel, setSelectedModel] = useState(() =>
-    effectiveDefaultRunModel(loadUserSettings(), "gemma4:e4b"),
+    effectiveDefaultRunModel(
+      userSettingsRef.current.defaultModel,
+      ollamaModels,
+    ),
   );
   const [sessionModel, setSessionModel] = useState<string | null>(null);
   const [thinkingEffort, setThinkingEffort] = useState<string | null>(null);
@@ -50,15 +52,17 @@ export function useSessionPreferences({
   const returningToSandboxRef = useRef(false);
 
   useEffect(() => {
-    if (!activeSessionId) return;
     setSelectedModel(
-      sessionModel?.trim() ||
-        effectiveDefaultRunModel(userSettingsRef.current, serverDefaultModel),
+      (activeSessionId ? sessionModel?.trim() : "") ||
+        effectiveDefaultRunModel(
+          userSettingsRef.current.defaultModel,
+          ollamaModels,
+        ),
     );
   }, [
     activeSessionId,
     sessionModel,
-    serverDefaultModel,
+    ollamaModels,
     userSettingsRef,
     userSettingsDefaultModel,
   ]);

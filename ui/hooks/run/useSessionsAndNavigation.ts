@@ -7,6 +7,14 @@ import {
   useRef,
   useState,
 } from "react";
+import { effectiveDefaultRunModel } from "../../lib/defaultModel";
+import {
+  NAVIGATION_EVENT,
+  isChatPath,
+  navigate,
+  replaceNavigation,
+  sessionPath,
+} from "../../lib/navigation";
 import { safeStorage } from "../../lib/safeStorage";
 import { getActiveRun } from "../../persist/runs";
 import {
@@ -28,7 +36,6 @@ import type {
 } from "../../types";
 import type { ModelOption } from "../../types";
 import type { RunFlightApi, SessionLoadState } from "./runTypes";
-import { effectiveDefaultRunModel } from "./sessionUtils";
 import { useSessionPreferences } from "./useSessionPreferences";
 
 const ACTIVE_SESSION_STORAGE_KEY = "activeSessionId";
@@ -44,22 +51,16 @@ function sessionIdFromUrl(): string | null {
 }
 
 function pushSessionUrl(id: string | null) {
-  const target = id ? `${RUN_PATH_PREFIX}${encodeURIComponent(id)}` : "/";
-  if (window.location.pathname !== target) {
-    window.history.pushState({ sessionId: id }, "", target);
-  }
+  // Session actions already update their state; only history needs changing.
+  void navigate(sessionPath(id));
 }
 
 function replaceSessionUrl(id: string | null) {
-  const target = id ? `${RUN_PATH_PREFIX}${encodeURIComponent(id)}` : "/";
-  if (window.location.pathname !== target) {
-    window.history.replaceState({ sessionId: id }, "", target);
-  }
+  if (isChatPath()) replaceNavigation(sessionPath(id));
 }
 
 type Args = {
   ollamaModels: ModelOption[];
-  serverDefaultModel: string;
   userSettingsRef: MutableRefObject<UserSettings>;
   userSettingsDefaultModel: string;
   messages: Message[];
@@ -80,7 +81,11 @@ type Args = {
 export function useSessionsAndNavigation(p: Args) {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
-    sessionIdFromUrl,
+    () =>
+      sessionIdFromUrl() ||
+      (!isChatPath()
+        ? safeStorage.session.getItem(ACTIVE_SESSION_STORAGE_KEY)
+        : null),
   );
   const [isEphemeral, setIsEphemeral] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -112,7 +117,7 @@ export function useSessionsAndNavigation(p: Args) {
     activeSessionIdRef: p.activeSessionIdRef,
     isEphemeralRef: p.isEphemeralRef,
     userSettingsRef: p.userSettingsRef,
-    serverDefaultModel: p.serverDefaultModel,
+    ollamaModels: p.ollamaModels,
     userSettingsDefaultModel: p.userSettingsDefaultModel,
     refreshSessions,
     setMessages: p.setMessages,
@@ -275,7 +280,9 @@ export function useSessionsAndNavigation(p: Args) {
     void refreshSessions();
     const restoredId =
       sessionIdFromUrl() ||
-      safeStorage.session.getItem(ACTIVE_SESSION_STORAGE_KEY);
+      (!isChatPath()
+        ? safeStorage.session.getItem(ACTIVE_SESSION_STORAGE_KEY)
+        : null);
     if (restoredId) void loadSession(restoredId);
     restoreDoneRef.current = true;
     return () => {
@@ -350,18 +357,12 @@ export function useSessionsAndNavigation(p: Args) {
         }
       }
       setIsEphemeral(false);
-      const names = new Set(p.ollamaModels.map((m) => m.id));
-      let modelForNew = effectiveDefaultRunModel(
-        p.userSettingsRef.current,
-        p.serverDefaultModel,
+      const modelForNew = effectiveDefaultRunModel(
+        p.userSettingsRef.current.defaultModel,
+        p.ollamaModels,
       );
-      if (names.size > 0 && !names.has(modelForNew)) {
-        modelForNew = names.has(p.serverDefaultModel)
-          ? p.serverDefaultModel
-          : (p.ollamaModels[0]?.id ?? modelForNew);
-      }
       const { id } = await createSessionApi({
-        model: modelForNew,
+        model: modelForNew || null,
       });
       await refreshSessions();
       pushSessionUrl(id);
@@ -379,7 +380,6 @@ export function useSessionsAndNavigation(p: Args) {
     p.onNavigate,
     canDiscardEmptySession,
     p.ollamaModels,
-    p.serverDefaultModel,
     p.userSettingsRef,
     refreshSessions,
   ]);
@@ -406,6 +406,7 @@ export function useSessionsAndNavigation(p: Args) {
     setActiveSessionId(id);
     resetSessionTransientState();
     setIsEphemeral(true);
+    preferences.setSessionModel(null);
     p.modelMessagesRef.current = null;
     p.onNavigate?.();
     preferences.setWorkspace({ kind: "sandbox" });
@@ -417,17 +418,31 @@ export function useSessionsAndNavigation(p: Args) {
     canDiscardEmptySession,
     p.modelMessagesRef,
     resetSessionTransientState,
+    preferences.setSessionModel,
     refreshSessions,
     preferences.setWorkspace,
   ]);
 
   useEffect(() => {
-    const onPopState = () => {
+    const onPopState = (event: Event) => {
+      if (
+        !(event instanceof CustomEvent) ||
+        !event.detail?.historyTraversal ||
+        !isChatPath()
+      )
+        return;
+      const urlId = sessionIdFromUrl();
+      if (urlId === p.activeSessionIdRef.current) return;
+      if (
+        !urlId &&
+        p.isEphemeralRef.current &&
+        !isChatPath(event.detail.previousPath)
+      )
+        return;
       const curId = p.activeSessionIdRef.current;
       if (curId && p.isEphemeralRef.current) {
         void deleteTemporarySessionApi(curId).catch(() => {});
       }
-      const urlId = sessionIdFromUrl();
       if (urlId) {
         setIsEphemeral(false);
         void loadSession(urlId);
@@ -441,8 +456,8 @@ export function useSessionsAndNavigation(p: Args) {
         resetSessionTransientState();
       }
     };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
+    window.addEventListener(NAVIGATION_EVENT, onPopState);
+    return () => window.removeEventListener(NAVIGATION_EVENT, onPopState);
   }, [
     loadSession,
     p.activeSessionIdRef,

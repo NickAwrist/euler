@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { DEFAULT_RUN_MODEL } from "../constants";
 import { getOpenRouterApiKey, listOpenRouterModels } from "../db/index";
 import { listModelFavorites, listOpenRouterPublishers } from "../db/openrouter";
 import { asyncRoute } from "../http/asyncRoute";
@@ -90,9 +89,10 @@ modelsRoutes.get(
           }))
       : [];
 
+    const models = [...ollamaModels, ...openRouterModels];
     res.json({
-      defaultModel: DEFAULT_RUN_MODEL,
-      models: [...ollamaModels, ...openRouterModels],
+      defaultModel: models[0]?.id ?? null,
+      models,
       providers: {
         ollama: { connected: ollamaError === null, error: ollamaError },
         openrouter: { configured: openrouterConfigured },
