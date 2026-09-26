@@ -19,7 +19,6 @@ export function stripSkillReferences(
     .replace(SKILL_REFERENCE_PATTERN, (reference, name: string) =>
       skillNames.has(name) ? "" : reference,
     )
-    .replace(/\s+/g, " ")
     .trim();
 }
 
