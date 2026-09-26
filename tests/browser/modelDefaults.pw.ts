@@ -135,7 +135,7 @@ test("model defaults desktop: unavailable preference matches settings, new chats
     .click();
   await expect(
     page.getByRole("button", { name: "Save settings", exact: true }),
-  ).toBeDisabled();
+  ).toBeHidden();
   await page.getByRole("button", { name: "Back to chat" }).click();
   await expect(page.getByText("Ephemeral", { exact: true })).toBeVisible();
   await expect(page.getByPlaceholder("Send a message...")).toHaveValue(

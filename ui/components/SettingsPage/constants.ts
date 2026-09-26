@@ -1,3 +1,13 @@
+import type { SettingsTab } from "../../types";
+
+export const SETTINGS_TABS: readonly { id: SettingsTab; label: string }[] = [
+  { id: "general", label: "General" },
+  { id: "ollama", label: "Ollama" },
+  { id: "openrouter", label: "OpenRouter" },
+  { id: "image-generation", label: "Image Generation" },
+  { id: "web-search", label: "Web Search" },
+];
+
 export const SIZE_PRESETS = [
   { label: "512x512 - Square", width: 512, height: 512 },
   { label: "512x768 - Portrait", width: 512, height: 768 },

@@ -4,12 +4,14 @@ import type {
   ComfyUIConfigPayload,
   ModelOption,
   SearXNGConfigPayload,
+  SettingsTab,
 } from "../../types";
 import { parseSize, sizeKey } from "./constants";
 import type {
   ComfyUITestState,
   OllamaTestState,
   SearXNGTestState,
+  SettingChange,
 } from "./types";
 
 type Args = {
@@ -224,25 +226,53 @@ export function useSettingsPageState({
     [comfyuiDefaultWidth, comfyuiDefaultHeight],
   );
 
-  const isDirty = useMemo(() => {
-    if (
-      settings.systemPrompt !== currentSettings.systemPrompt ||
-      settings.name !== currentSettings.name ||
-      settings.preferredFormats !== currentSettings.preferredFormats ||
-      settings.location !== currentSettings.location ||
-      settings.defaultModel !== currentSettings.defaultModel ||
-      settings.includeCurrentDate !== currentSettings.includeCurrentDate ||
-      settings.showDebugButton !== currentSettings.showDebugButton
-    ) {
-      return true;
-    }
-    if (ollamaUri !== ollamaHost) return true;
-    if (comfyUri !== comfyuiHost) return true;
-    if (comfyModel !== comfyuiDefaultModel) return true;
-    if (comfySize !== savedComfySize) return true;
-    if (comfyNegative !== comfyuiNegativePrompt) return true;
-    if (searxngUri !== searxngHost) return true;
-    return false;
+  const changes = useMemo((): SettingChange[] => {
+    const settingChanges: [SettingsTab, string, boolean][] = [
+      ["general", "Name", settings.name !== currentSettings.name],
+      ["general", "Location", settings.location !== currentSettings.location],
+      [
+        "general",
+        "Preferred response formats",
+        settings.preferredFormats !== currentSettings.preferredFormats,
+      ],
+      [
+        "general",
+        "Include current date",
+        settings.includeCurrentDate !== currentSettings.includeCurrentDate,
+      ],
+      [
+        "general",
+        "System prompt",
+        settings.systemPrompt !== currentSettings.systemPrompt,
+      ],
+      [
+        "general",
+        "Default model",
+        settings.defaultModel !== currentSettings.defaultModel,
+      ],
+      [
+        "general",
+        "Display debug button",
+        settings.showDebugButton !== currentSettings.showDebugButton,
+      ],
+      ["ollama", "Ollama server URL", ollamaUri !== ollamaHost],
+      ["image-generation", "ComfyUI server URL", comfyUri !== comfyuiHost],
+      [
+        "image-generation",
+        "Default checkpoint model",
+        comfyModel !== comfyuiDefaultModel,
+      ],
+      ["image-generation", "Default image size", comfySize !== savedComfySize],
+      [
+        "image-generation",
+        "Negative prompt",
+        comfyNegative !== comfyuiNegativePrompt,
+      ],
+      ["web-search", "SearXNG server URL", searxngUri !== searxngHost],
+    ];
+    return settingChanges
+      .filter(([, , changed]) => changed)
+      .map(([tab, label]) => ({ tab, label }));
   }, [
     settings,
     currentSettings,
@@ -257,6 +287,29 @@ export function useSettingsPageState({
     comfyNegative,
     comfyuiNegativePrompt,
     searxngUri,
+    searxngHost,
+  ]);
+  const isDirty = changes.length > 0;
+
+  const discardChanges = useCallback(() => {
+    setSettings(currentSettings);
+    setOllamaUri(ollamaHost);
+    setComfyUri(comfyuiHost);
+    setComfyModel(comfyuiDefaultModel);
+    setComfySize(savedComfySize);
+    setComfyNegative(comfyuiNegativePrompt);
+    setSearxngUri(searxngHost);
+    setTestState({ status: "idle" });
+    setComfyTestState({ status: "idle" });
+    setSearxngTestState({ status: "idle" });
+    setError(null);
+  }, [
+    currentSettings,
+    ollamaHost,
+    comfyuiHost,
+    comfyuiDefaultModel,
+    savedComfySize,
+    comfyuiNegativePrompt,
     searxngHost,
   ]);
 
@@ -324,7 +377,9 @@ export function useSettingsPageState({
     ollamaUri,
     onOllamaUriInput,
     isSaving,
+    changes,
     isDirty,
+    discardChanges,
     error,
     testState,
     comfyUri,

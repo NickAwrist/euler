@@ -38,11 +38,13 @@ export function FavoriteButton({
   );
 }
 export function EnableSwitch({
+  id,
   checked,
   label,
   disabled,
   onChange,
 }: {
+  id?: string;
   checked: boolean;
   label: string;
   disabled?: boolean;
@@ -50,6 +52,7 @@ export function EnableSwitch({
 }) {
   return (
     <button
+      id={id}
       type="button"
       role="switch"
       aria-label={label}

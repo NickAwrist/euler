@@ -108,8 +108,8 @@ export function ImageGenerationTab({
           ))}
         </select>
         <p className={hintClass}>
-          The checkpoint model used for image generation. Leave empty to use the
-          first available model.
+          The checkpoint model used for image generation. Auto uses the first
+          model ComfyUI reports.
         </p>
       </div>
 

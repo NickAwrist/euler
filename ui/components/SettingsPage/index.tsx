@@ -2,7 +2,6 @@ import { Save } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { addNavigationGuard } from "../../lib/navigation";
 import { cx } from "../../styles";
-import type { SettingsTab } from "../../types";
 import { BackToChatButton } from "../BackToChatButton";
 import { Button } from "../Button";
 import { GeneralSettingsTab } from "./GeneralSettingsTab";
@@ -11,6 +10,7 @@ import { OllamaSettingsTab } from "./OllamaSettingsTab";
 import { OpenRouterSettingsTab } from "./OpenRouterSettingsTab";
 import { UnsavedChangesModal } from "./UnsavedChangesModal";
 import { WebSearchTab } from "./WebSearchTab";
+import { SETTINGS_TABS } from "./constants";
 import type { SettingsPageProps } from "./types";
 import { useEnvironmentSettings } from "./useEnvironmentSettings";
 import { useSettingsPageState } from "./useSettingsPageState";
@@ -18,7 +18,7 @@ import { useSettingsPageState } from "./useSettingsPageState";
 export function SettingsPage(props: SettingsPageProps) {
   const p = useSettingsPageState(props);
   const environment = useEnvironmentSettings();
-  const [leavePromptOpen, setLeavePromptOpen] = useState(false);
+  const [prompt, setPrompt] = useState<"leave" | "discard" | null>(null);
 
   const { tab, onTabChange: setTab } = props;
   const allowLeave = useRef(false);
@@ -26,7 +26,7 @@ export function SettingsPage(props: SettingsPageProps) {
   const requestLeave = () =>
     new Promise<boolean>((resolve) => {
       pendingLeave.current = resolve;
-      setLeavePromptOpen(true);
+      setPrompt("leave");
     });
   useEffect(() => {
     if (!p.isDirty) return;
@@ -42,7 +42,7 @@ export function SettingsPage(props: SettingsPageProps) {
     allowLeave.current = approved;
     pendingLeave.current?.(approved);
     pendingLeave.current = null;
-    setLeavePromptOpen(false);
+    setPrompt(null);
   };
   const handleBack = async () => {
     if (!p.isDirty || (await requestLeave())) props.onBack();
@@ -51,13 +51,13 @@ export function SettingsPage(props: SettingsPageProps) {
     if (await p.handleSubmit()) resolveLeave(true);
   };
 
-  const tabButtonClass = (t: SettingsTab) =>
-    cx(
-      "rounded-t-md border-b-2 px-4 py-2 text-[0.8125rem] font-medium transition-colors",
-      tab === t
-        ? "border-foreground text-foreground"
-        : "border-transparent text-muted-foreground hover:text-foreground",
-    );
+  const confirmDiscard = () => {
+    p.discardChanges();
+    setPrompt(null);
+  };
+  const dirtyTabs = SETTINGS_TABS.filter((t) =>
+    p.changes.some((change) => change.tab === t.id),
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
@@ -69,42 +69,25 @@ export function SettingsPage(props: SettingsPageProps) {
         </h1>
       </header>
 
-      <div className="flex shrink-0 gap-1 overflow-x-auto border-b border-border-subtle px-3 sm:px-5">
-        <button
-          type="button"
-          className={tabButtonClass("general")}
-          onClick={() => setTab("general")}
-        >
-          General
-        </button>
-        <button
-          type="button"
-          className={tabButtonClass("ollama")}
-          onClick={() => setTab("ollama")}
-        >
-          Ollama
-        </button>
-        <button
-          type="button"
-          className={tabButtonClass("openrouter")}
-          onClick={() => setTab("openrouter")}
-        >
-          OpenRouter
-        </button>
-        <button
-          type="button"
-          className={tabButtonClass("image-generation")}
-          onClick={() => setTab("image-generation")}
-        >
-          Image Generation
-        </button>
-        <button
-          type="button"
-          className={tabButtonClass("web-search")}
-          onClick={() => setTab("web-search")}
-        >
-          Web Search
-        </button>
+      <div className="flex shrink-0 flex-wrap gap-x-1 border-b border-border-subtle px-3 sm:flex-nowrap sm:px-5">
+        {SETTINGS_TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={cx(
+              "flex items-center gap-1.5 whitespace-nowrap rounded-t-md border-b-2 px-3 py-2 text-[0.8125rem] font-medium transition-colors sm:px-4",
+              tab === t.id
+                ? "border-foreground text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => setTab(t.id)}
+          >
+            {t.label}
+            {dirtyTabs.includes(t) && (
+              <span aria-hidden className="size-1.5 rounded-full bg-accent" />
+            )}
+          </button>
+        ))}
       </div>
 
       <main className="flex-1 overflow-y-auto p-4 sm:p-6">
@@ -167,29 +150,50 @@ export function SettingsPage(props: SettingsPageProps) {
               onTestSearXNG={p.handleTestSearXNG}
             />
           )}
-
-          {tab !== "openrouter" && (
-            <div className="flex justify-end border-t border-border-subtle pt-6">
-              <Button
-                variant="primary"
-                disabled={!environment.settings || !p.isDirty || p.isSaving}
-                loading={p.isSaving}
-                icon={Save}
-                onClick={() => void p.handleSubmit()}
-              >
-                Save settings
-              </Button>
-            </div>
-          )}
         </div>
       </main>
 
-      {leavePromptOpen && (
+      {p.isDirty && (
+        <footer className="flex shrink-0 flex-wrap items-center justify-end gap-x-3 gap-y-2 border-t border-border-subtle bg-background px-4 py-3 sm:px-6">
+          <p className="mr-auto text-[0.8125rem] text-muted-foreground">
+            Unsaved changes in {dirtyTabs.map((t) => t.label).join(", ")}
+          </p>
+          <Button
+            variant="secondary"
+            disabled={p.isSaving}
+            onClick={() => setPrompt("discard")}
+          >
+            Discard
+          </Button>
+          <Button
+            variant="primary"
+            disabled={!environment.settings || p.isSaving}
+            loading={p.isSaving}
+            icon={Save}
+            onClick={() => void p.handleSubmit()}
+          >
+            Save settings
+          </Button>
+        </footer>
+      )}
+
+      {prompt === "leave" && (
         <UnsavedChangesModal
+          title="Leave settings?"
+          changes={p.changes}
           saving={p.isSaving}
           onStay={() => resolveLeave(false)}
           onDiscard={() => resolveLeave(true)}
           onSaveAndLeave={() => void handleSaveAndLeave()}
+        />
+      )}
+      {prompt === "discard" && (
+        <UnsavedChangesModal
+          title="Discard changes?"
+          changes={p.changes}
+          saving={p.isSaving}
+          onStay={() => setPrompt(null)}
+          onDiscard={confirmDiscard}
         />
       )}
     </div>
