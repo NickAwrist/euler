@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "katex/dist/katex.min.css";
 
 @theme {
   --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;

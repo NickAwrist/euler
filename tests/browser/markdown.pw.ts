@@ -19,6 +19,13 @@ test("markdown rendering preserves lists, lines, code, tables, and link navigati
   );
   await expect(reply.locator("pre br")).toHaveCount(0);
   await expect(reply.getByRole("cell", { name: "42" })).toBeVisible();
+  const math = reply.locator("p").filter({ hasText: "The ball costs" });
+  await expect(math).toContainText("The ball costs $0.05, so");
+  await expect(math.locator(".katex")).toHaveCount(1);
+  await expect(math.locator("annotation")).toHaveText("2x + 1.00 = 1.10");
+  await expect(reply.locator(".katex-display annotation")).toHaveText(
+    "\\frac{a}{b}",
+  );
 
   for (const name of ["External docs", "Protocol relative"]) {
     const link = reply.getByRole("link", { name, exact: true });

@@ -40,7 +40,7 @@ const markdownMessages: Message[] = [
   {
     role: "assistant",
     content:
-      "```\nUnlabeled code\nwith two lines\n```\n\nLocal weights awaken,\nCode flows through the quiet night,\nThinking whispers softly.\n\n3. First step\n4. Second step\n   - Nested bullet\n\n- First bullet\n- Second bullet\n\n[External docs](https://example.com/docs) and [Protocol relative](//example.com/docs).\n\n[Jump](#details) and [Email](mailto:hello@example.com).\n\n| Name | Value |\n| --- | --- |\n| Answer | 42 |",
+      "```\nUnlabeled code\nwith two lines\n```\n\nLocal weights awaken,\nCode flows through the quiet night,\nThinking whispers softly.\n\n3. First step\n4. Second step\n   - Nested bullet\n\n- First bullet\n- Second bullet\n\n[External docs](https://example.com/docs) and [Protocol relative](//example.com/docs).\n\n[Jump](#details) and [Email](mailto:hello@example.com).\n\n| Name | Value |\n| --- | --- |\n| Answer | 42 |\n\nThe ball costs $0.05, so $2x + 1.00 = 1.10$.\n\n$$\n\\frac{a}{b}\n$$",
   },
   {
     role: "assistant",
