@@ -1,6 +1,8 @@
 import { MessageAttachmentSchema } from "../attachments/types";
 import { MessageVersionSchema } from "../schemas/run";
+import { stripSkillReferences } from "../skills/runtime";
 import { getDb } from "./connection";
+import { listSkills } from "./skills/queries";
 import type { SessionRow, SessionSummaryRow, WireMessage } from "./types";
 
 export type { SessionRow, SessionSummaryRow, WireMessage } from "./types";
@@ -8,11 +10,14 @@ export type { SessionRow, SessionSummaryRow, WireMessage } from "./types";
 function previewFromTitleAndFirstUser(
   title: string | null,
   firstUser: string | null,
+  skillNames: ReadonlySet<string>,
 ): string {
   const t = title?.trim();
   if (t) return t;
-  if (firstUser?.trim()) {
-    const u = firstUser.trim();
+  const message = firstUser?.trim();
+  if (message) {
+    // A message that is only skill references keeps them as its preview.
+    const u = stripSkillReferences(message, skillNames) || message;
     return u.length > 40 ? `${u.slice(0, 40)}...` : u;
   }
   return "New run";
@@ -31,6 +36,7 @@ export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
     title: string | null;
   }>;
 
+  const skillNames = new Set(listSkills(ownerUuid).map((skill) => skill.name));
   const firstUserStmt = db.query(
     `SELECT content FROM messages WHERE session_id = ? AND role = 'user' ORDER BY position ASC LIMIT 1`,
   );
@@ -42,7 +48,11 @@ export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
       created_at: s.created_at,
       updated_at: s.updated_at,
       title: s.title,
-      preview: previewFromTitleAndFirstUser(s.title, fu?.content ?? null),
+      preview: previewFromTitleAndFirstUser(
+        s.title,
+        fu?.content ?? null,
+        skillNames,
+      ),
     };
   });
 }

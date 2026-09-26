@@ -10,6 +10,19 @@ export function findExplicitSkillNames(message: string): Set<string> {
   );
 }
 
+/** Removes `$name` references to the given skills, e.g. for display previews. */
+export function stripSkillReferences(
+  message: string,
+  skillNames: ReadonlySet<string>,
+): string {
+  return message
+    .replace(SKILL_REFERENCE_PATTERN, (reference, name: string) =>
+      skillNames.has(name) ? "" : reference,
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** Skills the agent may discover and load without an explicit $skill-name. */
 export function modelInvocableSkills(skills: SkillRow[]): SkillRow[] {
   return skills.filter((skill) => !skill.disable_model_invocation);
