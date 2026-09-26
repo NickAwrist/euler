@@ -7,10 +7,10 @@ import { cx } from "../styles";
 import type { ModelOption } from "../types";
 import { AnchoredPopover } from "./AnchoredPopover";
 import {
-  ModelCapabilityBadges,
+  ModelCapabilityIcons,
   formatContextLength,
   modelCapabilities,
-} from "./ModelCapabilityBadges";
+} from "./ModelCapabilityIcons";
 import { FavoriteButton, NewBadge } from "./ModelPreferenceControls";
 import { type ModelProvider, groupModelProviders } from "./modelProviders";
 
@@ -25,12 +25,14 @@ function isMonochromeProviderIcon(url: string): boolean {
 
 function modelDetails(model: ModelOption): string {
   const details: string[] = [];
+  const unverified = model.availability === "unverified";
   if (model.configured === false) details.push("Setup required");
-  if (model.availability === "unverified")
-    details.push("Availability unverified");
+  if (unverified) details.push("Availability unverified");
   if (model.contextLength)
     details.push(formatContextLength(model.contextLength));
-  if (modelCapabilities(model).length === 0) details.push("Chat only");
+  // Unverified models carry placeholder capabilities, so don't claim any.
+  if (!unverified && modelCapabilities(model).length === 0)
+    details.push("Chat only");
   return details.join(" · ");
 }
 
@@ -360,7 +362,7 @@ export function ModelSelectBar({
                       </span>
                       <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
                         {modelDetails(model)}
-                        <ModelCapabilityBadges model={model} />
+                        <ModelCapabilityIcons model={model} />
                       </span>
                     </span>
                     {selectedModel === model.id && (

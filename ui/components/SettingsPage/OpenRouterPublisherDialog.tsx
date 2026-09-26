@@ -5,9 +5,9 @@ import type { CatalogFreshness } from "../../../src/openRouterModels";
 import { Button } from "../Button";
 import { Modal } from "../Modal";
 import {
-  ModelCapabilityBadges,
+  ModelCapabilityIcons,
   formatContextLength,
-} from "../ModelCapabilityBadges";
+} from "../ModelCapabilityIcons";
 import {
   EnableSwitch,
   FavoriteButton,
@@ -274,7 +274,7 @@ export function PublisherDialog({
                     <span className="wrap-anywhere">
                       {[model.route, ...modelDetails(model)].join(" · ")}
                     </span>
-                    <ModelCapabilityBadges model={model} />
+                    <ModelCapabilityIcons model={model} />
                   </p>
                 </div>
                 <FavoriteButton

@@ -25,6 +25,8 @@ const models: ModelOption[] = [
       provider: "openrouter",
       configured: true,
       inputCapabilities: ["text"],
+      // Unverified routes carry placeholder capabilities.
+      ...(route === "openai/gpt" && { availability: "unverified" as const }),
     }),
   ),
 ];
@@ -137,7 +139,10 @@ for (const device of ["desktop", "mobile"] as const) {
         menu.getByRole("button", { name: "Claude Sonnet Chat only" }),
       ).toHaveAttribute("aria-pressed", "true");
       await expect(
-        menu.getByRole("button", { name: "GPT Chat only" }),
+        menu.getByRole("button", {
+          name: "GPT Availability unverified",
+          exact: true,
+        }),
       ).toHaveCount(0);
       await expect(menu).toHaveCSS("opacity", "1");
       const bounds = await menu.boundingBox();
@@ -160,7 +165,12 @@ for (const device of ["desktop", "mobile"] as const) {
       await model.click();
       await page.getByRole("tab", { name: "OpenAI" }).click();
       await expect(menu.getByRole("searchbox")).toHaveValue("");
-      await menu.getByRole("button", { name: "GPT Chat only" }).click();
+      await menu
+        .getByRole("button", {
+          name: "GPT Availability unverified",
+          exact: true,
+        })
+        .click();
       await expect(model).toHaveAccessibleName("Model: GPT");
       await expect(
         page.getByRole("button", {

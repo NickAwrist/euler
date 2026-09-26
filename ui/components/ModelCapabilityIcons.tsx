@@ -29,7 +29,7 @@ export function formatContextLength(tokens: number): string {
   return `${compactNumber.format(tokens)} context`;
 }
 
-export function ModelCapabilityBadges({
+export function ModelCapabilityIcons({
   model,
   className,
 }: {
