@@ -188,7 +188,7 @@ for (const device of ["desktop", "mobile"] as const) {
         ).toBeFocused();
         await menu.getByRole("searchbox").press("Enter");
       } else {
-        await expect(menu.getByText("Vision", { exact: true })).toBeVisible();
+        await expect(menu.getByRole("img", { name: "Vision" })).toBeVisible();
         await menu
           .getByRole("button", { name: "gemma4:e4b Vision Tools" })
           .tap();

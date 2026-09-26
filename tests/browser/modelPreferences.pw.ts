@@ -185,8 +185,8 @@ for (const device of ["desktop", "mobile"] as const) {
           exact: true,
         }),
       ).toBeVisible();
-      await expect(dialog.getByText("Vision", { exact: true })).toBeVisible();
-      await expect(dialog.getByText("Tools", { exact: true })).toBeVisible();
+      await expect(dialog.getByRole("img", { name: "Vision" })).toBeVisible();
+      await expect(dialog.getByRole("img", { name: "Tools" })).toBeVisible();
       const enable = dialog.getByRole("switch", { name: "Enable Test" });
       let releaseWrites!: () => void;
       holdWrites = new Promise<void>((resolve) => {
