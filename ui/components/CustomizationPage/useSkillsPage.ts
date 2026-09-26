@@ -75,7 +75,7 @@ export function useSkillsPage() {
 
   const save = async () => {
     if (skillEditorsEqual(editor, baseline)) return;
-    if (Object.values(fieldErrors).some(Boolean)) {
+    if (fieldErrors) {
       setShowFieldErrors(true);
       return;
     }
@@ -130,7 +130,7 @@ export function useSkillsPage() {
     isNew,
     editor,
     setEditor,
-    fieldErrors: showFieldErrors ? fieldErrors : {},
+    fieldErrors: showFieldErrors ? fieldErrors : null,
     saving,
     deleting,
     error,

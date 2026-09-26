@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { SkillWriteSchema } from "../../../src/schemas/skills";
 import type { SkillData, SkillWriteBody } from "../../persist/skills";
 
@@ -26,10 +27,13 @@ export function skillEditorsEqual(
   );
 }
 
-export function skillEditorErrors(editor: SkillWriteBody): SkillEditorErrors {
+/** First schema error per field, or null when the editor is valid. */
+export function skillEditorErrors(
+  editor: SkillWriteBody,
+): SkillEditorErrors | null {
   const parsed = SkillWriteSchema.safeParse(editor);
-  if (parsed.success) return {};
-  const { fieldErrors } = parsed.error.flatten();
+  if (parsed.success) return null;
+  const { fieldErrors } = z.flattenError(parsed.error);
   return {
     name: fieldErrors.name?.[0],
     description: fieldErrors.description?.[0],

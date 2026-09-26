@@ -1,10 +1,5 @@
 import { Save, Trash2 } from "lucide-react";
-import {
-  type Dispatch,
-  type ReactNode,
-  type SetStateAction,
-  useId,
-} from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { normalizeSkillName } from "../../../src/schemas/skills";
 import type { SkillData, SkillWriteBody } from "../../persist/skills";
 import { cx, textareaClass } from "../../styles";
@@ -16,7 +11,7 @@ type Props = {
   skill: SkillData | null;
   editor: SkillWriteBody;
   setEditor: Dispatch<SetStateAction<SkillWriteBody>>;
-  errors: SkillEditorErrors;
+  errors: SkillEditorErrors | null;
   saving: boolean;
   deleting: boolean;
   saveDisabled: boolean;
@@ -38,10 +33,6 @@ export function SkillEditor({
   onCancel,
   onDelete,
 }: Props) {
-  const id = useId();
-  const errorId = (field: keyof SkillWriteBody) =>
-    errors[field] ? `${id}-${field}-error` : undefined;
-
   return (
     <div className="ui-animate-fade-in mx-auto max-w-2xl px-6 py-6">
       <div className="mb-2 flex items-center justify-between">
@@ -71,14 +62,7 @@ export function SkillEditor({
           <span className="text-[0.75rem] font-medium text-muted-foreground">
             Name
           </span>
-          <div
-            className={cx(
-              "flex rounded-lg border bg-background transition-colors",
-              errors.name
-                ? "border-red-400/60"
-                : "border-border-subtle focus-within:border-border",
-            )}
-          >
+          <div className="flex rounded-lg border border-border-subtle bg-background transition-colors focus-within:border-border">
             <span className="flex items-center border-r border-border-subtle px-3 font-mono text-[0.8125rem] text-muted-foreground">
               $
             </span>
@@ -100,12 +84,12 @@ export function SkillEditor({
               placeholder="release-notes"
               maxLength={64}
               spellCheck={false}
-              aria-invalid={errors.name !== undefined}
-              aria-describedby={errorId("name")}
+              aria-invalid={Boolean(errors?.name)}
+              aria-describedby="skill-name-hint"
               className="min-w-0 flex-1 bg-transparent px-3 py-2 font-mono text-[0.8125rem] text-foreground outline-none placeholder:text-muted-foreground/50"
             />
           </div>
-          <FieldHint id={errorId("name")} error={errors.name}>
+          <FieldHint id="skill-name-hint" error={errors?.name}>
             Lowercase letters, numbers, and hyphens. Up to 64 characters.
           </FieldHint>
         </label>
@@ -125,16 +109,12 @@ export function SkillEditor({
             placeholder="When this skill should be used and what it helps with."
             maxLength={500}
             rows={3}
-            aria-invalid={errors.description !== undefined}
-            aria-describedby={errorId("description")}
-            className={cx(
-              textareaClass,
-              "text-[0.8125rem]",
-              errors.description && "border-red-400/60!",
-            )}
+            aria-invalid={Boolean(errors?.description)}
+            aria-describedby="skill-description-hint"
+            className={cx(textareaClass, "text-[0.8125rem]")}
             style={{ resize: "vertical" }}
           />
-          <FieldHint id={errorId("description")} error={errors.description}>
+          <FieldHint id="skill-description-hint" error={errors?.description}>
             This metadata lets the agent decide when to load the skill.
           </FieldHint>
         </label>
@@ -155,16 +135,12 @@ export function SkillEditor({
               "# Workflow\n\nDescribe the steps, constraints, and output format for this skill."
             }
             rows={15}
-            aria-invalid={errors.instructions !== undefined}
-            aria-describedby={errorId("instructions")}
-            className={cx(
-              textareaClass,
-              "font-mono text-[0.8125rem]",
-              errors.instructions && "border-red-400/60!",
-            )}
+            aria-invalid={Boolean(errors?.instructions)}
+            aria-describedby="skill-instructions-hint"
+            className={cx(textareaClass, "font-mono text-[0.8125rem]")}
             style={{ resize: "vertical" }}
           />
-          <FieldHint id={errorId("instructions")} error={errors.instructions}>
+          <FieldHint id="skill-instructions-hint" error={errors?.instructions}>
             Markdown body of the skill&apos;s SKILL.md file. The name and
             description above form its metadata.
           </FieldHint>
@@ -191,23 +167,25 @@ export function SkillEditor({
   );
 }
 
+/** Shows the field's validation error in place of its hint. */
 function FieldHint({
   id,
   error,
   children,
 }: {
-  id: string | undefined;
+  id: string;
   error: string | undefined;
   children: ReactNode;
 }) {
-  return error ? (
+  return (
     <span
       id={id}
-      className="text-[0.6875rem] text-red-400 first-letter:uppercase"
+      className={cx(
+        "text-[0.6875rem]",
+        error ? "text-red-400 first-letter:uppercase" : "text-muted-foreground",
+      )}
     >
-      {error}
+      {error ?? children}
     </span>
-  ) : (
-    <span className="text-[0.6875rem] text-muted-foreground">{children}</span>
   );
 }

@@ -20,7 +20,6 @@ describe("skill editor", () => {
     ).toEqual({
       name: "name must use lowercase letters, numbers, and single hyphens only",
       description: "description is required",
-      instructions: undefined,
     });
     expect(
       skillEditorErrors({
@@ -28,6 +27,6 @@ describe("skill editor", () => {
         description: "Draft release notes",
         instructions: "Write notes",
       }),
-    ).toEqual({});
+    ).toBeNull();
   });
 });
