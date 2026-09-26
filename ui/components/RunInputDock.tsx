@@ -43,7 +43,6 @@ export function RunInputDock({
   imageError,
   addPendingImages,
   removePendingImage,
-  supportsImageInput,
   canAttachImages,
   attachImageDisabledReason,
   attachmentsSendReady,
@@ -70,7 +69,6 @@ export function RunInputDock({
   imageError: string | null;
   addPendingImages: (files: File[]) => void;
   removePendingImage: (id: string) => void;
-  supportsImageInput: boolean;
   canAttachImages: boolean;
   attachImageDisabledReason?: string;
   attachmentsSendReady: boolean;
@@ -297,30 +295,26 @@ export function RunInputDock({
           </p>
         )}
         <div className="flex w-full items-end gap-1">
-          {supportsImageInput && (
-            <>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif"
-                multiple
-                className="hidden"
-                onChange={(e) => {
-                  addPendingImages(Array.from(e.target.files ?? []));
-                  e.target.value = "";
-                }}
-              />
-              <IconButton
-                variant="ghost"
-                icon={ImagePlus}
-                disabled={isBusy || !canAttachImages}
-                onClick={() => fileInputRef.current?.click()}
-                title={attachImageDisabledReason ?? "Add images"}
-                label={attachImageDisabledReason ?? "Add images"}
-                className="mb-0.5 border-transparent"
-              />
-            </>
-          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              addPendingImages(Array.from(e.target.files ?? []));
+              e.target.value = "";
+            }}
+          />
+          <IconButton
+            variant="ghost"
+            icon={ImagePlus}
+            disabled={isBusy || !canAttachImages}
+            onClick={() => fileInputRef.current?.click()}
+            title={attachImageDisabledReason ?? "Add images"}
+            label={attachImageDisabledReason ?? "Add images"}
+            className="mb-0.5 border-transparent"
+          />
           <textarea
             ref={inputRef}
             value={input}

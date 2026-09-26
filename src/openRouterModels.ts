@@ -116,10 +116,6 @@ export function isInteractiveModel(model: CatalogModel): boolean {
     model.outputCapabilities.includes("text")
   );
 }
-export function isNewModel(created: number, now = Date.now()): boolean {
-  const age = now / 1000 - created;
-  return age >= 0 && age <= 21 * 24 * 60 * 60;
-}
 export function catalogFreshness(result: CatalogResult): CatalogFreshness {
   return {
     status: result.status,

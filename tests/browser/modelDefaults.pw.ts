@@ -105,7 +105,7 @@ test("model defaults desktop: unavailable preference matches settings, new chats
   await page.getByRole("button", { name: "Model: Local", exact: true }).click();
   await page.getByRole("tab", { name: "Test" }).click();
   await page
-    .getByRole("button", { name: "Remote OpenRouter", exact: true })
+    .getByRole("button", { name: "Remote Chat only", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: "Model: Remote", exact: true }),
@@ -128,7 +128,7 @@ test("model defaults desktop: unavailable preference matches settings, new chats
   await page.getByRole("tab", { name: "Test" }).click();
   await page.getByPlaceholder("Search models...").fill("Remote");
   await page
-    .getByRole("button", { name: "Remote OpenRouter", exact: true })
+    .getByRole("button", { name: "Remote Chat only", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Save settings", exact: true })

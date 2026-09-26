@@ -7,7 +7,8 @@ const models: ModelOption[] = [
     name: "gemma4:e4b",
     lab: "Ollama",
     provider: "ollama",
-    inputCapabilities: ["text"],
+    inputCapabilities: ["text", "image"],
+    supportsTools: true,
   },
   ...(
     [
@@ -133,10 +134,10 @@ for (const device of ["desktop", "mobile"] as const) {
         page.getByRole("tab", { name: "Anthropic" }),
       ).toHaveAttribute("aria-selected", "true");
       await expect(
-        menu.getByRole("button", { name: "Claude Sonnet OpenRouter" }),
+        menu.getByRole("button", { name: "Claude Sonnet Chat only" }),
       ).toHaveAttribute("aria-pressed", "true");
       await expect(
-        menu.getByRole("button", { name: "GPT OpenRouter" }),
+        menu.getByRole("button", { name: "GPT Chat only" }),
       ).toHaveCount(0);
       await expect(menu).toHaveCSS("opacity", "1");
       const bounds = await menu.boundingBox();
@@ -150,19 +151,22 @@ for (const device of ["desktop", "mobile"] as const) {
       });
       await menu.getByRole("searchbox").fill("OPUS");
       await expect(
-        menu.getByRole("button", { name: "Claude Sonnet OpenRouter" }),
+        menu.getByRole("button", { name: "Claude Sonnet Chat only" }),
       ).toHaveCount(0);
-      await menu
-        .getByRole("button", { name: "Claude Opus OpenRouter" })
-        .click();
+      await menu.getByRole("button", { name: "Claude Opus Chat only" }).click();
       await expect(menu).not.toBeVisible();
       await expect(model).toHaveAccessibleName("Model: Claude Opus");
       await expect(input).toHaveValue("Keep this draft");
       await model.click();
       await page.getByRole("tab", { name: "OpenAI" }).click();
       await expect(menu.getByRole("searchbox")).toHaveValue("");
-      await menu.getByRole("button", { name: "GPT OpenRouter" }).click();
+      await menu.getByRole("button", { name: "GPT Chat only" }).click();
       await expect(model).toHaveAccessibleName("Model: GPT");
+      await expect(
+        page.getByRole("button", {
+          name: "The selected model does not accept images",
+        }),
+      ).toBeDisabled();
       expect(runs).toHaveLength(0);
       await model.click();
       await page.keyboard.press("Escape");
@@ -180,11 +184,14 @@ for (const device of ["desktop", "mobile"] as const) {
       if (device === "desktop") {
         await page.keyboard.press("ArrowDown");
         await expect(
-          menu.getByRole("button", { name: "gemma4:e4b Ollama" }),
+          menu.getByRole("button", { name: "gemma4:e4b Vision Tools" }),
         ).toBeFocused();
-        await page.keyboard.press("Enter");
+        await menu.getByRole("searchbox").press("Enter");
       } else {
-        await menu.getByRole("button", { name: "gemma4:e4b Ollama" }).tap();
+        await expect(menu.getByText("Vision", { exact: true })).toBeVisible();
+        await menu
+          .getByRole("button", { name: "gemma4:e4b Vision Tools" })
+          .tap();
       }
       await expect(model).toHaveAccessibleName("Model: gemma4:e4b");
       await expect(model.locator('img[src="/icons/ollama.svg"]')).toBeVisible();

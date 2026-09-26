@@ -1,5 +1,6 @@
 import { KeyRound, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
+import { NEW_MODEL_DAYS } from "../../../src/newModels";
 import { modelSettingsRequest } from "../../lib/modelSettingsRequest";
 import { Button } from "../Button";
 import { NewBadge } from "../ModelPreferenceControls";
@@ -204,7 +205,8 @@ export function OpenRouterSettingsTab({
             </Button>
           </div>
           <p className="text-sm text-muted-foreground">
-            Choose which models appear in the composer.
+            Choose which models appear in the composer. New marks models added
+            to OpenRouter in the last {NEW_MODEL_DAYS} days.
           </p>
           {overview && <CatalogStatus catalog={overview.catalog} />}
           {loadError && (
@@ -221,7 +223,7 @@ export function OpenRouterSettingsTab({
               Retry settings
             </Button>
           )}
-          <div className="grid gap-x-3 gap-y-5 pt-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-2">
             {overview?.publishers
               .toSorted((a, b) => a.name.localeCompare(b.name))
               .map((publisher) => (
@@ -229,13 +231,9 @@ export function OpenRouterSettingsTab({
                   key={publisher.id}
                   type="button"
                   aria-label={`${publisher.name}, ${publisher.enabledCount} enabled${publisher.recentCount ? ", new models available" : ""}`}
-                  className="relative flex items-center gap-3 rounded-xl border border-border-subtle p-4 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-accent-ring"
+                  className="flex items-center gap-3 rounded-xl border border-border-subtle p-4 text-left hover:bg-muted focus-visible:outline-2 focus-visible:outline-accent-ring"
                   onClick={() => setDialog(publisher.id)}
                 >
-                  {publisher.recentCount !== null &&
-                    publisher.recentCount > 0 && (
-                      <NewBadge className="absolute -top-2.5 left-3" />
-                    )}
                   <ProviderIcon
                     provider={{
                       id: publisher.id,
@@ -245,7 +243,11 @@ export function OpenRouterSettingsTab({
                     }}
                   />
                   <span>
-                    <span className="block font-medium">{publisher.name}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="font-medium">{publisher.name}</span>
+                      {publisher.recentCount !== null &&
+                        publisher.recentCount > 0 && <NewBadge />}
+                    </span>
                     <span className="text-xs text-muted-foreground">
                       {publisher.enabledCount} enabled
                       {publisher.recentCount === null &&

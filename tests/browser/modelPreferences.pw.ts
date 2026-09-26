@@ -180,8 +180,13 @@ for (const device of ["desktop", "mobile"] as const) {
       await page.keyboard.press("Enter");
       const dialog = page.getByRole("dialog", { name: "OpenAI" });
       await expect(dialog).toBeVisible();
-      await expect(dialog.getByText(/Input: \$0/)).toBeVisible();
-      await expect(dialog.getByText(/Added to OpenRouter:/)).toBeVisible();
+      await expect(
+        dialog.getByText("openai/test · 128K context · $0 in / $2 out", {
+          exact: true,
+        }),
+      ).toBeVisible();
+      await expect(dialog.getByText("Vision", { exact: true })).toBeVisible();
+      await expect(dialog.getByText("Tools", { exact: true })).toBeVisible();
       const enable = dialog.getByRole("switch", { name: "Enable Test" });
       let releaseWrites!: () => void;
       holdWrites = new Promise<void>((resolve) => {
@@ -253,7 +258,7 @@ for (const device of ["desktop", "mobile"] as const) {
       ).toBeEnabled();
       await card.click();
       await expect(
-        dialog.getByText("Availability unverified", { exact: true }),
+        dialog.getByText(/ · Availability unverified( · |$)/),
       ).toBeVisible();
       await enable.click();
       await expect(enable).not.toBeChecked();
@@ -285,7 +290,7 @@ for (const device of ["desktop", "mobile"] as const) {
       ).toHaveText("local-model");
       await picker.getByRole("tab", { name: "Favorites", exact: true }).click();
       await expect(
-        picker.getByRole("button", { name: "Local Ollama", exact: true }),
+        picker.getByRole("button", { name: "Local Chat only", exact: true }),
       ).toBeVisible();
       await page.keyboard.press("Escape");
 
@@ -318,9 +323,7 @@ for (const device of ["desktop", "mobile"] as const) {
         page.getByRole("button", { name: "Refresh catalog", exact: true }),
       ).toBeEnabled();
       await card.click();
-      await expect(
-        dialog.getByText("Unavailable", { exact: true }),
-      ).toBeVisible();
+      await expect(dialog.getByText(/ · Unavailable( · |$)/)).toBeVisible();
       await enable.click();
       await expect(enable).toBeDisabled();
       await page.mouse.click(4, 4);
@@ -352,7 +355,9 @@ for (const device of ["desktop", "mobile"] as const) {
       });
       const cards = settings.getByRole("button", { name: /, \d+ enabled/ });
       const expectAlphabetical = async () => {
-        const names = await cards.locator("span.block").allTextContents();
+        const names = await cards.evaluateAll((elements) =>
+          elements.map((element) => element.ariaLabel?.split(",")[0] ?? ""),
+        );
         expect(names.length).toBeGreaterThan(1);
         expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
       };

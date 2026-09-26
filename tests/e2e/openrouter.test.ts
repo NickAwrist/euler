@@ -40,11 +40,15 @@ describe("OpenRouter API integration", () => {
           provider: string;
           configured?: boolean;
           inputCapabilities?: string[];
+          supportsTools?: boolean;
         }>;
       };
       expect(
-        body.models.some((model) => model.provider === "ollama"),
-      ).toBeTrue();
+        body.models.find((model) => model.provider === "ollama"),
+      ).toMatchObject({
+        inputCapabilities: ["text", "image"],
+        supportsTools: true,
+      });
       expect(
         body.models.some((model) => model.provider === "openrouter"),
       ).toBeFalse();

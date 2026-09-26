@@ -1,5 +1,6 @@
 import { Star, X } from "lucide-react";
 import { useEffect } from "react";
+import { NEW_MODEL_DAYS } from "../../src/newModels";
 import { cx } from "../styles";
 
 export function FavoriteButton({
@@ -105,6 +106,7 @@ export function PreferenceNotice({
 export function NewBadge({ className }: { className?: string }) {
   return (
     <span
+      title={`Added to OpenRouter in the last ${NEW_MODEL_DAYS} days`}
       className={cx(
         "shrink-0 rounded border border-[#c6ad65]/25 bg-background px-1.5 py-0.5 font-medium leading-none text-[#c6ad65]",
         "text-[10px]",

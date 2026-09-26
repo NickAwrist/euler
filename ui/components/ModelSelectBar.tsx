@@ -6,6 +6,11 @@ import { navigate } from "../lib/navigation";
 import { cx } from "../styles";
 import type { ModelOption } from "../types";
 import { AnchoredPopover } from "./AnchoredPopover";
+import {
+  ModelCapabilityBadges,
+  formatContextLength,
+  modelCapabilities,
+} from "./ModelCapabilityBadges";
 import { FavoriteButton, NewBadge } from "./ModelPreferenceControls";
 import { type ModelProvider, groupModelProviders } from "./modelProviders";
 
@@ -16,6 +21,21 @@ function isMonochromeProviderIcon(url: string): boolean {
     url.endsWith("/moonshot.svg") ||
     url === "/icons/ollama.svg"
   );
+}
+
+function modelDetails(model: ModelOption): string {
+  const details: string[] = [];
+  if (model.configured === false) details.push("Setup required");
+  if (model.availability === "unverified")
+    details.push("Availability unverified");
+  if (model.contextLength)
+    details.push(formatContextLength(model.contextLength));
+  if (modelCapabilities(model).length === 0) details.push("Chat only");
+  return details.join(" · ");
+}
+
+function isUnconfigured(model: ModelOption): boolean {
+  return model.provider === "openrouter" && model.configured === false;
 }
 
 export function ProviderIcon({ provider }: { provider: ModelProvider }) {
@@ -262,6 +282,16 @@ export function ModelSelectBar({
                 placeholder="Search models..."
                 className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                 onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    const match = models.find(
+                      (model) => !isUnconfigured(model),
+                    );
+                    if (match && !disabled) {
+                      onModelChange(match.id);
+                      close();
+                    }
+                  }
                   if (event.key === "ArrowDown") {
                     event.preventDefault();
                     panelRef.current
@@ -289,11 +319,7 @@ export function ModelSelectBar({
                     type="button"
                     data-model-option
                     aria-pressed={selectedModel === model.id}
-                    disabled={
-                      disabled ||
-                      (model.provider === "openrouter" &&
-                        model.configured === false)
-                    }
+                    disabled={disabled || isUnconfigured(model)}
                     className={cx(
                       "flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-lg px-2.5 py-1.5 text-left transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-accent-ring disabled:cursor-not-allowed disabled:opacity-40",
                       selectedModel === model.id
@@ -332,18 +358,9 @@ export function ModelSelectBar({
                           <NewBadge className="ml-2 inline-block align-middle" />
                         )}
                       </span>
-                      <span className="mt-0.5 block text-xs text-muted-foreground">
-                        {model.provider === "ollama"
-                          ? "Ollama"
-                          : model.configured === false
-                            ? "OpenRouter · Setup required"
-                            : "OpenRouter"}
-                        {model.provider === "openrouter" &&
-                          (model.availability === "unverified"
-                            ? " · Availability unverified"
-                            : model.supportsTools === false
-                              ? " · Chat only"
-                              : "")}
+                      <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+                        {modelDetails(model)}
+                        <ModelCapabilityBadges model={model} />
                       </span>
                     </span>
                     {selectedModel === model.id && (
