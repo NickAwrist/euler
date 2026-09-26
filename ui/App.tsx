@@ -1,5 +1,5 @@
 import { Bug, EyeOff } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArtifactContext } from "./components/Artifacts/ArtifactContext";
 import { WorkspaceArtifacts } from "./components/Artifacts/WorkspaceArtifacts";
 import { workspaceArtifactSource } from "./components/Artifacts/api";
@@ -208,12 +208,19 @@ function ChatView({
     },
     [setTruncateConfirm],
   );
-  const requestRetryConfirm = useCallback(
-    (userIndex: number) => {
-      setTruncateConfirm({ kind: "retry", userIndex });
-    },
-    [setTruncateConfirm],
+  // Keep the callback stable so history rows skip rerendering while streaming.
+  const requestRegenerateRef = useRef(app.requestRegenerate);
+  requestRegenerateRef.current = app.requestRegenerate;
+  const requestRegenerate = useCallback(
+    (assistantIndex: number) => requestRegenerateRef.current(assistantIndex),
+    [],
   );
+  const selectedModelName = app.ollamaModels.find(
+    (model) => model.id === app.selectedModel,
+  )?.name;
+  const regenerateLabel = selectedModelName
+    ? `Regenerate with ${selectedModelName}`
+    : "Regenerate";
 
   useAppKeybinds({
     blockShortcuts:
@@ -381,7 +388,8 @@ function ChatView({
                   onStartEditUser={app.setEditingUserIndex}
                   onCancelEditUser={cancelEditUser}
                   onRequestEditConfirm={requestEditConfirm}
-                  onRequestRetryConfirm={requestRetryConfirm}
+                  onRegenerate={requestRegenerate}
+                  regenerateLabel={regenerateLabel}
                 />
               </div>
             ) : (
@@ -580,9 +588,13 @@ export default function App() {
         {app.truncateConfirm && (
           <TruncateConfirmModal
             title="Delete later messages?"
-            description="All message history after this point will be permanently deleted. This cannot be undone."
+            description={
+              app.truncateConfirm.kind === "regenerate"
+                ? "Messages after this reply will be permanently deleted. The current reply is kept as an earlier version."
+                : "All message history after this point will be permanently deleted. This cannot be undone."
+            }
             onClose={() => app.setTruncateConfirm(null)}
-            onConfirm={app.confirmTruncateAndRetry}
+            onConfirm={app.confirmTruncate}
           />
         )}
         {app.pendingDeleteSessionId && (

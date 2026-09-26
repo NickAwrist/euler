@@ -74,6 +74,19 @@ export default function MessageDemo() {
   const [trace, setTrace] = useState<MessageStep[] | null>(null);
   const [confirm, setConfirm] = useState<TruncateConfirmState>(null);
   const [busy, setBusy] = useState(false);
+  // Replaces a reply and later messages, keeping the reply as a version.
+  const regenerate = (index: number) =>
+    setMessages((previous) => {
+      const { content, steps, attachments, versions = [] } = previous[index]!;
+      return [
+        ...previous.slice(0, index),
+        {
+          role: "assistant",
+          content: `Regenerated reply ${versions.length + 2}.`,
+          versions: [...versions, { content, steps, attachments }],
+        },
+      ];
+    });
   return (
     <div className="min-h-full bg-background text-foreground">
       <header className="sticky top-0 z-10 flex h-[52px] items-center justify-between border-b border-border-subtle bg-background px-3.5 text-sm">
@@ -107,9 +120,12 @@ export default function MessageDemo() {
               onRequestEditConfirm={(userIndex, text) =>
                 setConfirm({ kind: "edit", userIndex, text })
               }
-              onRequestRetryConfirm={(userIndex) =>
-                setConfirm({ kind: "retry", userIndex })
+              onRegenerate={(assistantIndex) =>
+                assistantIndex < messages.length - 1
+                  ? setConfirm({ kind: "regenerate", assistantIndex })
+                  : regenerate(assistantIndex)
               }
+              regenerateLabel="Regenerate with Demo model"
               onViewSteps={
                 message.steps ? () => setTrace(message.steps ?? []) : undefined
               }
@@ -123,20 +139,24 @@ export default function MessageDemo() {
           title={
             confirm.kind === "edit"
               ? "Save edits and retry?"
-              : "Retry from here?"
+              : "Regenerate this reply?"
           }
           description="Later demo messages will be removed. Reload this page to reset the examples."
           onClose={() => setConfirm(null)}
           onConfirm={() => {
-            setMessages((previous) =>
-              previous
-                .slice(0, confirm.userIndex + 1)
-                .map((message, index) =>
-                  confirm.kind === "edit" && index === confirm.userIndex
-                    ? { ...message, content: confirm.text }
-                    : message,
-                ),
-            );
+            if (confirm.kind === "regenerate") {
+              regenerate(confirm.assistantIndex);
+            } else {
+              setMessages((previous) =>
+                previous
+                  .slice(0, confirm.userIndex + 1)
+                  .map((message, index) =>
+                    index === confirm.userIndex
+                      ? { ...message, content: confirm.text }
+                      : message,
+                  ),
+              );
+            }
             setEditing(null);
             setConfirm(null);
           }}

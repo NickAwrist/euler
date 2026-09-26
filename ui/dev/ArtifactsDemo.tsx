@@ -46,7 +46,8 @@ function DemoWorkspace({ alternate }: { alternate: boolean }) {
                   onStartEditUser={() => {}}
                   onCancelEditUser={() => {}}
                   onRequestEditConfirm={() => {}}
-                  onRequestRetryConfirm={() => {}}
+                  onRegenerate={() => {}}
+                  regenerateLabel="Regenerate"
                 />
               ))}
             </div>

@@ -46,7 +46,8 @@ export default function LongThreadDemo() {
         onStartEditUser={setEditing}
         onCancelEditUser={cancelEdit}
         onRequestEditConfirm={noOp}
-        onRequestRetryConfirm={noOp}
+        onRegenerate={noOp}
+        regenerateLabel="Regenerate"
       />
       <div className="fixed inset-x-0 bottom-0 z-10 flex gap-3 bg-background p-4">
         <button type="button" onClick={() => setEditing(0)}>

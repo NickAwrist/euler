@@ -1,4 +1,5 @@
 import { MessageAttachmentSchema } from "../attachments/types";
+import { MessageVersionSchema } from "../schemas/run";
 import { getDb } from "./connection";
 import type { SessionRow, SessionSummaryRow, WireMessage } from "./types";
 
@@ -92,13 +93,14 @@ export function getMessagesForSession(
   if (!getSessionById(ownerUuid, sessionId)) return [];
   const rows = getDb()
     .query(
-      "SELECT role, content, steps, attachments FROM messages WHERE session_id = ? ORDER BY position ASC",
+      "SELECT role, content, steps, attachments, versions FROM messages WHERE session_id = ? ORDER BY position ASC",
     )
     .all(sessionId) as Array<{
     role: string;
     content: string;
     steps: string | null;
     attachments: string | null;
+    versions: string | null;
   }>;
 
   return rows.map((r) => {
@@ -124,8 +126,35 @@ export function getMessagesForSession(
         /* ignore */
       }
     }
+    if (r.versions) {
+      try {
+        const parsed = MessageVersionSchema.array().safeParse(
+          JSON.parse(r.versions),
+        );
+        if (parsed.success && parsed.data.length > 0) {
+          msg.versions = parsed.data;
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     return msg;
   });
+}
+
+/** JSON columns for one message row. */
+function messageColumns(m: WireMessage) {
+  return {
+    steps: m.steps != null ? JSON.stringify(m.steps) : null,
+    attachments: m.attachments?.length
+      ? JSON.stringify(
+          m.attachments.map((attachment) =>
+            MessageAttachmentSchema.parse(attachment),
+          ),
+        )
+      : null,
+    versions: m.versions?.length ? JSON.stringify(m.versions) : null,
+  };
 }
 
 export function parseModelMessages(
@@ -251,43 +280,24 @@ export function persistSessionMessages(
     }
 
     const insert = db.prepare(
-      "INSERT INTO messages (session_id, role, content, steps, attachments, position) VALUES (?, ?, ?, ?, ?, ?)",
+      "INSERT INTO messages (session_id, role, content, steps, attachments, versions, position) VALUES (?, ?, ?, ?, ?, ?, ?)",
     );
     for (let i = n; i < messages.length; i++) {
       const m = messages[i]!;
-      const stepsJson =
-        m.steps !== undefined && m.steps != null
-          ? JSON.stringify(m.steps)
-          : null;
-      const attachmentsJson = m.attachments?.length
-        ? JSON.stringify(
-            m.attachments.map((attachment) =>
-              MessageAttachmentSchema.parse(attachment),
-            ),
-          )
-        : null;
-      insert.run(sessionId, m.role, m.content, stepsJson, attachmentsJson, i);
+      const { steps, attachments, versions } = messageColumns(m);
+      insert.run(sessionId, m.role, m.content, steps, attachments, versions, i);
     }
 
     if (messages.length > 0 && n === messages.length) {
       const last = messages[messages.length - 1]!;
-      const stepsJson =
-        last.steps !== undefined && last.steps != null
-          ? JSON.stringify(last.steps)
-          : null;
-      const attachmentsJson = last.attachments?.length
-        ? JSON.stringify(
-            last.attachments.map((attachment) =>
-              MessageAttachmentSchema.parse(attachment),
-            ),
-          )
-        : null;
+      const { steps, attachments, versions } = messageColumns(last);
       db.run(
-        "UPDATE messages SET content = ?, steps = ?, attachments = ? WHERE session_id = ? AND position = ?",
+        "UPDATE messages SET content = ?, steps = ?, attachments = ?, versions = ? WHERE session_id = ? AND position = ?",
         [
           last.content,
-          stepsJson,
-          attachmentsJson,
+          steps,
+          attachments,
+          versions,
           sessionId,
           messages.length - 1,
         ],

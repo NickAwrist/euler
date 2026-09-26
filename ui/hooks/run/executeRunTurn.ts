@@ -11,7 +11,7 @@ import { fetchSession, patchSessionApi } from "../../persist/sessions";
 import { userScopedFetch } from "../../persist/userIdentity";
 import { buildRunMetadata } from "../../persist/userSettings";
 import type { UserSettings } from "../../persist/userSettings";
-import type { Message, MessageStep } from "../../types";
+import type { Message, MessageStep, MessageVersion } from "../../types";
 import { type StreamBuffer, createEmptyStreamBuffer } from "./streamBuffer";
 
 type AppDeps = {
@@ -35,6 +35,7 @@ type RuntimeDeps = {
   rawRunPendingRef: MutableRefObject<boolean>;
   streamBufferRef: MutableRefObject<StreamBuffer>;
   turnMessagesSnapshotRef: MutableRefObject<Message[] | null>;
+  turnVersionsRef: MutableRefObject<MessageVersion[]>;
   setInFlightSessionId: Dispatch<SetStateAction<string | null>>;
   setRunPending: Dispatch<SetStateAction<boolean>>;
   setStreamingStep: Dispatch<SetStateAction<MessageStep | null>>;
@@ -48,6 +49,8 @@ type RuntimeDeps = {
 
 type TurnOptions = {
   rebuildModelMessages: boolean;
+  /** Earlier replies to keep on this turn's reply. */
+  versions?: MessageVersion[];
 };
 
 export async function executeRunTurn(
@@ -69,6 +72,7 @@ export async function executeRunTurn(
     rawRunPendingRef,
     streamBufferRef,
     turnMessagesSnapshotRef,
+    turnVersionsRef,
     setInFlightSessionId,
     setRunPending,
     setStreamingStep,
@@ -79,6 +83,8 @@ export async function executeRunTurn(
     reconnectToStream,
     fetchDebugData,
   } = runtime;
+  const versions = options.versions ?? [];
+  const keptVersions = versions.length > 0 ? { versions } : {};
 
   const message = messageText.trim();
   const ephemeral = p.isEphemeralRef.current;
@@ -99,6 +105,7 @@ export async function executeRunTurn(
   inFlightEphemeralRef.current = ephemeral;
   streamBufferRef.current = createEmptyStreamBuffer();
   turnMessagesSnapshotRef.current = nextHistory;
+  turnVersionsRef.current = versions;
   rawRunPendingRef.current = true;
   setInFlightSessionId(turnSessionId);
   setRunPending(true);
@@ -111,7 +118,7 @@ export async function executeRunTurn(
   const failWithAssistantError = async (errorText: string) => {
     const failedHistory: Message[] = [
       ...nextHistory,
-      { role: "assistant", content: `Error: ${errorText}` },
+      { role: "assistant", content: `Error: ${errorText}`, ...keptVersions },
     ];
     if (viewingThisTurn()) p.setMessages(failedHistory);
     if (ephemeral) return;
@@ -163,6 +170,7 @@ export async function executeRunTurn(
           ? { attachmentIds: attachments.map((attachment) => attachment.id) }
           : {}),
         metadata,
+        ...keptVersions,
         sessionId: turnSessionId,
         ...(ephemeral ? { ephemeral: true } : {}),
       };
@@ -276,6 +284,7 @@ export async function executeRunTurn(
             ...(outputAttachments.length > 0
               ? { attachments: outputAttachments }
               : {}),
+            ...keptVersions,
           };
           if (ephemeral) {
             if (viewingThisTurn()) {
@@ -368,6 +377,7 @@ export async function executeRunTurn(
       rawRunPendingRef.current = false;
       streamBufferRef.current = createEmptyStreamBuffer();
       turnMessagesSnapshotRef.current = null;
+      turnVersionsRef.current = [];
       setInFlightSessionId(null);
       setRunPending(false);
       if (wasViewing) clearStreamingUi();

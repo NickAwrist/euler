@@ -18,5 +18,6 @@ export type RunAreaProps = {
   onStartEditUser: (index: number) => void;
   onCancelEditUser: () => void;
   onRequestEditConfirm: (userIndex: number, text: string) => void;
-  onRequestRetryConfirm: (userIndex: number) => void;
+  onRegenerate: (assistantIndex: number) => void;
+  regenerateLabel: string;
 };

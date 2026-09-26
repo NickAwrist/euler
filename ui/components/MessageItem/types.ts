@@ -11,5 +11,7 @@ export type MessageItemProps = {
   onStartEditUser: (index: number) => void;
   onCancelEditUser: () => void;
   onRequestEditConfirm: (userIndex: number, text: string) => void;
-  onRequestRetryConfirm: (userIndex: number) => void;
+  onRegenerate: (assistantIndex: number) => void;
+  /** Names the model a regenerate will use. */
+  regenerateLabel: string;
 };

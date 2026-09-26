@@ -24,7 +24,8 @@ export const RunArea = memo(function RunArea({
   onStartEditUser,
   onCancelEditUser,
   onRequestEditConfirm,
-  onRequestRetryConfirm,
+  onRegenerate,
+  regenerateLabel,
 }: RunAreaProps) {
   const { scrollRef, contentRef, scrollToBottom, isAtBottom } =
     useStickToBottom({
@@ -106,7 +107,8 @@ export const RunArea = memo(function RunArea({
             onStartEditUser={onStartEditUser}
             onCancelEditUser={onCancelEditUser}
             onRequestEditConfirm={onRequestEditConfirm}
-            onRequestRetryConfirm={onRequestRetryConfirm}
+            onRegenerate={onRegenerate}
+            regenerateLabel={regenerateLabel}
           />
 
           {(streamingStep || streamingSteps.length > 0) && (

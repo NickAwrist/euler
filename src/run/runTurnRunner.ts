@@ -31,6 +31,13 @@ export async function runTurn(
 ): Promise<void> {
   const session = buildSession(ctx);
   const filesBefore = await workspaceFileSnapshot(ctx);
+  // A regenerated reply keeps the replies it replaces as earlier versions.
+  const keepVersions = (history: SessionMessage[]) => {
+    const reply = history.at(-1);
+    if (reply?.role === "assistant" && ctx.body.versions?.length) {
+      reply.versions = ctx.body.versions;
+    }
+  };
 
   const onStep = (p: SessionStepEvent) =>
     stream.emit({ type: "run_step", step: p.step, steps: p.steps });
@@ -44,6 +51,7 @@ export async function runTurn(
     });
 
   const onAborted = (p: SessionAbortedEvent) => {
+    keepVersions(p.history);
     persistence.saveFinal(p.history as WireMessage[], p.modelMessages);
     stream.emit({
       type: "run_aborted",
@@ -73,6 +81,7 @@ export async function runTurn(
       stream.signal,
     );
     if (stream.signal.aborted) return;
+    keepVersions(session.history);
     const changedFiles = await changedFileAttachments(ctx, filesBefore);
     const assistantMessage = session.history[session.history.length - 1];
     if (assistantMessage && changedFiles.length > 0) {

@@ -11,6 +11,7 @@ import type { LlmImage, LlmMessage } from "../llm/index";
 import { stripReasoningFromModelMessages } from "../llm/reasoningDetails";
 import { logger } from "../logger";
 import type { PromptContext } from "../prompts/render";
+import type { MessageVersion } from "../schemas/run";
 import { errorMessage } from "../utils/errors";
 import type { Workspace } from "../workspaces/WorkspaceService";
 
@@ -23,6 +24,7 @@ export type SessionMessage = {
   content: string;
   steps?: HistoryWireStep[];
   attachments?: MessageAttachment[];
+  versions?: MessageVersion[];
 };
 
 export type SessionStepEvent = {
@@ -117,6 +119,7 @@ export class AgentSession extends EventEmitter {
       content: string;
       steps?: HistoryWireStep[];
       attachments?: MessageAttachment[];
+      versions?: MessageVersion[];
     }[];
     modelMessages?: Array<Record<string, unknown>> | null;
   }) {
@@ -125,6 +128,7 @@ export class AgentSession extends EventEmitter {
       content: h.content,
       ...(h.steps != null ? { steps: h.steps } : {}),
       ...(h.attachments?.length ? { attachments: h.attachments } : {}),
+      ...(h.versions?.length ? { versions: h.versions } : {}),
     }));
     if (Array.isArray(payload.modelMessages)) {
       this.generalAgent.history = stripReasoningFromModelMessages(

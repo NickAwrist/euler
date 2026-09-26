@@ -6,11 +6,21 @@ import {
 
 export const WireStepSchema = z.record(z.string(), z.unknown());
 
+/** An earlier assistant reply to the same message, kept on regenerate. */
+export const MessageVersionSchema = z.object({
+  content: z.string(),
+  steps: z.array(WireStepSchema).optional(),
+  attachments: z.array(MessageAttachmentSchema).optional(),
+});
+
+export type MessageVersion = z.infer<typeof MessageVersionSchema>;
+
 export const WireMessageSchema = z.object({
   role: z.string(),
   content: z.string(),
   steps: z.array(WireStepSchema).optional(),
   attachments: z.array(MessageAttachmentSchema).optional(),
+  versions: z.array(MessageVersionSchema).optional(),
 });
 
 export type WireMessageInput = z.infer<typeof WireMessageSchema>;
@@ -35,6 +45,8 @@ export const RunBodySchema = z.object({
   ephemeral: z.boolean().optional(),
   metadata: RunMetadataSchema.optional(),
   attachmentIds: z.array(z.uuid()).max(MAX_IMAGES_PER_MESSAGE).optional(),
+  /** Earlier replies to carry onto this turn's reply when regenerating. */
+  versions: z.array(MessageVersionSchema).optional(),
 });
 
 export type RunBody = z.infer<typeof RunBodySchema>;
