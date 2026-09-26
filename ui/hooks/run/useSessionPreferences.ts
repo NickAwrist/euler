@@ -18,7 +18,6 @@ import type { UserSettings } from "../../persist/userSettings";
 import type { Message, ModelOption, SessionWorkspace } from "../../types";
 
 export interface UseSessionPreferencesOptions {
-  activeSessionId: string | null;
   activeSessionIdRef: MutableRefObject<string | null>;
   isEphemeralRef: MutableRefObject<boolean>;
   userSettingsRef: MutableRefObject<UserSettings>;
@@ -29,7 +28,6 @@ export interface UseSessionPreferencesOptions {
 }
 
 export function useSessionPreferences({
-  activeSessionId,
   activeSessionIdRef,
   isEphemeralRef,
   userSettingsRef,
@@ -53,19 +51,13 @@ export function useSessionPreferences({
 
   useEffect(() => {
     setSelectedModel(
-      (activeSessionId ? sessionModel?.trim() : "") ||
+      sessionModel?.trim() ||
         effectiveDefaultRunModel(
           userSettingsRef.current.defaultModel,
           ollamaModels,
         ),
     );
-  }, [
-    activeSessionId,
-    sessionModel,
-    ollamaModels,
-    userSettingsRef,
-    userSettingsDefaultModel,
-  ]);
+  }, [sessionModel, ollamaModels, userSettingsRef, userSettingsDefaultModel]);
 
   const handleThinkingEffortChange = useCallback((effort: string) => {
     setThinkingEffort(effort);

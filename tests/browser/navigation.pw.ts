@@ -234,7 +234,7 @@ test("view navigation desktop remembers General after Choose models and preserve
   ).toBe("true");
 });
 
-test("view navigation desktop stays in Settings when a pending new chat finishes", async ({
+test("view navigation desktop stays in Settings when a chat sent from Home is saved", async ({
   page,
 }) => {
   await mockApp(page);
@@ -244,15 +244,16 @@ test("view navigation desktop stays in Settings when a pending new chat finishes
     await created.promise;
     await route.fulfill({ json: { id: "b" } });
   });
-  await page.goto("/run/a");
-  await page.getByRole("button", { name: "New chat", exact: true }).click();
+  await page.goto("/");
+  await page.getByPlaceholder("Send a message...").fill("First message");
+  await page.getByRole("button", { name: "Send message" }).click();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByPlaceholder("Enter your name").fill("Keep this draft");
-  const loaded = page.waitForResponse(
-    (response) => new URL(response.url()).pathname === "/api/sessions/b",
+  const started = page.waitForRequest(
+    (request) => new URL(request.url()).pathname === "/api/runs",
   );
   created.resolve();
-  await loaded;
+  await started;
   await expect(page).toHaveURL(/\/settings\/general$/);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByPlaceholder("Enter your name")).toHaveValue(
@@ -261,6 +262,28 @@ test("view navigation desktop stays in Settings when a pending new chat finishes
   await page.getByRole("button", { name: "Back to chat" }).click();
   await page.getByRole("button", { name: "Discard changes" }).click();
   await expect(page.getByText("Stored b", { exact: true })).toBeVisible();
+});
+
+test("view navigation desktop deletes an empty chat left with Back", async ({
+  page,
+}) => {
+  await mockApp(page);
+  const deleted: string[] = [];
+  await page.route("**/api/sessions/b", (route) => {
+    if (route.request().method() === "DELETE") {
+      deleted.push(route.request().url());
+      return route.fulfill({ json: { ok: true } });
+    }
+    return route.fulfill({ json: { id: "b", model: "test", history: [] } });
+  });
+  await page.goto("/run/a");
+  await page.getByRole("button", { name: /Conversation b/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "What are we working on?" }),
+  ).toBeVisible();
+  await page.goBack();
+  await expect(page.getByText("Stored a", { exact: true })).toBeVisible();
+  await expect.poll(() => deleted.length).toBe(1);
 });
 
 test("view navigation desktop protects dirty settings after a markdown footnote history entry", async ({

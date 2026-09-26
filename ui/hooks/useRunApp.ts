@@ -125,6 +125,7 @@ export function useRunApp() {
     runFlightRef,
     supportsImageInput,
     isEphemeral: sessions.isEphemeral,
+    startSession: sessions.startSession,
   });
 
   const modalSteps = traceStepsForModal(
@@ -148,7 +149,6 @@ export function useRunApp() {
     debugData,
     stepsModalData,
     setStepsModalData,
-    isLoading: sessions.isLoading,
     sessionLoadState: sessions.sessionLoadState,
     sessionError: sessions.sessionError,
     retrySessionLoad: sessions.retrySessionLoad,
@@ -195,7 +195,7 @@ export function useRunApp() {
     saveUserSettings: settings.saveUserSettings,
     refreshModels: ollama.refreshOllamaModels,
     switchToSession: sessions.switchToSession,
-    createSession: sessions.createSession,
+    startSession: sessions.startSession,
     createEphemeralSession: sessions.createEphemeralSession,
     goToHome: sessions.goToHome,
     sendMessage: stream.sendMessage,

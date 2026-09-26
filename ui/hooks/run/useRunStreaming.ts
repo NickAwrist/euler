@@ -52,6 +52,7 @@ type Args = {
   runFlightRef: MutableRefObject<RunFlightApi | null>;
   supportsImageInput: boolean;
   isEphemeral: boolean;
+  startSession: () => Promise<string>;
 };
 
 export function useRunStreaming(p: Args) {
@@ -220,9 +221,8 @@ export function useRunStreaming(p: Args) {
 
   const sendMessage = async (event?: FormEvent) => {
     event?.preventDefault();
-    const sessionId = p.activeSessionId;
     const message = input.trim();
-    if (!message || !sessionId || !p.modelSendReady) return;
+    if (!message || !p.modelSendReady) return;
     if (images.pendingImages.length > 0 && !images.canAttachImages) {
       images.setImageError(
         !p.supportsImageInput
@@ -230,6 +230,15 @@ export function useRunStreaming(p: Args) {
           : "Images are not available in temporary sessions.",
       );
       return;
+    }
+    let sessionId = p.activeSessionId;
+    if (!sessionId) {
+      try {
+        sessionId = await p.startSession();
+      } catch (error) {
+        console.error(error);
+        return;
+      }
     }
 
     const attachments = await images.uploadPendingImages(sessionId);

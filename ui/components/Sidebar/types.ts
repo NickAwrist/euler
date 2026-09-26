@@ -9,7 +9,6 @@ export type SidebarProps = {
   onExportSession: (id: string) => Promise<void>;
   onRenameSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
-  isLoading: boolean;
   onCustomization: () => void;
   onUsage?: () => void;
   onSettings: () => void;

@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { effectiveDefaultRunModel } from "../../lib/defaultModel";
 import {
   NAVIGATION_EVENT,
   addNavigationGuard,
@@ -93,7 +92,7 @@ export function useSessionsAndNavigation(p: Args) {
     initialSessionId,
   );
   const [isEphemeral, setIsEphemeral] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [startingSession, setStartingSession] = useState(false);
   const [sessionLoadState, setSessionLoadState] =
     useState<SessionLoadState>("loading");
   const [sessionError, setSessionError] = useState<string | null>(null);
@@ -122,7 +121,6 @@ export function useSessionsAndNavigation(p: Args) {
   }, []);
 
   const preferences = useSessionPreferences({
-    activeSessionId,
     activeSessionIdRef: p.activeSessionIdRef,
     isEphemeralRef: p.isEphemeralRef,
     userSettingsRef: p.userSettingsRef,
@@ -149,6 +147,7 @@ export function useSessionsAndNavigation(p: Args) {
     p.setDebugOpen(false);
     p.setDebugData(null);
     preferences.setThinkingEffort(null);
+    preferences.setSessionModel(null);
   }, [
     p.setMessages,
     p.resetStreamingUi,
@@ -158,6 +157,7 @@ export function useSessionsAndNavigation(p: Args) {
     p.setDebugOpen,
     p.setDebugData,
     preferences.setThinkingEffort,
+    preferences.setSessionModel,
   ]);
 
   // Leaving an ephemeral chat deletes it, so ask first once it has content.
@@ -196,6 +196,23 @@ export function useSessionsAndNavigation(p: Args) {
     sessionLoadState === "empty" &&
     runStatusState === "resolved" &&
     !p.runFlightRef.current?.shouldPreserveMessages(activeSessionId ?? "");
+
+  // Leaving a saved chat that never received a message deletes it.
+  const discardEmptySession = useCallback(async () => {
+    const curId = p.activeSessionIdRef.current;
+    if (!curId || p.isEphemeralRef.current || !canDiscardEmptySession) return;
+    try {
+      await deleteSessionApi(curId);
+    } catch (e) {
+      console.error(e);
+    }
+    await refreshSessions();
+  }, [
+    p.activeSessionIdRef,
+    p.isEphemeralRef,
+    canDiscardEmptySession,
+    refreshSessions,
+  ]);
 
   const loadSession = useCallback(
     async (id: string) => {
@@ -361,9 +378,7 @@ export function useSessionsAndNavigation(p: Args) {
       if (curId && wasEphemeral) {
         void deleteTemporarySessionApi(curId).catch(() => {});
       }
-      if (curId && curId !== id && !wasEphemeral && canDiscardEmptySession) {
-        void deleteSessionApi(curId).then(refreshSessions).catch(console.error);
-      }
+      if (curId !== id) void discardEmptySession();
       setIsEphemeral(false);
       pushSessionUrl(id);
       await loadSession(id);
@@ -375,66 +390,44 @@ export function useSessionsAndNavigation(p: Args) {
       p.activeSessionIdRef,
       p.isEphemeralRef,
       p.onNavigate,
-      canDiscardEmptySession,
-      refreshSessions,
+      discardEmptySession,
     ],
   );
 
-  const createSession = useCallback(async () => {
-    if (!(await confirmEphemeralExit())) return;
-    setIsLoading(true);
+  /** Saves the chat started from Home and opens it without reloading. */
+  const startSession = useCallback(async () => {
+    setStartingSession(true);
     try {
-      const curId = p.activeSessionIdRef.current;
-      if (curId && p.isEphemeralRef.current) {
-        await deleteTemporarySessionApi(curId);
-      }
-      if (curId && !p.isEphemeralRef.current && canDiscardEmptySession) {
-        try {
-          await deleteSessionApi(curId);
-        } catch (e) {
-          console.error(e);
-        }
-      }
-      setIsEphemeral(false);
-      const modelForNew = effectiveDefaultRunModel(
-        p.userSettingsRef.current.defaultModel,
-        p.ollamaModels,
-      );
       const { id } = await createSessionApi({
-        model: modelForNew || null,
+        model: preferences.selectedModel || null,
       });
-      await refreshSessions();
+      loadGenRef.current++;
+      statusControllerRef.current?.abort();
+      p.activeSessionIdRef.current = id;
+      setActiveSessionId(id);
+      setSessionLoadState("empty");
+      setRunStatusState("resolved");
+      setSessionError(null);
+      preferences.setSessionModel(preferences.selectedModel || null);
+      p.modelMessagesRef.current = null;
       pushSessionUrl(id);
-      await loadSession(id);
-      p.onNavigate?.();
-    } catch (e) {
-      console.error(e);
+      void refreshSessions();
+      return id;
     } finally {
-      setIsLoading(false);
+      setStartingSession(false);
     }
   }, [
-    confirmEphemeralExit,
-    loadSession,
     p.activeSessionIdRef,
-    p.isEphemeralRef,
-    p.onNavigate,
-    canDiscardEmptySession,
-    p.ollamaModels,
-    p.userSettingsRef,
+    p.modelMessagesRef,
+    preferences.selectedModel,
+    preferences.setSessionModel,
     refreshSessions,
   ]);
 
   const createEphemeralSession = useCallback(async () => {
     if (!(await confirmEphemeralExit())) return;
+    await discardEmptySession();
     const curId = p.activeSessionIdRef.current;
-    if (curId && !p.isEphemeralRef.current && canDiscardEmptySession) {
-      try {
-        await deleteSessionApi(curId);
-      } catch (e) {
-        console.error(e);
-      }
-      await refreshSessions();
-    }
     if (curId && p.isEphemeralRef.current) {
       await deleteTemporarySessionApi(curId).catch(() => {});
     }
@@ -457,11 +450,10 @@ export function useSessionsAndNavigation(p: Args) {
     p.activeSessionIdRef,
     p.isEphemeralRef,
     p.onNavigate,
-    canDiscardEmptySession,
+    discardEmptySession,
     p.modelMessagesRef,
     resetSessionTransientState,
     preferences.setSessionModel,
-    refreshSessions,
     preferences.setWorkspace,
   ]);
 
@@ -487,6 +479,7 @@ export function useSessionsAndNavigation(p: Args) {
       if (curId && p.isEphemeralRef.current) {
         void deleteTemporarySessionApi(curId).catch(() => {});
       }
+      void discardEmptySession();
       if (urlId) {
         setIsEphemeral(false);
         void loadSession(urlId);
@@ -504,6 +497,7 @@ export function useSessionsAndNavigation(p: Args) {
     return () => window.removeEventListener(NAVIGATION_EVENT, onPopState);
   }, [
     loadSession,
+    discardEmptySession,
     p.activeSessionIdRef,
     p.isEphemeralRef,
     resetSessionTransientState,
@@ -518,14 +512,7 @@ export function useSessionsAndNavigation(p: Args) {
     if (curId && p.isEphemeralRef.current) {
       await deleteTemporarySessionApi(curId).catch(() => {});
     }
-    if (curId && !p.isEphemeralRef.current && canDiscardEmptySession) {
-      try {
-        await deleteSessionApi(curId);
-      } catch (e) {
-        console.error(e);
-      }
-      await refreshSessions();
-    }
+    await discardEmptySession();
     setIsEphemeral(false);
     setActiveSessionId(null);
     resetSessionTransientState();
@@ -537,9 +524,8 @@ export function useSessionsAndNavigation(p: Args) {
     p.activeSessionIdRef,
     p.isEphemeralRef,
     p.onNavigate,
-    canDiscardEmptySession,
+    discardEmptySession,
     resetSessionTransientState,
-    refreshSessions,
     preferences.setWorkspace,
   ]);
 
@@ -556,6 +542,7 @@ export function useSessionsAndNavigation(p: Args) {
         p.activeSessionIdRef.current = null;
         setActiveSessionId(null);
         preferences.setWorkspace({ kind: "sandbox" });
+        preferences.setSessionModel(null);
         p.setMessages([]);
         p.setDebugOpen(false);
         p.setDebugData(null);
@@ -574,6 +561,7 @@ export function useSessionsAndNavigation(p: Args) {
       p.setTruncateConfirm,
       refreshSessions,
       preferences.setWorkspace,
+      preferences.setSessionModel,
     ],
   );
 
@@ -634,13 +622,13 @@ export function useSessionsAndNavigation(p: Args) {
     sessions,
     activeSessionId,
     isEphemeral,
-    isLoading,
     sessionLoadState,
     sessionError,
     retrySessionLoad,
-    sessionSendReady:
-      (sessionLoadState === "loaded" || sessionLoadState === "empty") &&
-      runStatusState === "resolved",
+    sessionSendReady: activeSessionId
+      ? (sessionLoadState === "loaded" || sessionLoadState === "empty") &&
+        runStatusState === "resolved"
+      : !startingSession,
     renameSessionId,
     setRenameSessionId,
     pendingDeleteSessionId,
@@ -650,7 +638,7 @@ export function useSessionsAndNavigation(p: Args) {
     ...preferences,
     refreshSessions,
     switchToSession,
-    createSession,
+    startSession,
     createEphemeralSession,
     goToHome,
     saveSessionTitle,

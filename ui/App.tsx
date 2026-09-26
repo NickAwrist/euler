@@ -192,6 +192,11 @@ function ChatView({
     [openFile, app.workspace],
   );
   const [runFooterInset, setRunFooterInset] = useState(104);
+  // Home and empty chats center the composer; the first message docks it.
+  const composerCentered =
+    app.messages.length === 0 &&
+    !app.runPending &&
+    (!app.activeSessionId || app.sessionLoadState === "empty");
   const { setEditingUserIndex, setTruncateConfirm } = app;
   const cancelEditUser = useCallback(
     () => setEditingUserIndex(null),
@@ -222,7 +227,6 @@ function ChatView({
     sessions: app.sessions,
     activeSessionId: app.activeSessionId,
     switchToSession: app.switchToSession,
-    createSession: app.createSession,
     setSidebarOpen: app.setSidebarOpen,
     setSidebarCollapsed: app.setSidebarCollapsed,
     goToHome: app.goToHome,
@@ -274,7 +278,7 @@ function ChatView({
               app.setSidebarOpen(false);
               app.switchToSession(id);
             }}
-            onNewSession={app.createSession}
+            onNewSession={app.goToHome}
             onNewEphemeralSession={app.createEphemeralSession}
             onRenameSession={(id) => app.setRenameSessionId(id)}
             onExportSession={async (id) => {
@@ -303,7 +307,6 @@ function ChatView({
               );
             }}
             onDeleteSession={app.requestDeleteSession}
-            isLoading={app.isLoading}
             onCustomization={onCustomization}
             onSettings={onSettings}
             onUsage={onUsage}
@@ -356,7 +359,7 @@ function ChatView({
               !app.activeSessionId && "pt-0",
             )}
           >
-            {app.activeSessionId ? (
+            {app.activeSessionId && !composerCentered ? (
               <div
                 key={app.activeSessionId}
                 className="ui-animate-fade-in flex h-full min-h-0 min-w-0 flex-1 flex-col"
@@ -383,46 +386,44 @@ function ChatView({
               </div>
             ) : (
               <WelcomeHome
-                key="home"
                 sessions={app.sessions}
-                isLoading={app.isLoading}
-                onNewRun={app.createSession}
+                home={!app.activeSessionId}
+                ephemeral={app.isEphemeral}
+                composerHeight={runFooterInset}
                 onNewEphemeralRun={app.createEphemeralSession}
                 onOpenSession={app.switchToSession}
               />
             )}
           </section>
 
-          {app.activeSessionId && (
-            <RunInputDock
-              key={app.activeSessionId}
-              ollamaModels={app.ollamaModels}
-              ollamaConnected={app.ollamaConnected}
-              modelsLoadError={app.modelsLoadError}
-              selectedModel={app.selectedModel}
-              onModelChange={app.handleModelChange}
-              thinkingEffort={app.thinkingEffort}
-              onThinkingEffortChange={app.handleThinkingEffortChange}
-              input={app.input}
-              setInput={app.setInput}
-              onSendMessage={app.sendMessage}
-              onStopGeneration={app.stopGeneration}
-              runPending={app.runPending}
-              streamingStep={app.streamingStep}
-              streamingSteps={app.streamingSteps}
-              modelSendReady={app.modelSendReady}
-              pendingImages={app.pendingImages}
-              imageError={app.imageError}
-              addPendingImages={app.addPendingImages}
-              removePendingImage={app.removePendingImage}
-              canAttachImages={app.canAttachImages}
-              attachImageDisabledReason={app.attachImageDisabledReason}
-              attachmentsSendReady={app.attachmentsSendReady}
-              workspace={app.workspace}
-              onRunCommand={runCommand}
-              onFooterHeightChange={setRunFooterInset}
-            />
-          )}
+          <RunInputDock
+            centered={composerCentered}
+            ollamaModels={app.ollamaModels}
+            ollamaConnected={app.ollamaConnected}
+            modelsLoadError={app.modelsLoadError}
+            selectedModel={app.selectedModel}
+            onModelChange={app.handleModelChange}
+            thinkingEffort={app.thinkingEffort}
+            onThinkingEffortChange={app.handleThinkingEffortChange}
+            input={app.input}
+            setInput={app.setInput}
+            onSendMessage={app.sendMessage}
+            onStopGeneration={app.stopGeneration}
+            runPending={app.runPending}
+            streamingStep={app.streamingStep}
+            streamingSteps={app.streamingSteps}
+            modelSendReady={app.modelSendReady}
+            pendingImages={app.pendingImages}
+            imageError={app.imageError}
+            addPendingImages={app.addPendingImages}
+            removePendingImage={app.removePendingImage}
+            canAttachImages={app.canAttachImages}
+            attachImageDisabledReason={app.attachImageDisabledReason}
+            attachmentsSendReady={app.attachmentsSendReady}
+            workspace={app.workspace}
+            onRunCommand={runCommand}
+            onFooterHeightChange={setRunFooterInset}
+          />
         </main>
         {app.activeSessionId && workspaceReady && (
           <WorkspaceArtifacts
@@ -476,7 +477,8 @@ export default function App() {
 
   const runCommand = async (command: RunCommandName) => {
     try {
-      if (command === "directory") setDirectorySessionId(app.activeSessionId);
+      const sessionId = app.activeSessionId ?? (await app.startSession());
+      if (command === "directory") setDirectorySessionId(sessionId);
       if (command === "sandbox") await app.returnToSandbox();
       if (command === "workspace") setWorkspaceOpen(true);
     } catch (error) {

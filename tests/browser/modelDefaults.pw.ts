@@ -96,10 +96,14 @@ test("model defaults desktop: unavailable preference matches settings, new chats
     .getByRole("button", { name: "New chat", exact: true })
     .first()
     .click();
-  await expect.poll(() => created).toEqual([{ model: "local" }]);
   await expect(
     page.getByRole("button", { name: "Model: Local", exact: true }),
   ).toBeVisible();
+  // Home saves the chat on its first message, with the selected model.
+  expect(created).toEqual([]);
+  await page.getByPlaceholder("Send a message...").fill("Hello");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect.poll(() => created).toEqual([{ model: "local" }]);
 
   // A previous chat's model must not become the next ephemeral chat's default.
   await page.getByRole("button", { name: "Model: Local", exact: true }).click();
@@ -146,15 +150,16 @@ test("model defaults desktop: unavailable preference matches settings, new chats
     .getByRole("button", { name: "New chat", exact: true })
     .first()
     .click();
-  await expect
-    .poll(() => created.at(-1))
-    .toEqual({ model: "openrouter:test/remote" });
   await expect(
     page.getByRole("button", { name: "Model: Remote", exact: true }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect
+    .poll(() => created.at(-1))
+    .toEqual({ model: "openrouter:test/remote" });
 });
 
-test("model defaults desktop: a chat created during catalog loading resolves when models arrive", async ({
+test("model defaults desktop: the Home composer resolves its model when the catalog arrives", async ({
   page,
 }) => {
   const pending = Promise.withResolvers<typeof models>();
@@ -174,7 +179,6 @@ test("model defaults desktop: a chat created during catalog loading resolves whe
       .getByRole("button", { name: "New chat", exact: true })
       .first()
       .click();
-    await expect.poll(() => created).toEqual([{}]);
     await page.getByPlaceholder("Send a message...").fill("Hello");
     await expect(
       page.getByRole("button", { name: "Send message", exact: true }),
@@ -186,6 +190,7 @@ test("model defaults desktop: a chat created during catalog loading resolves whe
     await expect(
       page.getByRole("button", { name: "Send message", exact: true }),
     ).toBeEnabled();
+    expect(created).toEqual([]);
   } finally {
     pending.resolve(models);
   }
@@ -208,9 +213,9 @@ test("model defaults desktop: empty catalogs show no default and cannot send", a
     .getByRole("button", { name: "New chat", exact: true })
     .first()
     .click();
-  await expect.poll(() => created).toEqual([{}]);
   await page.getByPlaceholder("Send a message...").fill("Hello");
   await expect(
     page.getByRole("button", { name: "Send message", exact: true }),
   ).toBeDisabled();
+  expect(created).toEqual([]);
 });
