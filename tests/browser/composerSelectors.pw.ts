@@ -183,7 +183,10 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect(menu).not.toBeVisible();
       await expect(model).toBeFocused();
       await model.click();
-      await page.locator("main").click({ position: { x: 50, y: 50 } });
+      // Click the right gutter; the chat list may overlay the left one.
+      const main = page.locator("main");
+      const { width } = (await main.boundingBox())!;
+      await main.click({ position: { x: width - 50, y: 50 } });
       await expect(menu).not.toBeVisible();
       await expect.poll(() => sessionModel).toBe("openrouter:openai/gpt");
       await model.click();

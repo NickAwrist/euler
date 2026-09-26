@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  applyAppearance,
+  loadAppearance,
+  saveAppearance,
+} from "../../persist/appearance";
 import type { UserSettings } from "../../persist/userSettings";
 import type {
   ComfyUIConfigPayload,
@@ -50,6 +55,8 @@ export function useSettingsPageState({
   searxngConnected,
   onSave,
 }: Args) {
+  const [savedAppearance, setSavedAppearance] = useState(loadAppearance);
+  const [appearance, setAppearance] = useState(savedAppearance);
   const [settings, setSettings] = useState<UserSettings>(currentSettings);
   const [ollamaUri, setOllamaUri] = useState(ollamaHost);
   const [isSaving, setIsSaving] = useState(false);
@@ -255,6 +262,33 @@ export function useSettingsPageState({
         "Display debug button",
         settings.showDebugButton !== currentSettings.showDebugButton,
       ],
+      ["appearance", "Color theme", appearance.theme !== savedAppearance.theme],
+      [
+        "appearance",
+        "Chat width",
+        appearance.chatWidth !== savedAppearance.chatWidth,
+      ],
+      ["appearance", "Font style", appearance.font !== savedAppearance.font],
+      [
+        "appearance",
+        "Code block font",
+        appearance.codeFont !== savedAppearance.codeFont,
+      ],
+      [
+        "appearance",
+        "Make room for the chat list",
+        appearance.shiftForChatList !== savedAppearance.shiftForChatList,
+      ],
+      [
+        "appearance",
+        "Make room for artifacts",
+        appearance.shiftForArtifacts !== savedAppearance.shiftForArtifacts,
+      ],
+      [
+        "appearance",
+        "Sidebar animation",
+        appearance.sidebarAnimationMs !== savedAppearance.sidebarAnimationMs,
+      ],
       ["ollama", "Ollama server URL", ollamaUri !== ollamaHost],
       ["image-generation", "ComfyUI server URL", comfyUri !== comfyuiHost],
       [
@@ -274,6 +308,8 @@ export function useSettingsPageState({
       .filter(([, , changed]) => changed)
       .map(([tab, label]) => ({ tab, label }));
   }, [
+    appearance,
+    savedAppearance,
     settings,
     currentSettings,
     ollamaUri,
@@ -292,6 +328,7 @@ export function useSettingsPageState({
   const isDirty = changes.length > 0;
 
   const discardChanges = useCallback(() => {
+    setAppearance(savedAppearance);
     setSettings(currentSettings);
     setOllamaUri(ollamaHost);
     setComfyUri(comfyuiHost);
@@ -304,6 +341,7 @@ export function useSettingsPageState({
     setSearxngTestState({ status: "idle" });
     setError(null);
   }, [
+    savedAppearance,
     currentSettings,
     ollamaHost,
     comfyuiHost,
@@ -319,20 +357,30 @@ export function useSettingsPageState({
     setError(null);
     try {
       const { width, height } = parseSize(comfySize);
-      await onSave(
-        settings,
-        ollamaUri,
-        {
-          host: comfyUri,
-          defaultModel: comfyModel,
-          defaultWidth: width,
-          defaultHeight: height,
-          negativePrompt: comfyNegative,
-        },
-        {
-          host: searxngUri,
-        },
-      );
+      if (changes.some((change) => change.tab !== "appearance"))
+        await onSave(
+          settings,
+          ollamaUri,
+          {
+            host: comfyUri,
+            defaultModel: comfyModel,
+            defaultWidth: width,
+            defaultHeight: height,
+            negativePrompt: comfyNegative,
+          },
+          {
+            host: searxngUri,
+          },
+        );
+      if (changes.some((change) => change.tab === "appearance")) {
+        if (!saveAppearance(appearance)) {
+          throw new Error(
+            "Could not save appearance in this browser. Your changes have not been applied.",
+          );
+        }
+        applyAppearance(appearance);
+        setSavedAppearance(appearance);
+      }
       setTestState({ status: "idle" });
       setComfyTestState({ status: "idle" });
       setSearxngTestState({ status: "idle" });
@@ -344,6 +392,8 @@ export function useSettingsPageState({
       setIsSaving(false);
     }
   }, [
+    appearance,
+    changes,
     isDirty,
     settings,
     ollamaUri,
@@ -373,6 +423,8 @@ export function useSettingsPageState({
   }, []);
 
   return {
+    appearance,
+    setAppearance,
     settings,
     ollamaUri,
     onOllamaUriInput,

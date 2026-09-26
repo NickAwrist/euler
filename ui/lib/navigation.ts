@@ -15,7 +15,8 @@ let currentPath = "";
 
 function settingsTab(path: string): SettingsTab {
   const tab = path.split("/")[2];
-  return tab === "ollama" ||
+  return tab === "appearance" ||
+    tab === "ollama" ||
     tab === "openrouter" ||
     tab === "image-generation" ||
     tab === "web-search"

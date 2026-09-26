@@ -524,3 +524,95 @@ test("chat sidebar desktop jumps to the latest message after scrolling up", asyn
   await expect(latest).toBeInViewport();
   await expect(jump).toHaveCount(0);
 });
+
+async function openLayoutChat(
+  page: Page,
+  width: number,
+  appearance: Record<string, unknown>,
+) {
+  await page.setViewportSize({ width, height: 900 });
+  await mockApp(page);
+  await page.addInitScript((appearance) => {
+    localStorage.setItem(
+      "euler:appearance",
+      JSON.stringify({ sidebarAnimationMs: 0, ...appearance }),
+    );
+    localStorage.setItem("euler:artifactSidebarWidth", "560");
+  }, appearance);
+  await page.route("**/artifacts/tree?*", (route) =>
+    route.fulfill({
+      json: {
+        entries: [{ name: "notes.md", path: "notes.md", kind: "file" }],
+      },
+    }),
+  );
+  await page.goto("/run/sidebar-test");
+  await expect(page.getByText("Check the sidebar controls.")).toBeVisible();
+  const chats = page.getByRole("button", { name: "Toggle chats", exact: true });
+  const composer = page.locator(".pointer-events-auto.relative");
+  return {
+    setChats: async (open: boolean) => {
+      if ((await chats.getAttribute("aria-expanded")) !== String(open))
+        await chats.click();
+    },
+    toggleArtifacts: () =>
+      page.getByRole("button", { name: "Toggle artifacts" }).click(),
+    composerSpan: async () => {
+      const box = (await composer.boundingBox())!;
+      return [Math.round(box.x), Math.round(box.x + box.width)];
+    },
+  };
+}
+
+test("chat sidebar desktop panels slide over empty space and nudge the chat only as needed", async ({
+  page,
+}) => {
+  const layout = await openLayoutChat(page, 1440, {});
+  await layout.setChats(false);
+  // A 768px column centered in 1440px.
+  await expect.poll(layout.composerSpan).toEqual([336, 1104]);
+  await layout.setChats(true);
+  await expect.poll(layout.composerSpan).toEqual([336, 1104]);
+  await expect(page.locator("main")).toHaveCSS("margin-left", "0px");
+  await layout.setChats(false);
+  // The 560px panel starts at 880px; the column moves just clear of it.
+  await layout.toggleArtifacts();
+  await expect.poll(layout.composerSpan).toEqual([92, 860]);
+  // With both panels open the column narrows to the space between them.
+  await layout.setChats(true);
+  await expect.poll(layout.composerSpan).toEqual([280, 860]);
+});
+
+test("chat sidebar desktop panels set to make room always move the chat", async ({
+  page,
+}) => {
+  const layout = await openLayoutChat(page, 1440, {
+    shiftForChatList: true,
+    shiftForArtifacts: true,
+  });
+  await layout.setChats(true);
+  await expect(page.locator("main")).toHaveCSS("margin-left", "260px");
+  await expect(page.locator("#app-sidebar")).toHaveCSS(
+    "transition-duration",
+    "0s",
+  );
+  await layout.toggleArtifacts();
+  await expect(page.locator("main")).toHaveCSS("margin-right", "560px");
+});
+
+test("chat sidebar mobile chat uses the full width with any setting", async ({
+  page,
+}) => {
+  const layout = await openLayoutChat(page, 390, {
+    chatWidth: "full",
+    shiftForChatList: true,
+  });
+  await expect.poll(layout.composerSpan).toEqual([14, 376]);
+  await layout.setChats(true);
+  await expect(page.locator("main")).toHaveCSS("margin-left", "0px");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+});

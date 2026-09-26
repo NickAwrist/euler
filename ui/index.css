@@ -20,6 +20,298 @@
   --color-border-subtle: #2a2a2a;
 }
 
+/* Restrained UI adaptations of familiar editor palettes. */
+[data-theme="default"] {
+  --color-background: #171717;
+  --color-surface: #212121;
+  --color-foreground: #e8e8e8;
+  --color-muted: #262626;
+  --color-muted-foreground: #9b9b9b;
+  --color-accent: #e8e8e8;
+  --color-accent-hover: #f5f5f5;
+  --color-accent-foreground: #171717;
+  --color-border: #3a3a3a;
+  --color-border-subtle: #2a2a2a;
+  --color-accent-soft: #ffffff14;
+  --color-accent-soft-strong: #ffffff1f;
+  --color-accent-ring: #ffffff33;
+}
+
+[data-theme="one-dark"] {
+  --color-background: #21252b;
+  --color-surface: #282c34;
+  --color-foreground: #d7dae0;
+  --color-muted: #2e333d;
+  --color-muted-foreground: #a3aab7;
+  --color-accent: #9ab9df;
+  --color-accent-hover: #b7cdea;
+  --color-accent-foreground: #21252b;
+  --color-border: #454c59;
+  --color-border-subtle: #343b46;
+  --color-accent-soft: color-mix(in srgb, #9ab9df 8%, transparent);
+  --color-accent-soft-strong: color-mix(in srgb, #9ab9df 12%, transparent);
+  --color-accent-ring: color-mix(in srgb, #9ab9df 20%, transparent);
+}
+
+[data-theme="dracula"] {
+  --color-background: #24242e;
+  --color-surface: #2c2c38;
+  --color-foreground: #eeedf3;
+  --color-muted: #333340;
+  --color-muted-foreground: #aaa7ba;
+  --color-accent: #baa6d9;
+  --color-accent-hover: #cdbde4;
+  --color-accent-foreground: #24242e;
+  --color-border: #494554;
+  --color-border-subtle: #393643;
+  --color-accent-soft: color-mix(in srgb, #baa6d9 8%, transparent);
+  --color-accent-soft-strong: color-mix(in srgb, #baa6d9 12%, transparent);
+  --color-accent-ring: color-mix(in srgb, #baa6d9 20%, transparent);
+}
+
+[data-theme="nord"] {
+  --color-background: #2e3440;
+  --color-surface: #353d4b;
+  --color-foreground: #eceff4;
+  --color-muted: #3b4252;
+  --color-muted-foreground: #b0bacb;
+  --color-accent: #9fc4cf;
+  --color-accent-hover: #bad8df;
+  --color-accent-foreground: #2e3440;
+  --color-border: #505c70;
+  --color-border-subtle: #434c5e;
+  --color-accent-soft: color-mix(in srgb, #9fc4cf 8%, transparent);
+  --color-accent-soft-strong: color-mix(in srgb, #9fc4cf 12%, transparent);
+  --color-accent-ring: color-mix(in srgb, #9fc4cf 20%, transparent);
+}
+
+[data-theme="catppuccin"] {
+  --color-background: #242331;
+  --color-surface: #2c2b3b;
+  --color-foreground: #ddd9ee;
+  --color-muted: #343245;
+  --color-muted-foreground: #b4adc9;
+  --color-accent: #c2afe2;
+  --color-accent-hover: #d6c8ed;
+  --color-accent-foreground: #242331;
+  --color-border: #504961;
+  --color-border-subtle: #403a50;
+  --color-accent-soft: color-mix(in srgb, #c2afe2 8%, transparent);
+  --color-accent-soft-strong: color-mix(in srgb, #c2afe2 12%, transparent);
+  --color-accent-ring: color-mix(in srgb, #c2afe2 20%, transparent);
+}
+
+[data-theme="github"] {
+  --color-background: #0d1117;
+  --color-surface: #161b22;
+  --color-foreground: #e6edf3;
+  --color-muted: #21262d;
+  --color-muted-foreground: #9da7b3;
+  --color-accent: #91b9e8;
+  --color-accent-hover: #b1cef0;
+  --color-accent-foreground: #0d1117;
+  --color-border: #39424e;
+  --color-border-subtle: #30363d;
+  --color-accent-soft: color-mix(in srgb, #91b9e8 8%, transparent);
+  --color-accent-soft-strong: color-mix(in srgb, #91b9e8 12%, transparent);
+  --color-accent-ring: color-mix(in srgb, #91b9e8 20%, transparent);
+}
+
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("/fonts/source-serif-4-roman.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("/fonts/source-serif-4-italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 200 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/geist-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/geist-italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("/fonts/source-sans-3-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Source Sans 3";
+  src: url("/fonts/source-sans-3-italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 200 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  src: url("/fonts/atkinson-hyperlegible-next-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  src: url("/fonts/atkinson-hyperlegible-next-italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/geist-mono-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/geist-mono-italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrains-mono-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrains-mono-italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 100 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Source Code Pro";
+  src: url("/fonts/source-code-pro-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Source Code Pro";
+  src: url("/fonts/source-code-pro-italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 200 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("/fonts/opendyslexic-latin-400-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("/fonts/opendyslexic-latin-400-italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("/fonts/opendyslexic-latin-700-normal.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("/fonts/opendyslexic-latin-700-italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+}
+
+[data-font="default"] {
+  --font-sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+[data-font="serif"] {
+  --font-sans: "Source Serif 4", Georgia, serif;
+}
+
+[data-font="geist"] {
+  --font-sans: "Geist", system-ui, sans-serif;
+}
+
+[data-font="source-sans"] {
+  --font-sans: "Source Sans 3", system-ui, sans-serif;
+}
+
+[data-font="atkinson"] {
+  --font-sans: "Atkinson Hyperlegible Next", system-ui, sans-serif;
+}
+
+[data-font="opendyslexic"] {
+  --font-sans: "OpenDyslexic", system-ui, sans-serif;
+}
+
+[data-font="system"] {
+  --font-sans: system-ui, sans-serif;
+}
+
+:root,
+[data-code-font="default"] {
+  --font-code: var(--font-mono);
+}
+
+[data-code-font="geist-mono"] {
+  --font-code: "Geist Mono", var(--font-mono);
+}
+
+[data-code-font="jetbrains-mono"] {
+  --font-code: "JetBrains Mono", var(--font-mono);
+}
+
+[data-code-font="source-code"] {
+  --font-code: "Source Code Pro", var(--font-mono);
+}
+
+/* Keep code blocks independent of interface and inline-code typography. */
+pre,
+pre code {
+  font-family: var(--font-code);
+}
+
 :root {
   color-scheme: dark;
   --workspace-header-height: 56px;

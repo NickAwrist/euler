@@ -74,7 +74,7 @@ export const RunArea = memo(function RunArea({
       >
         <div
           ref={contentRef}
-          className="mx-auto flex min-h-min w-full max-w-3xl flex-col"
+          className="mx-auto flex min-h-min w-full max-w-[var(--chat-width)] flex-col"
         >
           {sessionError && (
             <div
@@ -134,7 +134,7 @@ export const RunArea = memo(function RunArea({
 
           {streamingContent && (
             <div className="ui-animate-slide-up flex w-full min-w-0 flex-col">
-              <div className="max-w-[min(100%,42rem)] min-w-0 pt-4 max-[640px]:pt-3.5">
+              <div className="max-w-full min-w-0 pt-4 max-[640px]:pt-3.5">
                 <MarkdownMessage className="text-foreground">
                   {streamingContent}
                 </MarkdownMessage>
