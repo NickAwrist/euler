@@ -126,7 +126,7 @@
   font-size: 16px;
   font-weight: 500;
 }
-.usage-chart svg {
+.usage-plot > svg {
   width: 100%;
   margin-top: 18px;
 }
@@ -258,6 +258,23 @@
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 11 11'%3E%3Cpath d='M5.5 1v9M1 5.5h9' stroke='%23171717' stroke-width='3'/%3E%3Cpath d='M5.5 1v9M1 5.5h9' stroke='%23ddd' stroke-width='1'/%3E%3C/svg%3E")
     5 5, crosshair;
   margin: 0;
+}
+.usage-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 12px;
+  padding-left: 8.42%;
+  color: var(--color-muted-foreground);
+  font-size: 12px;
+}
+.usage-chart-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.usage-swatch {
+  flex-shrink: 0;
 }
 .usage-plot:has(.usage-chart-cursor:focus-visible) {
   outline: 2px solid var(--color-muted-foreground);

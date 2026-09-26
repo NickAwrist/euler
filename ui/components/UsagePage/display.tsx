@@ -5,7 +5,7 @@ export const number = (n: number | null) =>
     ? "Not reported"
     : Intl.NumberFormat("en", {
         notation: "compact",
-        maximumFractionDigits: 2,
+        maximumSignificantDigits: 3,
       }).format(n);
 export const money = (n: number | null) =>
   n === null

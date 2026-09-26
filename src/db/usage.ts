@@ -131,10 +131,11 @@ export function getUsageDashboard(
           `${columns[rule.column]} ${rule.direction === "ascending" ? "ASC" : "DESC"} NULLS LAST`,
       )
       .join(", ");
+    // Ties fall back to token volume, so all-$0 local usage still ranks by size.
     const rows = db
       .query(`${BASE} SELECT CAST(${group} AS TEXT) AS key,
       ${query.grouping === "hour" ? group : "0"} AS timestamp, ${TOTALS}
-      FROM calls${filter} GROUP BY ${group} ORDER BY ${order}, key ASC LIMIT ? OFFSET ?`)
+      FROM calls${filter} GROUP BY ${group} ORDER BY ${order}, tokens DESC, key ASC LIMIT ? OFFSET ?`)
       .all(...filteredArgs, pageSize, page * pageSize) as UsageGroup[];
     for (const row of rows)
       row.tokenShare = totals.tokens ? (row.tokens / totals.tokens) * 100 : 0;
