@@ -279,7 +279,7 @@ test("view navigation desktop deletes an empty chat left with Back", async ({
   await page.goto("/run/a");
   await page.getByRole("button", { name: /Conversation b/ }).click();
   await expect(
-    page.getByRole("heading", { name: "What are we working on?" }),
+    page.getByRole("heading", { name: "What are we working on today?" }),
   ).toBeVisible();
   await page.goBack();
   await expect(page.getByText("Stored a", { exact: true })).toBeVisible();

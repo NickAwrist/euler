@@ -413,6 +413,11 @@ function ChatView({
               </div>
             ) : (
               <WelcomeHome
+                key={
+                  app.activeSessionId ??
+                  (app.isEphemeral ? "ephemeral" : "home")
+                }
+                name={app.userSettings.name}
                 sessions={app.sessions}
                 home={!app.activeSessionId}
                 ephemeral={app.isEphemeral}

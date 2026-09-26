@@ -144,7 +144,7 @@ test("session loading distinguishes loading, errors, and loaded empty", async ({
     );
   });
   const emptyChat = page.getByRole("heading", {
-    name: "What are we working on?",
+    name: "What are we working on today?",
   });
   await page.goto("/run/a");
   await expect(

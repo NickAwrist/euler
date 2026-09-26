@@ -1,8 +1,16 @@
 import { EyeOff, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { safeStorage } from "../lib/safeStorage";
 import type { SessionSummary } from "../types";
+import {
+  WELCOME_QUESTION_KEY,
+  chooseWelcomeQuestion,
+  welcomeFirstName,
+} from "./welcomeQuestions";
 
 type WelcomeHomeProps = {
   sessions: SessionSummary[];
+  name: string;
   /** Home, unlike an empty chat, also offers ephemeral and recent chats. */
   home: boolean;
   ephemeral: boolean;
@@ -14,18 +22,29 @@ type WelcomeHomeProps = {
 
 export function WelcomeHome({
   sessions,
+  name,
   home,
   ephemeral,
   composerHeight,
   onNewEphemeralRun,
   onOpenSession,
 }: WelcomeHomeProps) {
+  const firstName = welcomeFirstName(name);
+  const [greeting] = useState(() =>
+    chooseWelcomeQuestion(
+      firstName,
+      safeStorage.session.getItem(WELCOME_QUESTION_KEY),
+    ),
+  );
+  useEffect(() => {
+    safeStorage.session.setItem(WELCOME_QUESTION_KEY, greeting.question);
+  }, [greeting]);
   const composerHalf = `${composerHeight / 2}px`;
   return (
     <div className="ui-animate-fade-in relative h-full w-full">
       <div
         className="absolute inset-x-0 flex flex-col items-center px-6 text-center"
-        style={{ bottom: `calc(50% + ${composerHalf} + 0.5rem)` }}
+        style={{ bottom: `calc(50% + ${composerHalf} + 0.25rem)` }}
       >
         <div
           className="mb-4 flex size-[44px] items-center justify-center rounded-[12px] bg-accent-soft text-accent"
@@ -33,14 +52,19 @@ export function WelcomeHome({
         >
           {ephemeral ? <EyeOff size={20} /> : <Sparkles size={20} />}
         </div>
-        <h2 className="mb-2 text-[1.375rem] font-semibold leading-[1.25] tracking-[-0.02em] text-foreground">
-          {ephemeral
-            ? "Ephemeral chat"
-            : sessions.length > 0
-              ? "What are we working on?"
-              : "Start your first chat"}
+        <h2 className="mb-10 text-[1.875rem] font-normal leading-[1.25] tracking-[-0.02em] text-foreground">
+          {greeting.personalized && firstName ? (
+            <>
+              {greeting.question.slice(0, -1)},{" "}
+              <span className="welcome-name italic">{firstName}</span>?
+            </>
+          ) : (
+            greeting.question
+          )}
         </h2>
-        <p className="m-0 max-w-[40ch] text-[0.9375rem] leading-[1.6] text-muted-foreground">
+        <p
+          className={`m-0 max-w-[40ch] leading-[1.6] text-muted-foreground ${ephemeral ? "text-[0.9375rem]" : "text-[0.75rem]"}`}
+        >
           {ephemeral
             ? "Nothing here is saved. Messages and files are deleted when you leave."
             : "Type / for commands or $ to use a skill."}
