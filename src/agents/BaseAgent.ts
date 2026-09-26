@@ -178,6 +178,8 @@ export class BaseAgent {
       toolCalls = [];
       const reasoningDetails: unknown[] = [];
       let llmMetrics: LlmMetrics | undefined;
+      const requestStartedAt = Date.now();
+      let lastThinkingAt: number | undefined;
 
       const stream = await streamModelChat({
         model: this.model,
@@ -203,7 +205,10 @@ export class BaseAgent {
           const tDelta = chunk.thinkingDelta ?? "";
 
           if (cDelta) fullContent += cDelta;
-          if (tDelta) fullThinking += tDelta;
+          if (tDelta) {
+            fullThinking += tDelta;
+            lastThinkingAt = Date.now();
+          }
 
           if (cDelta || tDelta) {
             ctx.streamDelta(cDelta, tDelta);
@@ -229,6 +234,13 @@ export class BaseAgent {
             log.error({ err }, "Could not record model usage");
           }
         }
+      }
+
+      if (lastThinkingAt !== undefined) {
+        llmMetrics = {
+          ...llmMetrics,
+          thinkingDurationMs: lastThinkingAt - requestStartedAt,
+        };
       }
 
       if (signal?.aborted) {

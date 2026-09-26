@@ -1,6 +1,7 @@
 import type { MessageStep } from "../../types";
 import { TraceStepBody } from "./TraceNodes";
 import { traceStepsForDisplay } from "./normalizeTrace";
+import { traceTimeline } from "./traceDisplay";
 import {
   formatTraceResultsForCopy,
   shouldShowStepsModal,
@@ -37,6 +38,7 @@ export function ExecutionTraceList({
 }) {
   const displaySteps = traceStepsForDisplay(steps ?? []);
   const lastIdx = displaySteps.length - 1;
+  const timeline = traceTimeline(displaySteps, Date.now());
   return (
     <>
       {displaySteps.map((step, index) => (
@@ -46,6 +48,7 @@ export function ExecutionTraceList({
           showIndex
           stepNumber={index + 1}
           streamingThinking={index === lastIdx ? streamingThinking : undefined}
+          timeline={timeline[index]}
         />
       ))}
     </>

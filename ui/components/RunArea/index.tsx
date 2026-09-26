@@ -1,8 +1,10 @@
 import { ArrowDown } from "lucide-react";
 import { memo, useLayoutEffect, useRef } from "react";
 import { useStickToBottom } from "use-stick-to-bottom";
+import { MAIN_AGENT_NAME } from "../../../src/agents/agentNames";
 import { IconButton } from "../IconButton";
 import { MarkdownMessage } from "../MarkdownMessage";
+import { LiveThinking } from "./LiveThinking";
 import { MessageHistory } from "./MessageHistory";
 import { StreamingStatusRow } from "./StreamingStatusRow";
 import type { RunAreaProps } from "./types";
@@ -120,6 +122,15 @@ export const RunArea = memo(function RunArea({
               onViewSteps={onViewSteps}
             />
           )}
+
+          {streamingStep?.kind === "llm_call" &&
+            streamingStep.agentName === MAIN_AGENT_NAME && (
+              <LiveThinking
+                key={streamingStep.startedAt}
+                thinking={streamingThinking}
+                responding={streamingContent.length > 0}
+              />
+            )}
 
           {streamingContent && (
             <div className="ui-animate-slide-up flex w-full min-w-0 flex-col">

@@ -124,6 +124,28 @@ describe("OpenRouter provider", () => {
     );
   });
 
+  test("records thinking time only for model calls that reason", async () => {
+    setOpenRouterApiKey("sk-or-test");
+    const thinkingDuration = async () => {
+      const agent = new BaseAgent(
+        "test_agent",
+        "Test agent",
+        [],
+        `openrouter:${model}`,
+        "Be concise.",
+      );
+      const context = new RunContext(agent, "Hello");
+      await agent.run("Hello", context);
+      return context.steps.find((step) => step.kind === "llm_call")?.metrics
+        ?.thinkingDurationMs;
+    };
+
+    setOpenRouterScenario("reasoning");
+    expect(await thinkingDuration()).toBeGreaterThanOrEqual(0);
+    resetOpenRouterScenario();
+    expect(await thinkingDuration()).toBeUndefined();
+  });
+
   test("assembles tool fragments and preserves tool_call_id in the loop", async () => {
     setOpenRouterApiKey("sk-or-test");
     setOpenRouterScenario("tool-loop");

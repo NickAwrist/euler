@@ -24,6 +24,7 @@ import {
   comfyUIImageKey,
   extractComfyUIImageUrls,
 } from "../MarkdownMessage";
+import { ThinkingBlock } from "../ThinkingBlock";
 import { MessageActions } from "./MessageActions";
 import {
   msgIconBtn,
@@ -31,6 +32,7 @@ import {
   msgIconStroke,
   msgOutputChip,
 } from "./messageItemStyles";
+import { replyThinking } from "./replyThinking";
 
 type Props = {
   message: Message;
@@ -81,6 +83,7 @@ export function AssistantMessageBubble({
   const isOtherWorkspace = (file: WorkspaceFileAttachment) =>
     artifacts !== null && file.workspaceKind !== artifacts.workspaceKind;
   const otherWorkspaceKind = outputFiles.find(isOtherWorkspace)?.workspaceKind;
+  const thinking = replyThinking(message.steps);
   const sources = attachments.filter(
     (attachment): attachment is WebSourceAttachment =>
       attachment.kind === "web_source",
@@ -101,6 +104,14 @@ export function AssistantMessageBubble({
       </div>
       <div className="max-w-[min(100%,42rem)] min-w-0 pt-2">
         <div className="-mx-2 rounded-lg px-2">
+          {thinking && (
+            <div className="mb-2">
+              <ThinkingBlock
+                thinking={thinking.text}
+                durationMs={thinking.durationMs}
+              />
+            </div>
+          )}
           <MarkdownMessage className="text-foreground">
             {message.content}
           </MarkdownMessage>
