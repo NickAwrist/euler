@@ -62,7 +62,7 @@ const originalFetch = globalThis.fetch;
 
     if (pathname.endsWith("/api/show")) {
       return Response.json({
-        capabilities: ["completion", "vision"],
+        capabilities: ["completion", "vision", "tools"],
       });
     }
 

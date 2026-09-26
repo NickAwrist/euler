@@ -51,6 +51,7 @@ modelsRoutes.get(
             InputCapability.Text,
             ...(capabilities.includes("vision") ? [InputCapability.Image] : []),
           ],
+          supportsTools: capabilities.includes("tools"),
         };
       });
     } catch (error) {

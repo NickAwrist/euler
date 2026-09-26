@@ -5,6 +5,10 @@ import type { CatalogFreshness } from "../../../src/openRouterModels";
 import { Button } from "../Button";
 import { Modal } from "../Modal";
 import {
+  ModelCapabilityIcons,
+  formatContextLength,
+} from "../ModelCapabilityIcons";
+import {
   EnableSwitch,
   FavoriteButton,
   NewBadge,
@@ -17,6 +21,7 @@ import type {
   CatalogSettings,
   PreferenceChange,
   Publisher,
+  PublisherModel,
 } from "./useOpenRouterCatalog";
 
 export function CatalogStatus({ catalog }: { catalog: CatalogFreshness }) {
@@ -35,6 +40,22 @@ function rate(value: number | null) {
   return value === null
     ? "Unknown"
     : `$${value.toLocaleString(undefined, { maximumFractionDigits: 4 })}`;
+}
+function modelDetails(model: PublisherModel): string[] {
+  const details: string[] = [];
+  if (model.availability === "unavailable") details.push("Unavailable");
+  if (model.availability === "unverified")
+    details.push("Availability unverified");
+  if (model.contextLength !== null)
+    details.push(formatContextLength(model.contextLength));
+  if (
+    model.promptPricePerMillion !== null ||
+    model.completionPricePerMillion !== null
+  )
+    details.push(
+      `${rate(model.promptPricePerMillion)} in / ${rate(model.completionPricePerMillion)} out`,
+    );
+  return details;
 }
 export function PublisherDialog({
   publisher,
@@ -236,80 +257,58 @@ export function PublisherDialog({
             )}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-2">
             {visible.map((model) => (
               <article
                 key={model.route}
-                className="relative rounded-lg border border-border-subtle p-4 transition-colors duration-200 motion-reduce:transition-none"
+                className="flex items-center gap-2 rounded-lg border border-border-subtle px-3 py-2"
               >
-                {model.isNew && (
-                  <NewBadge className="absolute -top-2.5 left-3" />
-                )}
-                <div className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    <h3 className="font-medium">{model.name}</h3>
-                    <p className="break-all text-xs text-muted-foreground">
-                      {model.route}
-                    </p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="truncate text-sm font-medium">
+                      {model.name}
+                    </h3>
+                    {model.isNew && <NewBadge />}
                   </div>
-                  <FavoriteButton
-                    name={model.name}
-                    favorite={model.favorite}
-                    disabled={busy || pending.has(`favorite:${model.route}`)}
-                    onClick={() =>
+                  <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+                    <span className="wrap-anywhere">
+                      {[model.route, ...modelDetails(model)].join(" · ")}
+                    </span>
+                    <ModelCapabilityIcons model={model} />
+                  </p>
+                </div>
+                <FavoriteButton
+                  name={model.name}
+                  favorite={model.favorite}
+                  disabled={busy || pending.has(`favorite:${model.route}`)}
+                  onClick={() =>
+                    void mutate({
+                      kind: "favorite",
+                      publisherId: publisher.id,
+                      route: model.route,
+                      value: !model.favorite,
+                    })
+                  }
+                />
+                <div className="flex h-9 items-center">
+                  <EnableSwitch
+                    label={`Enable ${model.name}`}
+                    checked={model.enabled}
+                    disabled={
+                      busy ||
+                      pending.has(`enabled:${model.route}`) ||
+                      (!model.enabled && model.availability !== "available")
+                    }
+                    onChange={(value) =>
                       void mutate({
-                        kind: "favorite",
+                        kind: "enabled",
                         publisherId: publisher.id,
                         route: model.route,
-                        value: !model.favorite,
+                        value,
                       })
                     }
                   />
-                  <div className="flex h-9 items-center">
-                    <EnableSwitch
-                      label={`Enable ${model.name}`}
-                      checked={model.enabled}
-                      disabled={
-                        busy ||
-                        pending.has(`enabled:${model.route}`) ||
-                        (!model.enabled && model.availability !== "available")
-                      }
-                      onChange={(value) =>
-                        void mutate({
-                          kind: "enabled",
-                          publisherId: publisher.id,
-                          route: model.route,
-                          value,
-                        })
-                      }
-                    />
-                  </div>
                 </div>
-                <p className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                  {model.availability !== "available" && (
-                    <span>
-                      {model.availability === "unavailable"
-                        ? "Unavailable"
-                        : "Availability unverified"}
-                    </span>
-                  )}
-                  <span>
-                    {model.availability === "available"
-                      ? model.supportsTools
-                        ? "Tools supported"
-                        : "Chat only · No tool support"
-                      : "Tool support unverified"}
-                  </span>
-                </p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Context: {model.contextLength?.toLocaleString() ?? "Unknown"}{" "}
-                  · Input: {rate(model.promptPricePerMillion)} · Output:{" "}
-                  {rate(model.completionPricePerMillion)}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Added to OpenRouter:{" "}
-                  {new Date(model.created * 1000).toLocaleDateString()}
-                </p>
               </article>
             ))}
             {visible.length === 0 && (

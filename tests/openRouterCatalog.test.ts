@@ -7,10 +7,10 @@ import {
   setOpenRouterModelEnabled,
   setPublisherSubscription,
 } from "../src/db/openrouter";
+import { isNewModel } from "../src/newModels";
 import {
   OpenRouterCatalog,
   isInteractiveModel,
-  isNewModel,
   normalizeCatalog,
 } from "../src/openRouterModels";
 import {

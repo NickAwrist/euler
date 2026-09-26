@@ -415,7 +415,6 @@ function ChatView({
               imageError={app.imageError}
               addPendingImages={app.addPendingImages}
               removePendingImage={app.removePendingImage}
-              supportsImageInput={app.supportsImageInput}
               canAttachImages={app.canAttachImages}
               attachImageDisabledReason={app.attachImageDisabledReason}
               attachmentsSendReady={app.attachmentsSendReady}

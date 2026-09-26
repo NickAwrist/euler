@@ -7,12 +7,12 @@ import {
 } from "./db/openrouter";
 import { InputCapability } from "./modelCapabilities";
 import { comparePublisherModels } from "./modelSort";
+import { isNewModel } from "./newModels";
 import {
   type CatalogModel,
   type CatalogResult,
   catalogFreshness,
   isInteractiveModel,
-  isNewModel,
   openRouterCatalog,
 } from "./openRouterModels";
 import { publisherName } from "./openRouterPublishers";
