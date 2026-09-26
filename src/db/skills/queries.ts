@@ -6,33 +6,58 @@ export type SkillWriteData = {
   name: string;
   description: string;
   instructions: string;
+  user_invocable: boolean;
+  disable_model_invocation: boolean;
 };
 
+type StoredSkillRow = Omit<
+  SkillRow,
+  "user_invocable" | "disable_model_invocation"
+> & {
+  user_invocable: number;
+  disable_model_invocation: number;
+};
+
+const SKILL_COLUMNS =
+  "id, owner_uuid, name, description, instructions, user_invocable, disable_model_invocation, created_at, updated_at";
+
+function toSkillRow(row: StoredSkillRow): SkillRow {
+  return {
+    ...row,
+    user_invocable: row.user_invocable === 1,
+    disable_model_invocation: row.disable_model_invocation === 1,
+  };
+}
+
 export function listSkills(ownerUuid: string): SkillRow[] {
-  return getDb()
-    .query(
-      "SELECT id, owner_uuid, name, description, instructions, created_at, updated_at FROM skills WHERE owner_uuid = ? ORDER BY created_at ASC",
-    )
-    .all(ownerUuid) as SkillRow[];
+  return (
+    getDb()
+      .query(
+        `SELECT ${SKILL_COLUMNS} FROM skills WHERE owner_uuid = ? ORDER BY created_at ASC`,
+      )
+      .all(ownerUuid) as StoredSkillRow[]
+  ).map(toSkillRow);
 }
 
 export function getSkillById(ownerUuid: string, id: string): SkillRow | null {
-  return getDb()
+  const row = getDb()
     .query(
-      "SELECT id, owner_uuid, name, description, instructions, created_at, updated_at FROM skills WHERE owner_uuid = ? AND id = ?",
+      `SELECT ${SKILL_COLUMNS} FROM skills WHERE owner_uuid = ? AND id = ?`,
     )
-    .get(ownerUuid, id) as SkillRow | null;
+    .get(ownerUuid, id) as StoredSkillRow | null;
+  return row && toSkillRow(row);
 }
 
 export function getSkillByName(
   ownerUuid: string,
   name: string,
 ): SkillRow | null {
-  return getDb()
+  const row = getDb()
     .query(
-      "SELECT id, owner_uuid, name, description, instructions, created_at, updated_at FROM skills WHERE owner_uuid = ? AND name = ?",
+      `SELECT ${SKILL_COLUMNS} FROM skills WHERE owner_uuid = ? AND name = ?`,
     )
-    .get(ownerUuid, name) as SkillRow | null;
+    .get(ownerUuid, name) as StoredSkillRow | null;
+  return row && toSkillRow(row);
 }
 
 export function createSkillRow(
@@ -42,8 +67,18 @@ export function createSkillRow(
   const id = crypto.randomUUID();
   const now = Date.now();
   getDb().run(
-    "INSERT INTO skills (id, owner_uuid, name, description, instructions, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    [id, ownerUuid, data.name, data.description, data.instructions, now, now],
+    `INSERT INTO skills (${SKILL_COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      ownerUuid,
+      data.name,
+      data.description,
+      data.instructions,
+      Number(data.user_invocable),
+      Number(data.disable_model_invocation),
+      now,
+      now,
+    ],
   );
   return {
     id,
@@ -61,8 +96,17 @@ export function updateSkillRow(
 ): SkillRow | null {
   const now = Date.now();
   const result = getDb().run(
-    "UPDATE skills SET name = ?, description = ?, instructions = ?, updated_at = ? WHERE owner_uuid = ? AND id = ?",
-    [data.name, data.description, data.instructions, now, ownerUuid, id],
+    "UPDATE skills SET name = ?, description = ?, instructions = ?, user_invocable = ?, disable_model_invocation = ?, updated_at = ? WHERE owner_uuid = ? AND id = ?",
+    [
+      data.name,
+      data.description,
+      data.instructions,
+      Number(data.user_invocable),
+      Number(data.disable_model_invocation),
+      now,
+      ownerUuid,
+      id,
+    ],
   );
   if (result.changes === 0) return null;
   return getSkillById(ownerUuid, id);

@@ -10,23 +10,27 @@ export function findExplicitSkillNames(message: string): Set<string> {
   );
 }
 
+/** Skills the agent may discover and load without an explicit $skill-name. */
+export function modelInvocableSkills(skills: SkillRow[]): SkillRow[] {
+  return skills.filter((skill) => !skill.disable_model_invocation);
+}
+
 export function renderSkillsPrompt(
   skills: SkillRow[],
   userMessage: string,
 ): string {
-  if (skills.length === 0) return "";
-
   const explicitNames = findExplicitSkillNames(userMessage);
   const activeSkills = skills
-    .filter((skill) => explicitNames.has(skill.name))
+    .filter((skill) => skill.user_invocable && explicitNames.has(skill.name))
     .map((skill) => ({
       name: skill.name,
       instructions: skill.instructions,
     }));
-  const metadata = skills.map((skill) => ({
+  const metadata = modelInvocableSkills(skills).map((skill) => ({
     name: skill.name,
     description: skill.description,
   }));
+  if (metadata.length === 0 && activeSkills.length === 0) return "";
 
   const lines = [
     "<skills>",

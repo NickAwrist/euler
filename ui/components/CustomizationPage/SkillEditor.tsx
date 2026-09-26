@@ -4,6 +4,7 @@ import { normalizeSkillName } from "../../../src/schemas/skills";
 import type { SkillData, SkillWriteBody } from "../../persist/skills";
 import { cx, textareaClass } from "../../styles";
 import { Button } from "../Button";
+import { EnableSwitch } from "../ModelPreferenceControls";
 import type { SkillEditorErrors } from "./skillsPageUtils";
 
 type Props = {
@@ -146,6 +147,30 @@ export function SkillEditor({
           </FieldHint>
         </label>
 
+        <div className="flex flex-col gap-3">
+          <InvocationSwitch
+            id="skill-user-invocable"
+            label="Users can invoke"
+            hint={`Offer $${editor.name || "skill-name"} in the message box.`}
+            checked={editor.user_invocable}
+            onChange={(checked) =>
+              setEditor((current) => ({ ...current, user_invocable: checked }))
+            }
+          />
+          <InvocationSwitch
+            id="skill-model-invocable"
+            label="Agents can load automatically"
+            hint="List the skill for agents to load when a task matches. When off, it runs only when a user invokes it."
+            checked={!editor.disable_model_invocation}
+            onChange={(checked) =>
+              setEditor((current) => ({
+                ...current,
+                disable_model_invocation: !checked,
+              }))
+            }
+          />
+        </div>
+
         <div className="flex items-center gap-3 pt-2">
           <Button
             variant="primary"
@@ -163,6 +188,37 @@ export function SkillEditor({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function InvocationSwitch({
+  id,
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  hint: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex items-start gap-3 text-[0.8125rem] text-foreground">
+      <EnableSwitch
+        id={id}
+        label={label}
+        checked={checked}
+        onChange={onChange}
+      />
+      <label htmlFor={id}>
+        {label}
+        <span className="mt-0.5 block text-[0.6875rem] text-muted-foreground">
+          {hint}
+        </span>
+      </label>
     </div>
   );
 }

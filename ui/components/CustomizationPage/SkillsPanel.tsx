@@ -1,10 +1,13 @@
+import { useState } from "react";
 import { TruncateConfirmModal } from "../TruncateConfirmModal";
+import { ImportSkillModal } from "./ImportSkillModal";
 import { SkillEditor } from "./SkillEditor";
 import { SkillList } from "./SkillList";
 import { useSkillsPage } from "./useSkillsPage";
 
 export function SkillsPanel() {
   const p = useSkillsPage();
+  const [importOpen, setImportOpen] = useState(false);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -20,6 +23,7 @@ export function SkillsPanel() {
           isNew={p.isNew}
           onSelectSkill={p.selectSkill}
           onStartNew={p.startNew}
+          onImport={() => setImportOpen(true)}
         />
         <div className="min-h-0 overflow-y-auto">
           {p.showEditor ? (
@@ -45,6 +49,16 @@ export function SkillsPanel() {
           )}
         </div>
       </div>
+
+      {importOpen && (
+        <ImportSkillModal
+          onImport={(skill) => {
+            p.importSkill(skill);
+            setImportOpen(false);
+          }}
+          onClose={() => setImportOpen(false)}
+        />
+      )}
 
       {p.pendingDelete && (
         <TruncateConfirmModal

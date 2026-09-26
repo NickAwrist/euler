@@ -59,6 +59,23 @@ export function migrateMessagesAttachmentsColumn(db: Database) {
   }
 }
 
+export function migrateSkillInvocationColumns(db: Database) {
+  const cols = db.query("PRAGMA table_info(skills)").all() as {
+    name: string;
+  }[];
+  if (cols.length === 0) return;
+  if (!cols.some((c) => c.name === "user_invocable")) {
+    db.run(
+      "ALTER TABLE skills ADD COLUMN user_invocable INTEGER NOT NULL DEFAULT 1 CHECK (user_invocable IN (0, 1))",
+    );
+  }
+  if (!cols.some((c) => c.name === "disable_model_invocation")) {
+    db.run(
+      "ALTER TABLE skills ADD COLUMN disable_model_invocation INTEGER NOT NULL DEFAULT 0 CHECK (disable_model_invocation IN (0, 1))",
+    );
+  }
+}
+
 export function migrateOpenRouterCatalog(db: Database) {
   db.transaction(() => {
     const columns = db.query("PRAGMA table_info(openrouter_models)").all() as {
@@ -144,5 +161,6 @@ export function runMigrations(db: Database) {
   migrateSessionsOwnerColumn(db);
   migrateRemoveAgents(db);
   migrateMessagesAttachmentsColumn(db);
+  migrateSkillInvocationColumns(db);
   if (tableExists(db, "messages")) migrateAttachmentMetadata(db);
 }

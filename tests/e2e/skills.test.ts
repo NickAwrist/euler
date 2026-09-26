@@ -35,7 +35,11 @@ test("skills CRUD is validated and scoped to the current user", async () => {
     });
     expect(create.status).toBe(201);
     const skill = (await create.json()) as { id: string; name: string };
-    expect(skill.name).toBe("release-notes");
+    expect(skill).toMatchObject({
+      name: "release-notes",
+      user_invocable: true,
+      disable_model_invocation: false,
+    });
 
     const ownList = await fetch(`${url}/api/skills`, {
       headers: userHeaders(),
@@ -56,12 +60,15 @@ test("skills CRUD is validated and scoped to the current user", async () => {
         name: "release-notes",
         description: "Draft concise release notes.",
         instructions: "Lead with user-visible changes.",
+        disable_model_invocation: true,
       }),
     });
     expect(update.status).toBe(200);
     expect(await update.json()).toMatchObject({
       id: skill.id,
       instructions: "Lead with user-visible changes.",
+      user_invocable: true,
+      disable_model_invocation: true,
     });
 
     const forbiddenDelete = await fetch(`${url}/api/skills/${skill.id}`, {

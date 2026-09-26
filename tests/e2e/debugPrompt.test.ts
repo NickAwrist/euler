@@ -78,6 +78,8 @@ for (const includeCurrentDate of [undefined, false]) {
         name: "prompt-check",
         description: "Check prompts",
         instructions: "Verify every instruction.",
+        user_invocable: true,
+        disable_model_invocation: false,
       });
       const input = {
         sessionId: lease.id,

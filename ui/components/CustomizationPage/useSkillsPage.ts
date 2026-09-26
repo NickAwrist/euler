@@ -62,6 +62,13 @@ export function useSkillsPage() {
     setShowFieldErrors(false);
   };
 
+  /** Opens an unsaved new skill filled from a pasted SKILL.md. */
+  const importSkill = (imported: SkillWriteBody) => {
+    startNew();
+    setEditor(imported);
+    setShowFieldErrors(true);
+  };
+
   const cancelEdit = () => {
     setSelectedId(null);
     setIsNew(false);
@@ -138,6 +145,7 @@ export function useSkillsPage() {
     setPendingDelete,
     selectSkill,
     startNew,
+    importSkill,
     cancelEdit,
     save,
     performDelete,

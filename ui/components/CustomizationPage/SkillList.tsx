@@ -1,4 +1,4 @@
-import { BookOpen, Plus } from "lucide-react";
+import { BookOpen, FileInput, Plus } from "lucide-react";
 import type { SkillData } from "../../persist/skills";
 import { cx, eyebrowText } from "../../styles";
 
@@ -8,6 +8,7 @@ type Props = {
   isNew: boolean;
   onSelectSkill: (skill: SkillData) => void;
   onStartNew: () => void;
+  onImport: () => void;
 };
 
 export function SkillList({
@@ -16,19 +17,30 @@ export function SkillList({
   isNew,
   onSelectSkill,
   onStartNew,
+  onImport,
 }: Props) {
   return (
     <div className="flex min-h-0 flex-col border-r border-border-subtle max-[700px]:border-b max-[700px]:border-r-0">
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
         <span className={eyebrowText}>Skills</span>
-        <button
-          type="button"
-          onClick={onStartNew}
-          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[0.75rem] font-medium text-accent transition-colors hover:bg-muted"
-        >
-          <Plus size={14} />
-          New
-        </button>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={onImport}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[0.75rem] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <FileInput size={14} />
+            Import
+          </button>
+          <button
+            type="button"
+            onClick={onStartNew}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[0.75rem] font-medium text-accent transition-colors hover:bg-muted"
+          >
+            <Plus size={14} />
+            New
+          </button>
+        </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
         {skills.map((skill) => {
