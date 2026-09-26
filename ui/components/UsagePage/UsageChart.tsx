@@ -6,9 +6,64 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { money, number } from "./display";
+import { color, money, number, provider } from "./display";
 
-type Series = { model: string; color: string; values: number[] };
+type Series = { model: string; values: number[] };
+type Shape = "circle" | "square" | "triangle" | "diamond";
+// Models share their provider's brand color. Line style, marker and bar
+// hatching distinguish models from the same provider, in token order.
+const variants: {
+  dash?: string;
+  marker: Shape;
+  hatch?: { angle: number; cross?: boolean };
+}[] = [
+  { marker: "circle" },
+  { dash: "6 5", marker: "square", hatch: { angle: 45 } },
+  { dash: "0 5", marker: "triangle", hatch: { angle: 135 } },
+  { dash: "8 5 0 5", marker: "diamond", hatch: { angle: 45, cross: true } },
+];
+
+function Marker({
+  shape,
+  x,
+  y,
+  size,
+  fill,
+}: { shape: Shape; x: number; y: number; size: number; fill: string }) {
+  const style = { fill, stroke: "var(--color-background)", strokeWidth: 1 };
+  if (shape === "circle") return <circle cx={x} cy={y} r={size} {...style} />;
+  if (shape === "square")
+    return (
+      <rect
+        x={x - size}
+        y={y - size}
+        width={size * 2}
+        height={size * 2}
+        {...style}
+      />
+    );
+  const corners =
+    shape === "triangle"
+      ? [
+          [0, -1.25],
+          [1.15, 0.85],
+          [-1.15, 0.85],
+        ]
+      : [
+          [0, -1.35],
+          [1.35, 0],
+          [0, 1.35],
+          [-1.35, 0],
+        ];
+  return (
+    <polygon
+      points={corners
+        .map(([cx = 0, cy = 0]) => `${x + cx * size},${y + cy * size}`)
+        .join(" ")}
+      {...style}
+    />
+  );
+}
 export function UsageChart({
   series,
   buckets,
@@ -25,7 +80,21 @@ export function UsageChart({
   const cursorRef = useRef<HTMLInputElement>(null);
   const anchor = useRef({ x: 0, y: 0 });
   const tooltipId = useId();
+  const patternId = useId().replace(/[^\w-]/g, "");
   const [active, setActive] = useState<number | null>(null);
+  const providerCounts = new Map<string, number>();
+  const styled = series.map((item, i) => {
+    const key = provider(item.model);
+    const rank = providerCounts.get(key) ?? 0;
+    providerCounts.set(key, rank + 1);
+    const variant = variants[Math.min(rank, variants.length - 1)]!;
+    return {
+      ...item,
+      ...variant,
+      color: color(item.model),
+      fill: variant.hatch ? `url(#${patternId}-${i})` : color(item.model),
+    };
+  });
   const count = buckets.length;
   const index = active === null ? null : Math.min(active, count - 1);
   const stacks = buckets.map((_, i) =>
@@ -40,6 +109,8 @@ export function UsageChart({
   const slot = 686 / (bars ? count : count - 1);
   const x = (i: number) => 64 + (bars ? i + 0.5 : i) * slot;
   const barWidth = Math.min(slot * 0.6, 48);
+  // Markers on every point turn dense ranges into clutter; hover still shows them.
+  const pointMarkers = slot >= 16;
   const bucketAt = (fraction: number) =>
     Math.max(
       0,
@@ -107,6 +178,39 @@ export function UsageChart({
           aria-label={`${metric === "tokens" ? "Tokens" : "Spend"} by model over time`}
         >
           <title>Usage by model</title>
+          <defs>
+            {styled.map(
+              (item, i) =>
+                item.hatch && (
+                  <pattern
+                    key={item.model}
+                    id={`${patternId}-${i}`}
+                    width="6"
+                    height="6"
+                    patternUnits="userSpaceOnUse"
+                    patternTransform={`rotate(${item.hatch.angle})`}
+                  >
+                    <rect width="6" height="6" fill={item.color} />
+                    <line
+                      x1="0"
+                      x2="0"
+                      y2="6"
+                      stroke="var(--color-background)"
+                      strokeWidth="2.5"
+                    />
+                    {item.hatch.cross && (
+                      <line
+                        x2="6"
+                        y1="0"
+                        y2="0"
+                        stroke="var(--color-background)"
+                        strokeWidth="2.5"
+                      />
+                    )}
+                  </pattern>
+                ),
+            )}
+          </defs>
           {[0, 0.25, 0.5, 0.75, 1].map((f) => (
             <g key={f}>
               <line
@@ -132,7 +236,7 @@ export function UsageChart({
                 let base = 0;
                 return (
                   <g key={bucket}>
-                    {series.map(({ model, color, values }) => {
+                    {styled.map(({ model, fill, values }) => {
                       const value = values[i] ?? 0;
                       if (!value) return null;
                       base += value;
@@ -143,7 +247,7 @@ export function UsageChart({
                           y={y(base)}
                           width={barWidth}
                           height={y(base - value) - y(base)}
-                          fill={color}
+                          fill={fill}
                           stroke="var(--color-background)"
                           strokeWidth="1"
                         />
@@ -152,7 +256,7 @@ export function UsageChart({
                   </g>
                 );
               })
-            : series.map(({ model, color, values }) => {
+            : styled.map(({ model, color, dash, marker, values }) => {
                 const points = values
                   .map((value, j) => `${x(j)},${y(value)}`)
                   .join(" ");
@@ -168,16 +272,21 @@ export function UsageChart({
                       fill="none"
                       stroke={color}
                       strokeWidth="2.5"
+                      strokeDasharray={dash}
+                      strokeLinecap="round"
                     />
-                    {index !== null && (
-                      <circle
-                        cx={x(index)}
-                        cy={y(values[index] ?? 0)}
-                        r="2.5"
-                        fill={color}
-                        stroke="var(--color-background)"
-                        strokeWidth="1"
-                      />
+                    {values.map(
+                      (value, j) =>
+                        (j === index || (pointMarkers && value > 0)) && (
+                          <Marker
+                            key={buckets[j]}
+                            shape={marker}
+                            x={x(j)}
+                            y={y(value)}
+                            size={j === index ? 5 : 4}
+                            fill={color}
+                          />
+                        ),
                     )}
                   </g>
                 );
@@ -279,12 +388,9 @@ export function UsageChart({
                   {metric === "tokens" ? "Processed tokens" : "Spend"}
                 </span>
               </header>
-              {series.map((item) => (
+              {styled.map((item) => (
                 <div key={item.model}>
-                  <span
-                    className="usage-dot"
-                    style={{ background: item.color }}
-                  />
+                  <Swatch item={item} bars={bars} />
                   <span className="usage-tooltip-name">
                     {item.model.replace(/^openrouter:/, "")}
                   </span>
@@ -301,14 +407,57 @@ export function UsageChart({
       </div>
       {series.length > 1 && (
         <ul className="usage-chart-legend" aria-label="Models">
-          {series.map(({ model, color }) => (
-            <li key={model}>
-              <span className="usage-dot" style={{ background: color }} />
-              {model.replace(/^openrouter:/, "")}
+          {styled.map((item) => (
+            <li key={item.model}>
+              <Swatch item={item} bars={bars} />
+              {item.model.replace(/^openrouter:/, "")}
             </li>
           ))}
         </ul>
       )}
     </>
+  );
+}
+
+// A legend sample of the series mark: its hatched bar fill or its line and marker.
+function Swatch({
+  item,
+  bars,
+}: {
+  item: { color: string; fill: string; dash?: string; marker: Shape };
+  bars: boolean;
+}) {
+  return (
+    <svg
+      className="usage-swatch"
+      width="22"
+      height="12"
+      viewBox="0 0 22 12"
+      aria-hidden="true"
+    >
+      {bars ? (
+        <rect y="1" width="22" height="10" rx="2" fill={item.fill} />
+      ) : (
+        <>
+          <line
+            x1="2"
+            x2="20"
+            y1="6"
+            y2="6"
+            stroke={item.color}
+            strokeWidth="2"
+            strokeDasharray={item.dash}
+            strokeLinecap="round"
+          />
+          <Marker
+            shape={item.marker}
+            x={11}
+            y={6}
+            size={3.5}
+            fill={item.color}
+          />
+        </>
+      )}
+    </svg>
   );
 }

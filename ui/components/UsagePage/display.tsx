@@ -30,19 +30,9 @@ export function provider(model: string) {
     ? model.slice(11).split("/")[0]!
     : "ollama";
 }
-// Categorical slots validated for color-vision deficiency against the dark
-// surface. Models past the eighth share a neutral color instead of new hues.
-const seriesPalette = [
-  "#3987e5",
-  "#d95926",
-  "#199e70",
-  "#c98500",
-  "#d55181",
-  "#008300",
-  "#9085e9",
-  "#e66767",
-];
-export const seriesColor = (index: number) => seriesPalette[index] ?? "#8a8a8a";
+export function color(model: string) {
+  return providerColor(provider(model));
+}
 export function ModelLabel({ model }: { model: string }) {
   const icon =
     provider(model) === "ollama"

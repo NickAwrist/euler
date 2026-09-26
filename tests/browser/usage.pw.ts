@@ -205,13 +205,18 @@ for (const mode of ["desktop", "mobile"]) {
       page.getByRole("list", { name: "Models" }).getByRole("listitem"),
     ).toHaveText(["anthropic/claude-sonnet-4.6", "anthropic/claude-opus-4.6"]);
     await expect(page.locator(".usage-plot polyline")).toHaveCount(0);
-    expect(
-      await page
-        .locator(".usage-plot rect")
-        .evaluateAll((nodes) => [
-          ...new Set(nodes.map((node) => node.getAttribute("fill"))),
-        ]),
-    ).toEqual(["#3987e5", "#d95926"]);
+    // Same-provider models share the brand color; the second is hatched.
+    const fills = await page
+      .locator(".usage-plot svg > g > rect")
+      .evaluateAll((nodes) => [
+        ...new Set(nodes.map((node) => node.getAttribute("fill"))),
+      ]);
+    expect(fills).toHaveLength(2);
+    expect(fills[0]).toBe("#D97757");
+    expect(fills[1]).toMatch(/^url\(#.+-1\)$/);
+    await expect(
+      page.locator(`.usage-plot pattern[id="${fills[1]!.slice(5, -1)}"] rect`),
+    ).toHaveAttribute("fill", "#D97757");
     await expect(page.locator(".usage-plot svg > text")).toHaveText([
       /Sep 1[78]/,
       /Sep 1[89]/,
@@ -404,7 +409,18 @@ for (const mode of ["desktop", "mobile"]) {
     await expect(
       page.getByRole("heading", { name: "Hourly spend" }),
     ).toBeVisible();
-    await expect(page.locator(".usage-plot polyline")).toHaveCount(8);
+    const lines = page.locator(".usage-plot polyline");
+    await expect(lines).toHaveCount(8);
+    // Sonnet and Opus share Anthropic's color; Opus is dashed.
+    for (const [i, dash] of [
+      [1, null],
+      [2, "6 5"],
+    ] as const) {
+      await expect(lines.nth(i)).toHaveAttribute("stroke", "#D97757");
+      if (dash)
+        await expect(lines.nth(i)).toHaveAttribute("stroke-dasharray", dash);
+      else await expect(lines.nth(i)).not.toHaveAttribute("stroke-dasharray");
+    }
     await page.screenshot({ path: `.cache/usage-${mode}.png`, fullPage: true });
     expect(
       await page.evaluate(

@@ -126,7 +126,7 @@
   font-size: 16px;
   font-weight: 500;
 }
-.usage-chart svg {
+.usage-plot > svg {
   width: 100%;
   margin-top: 18px;
 }
@@ -272,6 +272,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
+}
+.usage-swatch {
+  flex-shrink: 0;
 }
 .usage-plot:has(.usage-chart-cursor:focus-visible) {
   outline: 2px solid var(--color-muted-foreground);

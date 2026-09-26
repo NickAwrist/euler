@@ -10,10 +10,10 @@ import { UsageChart } from "./UsageChart";
 import {
   ModelLabel,
   ProviderLabel,
+  color,
   money,
   number,
   providerColor,
-  seriesColor,
 } from "./display";
 import { type SortRule, changeSorting } from "./sorting";
 import "./usage.css";
@@ -75,12 +75,10 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
   };
   const totals = data?.totals;
   const series =
-    data?.chart.series.map((item, i) => ({
+    data?.chart.series.map((item) => ({
       model: item.model,
-      color: seriesColor(i),
       values: metric === "tokens" ? item.tokens : item.spend,
     })) ?? [];
-  const modelColors = new Map(series.map((item) => [item.model, item.color]));
   const tiles = totals
     ? (
         [
@@ -374,7 +372,7 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
                                   width: `${item.tokenShare}%`,
                                   background:
                                     data.grouping === "model"
-                                      ? modelColors.get(key)
+                                      ? color(key)
                                       : "#999",
                                 }}
                               />
