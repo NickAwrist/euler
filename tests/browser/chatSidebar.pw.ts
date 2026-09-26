@@ -465,3 +465,62 @@ test("chat sidebar desktop export and opt-in debug access", async ({
     page.getByRole("button", { name: "Debug inspector", exact: true }),
   ).toHaveCount(0);
 });
+
+test("chat sidebar desktop keeps a remembered files panel closed for an empty workspace", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockApp(page);
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "euler:artifactSidebarState",
+      JSON.stringify({ open: true, workspace: "", path: null }),
+    ),
+  );
+  const tree = page.waitForResponse("**/artifacts/tree?*");
+  await page.goto("/run/sidebar-test");
+  await tree;
+  await expect(page).toHaveTitle("Sidebar test chat · Euler");
+  const toggle = page.getByRole("button", { name: "Toggle artifacts" });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByText("No files in this folder.")).toBeVisible();
+  // Escape belongs to whatever has focus; only the panel's own Escape closes it.
+  await page.getByPlaceholder("Send a message...").press("Escape");
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+  await page.getByRole("button", { name: "Refresh files" }).press("Escape");
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+});
+
+test("chat sidebar desktop jumps to the latest message after scrolling up", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 700 });
+  await mockApp(page);
+  await page.route("**/api/sessions/sidebar-test", (route) =>
+    route.fulfill({
+      json: {
+        id: "sidebar-test",
+        model: "test",
+        workspace: { kind: "sandbox" },
+        history: Array.from({ length: 40 }, (_, i) => ({
+          role: i % 2 ? "assistant" : "user",
+          content: `Message ${i}`,
+        })),
+      },
+    }),
+  );
+  await page.goto("/run/sidebar-test");
+  const latest = page.getByText("Message 39", { exact: true });
+  const jump = page.getByRole("button", { name: "Jump to latest" });
+  await expect(latest).toBeInViewport();
+  await expect(jump).toHaveCount(0);
+  await page.mouse.move(720, 300);
+  await page.mouse.wheel(0, -3000);
+  await expect(jump).toBeVisible();
+  await expect(latest).not.toBeInViewport();
+  await jump.click();
+  await expect(latest).toBeInViewport();
+  await expect(jump).toHaveCount(0);
+});

@@ -1,6 +1,7 @@
-import { Bot } from "lucide-react";
+import { ArrowDown, Bot } from "lucide-react";
 import { memo, useLayoutEffect, useRef } from "react";
 import { useStickToBottom } from "use-stick-to-bottom";
+import { IconButton } from "../IconButton";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { MessageHistory } from "./MessageHistory";
 import { StreamingStatusRow } from "./StreamingStatusRow";
@@ -61,6 +62,8 @@ export const RunArea = memo(function RunArea({
 
   return (
     <div className="relative h-full min-h-0 flex-1 overflow-x-hidden">
+      {/* Narrow layouts float the panel toggles over messages, so back them with a bar. */}
+      <div className="absolute inset-x-0 top-0 z-[5] h-[var(--workspace-header-height)] border-b border-border-subtle bg-background min-[901px]:hidden" />
       <div
         ref={scrollRef}
         className="absolute inset-0 z-0 overflow-x-hidden overflow-y-auto px-5 pt-[calc(var(--workspace-header-height)+1.25rem)] max-[640px]:px-3.5 max-[640px]:pt-[calc(var(--workspace-header-height)+1rem)]"
@@ -133,6 +136,15 @@ export const RunArea = memo(function RunArea({
           )}
         </div>
       </div>
+      {!isAtBottom && messages.length > 0 && (
+        <IconButton
+          icon={ArrowDown}
+          label="Jump to latest"
+          onClick={() => void scrollToBottom()}
+          className="absolute left-1/2 z-10 -translate-x-1/2 !bg-background shadow-md hover:!bg-muted"
+          style={{ bottom: footerInset + 12 }}
+        />
+      )}
     </div>
   );
 });

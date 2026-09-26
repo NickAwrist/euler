@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArtifactContext } from "./components/Artifacts/ArtifactContext";
 import { WorkspaceArtifacts } from "./components/Artifacts/WorkspaceArtifacts";
 import { workspaceArtifactSource } from "./components/Artifacts/api";
+import { useWorkspaceHasFiles } from "./components/Artifacts/useWorkspaceHasFiles";
 import { CustomizationPage } from "./components/CustomizationPage";
 import { DebugModal } from "./components/DebugModal";
 import { DirectoryModal } from "./components/DirectoryModal";
@@ -146,13 +147,41 @@ function ChatView({
     () => workspaceArtifactSource(app.activeSessionId ?? "", app.isEphemeral),
     [app.activeSessionId, app.isEphemeral],
   );
+  const hasFiles = useWorkspaceHasFiles(
+    source,
+    workspaceKey,
+    workspaceReady && artifactsOpen,
+  );
+  // The remembered open state applies only to workspaces with files; an
+  // explicit open in this chat shows the panel even when it is empty.
+  const [openedSessionId, setOpenedSessionId] = useState<string | null>(null);
+  const filesOpen =
+    artifactsOpen &&
+    (hasFiles === true || openedSessionId === app.activeSessionId);
+  const toggleFiles = () => {
+    setArtifactsOpen(!filesOpen);
+    if (!filesOpen) setOpenedSessionId(app.activeSessionId);
+  };
   const openFile = useCallback(
     (path: string) => {
       setSelectedFile(path);
       setArtifactsOpen(true);
+      setOpenedSessionId(app.activeSessionId);
     },
-    [setSelectedFile],
+    [setSelectedFile, app.activeSessionId],
   );
+  const chatTitle = app.activeSessionId
+    ? app.sessions.find((session) => session.id === app.activeSessionId)
+        ?.preview || "New chat"
+    : null;
+  useEffect(() => {
+    document.title = chatTitle
+      ? `${app.runPending ? "● " : ""}${chatTitle} · Euler`
+      : "Euler";
+    return () => {
+      document.title = "Euler";
+    };
+  }, [chatTitle, app.runPending]);
   const artifactContext = useMemo(
     () => ({
       openFile,
@@ -209,14 +238,10 @@ function ChatView({
           side="left"
           open={chatsOpen}
           onToggle={toggleChats}
-          className={artifactsOpen ? "max-[900px]:hidden" : undefined}
+          className={filesOpen ? "max-[900px]:hidden" : undefined}
         />
         {app.activeSessionId && (
-          <SidebarToggle
-            side="right"
-            open={artifactsOpen}
-            onToggle={() => setArtifactsOpen((value) => !value)}
-          />
+          <SidebarToggle side="right" open={filesOpen} onToggle={toggleFiles} />
         )}
         <aside
           id="app-sidebar"
@@ -293,7 +318,7 @@ function ChatView({
         <main
           className={cx(
             "relative h-full min-h-0 min-w-0 flex-1 bg-background transition-[margin-left] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-            artifactsOpen && !app.sidebarCollapsed && "min-[1320px]:ml-[260px]",
+            filesOpen && !app.sidebarCollapsed && "min-[1320px]:ml-[260px]",
           )}
         >
           {app.activeSessionId && app.userSettings.showDebugButton && (
@@ -304,7 +329,7 @@ function ChatView({
               aria-label="Debug inspector"
               className={cx(
                 "absolute top-[calc((var(--workspace-header-height)-2.25rem-1px)/2)] z-10 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground",
-                artifactsOpen ? "right-2" : "right-14",
+                filesOpen ? "right-2" : "right-14",
               )}
             >
               <Bug size={16} />
@@ -316,7 +341,7 @@ function ChatView({
               className={cx(
                 "absolute left-14 top-4 z-10 inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-background px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-amber-400",
                 !app.sidebarCollapsed &&
-                  !artifactsOpen &&
+                  !filesOpen &&
                   "min-[1320px]:left-[calc(260px+1rem)]",
               )}
             >
@@ -403,7 +428,7 @@ function ChatView({
         {app.activeSessionId && workspaceReady && (
           <WorkspaceArtifacts
             key={workspaceKey}
-            open={artifactsOpen}
+            open={filesOpen}
             source={source}
             path={selectedFile}
             revision={revision}
