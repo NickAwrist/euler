@@ -10,7 +10,10 @@ Custom skills live under **Customization > Skills**. A skill follows the
 `SKILL.md` shape: a lowercase hyphenated name, a description that tells agents
 when to use it, and Markdown instructions. Agents receive only the skill
 metadata until they load a matching skill. Type `$skill-name` in a message to
-invoke one directly.
+invoke one directly. **Import** reads a pasted `SKILL.md`, including the
+`user-invocable` and `disable-model-invocation` frontmatter fields. Turn off
+**Users can invoke** to hide a skill from `$skill-name`, or **Agents can load
+automatically** to keep it out of the agent's skill list.
 
 ## Requirements
 

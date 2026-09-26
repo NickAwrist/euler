@@ -11,6 +11,8 @@ const skill: SkillRow = {
   name: "release-notes",
   description: "Draft release notes from a set of merged changes.",
   instructions: "Group changes by user impact and link each pull request.",
+  user_invocable: true,
+  disable_model_invocation: false,
   created_at: 1,
   updated_at: 1,
 };
@@ -35,5 +37,24 @@ describe("skill runtime", () => {
     );
     expect(prompt).toContain("<active_skills>");
     expect(prompt).toContain(skill.instructions);
+  });
+
+  test("hides user-only skills from agents but activates them when invoked", () => {
+    const userOnly = { ...skill, disable_model_invocation: true };
+
+    expect(renderSkillsPrompt([userOnly], "Summarize this patch")).toBe("");
+    const invoked = renderSkillsPrompt([userOnly], "Use $release-notes.");
+    expect(invoked).toContain("<available_skills>\n[]");
+    expect(invoked).toContain(skill.instructions);
+  });
+
+  test("ignores $skill-name for skills users cannot invoke", () => {
+    const prompt = renderSkillsPrompt(
+      [{ ...skill, user_invocable: false }],
+      "Use $release-notes.",
+    );
+
+    expect(prompt).toContain('"name":"release-notes"');
+    expect(prompt).not.toContain(skill.instructions);
   });
 });

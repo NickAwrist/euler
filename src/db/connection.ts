@@ -70,6 +70,8 @@ export function getDb(): Database {
       name TEXT NOT NULL,
       description TEXT NOT NULL,
       instructions TEXT NOT NULL,
+      user_invocable INTEGER NOT NULL DEFAULT 1 CHECK (user_invocable IN (0, 1)),
+      disable_model_invocation INTEGER NOT NULL DEFAULT 0 CHECK (disable_model_invocation IN (0, 1)),
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       UNIQUE(owner_uuid, name)

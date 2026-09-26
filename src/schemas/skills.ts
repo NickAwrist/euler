@@ -31,6 +31,8 @@ export const SkillWriteSchema = z.object({
     .min(1, "description is required")
     .max(500, "description must be 500 characters or fewer"),
   instructions: z.string().trim().min(1, "instructions are required"),
+  user_invocable: z.boolean().default(true),
+  disable_model_invocation: z.boolean().default(false),
 });
 
 export type SkillWriteBody = z.infer<typeof SkillWriteSchema>;
@@ -40,6 +42,8 @@ export const SkillSchema = z.object({
   name: z.string(),
   description: z.string(),
   instructions: z.string(),
+  user_invocable: z.boolean(),
+  disable_model_invocation: z.boolean(),
   created_at: z.number(),
   updated_at: z.number(),
 });

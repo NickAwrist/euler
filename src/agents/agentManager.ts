@@ -11,7 +11,7 @@ import {
   DEFAULT_SYSTEM_PROMPT,
   SUBAGENT_DIRECTIVES,
 } from "../prompts/systemPrompt";
-import { renderSkillsPrompt } from "../skills/runtime";
+import { modelInvocableSkills, renderSkillsPrompt } from "../skills/runtime";
 import type { BaseTool } from "../tools/BaseTool";
 import { ApplyPatchTool } from "../tools/apply_patch";
 import { BashTool } from "../tools/bash";
@@ -123,7 +123,11 @@ function buildAgent(
     opts.toolSessionDir,
   );
   const isSubagent = name === SUBAGENT_NAME;
-  const skills = listSkills(opts.ownerUuid);
+  const allSkills = listSkills(opts.ownerUuid);
+  // A subagent's task is written by the model, so its $skill-name references
+  // are model invocations too.
+  const skills = isSubagent ? modelInvocableSkills(allSkills) : allSkills;
+  const loadableSkills = modelInvocableSkills(skills);
   const finalPrompt = [
     renderSystemPrompt(
       promptContext.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT,
@@ -146,8 +150,8 @@ function buildAgent(
   if (!isSubagent) {
     agent.addTool(new RunSubagentTool());
   }
-  if (skills.length > 0) {
-    agent.addTool(new LoadSkillTool(skills));
+  if (loadableSkills.length > 0) {
+    agent.addTool(new LoadSkillTool(loadableSkills));
   }
   if (opts.reasoningEffort) {
     agent.reasoningEffort = opts.reasoningEffort;

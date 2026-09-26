@@ -38,11 +38,15 @@ describe("agent runtime", () => {
       name: "manager-release-notes",
       description: "Write release notes.",
       instructions: "Release instructions only.",
+      user_invocable: true,
+      disable_model_invocation: false,
     });
     const otherUserSkill = createSkillRow(OTHER_USER_ID, {
       name: "private-skill",
       description: "Private metadata.",
       instructions: "Private instructions.",
+      user_invocable: true,
+      disable_model_invocation: false,
     });
 
     const agent = agentManager.createAgent({

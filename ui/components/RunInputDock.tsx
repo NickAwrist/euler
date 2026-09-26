@@ -95,7 +95,11 @@ export function RunInputDock({
     : findActiveSkillToken(input, caretIndex);
   const matchingSkills = activeSkillToken
     ? skills
-        .filter((skill) => skill.name.startsWith(activeSkillToken.query))
+        .filter(
+          (skill) =>
+            skill.user_invocable &&
+            skill.name.startsWith(activeSkillToken.query),
+        )
         .slice(0, 8)
     : [];
   const skillPickerOpen = matchingSkills.length > 0;
