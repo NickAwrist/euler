@@ -130,7 +130,7 @@ for (const device of ["desktop", "mobile"] as const) {
     await expect(page.locator("#ollamaUri")).toBeDisabled();
     await expect(
       page.getByRole("button", { name: "Save settings" }),
-    ).toBeDisabled();
+    ).toBeHidden();
     expect(errors).toEqual([]);
     await page.close();
   });

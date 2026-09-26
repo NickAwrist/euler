@@ -6,6 +6,8 @@ import type {
   SettingsTab,
 } from "../../types";
 
+export type SettingChange = { tab: SettingsTab; label: string };
+
 export type ComfyUITestState =
   | { status: "idle" }
   | { status: "loading"; holdConnected?: boolean }

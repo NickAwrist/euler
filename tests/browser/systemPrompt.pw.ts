@@ -16,12 +16,12 @@ test("system prompt settings desktop: customize, save, and reset to default", as
   const save = page.getByRole("button", { name: "Save settings" });
   await expect(prompt).toHaveValue(DEFAULT_SYSTEM_PROMPT);
   await expect(reset).toBeDisabled();
-  await expect(save).toBeDisabled();
+  await expect(save).toBeHidden();
 
   await prompt.fill("Be terse.");
   await expect(reset).toBeEnabled();
   await save.click();
-  await expect(save).toBeDisabled();
+  await expect(save).toBeHidden();
   await expect(prompt).toHaveValue("Be terse.");
 
   await page.getByRole("button", { name: "{{OS}}" }).click();

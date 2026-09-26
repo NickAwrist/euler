@@ -10,6 +10,7 @@ import type {
   ComfyUITestState,
   OllamaTestState,
   SearXNGTestState,
+  SettingChange,
 } from "./types";
 
 type Args = {
@@ -224,25 +225,78 @@ export function useSettingsPageState({
     [comfyuiDefaultWidth, comfyuiDefaultHeight],
   );
 
-  const isDirty = useMemo(() => {
-    if (
-      settings.systemPrompt !== currentSettings.systemPrompt ||
-      settings.name !== currentSettings.name ||
-      settings.preferredFormats !== currentSettings.preferredFormats ||
-      settings.location !== currentSettings.location ||
-      settings.defaultModel !== currentSettings.defaultModel ||
-      settings.includeCurrentDate !== currentSettings.includeCurrentDate ||
-      settings.showDebugButton !== currentSettings.showDebugButton
-    ) {
-      return true;
-    }
-    if (ollamaUri !== ollamaHost) return true;
-    if (comfyUri !== comfyuiHost) return true;
-    if (comfyModel !== comfyuiDefaultModel) return true;
-    if (comfySize !== savedComfySize) return true;
-    if (comfyNegative !== comfyuiNegativePrompt) return true;
-    if (searxngUri !== searxngHost) return true;
-    return false;
+  const changes = useMemo((): SettingChange[] => {
+    const settingChanges: (SettingChange & { changed: boolean })[] = [
+      {
+        tab: "general",
+        label: "Name",
+        changed: settings.name !== currentSettings.name,
+      },
+      {
+        tab: "general",
+        label: "Location",
+        changed: settings.location !== currentSettings.location,
+      },
+      {
+        tab: "general",
+        label: "Preferred response formats",
+        changed: settings.preferredFormats !== currentSettings.preferredFormats,
+      },
+      {
+        tab: "general",
+        label: "Include current date",
+        changed:
+          settings.includeCurrentDate !== currentSettings.includeCurrentDate,
+      },
+      {
+        tab: "general",
+        label: "System prompt",
+        changed: settings.systemPrompt !== currentSettings.systemPrompt,
+      },
+      {
+        tab: "general",
+        label: "Default model",
+        changed: settings.defaultModel !== currentSettings.defaultModel,
+      },
+      {
+        tab: "general",
+        label: "Display debug button",
+        changed: settings.showDebugButton !== currentSettings.showDebugButton,
+      },
+      {
+        tab: "ollama",
+        label: "Ollama server URL",
+        changed: ollamaUri !== ollamaHost,
+      },
+      {
+        tab: "image-generation",
+        label: "ComfyUI server URL",
+        changed: comfyUri !== comfyuiHost,
+      },
+      {
+        tab: "image-generation",
+        label: "Default checkpoint model",
+        changed: comfyModel !== comfyuiDefaultModel,
+      },
+      {
+        tab: "image-generation",
+        label: "Default image size",
+        changed: comfySize !== savedComfySize,
+      },
+      {
+        tab: "image-generation",
+        label: "Negative prompt",
+        changed: comfyNegative !== comfyuiNegativePrompt,
+      },
+      {
+        tab: "web-search",
+        label: "SearXNG server URL",
+        changed: searxngUri !== searxngHost,
+      },
+    ];
+    return settingChanges
+      .filter((change) => change.changed)
+      .map(({ tab, label }) => ({ tab, label }));
   }, [
     settings,
     currentSettings,
@@ -257,6 +311,29 @@ export function useSettingsPageState({
     comfyNegative,
     comfyuiNegativePrompt,
     searxngUri,
+    searxngHost,
+  ]);
+  const isDirty = changes.length > 0;
+
+  const discardChanges = useCallback(() => {
+    setSettings(currentSettings);
+    setOllamaUri(ollamaHost);
+    setComfyUri(comfyuiHost);
+    setComfyModel(comfyuiDefaultModel);
+    setComfySize(savedComfySize);
+    setComfyNegative(comfyuiNegativePrompt);
+    setSearxngUri(searxngHost);
+    setTestState({ status: "idle" });
+    setComfyTestState({ status: "idle" });
+    setSearxngTestState({ status: "idle" });
+    setError(null);
+  }, [
+    currentSettings,
+    ollamaHost,
+    comfyuiHost,
+    comfyuiDefaultModel,
+    savedComfySize,
+    comfyuiNegativePrompt,
     searxngHost,
   ]);
 
@@ -324,7 +401,9 @@ export function useSettingsPageState({
     ollamaUri,
     onOllamaUriInput,
     isSaving,
+    changes,
     isDirty,
+    discardChanges,
     error,
     testState,
     comfyUri,

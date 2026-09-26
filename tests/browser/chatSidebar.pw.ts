@@ -423,7 +423,7 @@ test("chat sidebar desktop export and opt-in debug access", async ({
     .filter({ hasText: "Developer tools" });
   await expect(developerTools).not.toHaveAttribute("open", "");
   await developerTools.locator("summary").click();
-  const showDebug = page.getByRole("checkbox", {
+  const showDebug = page.getByRole("switch", {
     name: /Display debug button/,
   });
   await expect(showDebug).not.toBeChecked();
@@ -433,7 +433,7 @@ test("chat sidebar desktop export and opt-in debug access", async ({
     .click();
   await expect(
     page.getByRole("button", { name: "Save settings", exact: true }),
-  ).toBeDisabled();
+  ).toBeHidden();
   await page.getByRole("button", { name: "Back to chat" }).click();
   await page.reload();
   await page
@@ -459,7 +459,7 @@ test("chat sidebar desktop export and opt-in debug access", async ({
     .click();
   await expect(
     page.getByRole("button", { name: "Save settings", exact: true }),
-  ).toBeDisabled();
+  ).toBeHidden();
   await page.getByRole("button", { name: "Back to chat" }).click();
   await expect(
     page.getByRole("button", { name: "Debug inspector", exact: true }),

@@ -9,6 +9,7 @@ import type { UserSettings } from "../../persist/userSettings";
 import { cx, eyebrowText } from "../../styles";
 import type { ModelOption } from "../../types";
 import { Button } from "../Button";
+import { EnableSwitch } from "../ModelPreferenceControls";
 import { ModelSelectBar } from "../ModelSelectBar";
 import { SystemPromptField } from "./SystemPromptField";
 import { hintClass, inputClass, labelClass } from "./constants";
@@ -145,19 +146,13 @@ export function GeneralSettingsTab({
         </div>
 
         <div className="flex items-start gap-3 pt-1">
-          <input
-            type="checkbox"
-            id="includeCurrentDate"
+          <EnableSwitch
+            label="Include current date"
             checked={settings.includeCurrentDate}
-            onChange={(e) =>
-              onFieldChange("includeCurrentDate", e.target.checked)
-            }
-            className="mt-0.5 h-4 w-4 rounded border-border-subtle bg-surface text-primary focus:ring-primary"
+            onChange={(checked) => onFieldChange("includeCurrentDate", checked)}
           />
           <div className="space-y-0.5">
-            <label htmlFor="includeCurrentDate" className={labelClass}>
-              Include current date
-            </label>
+            <p className={labelClass}>Include current date</p>
             <p className={hintClass}>
               Include today&apos;s date in the system prompt so models know what
               day it is.
@@ -216,14 +211,11 @@ export function GeneralSettingsTab({
         <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
           Developer tools
         </summary>
-        <label className="mt-3 flex items-start gap-3 text-[0.8125rem] text-muted-foreground">
-          <input
-            type="checkbox"
+        <div className="mt-3 flex items-start gap-3 text-[0.8125rem] text-muted-foreground">
+          <EnableSwitch
+            label="Display debug button"
             checked={settings.showDebugButton}
-            onChange={(event) =>
-              onFieldChange("showDebugButton", event.target.checked)
-            }
-            className="mt-0.5 h-4 w-4 rounded border-border-subtle bg-surface text-primary focus:ring-primary"
+            onChange={(checked) => onFieldChange("showDebugButton", checked)}
           />
           <span>
             Display debug button
@@ -231,7 +223,7 @@ export function GeneralSettingsTab({
               Inspect model context and request details.
             </span>
           </span>
-        </label>
+        </div>
       </details>
     </div>
   );
