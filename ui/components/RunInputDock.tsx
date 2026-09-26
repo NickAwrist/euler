@@ -100,7 +100,7 @@ export function RunInputDock({
         .filter((skill) => skill.name.startsWith(activeSkillToken.query))
         .slice(0, 8)
     : [];
-  const skillPickerOpen = !isBusy && matchingSkills.length > 0;
+  const skillPickerOpen = matchingSkills.length > 0;
   const matchingCommands = matchingRunCommands(input, workspace.kind);
   const commandPickerOpen = !isBusy && matchingCommands.length > 0;
 
@@ -338,7 +338,7 @@ export function RunInputDock({
               const files = Array.from(e.clipboardData.files);
               if (files.length > 0) {
                 e.preventDefault();
-                addPendingImages(files);
+                if (!isBusy) addPendingImages(files);
               }
             }}
             onKeyDown={(e) => {
@@ -353,7 +353,6 @@ export function RunInputDock({
                 if (canSend) onSendMessage(e);
               }
             }}
-            disabled={isBusy}
             placeholder="Send a message..."
             aria-autocomplete="list"
             aria-controls={
@@ -364,7 +363,7 @@ export function RunInputDock({
                   : undefined
             }
             aria-expanded={skillPickerOpen || commandPickerOpen}
-            className="min-h-10 max-h-[30vh] w-full flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-[0.9375rem] leading-[1.5] text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            className="min-h-10 max-h-[30vh] w-full flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-[0.9375rem] leading-[1.5] text-foreground outline-none placeholder:text-muted-foreground"
             rows={1}
           />
           {isBusy ? (
