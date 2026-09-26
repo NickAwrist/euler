@@ -1,14 +1,22 @@
 import { Save, Trash2 } from "lucide-react";
-import type { Dispatch, SetStateAction } from "react";
+import {
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+  useId,
+} from "react";
+import { normalizeSkillName } from "../../../src/schemas/skills";
 import type { SkillData, SkillWriteBody } from "../../persist/skills";
 import { cx, textareaClass } from "../../styles";
 import { Button } from "../Button";
+import type { SkillEditorErrors } from "./skillsPageUtils";
 
 type Props = {
   isNew: boolean;
   skill: SkillData | null;
   editor: SkillWriteBody;
   setEditor: Dispatch<SetStateAction<SkillWriteBody>>;
+  errors: SkillEditorErrors;
   saving: boolean;
   deleting: boolean;
   saveDisabled: boolean;
@@ -22,6 +30,7 @@ export function SkillEditor({
   skill,
   editor,
   setEditor,
+  errors,
   saving,
   deleting,
   saveDisabled,
@@ -29,6 +38,10 @@ export function SkillEditor({
   onCancel,
   onDelete,
 }: Props) {
+  const id = useId();
+  const errorId = (field: keyof SkillWriteBody) =>
+    errors[field] ? `${id}-${field}-error` : undefined;
+
   return (
     <div className="ui-animate-fade-in mx-auto max-w-2xl px-6 py-6">
       <div className="mb-2 flex items-center justify-between">
@@ -58,7 +71,14 @@ export function SkillEditor({
           <span className="text-[0.75rem] font-medium text-muted-foreground">
             Name
           </span>
-          <div className="flex rounded-lg border border-border-subtle bg-background transition-colors focus-within:border-border">
+          <div
+            className={cx(
+              "flex rounded-lg border bg-background transition-colors",
+              errors.name
+                ? "border-red-400/60"
+                : "border-border-subtle focus-within:border-border",
+            )}
+          >
             <span className="flex items-center border-r border-border-subtle px-3 font-mono text-[0.8125rem] text-muted-foreground">
               $
             </span>
@@ -68,17 +88,26 @@ export function SkillEditor({
               onChange={(event) =>
                 setEditor((current) => ({
                   ...current,
-                  name: event.target.value.toLowerCase(),
+                  name: normalizeSkillName(event.target.value),
+                }))
+              }
+              onBlur={() =>
+                setEditor((current) => ({
+                  ...current,
+                  name: current.name.replace(/-+$/, ""),
                 }))
               }
               placeholder="release-notes"
+              maxLength={64}
               spellCheck={false}
+              aria-invalid={errors.name !== undefined}
+              aria-describedby={errorId("name")}
               className="min-w-0 flex-1 bg-transparent px-3 py-2 font-mono text-[0.8125rem] text-foreground outline-none placeholder:text-muted-foreground/50"
             />
           </div>
-          <span className="text-[0.6875rem] text-muted-foreground">
+          <FieldHint id={errorId("name")} error={errors.name}>
             Lowercase letters, numbers, and hyphens. Up to 64 characters.
-          </span>
+          </FieldHint>
         </label>
 
         <label className="flex flex-col gap-1.5">
@@ -96,12 +125,18 @@ export function SkillEditor({
             placeholder="When this skill should be used and what it helps with."
             maxLength={500}
             rows={3}
-            className={cx(textareaClass, "text-[0.8125rem]")}
+            aria-invalid={errors.description !== undefined}
+            aria-describedby={errorId("description")}
+            className={cx(
+              textareaClass,
+              "text-[0.8125rem]",
+              errors.description && "border-red-400/60!",
+            )}
             style={{ resize: "vertical" }}
           />
-          <span className="text-[0.6875rem] text-muted-foreground">
+          <FieldHint id={errorId("description")} error={errors.description}>
             This metadata lets the agent decide when to load the skill.
-          </span>
+          </FieldHint>
         </label>
 
         <label className="flex flex-col gap-1.5">
@@ -120,13 +155,19 @@ export function SkillEditor({
               "# Workflow\n\nDescribe the steps, constraints, and output format for this skill."
             }
             rows={15}
-            className={cx(textareaClass, "font-mono text-[0.8125rem]")}
+            aria-invalid={errors.instructions !== undefined}
+            aria-describedby={errorId("instructions")}
+            className={cx(
+              textareaClass,
+              "font-mono text-[0.8125rem]",
+              errors.instructions && "border-red-400/60!",
+            )}
             style={{ resize: "vertical" }}
           />
-          <span className="text-[0.6875rem] text-muted-foreground">
+          <FieldHint id={errorId("instructions")} error={errors.instructions}>
             Markdown body of the skill&apos;s SKILL.md file. The name and
             description above form its metadata.
-          </span>
+          </FieldHint>
         </label>
 
         <div className="flex items-center gap-3 pt-2">
@@ -147,5 +188,26 @@ export function SkillEditor({
         </div>
       </div>
     </div>
+  );
+}
+
+function FieldHint({
+  id,
+  error,
+  children,
+}: {
+  id: string | undefined;
+  error: string | undefined;
+  children: ReactNode;
+}) {
+  return error ? (
+    <span
+      id={id}
+      className="text-[0.6875rem] text-red-400 first-letter:uppercase"
+    >
+      {error}
+    </span>
+  ) : (
+    <span className="text-[0.6875rem] text-muted-foreground">{children}</span>
   );
 }

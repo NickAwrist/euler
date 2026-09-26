@@ -10,6 +10,7 @@ import {
 import {
   editorFromSkill,
   emptySkillEditor,
+  skillEditorErrors,
   skillEditorsEqual,
 } from "./skillsPageUtils";
 
@@ -22,6 +23,7 @@ export function useSkillsPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<SkillData | null>(null);
 
   const load = useCallback(async () => {
@@ -47,6 +49,7 @@ export function useSkillsPage() {
     setEditor(next);
     setBaseline(next);
     setError(null);
+    setShowFieldErrors(false);
   };
 
   const startNew = () => {
@@ -56,6 +59,7 @@ export function useSkillsPage() {
     setEditor(next);
     setBaseline(next);
     setError(null);
+    setShowFieldErrors(false);
   };
 
   const cancelEdit = () => {
@@ -64,10 +68,17 @@ export function useSkillsPage() {
     setEditor(emptySkillEditor());
     setBaseline(emptySkillEditor());
     setError(null);
+    setShowFieldErrors(false);
   };
+
+  const fieldErrors = skillEditorErrors(editor);
 
   const save = async () => {
     if (skillEditorsEqual(editor, baseline)) return;
+    if (Object.values(fieldErrors).some(Boolean)) {
+      setShowFieldErrors(true);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -83,6 +94,7 @@ export function useSkillsPage() {
       setIsNew(false);
       setEditor(next);
       setBaseline(next);
+      setShowFieldErrors(false);
     } catch (saveError: unknown) {
       setError(
         saveError instanceof Error ? saveError.message : "Failed to save skill",
@@ -118,6 +130,7 @@ export function useSkillsPage() {
     isNew,
     editor,
     setEditor,
+    fieldErrors: showFieldErrors ? fieldErrors : {},
     saving,
     deleting,
     error,

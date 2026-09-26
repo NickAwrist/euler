@@ -28,6 +28,7 @@ export function SkillsPanel() {
               skill={p.selectedSkill}
               editor={p.editor}
               setEditor={p.setEditor}
+              errors={p.fieldErrors}
               saving={p.saving}
               deleting={p.deleting}
               saveDisabled={!p.editorDirty || p.saving}

@@ -2,6 +2,19 @@ import { z } from "zod";
 
 export const SKILL_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+/**
+ * Coerces typed input toward SKILL_NAME_PATTERN. A trailing hyphen is kept so
+ * the next word can still be typed; the schema rejects it if left in place.
+ */
+export function normalizeSkillName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-/, "");
+}
+
 export const SkillWriteSchema = z.object({
   name: z
     .string()
