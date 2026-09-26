@@ -4,7 +4,7 @@ Reviewed September 24, 2026 against `main` at `910e6c94ceb5cd94d690feb7d538f8197
 
 The review covered all 32 open issues, their comments, and relevant source code. Twelve issues were labeled bugs, and there were no open pull requests. This is a source-based triage, not a browser reproduction pass. Counts and priorities are a snapshot.
 
-Tool-output display, ephemeral-exit protection, chat titles/export, and workspace feedback shipped in PRs #46, #45, #47, and #48. The remaining work is grouped below by shared behavior and code ownership.
+Tool-output display, ephemeral-exit protection, chat titles/export, workspace feedback, Usage display, and chat layout shipped in PRs #46, #45, #47, #48, #49, and #50. The remaining work is grouped below by shared behavior and code ownership.
 
 ## Priorities
 
@@ -20,14 +20,10 @@ Each row is suitable for one agent working on one branch, within the stated scop
 
 | Priority | Branch and issues | Deliverable and rationale | Size |
 | --- | --- | --- | --- |
-| P2 | `fix/usage-display`: [#16](https://github.com/NickAwrist/euler/issues/16), [#41](https://github.com/NickAwrist/euler/issues/41) | Fix duplicate ticks alongside sparse-data presentation, missing-data tiles, model colors and legend, sorting, and consistent numbers. One bounded Usage-page branch. | Medium |
-| P2 | `fix/chat-layout`: [#21](https://github.com/NickAwrist/euler/issues/21), layout portions of [#38](https://github.com/NickAwrist/euler/issues/38) | Fix mobile header overlap, add jump-to-latest, handle empty files panels and Escape focus correctly, and update the browser title. Move halted-response actions to response-actions work and the empty-chat hint to #28. | Medium |
 | P2 | `fix/settings-save`: [#34](https://github.com/NickAwrist/euler/issues/34) | Visible Save/Discard controls, dirty-tab indicators, mobile tabs, and a discard warning listing changed settings, as requested in the comment. Include the issue's smaller control/copy corrections. | Medium |
 | P2 | `feat/model-selection`: [#32](https://github.com/NickAwrist/euler/issues/32), [#35](https://github.com/NickAwrist/euler/issues/35) | Improve picker capabilities and Enter behavior alongside publisher/model-list scanning. This grouping was explicitly requested in the comments. | Medium |
 | P2 | `fix/draft-during-run`: [#23](https://github.com/NickAwrist/euler/issues/23) | Allow drafting while running, preserve drafts when the run completes, and keep submission disabled. Message queuing is a separate feature. Standalone fix. | Small to medium |
 | P2 | `fix/skill-validation`: validation portion of [#36](https://github.com/NickAwrist/euler/issues/36) | Reuse the existing shared skill schema for inline validation and name normalization. Separate the larger import/runtime additions. | Small |
-
-If the Usage branch is delayed, #16's tick deduplication can ship independently.
 
 ## Separate feature branches and scope splits
 
@@ -48,8 +44,6 @@ If the Usage branch is delayed, #16's tick deduplication can ship independently.
 An issue split across multiple merges should remain open until its agreed scope is complete, or have the remaining work tracked explicitly in follow-up issues.
 
 ## Agent scheduling and merge order
-
-Usage fixes can proceed independently of the remaining navigation work.
 
 Give one agent ownership of the navigation sequence:
 
