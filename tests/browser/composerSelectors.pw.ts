@@ -47,7 +47,7 @@ for (const device of ["desktop", "mobile"] as const) {
     let catalog = models;
     let sessionReads = 0;
     const runs: { model: string; message: string }[] = [];
-    const finishRun = Promise.withResolvers<void>();
+    let finishRun = Promise.withResolvers<void>();
     await page.route("**/api/**", async (route) => {
       const path = new URL(route.request().url()).pathname;
       if (
@@ -221,6 +221,15 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect(input).toHaveValue("Draft while running");
       finishRun.resolve();
 
+      // A run that finishes on its own keeps the draft too.
+      finishRun = Promise.withResolvers<void>();
+      await page.getByRole("button", { name: "Send message" }).click();
+      await expect.poll(() => runs.length).toBe(2);
+      await input.fill("Draft after completion");
+      finishRun.resolve();
+      await expect(model).toBeEnabled();
+      await expect(input).toHaveValue("Draft after completion");
+
       // A refreshed catalog must not silently replace the selected model.
       catalog = models.filter((entry) => entry.provider === "openrouter");
       await page.evaluate(() =>
@@ -248,7 +257,7 @@ for (const device of ["desktop", "mobile"] as const) {
       ).toBeDisabled();
       await input.press("Enter");
       await expect(input).toHaveValue("Keep this unsent draft");
-      expect(runs).toHaveLength(1);
+      expect(runs).toHaveLength(2);
 
       const readsBeforeSettings = sessionReads;
       await model.click();
