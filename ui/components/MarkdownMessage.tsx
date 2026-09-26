@@ -30,7 +30,10 @@ const remarkPlugins: Options["remarkPlugins"] = [
   // Single dollars are currency; see normalizeMathDelimiters.
   [remarkMath, { singleDollarTextMath: false }],
 ];
-const rehypePlugins: Options["rehypePlugins"] = [rehypeKatex];
+// Math that is invalid or still streaming shows as plain TeX, not red errors.
+const rehypePlugins: Options["rehypePlugins"] = [
+  [rehypeKatex, { errorColor: "inherit" }],
+];
 
 /** GFM tables need newline-separated rows; streamed/model text often uses a single line. */
 function normalizeFlattenedPipeTables(markdown: string): string {
@@ -174,35 +177,34 @@ const markdownParser = unified().use(remarkParse).use(remarkGfm);
 const MATH_DELIMITERS =
   /\$\$[\s\S]*?\$\$|\\\(([\s\S]*?)\\\)|\\\[([\s\S]*?)\\\]|(?<![\\$])\$(?![\s$])((?:\\.|[^$\\\n])*?[^\s\\$])\$(?![\d$])/g;
 
+function toDollarMath(text: string): string {
+  return text.replace(
+    MATH_DELIMITERS,
+    (match: string, paren?: string, bracket?: string, single?: string) => {
+      const tex = paren ?? bracket ?? single;
+      return tex === undefined ? match : `$$${tex}$$`;
+    },
+  );
+}
+
 /** Rewrites math under the delimiter policy as `$$…$$`, leaving code untouched. */
 export function normalizeMathDelimiters(markdown: string): string {
   if (!/\$|\\[([]/.test(markdown)) return markdown;
-  const codeRanges: [number, number][] = [];
-  function collect(node: Root | RootContent): void {
-    if (node.type === "code" || node.type === "inlineCode") {
-      codeRanges.push([
-        node.position!.start.offset!,
-        node.position!.end.offset!,
-      ]);
-    } else if ("children" in node) {
-      node.children.forEach(collect);
-    }
-  }
-  collect(markdownParser.parse(markdown));
-  codeRanges.push([markdown.length, markdown.length]);
   let result = "";
   let cursor = 0;
-  for (const [start, end] of codeRanges) {
-    result +=
-      markdown
-        .slice(cursor, start)
-        .replace(MATH_DELIMITERS, (match, paren, bracket, single) => {
-          const tex = paren ?? bracket ?? single;
-          return tex === undefined ? match : `$$${tex}$$`;
-        }) + markdown.slice(start, end);
-    cursor = end;
+  function visit(node: Root | RootContent): void {
+    if (node.type === "code" || node.type === "inlineCode") {
+      const start = node.position!.start.offset!;
+      const end = node.position!.end.offset!;
+      result += toDollarMath(markdown.slice(cursor, start));
+      result += markdown.slice(start, end);
+      cursor = end;
+    } else if ("children" in node) {
+      node.children.forEach(visit);
+    }
   }
-  return result;
+  visit(markdownParser.parse(markdown));
+  return result + toDollarMath(markdown.slice(cursor));
 }
 
 function isComfyUIImage(src: string | undefined): boolean {
