@@ -4,7 +4,7 @@ Reviewed September 24, 2026 against `main` at `910e6c94ceb5cd94d690feb7d538f8197
 
 The review covered all 32 open issues, their comments, and relevant source code. Twelve issues were labeled bugs, and there were no open pull requests. This is a source-based triage, not a browser reproduction pass. Counts and priorities are a snapshot.
 
-Tool-output display, ephemeral-exit protection, chat titles/export, workspace feedback, Usage display, and chat layout shipped in PRs #46, #45, #47, #48, #49, and #50. The remaining work is grouped below by shared behavior and code ownership.
+Tool-output display, ephemeral-exit protection, chat titles/export, workspace feedback, Usage display, and chat layout shipped in PRs #46, #45, #47, #48, #49, and #50. Settings save/discard, model selection, and drafting during a run are in review in PRs #52, #53, and #51. The remaining work is grouped below by shared behavior and code ownership.
 
 ## Priorities
 
@@ -20,9 +20,6 @@ Each row is suitable for one agent working on one branch, within the stated scop
 
 | Priority | Branch and issues | Deliverable and rationale | Size |
 | --- | --- | --- | --- |
-| P2 | `fix/settings-save`: [#34](https://github.com/NickAwrist/euler/issues/34) | Visible Save/Discard controls, dirty-tab indicators, mobile tabs, and a discard warning listing changed settings, as requested in the comment. Include the issue's smaller control/copy corrections. | Medium |
-| P2 | `feat/model-selection`: [#32](https://github.com/NickAwrist/euler/issues/32), [#35](https://github.com/NickAwrist/euler/issues/35) | Improve picker capabilities and Enter behavior alongside publisher/model-list scanning. This grouping was explicitly requested in the comments. | Medium |
-| P2 | `fix/draft-during-run`: [#23](https://github.com/NickAwrist/euler/issues/23) | Allow drafting while running, preserve drafts when the run completes, and keep submission disabled. Message queuing is a separate feature. Standalone fix. | Small to medium |
 | P2 | `fix/skill-validation`: validation portion of [#36](https://github.com/NickAwrist/euler/issues/36) | Reuse the existing shared skill schema for inline validation and name normalization. Separate the larger import/runtime additions. | Small |
 
 ## Separate feature branches and scope splits
@@ -45,14 +42,9 @@ An issue split across multiple merges should remain open until its agreed scope 
 
 ## Agent scheduling and merge order
 
-Give one agent ownership of the navigation sequence:
+Start #28 (home composer and session creation) after #52 merges. Both touch the same navigation and exit behavior.
 
-1. #34: settings save/discard behavior.
-2. #28: home composer and session creation.
-
-These touch the same navigation and exit behavior. Parallel branches would create avoidable conflicts.
-
-Keep #32 and #35 together, as requested. Coordinate model-selection work with #33, and skill import/runtime work with the earlier validation branch.
+Coordinate #33 with the model picker changes in #53, and skill import/runtime work with the earlier validation branch.
 
 ## Findings to verify before implementation
 
