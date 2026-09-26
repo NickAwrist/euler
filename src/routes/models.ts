@@ -4,6 +4,7 @@ import { listModelFavorites, listOpenRouterPublishers } from "../db/openrouter";
 import { asyncRoute } from "../http/asyncRoute";
 import { errorMessage } from "../http/errors";
 import { openRouterModelId } from "../llm/index";
+import { ollamaReasoning } from "../llm/ollamaProvider";
 import { InputCapability } from "../modelCapabilities";
 import { getOllamaClient } from "../ollamaClient";
 import {
@@ -52,6 +53,7 @@ modelsRoutes.get(
             ...(capabilities.includes("vision") ? [InputCapability.Image] : []),
           ],
           supportsTools: capabilities.includes("tools"),
+          reasoning: ollamaReasoning(capabilities, m.details.family),
         };
       });
     } catch (error) {

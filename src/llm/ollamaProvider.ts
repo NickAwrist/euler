@@ -1,4 +1,5 @@
-import type { ChatResponse, Message, ToolCall } from "ollama";
+import type { ChatRequest, ChatResponse, Message, ToolCall } from "ollama";
+import type { ModelReasoning } from "../modelCapabilities";
 import { getOllamaClient } from "../ollamaClient";
 import type {
   LlmChatRequest,
@@ -74,19 +75,43 @@ function toLlmToolCalls(toolCalls: ToolCall[] | undefined): LlmToolCall[] {
   }));
 }
 
+const GPT_OSS_EFFORTS = ["low", "medium", "high"] as const;
+
+/**
+ * Thinking controls for an Ollama model. gpt-oss always reasons and takes an
+ * effort level; other thinking models can only turn reasoning on or off.
+ */
+export function ollamaReasoning(
+  capabilities: readonly string[],
+  family: string | undefined,
+): ModelReasoning | undefined {
+  if (!capabilities.includes("thinking")) return undefined;
+  return family === "gptoss"
+    ? {
+        mandatory: true,
+        defaultEnabled: true,
+        supportedEfforts: [...GPT_OSS_EFFORTS],
+        defaultEffort: "medium",
+      }
+    : { mandatory: false, defaultEnabled: true, supportedEfforts: [] };
+}
+
+function ollamaThink(effort: string | undefined): ChatRequest["think"] {
+  if (effort === "off") return false;
+  if (effort === "on") return true;
+  return GPT_OSS_EFFORTS.find((level) => level === effort);
+}
+
 export async function streamOllamaChat(
   request: LlmChatRequest,
 ): Promise<LlmChatStream> {
-  const thinkOpt =
-    /gemma/i.test(request.model) || /qwen3/i.test(request.model)
-      ? ({ think: true as const } satisfies { think: true })
-      : {};
+  const think = ollamaThink(request.reasoningEffort);
   const stream = await getOllamaClient().chat({
     model: request.model,
     messages: toOllamaMessages(request.messages),
     tools: request.tools,
     stream: true,
-    ...thinkOpt,
+    ...(think === undefined ? {} : { think }),
   });
 
   return {
