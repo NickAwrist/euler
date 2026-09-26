@@ -105,13 +105,12 @@ function ollamaThink(effort: string | undefined): ChatRequest["think"] {
 export async function streamOllamaChat(
   request: LlmChatRequest,
 ): Promise<LlmChatStream> {
-  const think = ollamaThink(request.reasoningEffort);
   const stream = await getOllamaClient().chat({
     model: request.model,
     messages: toOllamaMessages(request.messages),
     tools: request.tools,
     stream: true,
-    ...(think === undefined ? {} : { think }),
+    think: ollamaThink(request.reasoningEffort),
   });
 
   return {

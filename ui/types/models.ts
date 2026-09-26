@@ -1,7 +1,5 @@
-import type {
-  InputCapability,
-  ModelReasoning,
-} from "../../src/modelCapabilities";
+import type { InputCapability } from "../../src/modelCapabilities";
+import type { ModelReasoning } from "../../src/openRouterModels";
 
 export type { ModelReasoning };
 
