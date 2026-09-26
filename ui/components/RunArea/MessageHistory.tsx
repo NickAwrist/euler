@@ -12,7 +12,8 @@ type Props = Pick<
   | "onStartEditUser"
   | "onCancelEditUser"
   | "onRequestEditConfirm"
-  | "onRequestRetryConfirm"
+  | "onRegenerate"
+  | "regenerateLabel"
 > & { initialCount: number; isBusy: boolean };
 
 // Keep per-message closures inside the memo boundary so appending a message

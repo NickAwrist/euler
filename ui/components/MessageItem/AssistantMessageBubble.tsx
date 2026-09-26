@@ -1,4 +1,13 @@
-import { Check, Copy, Download, Globe, Waypoints } from "lucide-react";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Download,
+  Globe,
+  RefreshCw,
+  Waypoints,
+} from "lucide-react";
 import { type CSSProperties, useMemo } from "react";
 import type {
   WebSourceAttachment,
@@ -30,6 +39,11 @@ type Props = {
   copied: boolean;
   copyContent: () => void;
   onViewSteps?: () => void;
+  isBusy: boolean;
+  onRegenerate: () => void;
+  regenerateLabel: string;
+  /** Present when earlier replies were kept by Regenerate. */
+  version?: { index: number; count: number; onChange: (index: number) => void };
 };
 
 export function AssistantMessageBubble({
@@ -39,6 +53,10 @@ export function AssistantMessageBubble({
   copied,
   copyContent,
   onViewSteps,
+  isBusy,
+  onRegenerate,
+  regenerateLabel,
+  version,
 }: Props) {
   const artifacts = useArtifacts();
   const attachments = message.attachments ?? [];
@@ -146,60 +164,100 @@ export function AssistantMessageBubble({
           )}
         </div>
 
-        <div
-          className={cx(
-            "mt-2 flex flex-wrap items-center gap-1",
-            "message-actions opacity-0 transition-opacity duration-300 ease-out",
-            "group-hover/msg:opacity-100 focus-within:opacity-100",
-          )}
-        >
-          {comfyImageUrls.map((href, index) => (
-            <a
-              key={href}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={msgIconBtn}
-              title="Open image"
-              aria-label={
-                comfyImageUrls.length > 1
-                  ? `Open generated image ${index + 1} in new tab`
-                  : "Open generated image in new tab"
-              }
+        <div className="mt-2 flex flex-wrap items-center gap-1">
+          {version && (
+            <fieldset
+              aria-label="Reply versions"
+              className="flex items-center text-xs tabular-nums text-muted-foreground"
             >
-              <Download size={msgIconSize} strokeWidth={msgIconStroke} />
-            </a>
-          ))}
-          <MessageActions
-            actions={[
-              {
-                label: "Copy message",
-                feedback: copied ? "Copied" : undefined,
-                icon: copied ? (
-                  <Check size={msgIconSize} strokeWidth={msgIconStroke} />
-                ) : (
-                  <Copy size={msgIconSize} strokeWidth={msgIconStroke} />
-                ),
-                onSelect: copyContent,
-              },
-              ...(message.steps &&
-              traceStepsForDisplay(message.steps).length > 0 &&
-              onViewSteps
-                ? [
-                    {
-                      label: "View trace",
-                      icon: (
-                        <Waypoints
-                          size={msgIconSize}
-                          strokeWidth={msgIconStroke}
-                        />
-                      ),
-                      onSelect: onViewSteps,
-                    },
-                  ]
-                : []),
-            ]}
-          />
+              <button
+                type="button"
+                className={msgIconBtn}
+                aria-label="Previous version"
+                title="Previous version"
+                disabled={version.index === 0}
+                onClick={() => version.onChange(version.index - 1)}
+              >
+                <ChevronLeft size={msgIconSize} strokeWidth={msgIconStroke} />
+              </button>
+              <span aria-live="polite">
+                {version.index + 1}/{version.count}
+              </span>
+              <button
+                type="button"
+                className={msgIconBtn}
+                aria-label="Next version"
+                title="Next version"
+                disabled={version.index === version.count - 1}
+                onClick={() => version.onChange(version.index + 1)}
+              >
+                <ChevronRight size={msgIconSize} strokeWidth={msgIconStroke} />
+              </button>
+            </fieldset>
+          )}
+          <div
+            className={cx(
+              "flex flex-wrap items-center gap-1",
+              "message-actions opacity-0 transition-opacity duration-300 ease-out",
+              "group-hover/msg:opacity-100 focus-within:opacity-100",
+            )}
+          >
+            {comfyImageUrls.map((href, index) => (
+              <a
+                key={href}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={msgIconBtn}
+                title="Open image"
+                aria-label={
+                  comfyImageUrls.length > 1
+                    ? `Open generated image ${index + 1} in new tab`
+                    : "Open generated image in new tab"
+                }
+              >
+                <Download size={msgIconSize} strokeWidth={msgIconStroke} />
+              </a>
+            ))}
+            <MessageActions
+              actions={[
+                {
+                  label: "Copy message",
+                  feedback: copied ? "Copied" : undefined,
+                  icon: copied ? (
+                    <Check size={msgIconSize} strokeWidth={msgIconStroke} />
+                  ) : (
+                    <Copy size={msgIconSize} strokeWidth={msgIconStroke} />
+                  ),
+                  onSelect: copyContent,
+                },
+                ...(message.steps &&
+                traceStepsForDisplay(message.steps).length > 0 &&
+                onViewSteps
+                  ? [
+                      {
+                        label: "View trace",
+                        icon: (
+                          <Waypoints
+                            size={msgIconSize}
+                            strokeWidth={msgIconStroke}
+                          />
+                        ),
+                        onSelect: onViewSteps,
+                      },
+                    ]
+                  : []),
+                {
+                  label: regenerateLabel,
+                  icon: (
+                    <RefreshCw size={msgIconSize} strokeWidth={msgIconStroke} />
+                  ),
+                  onSelect: onRegenerate,
+                  disabled: isBusy,
+                },
+              ]}
+            />
+          </div>
         </div>
       </div>
     </div>

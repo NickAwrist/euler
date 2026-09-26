@@ -1,4 +1,4 @@
-import { Check, Copy, Pencil, RotateCcw } from "lucide-react";
+import { Check, Copy, Pencil } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import type { CSSProperties } from "react";
@@ -22,7 +22,6 @@ type Props = {
   copied: boolean;
   isBusy: boolean;
   onCancelEditUser: () => void;
-  onRequestRetryConfirm: (userIndex: number) => void;
   onRequestEditConfirm: (userIndex: number, text: string) => void;
   beginEdit: () => void;
   copyContent: () => void;
@@ -40,7 +39,6 @@ export function UserMessageBubble({
   copied,
   isBusy,
   onCancelEditUser,
-  onRequestRetryConfirm,
   onRequestEditConfirm,
   beginEdit,
   copyContent,
@@ -150,14 +148,6 @@ export function UserMessageBubble({
                     <Pencil size={msgIconSize} strokeWidth={msgIconStroke} />
                   ),
                   onSelect: beginEdit,
-                  disabled: isBusy,
-                },
-                {
-                  label: "Retry from here",
-                  icon: (
-                    <RotateCcw size={msgIconSize} strokeWidth={msgIconStroke} />
-                  ),
-                  onSelect: () => onRequestRetryConfirm(messageIndex),
                   disabled: isBusy,
                 },
               ]}

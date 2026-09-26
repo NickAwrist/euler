@@ -1,5 +1,6 @@
 import { type CSSProperties, useEffect, useRef, useState } from "react";
 import { copyTextToClipboard } from "../../lib/copyTextToClipboard";
+import type { Message } from "../../types";
 import { AssistantMessageBubble } from "./AssistantMessageBubble";
 import { UserMessageBubble } from "./UserMessageBubble";
 import type { MessageItemProps } from "./types";
@@ -15,11 +16,17 @@ export function MessageItem({
   onStartEditUser,
   onCancelEditUser,
   onRequestEditConfirm,
-  onRequestRetryConfirm,
+  onRegenerate,
+  regenerateLabel,
 }: MessageItemProps) {
   const bubbleRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState(message.content);
   const [copied, setCopied] = useState(false);
+  const versions = message.versions ?? [];
+  // A new reply remounts this row, so viewing restarts at the latest version.
+  const [versionIndex, setVersionIndex] = useState(versions.length);
+  const viewed = versions[versionIndex];
+  const shown: Message = viewed ? { role: message.role, ...viewed } : message;
 
   const isEditingUser =
     message.role === "user" && editingUserIndex === messageIndex;
@@ -32,7 +39,7 @@ export function MessageItem({
     animDelayMs > 0 ? { animationDelay: `${animDelayMs}ms` } : undefined;
 
   const copyContent = async () => {
-    const ok = await copyTextToClipboard(message.content);
+    const ok = await copyTextToClipboard(shown.content);
     if (ok) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
@@ -70,7 +77,6 @@ export function MessageItem({
         copied={copied}
         isBusy={isBusy}
         onCancelEditUser={onCancelEditUser}
-        onRequestRetryConfirm={onRequestRetryConfirm}
         onRequestEditConfirm={onRequestEditConfirm}
         beginEdit={beginEdit}
         copyContent={copyContent}
@@ -80,12 +86,24 @@ export function MessageItem({
 
   return (
     <AssistantMessageBubble
-      message={message}
+      message={shown}
       animateEntry={animateEntry}
       enterStyle={enterStyle}
       copied={copied}
       copyContent={copyContent}
       onViewSteps={onViewSteps}
+      isBusy={isBusy}
+      onRegenerate={() => onRegenerate(messageIndex)}
+      regenerateLabel={regenerateLabel}
+      version={
+        versions.length > 0
+          ? {
+              index: versionIndex,
+              count: versions.length + 1,
+              onChange: setVersionIndex,
+            }
+          : undefined
+      }
     />
   );
 }

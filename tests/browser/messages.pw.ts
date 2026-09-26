@@ -72,7 +72,18 @@ test("mobile message actions and code layout", async ({ page }, testInfo) => {
     fullPage: true,
   });
 
-  await firstReply.getByRole("button", { name: "More message actions" }).tap();
+  // Leave room above the trigger so the menu opens in its preferred spot.
+  const tracedReply = page.getByRole("region", {
+    name: "Message 4",
+    exact: true,
+  });
+  const tracedMore = tracedReply.getByRole("button", {
+    name: "More message actions",
+  });
+  await tracedMore.evaluate((element) =>
+    element.scrollIntoView({ block: "center" }),
+  );
+  await tracedMore.tap();
   const sheet = page.getByRole("dialog", {
     name: "Message actions",
     exact: true,
@@ -84,9 +95,7 @@ test("mobile message actions and code layout", async ({ page }, testInfo) => {
   await expect(sheet).toHaveCSS("opacity", "1");
   const bounds = await sheet.boundingBox();
   expect(bounds?.width).toBeLessThan(260);
-  const trigger = await firstReply
-    .getByRole("button", { name: "More message actions" })
-    .boundingBox();
+  const trigger = await tracedMore.boundingBox();
   if (!bounds || !trigger) throw new Error("Missing menu or trigger");
   expect(trigger.y - (bounds.y + bounds.height)).toBeCloseTo(6, 0);
   expect(bounds.x).toBeLessThanOrEqual(trigger.x + trigger.width);
@@ -120,7 +129,7 @@ test("mobile message actions and code layout", async ({ page }, testInfo) => {
   expect(errors).toEqual([]);
 });
 
-test("sheet dismissal, busy actions, and retry confirmation", async ({
+test("sheet dismissal, busy actions, and regenerate confirmation", async ({
   page,
 }) => {
   await page.goto("/dev/messages");
@@ -164,17 +173,18 @@ test("sheet dismissal, busy actions, and retry confirmation", async ({
   await expect(
     page.getByRole("button", { name: "Edit message", exact: true }),
   ).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await more.tap();
   await expect(
-    page.getByRole("button", { name: "Retry from here", exact: true }),
+    menu.getByRole("button", { name: "Regenerate with Demo model" }),
   ).toBeDisabled();
   await page.keyboard.press("Escape");
   await page.getByRole("checkbox", { name: "Simulate busy" }).uncheck();
-  await holdMessage(page, userBubble);
-  await page
-    .getByRole("button", { name: "Retry from here", exact: true })
-    .tap();
+  // Regenerating an earlier reply deletes later messages, so it confirms.
+  await more.tap();
+  await menu.getByRole("button", { name: "Regenerate with Demo model" }).tap();
   await expect(
-    page.getByRole("heading", { name: "Retry from here?" }),
+    page.getByRole("heading", { name: "Regenerate this reply?" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Cancel", exact: true }).tap();
   await expect(page.getByRole("region")).toHaveCount(7);
@@ -212,7 +222,7 @@ test("desktop hover and keyboard access", async ({ browser }, testInfo) => {
   await expect(
     user.getByRole("button", { name: "More message actions" }),
   ).toHaveCount(0);
-  for (const name of ["Copy message", "Edit message", "Retry from here"]) {
+  for (const name of ["Copy message", "Edit message"]) {
     await expect(user.getByRole("button", { name, exact: true })).toBeVisible();
   }
   const reply = page.getByRole("region", { name: "Message 2", exact: true });
@@ -226,6 +236,26 @@ test("desktop hover and keyboard access", async ({ browser }, testInfo) => {
   await reply.getByRole("button", { name: "View trace" }).click();
   await expect(page.getByLabel("Execution metrics")).toBeVisible();
   await page.getByRole("button", { name: "Close steps viewer" }).click();
+
+  // Regenerating the latest reply keeps the old one as a version.
+  const last = page.getByRole("region", { name: "Message 7", exact: true });
+  const original = "Inline code like hello world stays in the text.";
+  await last.hover();
+  await last
+    .getByRole("button", { name: "Regenerate with Demo model", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(last).toContainText("Regenerated reply 2.");
+  const versions = last.getByRole("group", { name: "Reply versions" });
+  await expect(versions).toContainText("2/2");
+  await versions.getByRole("button", { name: "Previous version" }).click();
+  await expect(versions).toContainText("1/2");
+  await expect(last).toContainText(original);
+  await expect(
+    versions.getByRole("button", { name: "Previous version" }),
+  ).toBeDisabled();
+  await versions.getByRole("button", { name: "Next version" }).click();
+  await expect(last).toContainText("Regenerated reply 2.");
   await page.mouse.move(0, 0);
   const edit = user.getByRole("button", { name: "Edit message", exact: true });
   await edit.focus();
@@ -248,9 +278,6 @@ test("desktop hover and keyboard access", async ({ browser }, testInfo) => {
   await page.keyboard.press("Escape");
   await page.getByRole("checkbox", { name: "Simulate busy" }).check();
   await expect(edit).toBeDisabled();
-  await expect(
-    user.getByRole("button", { name: "Retry from here", exact: true }),
-  ).toBeDisabled();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(
     user.getByRole("button", { name: "More message actions" }),

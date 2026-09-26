@@ -17,6 +17,7 @@ import type {
   DebugData,
   Message,
   MessageStep,
+  MessageVersion,
   TruncateConfirmState,
 } from "../../types";
 import { executeRunTurn } from "./executeRunTurn";
@@ -66,7 +67,8 @@ export function useRunStreaming(p: Args) {
   const rawRunPendingRef = useRef(false);
   const inFlightSessionIdRef = useRef<string | null>(null);
   const inFlightEphemeralRef = useRef(false);
-  const { streamBufferRef, turnMessagesSnapshotRef } = useTurnBuffer();
+  const { streamBufferRef, turnMessagesSnapshotRef, turnVersionsRef } =
+    useTurnBuffer();
 
   p.debugOpenRef.current = p.debugOpen;
 
@@ -139,7 +141,7 @@ export function useRunStreaming(p: Args) {
     priorMessages: Message[],
     message: string,
     attachments: ImageAttachment[],
-    options: { rebuildModelMessages: boolean },
+    options: { rebuildModelMessages: boolean; versions?: MessageVersion[] },
   ) =>
     executeRunTurn(
       {
@@ -162,6 +164,7 @@ export function useRunStreaming(p: Args) {
         rawRunPendingRef,
         streamBufferRef,
         turnMessagesSnapshotRef,
+        turnVersionsRef,
         setInFlightSessionId,
         setRunPending,
         setStreamingStep,
@@ -186,6 +189,7 @@ export function useRunStreaming(p: Args) {
     const requestId = activeRequestIdRef.current;
     const sessionId = inFlightSessionIdRef.current;
     const ephemeral = inFlightEphemeralRef.current;
+    const versions = turnVersionsRef.current;
     if (requestId) {
       void abortRun(requestId).catch(() => {});
     }
@@ -198,6 +202,7 @@ export function useRunStreaming(p: Args) {
     rawRunPendingRef.current = false;
     streamBufferRef.current = createEmptyStreamBuffer();
     turnMessagesSnapshotRef.current = null;
+    turnVersionsRef.current = [];
     setInFlightSessionId(null);
     setRunPending(false);
     clearStreamingUi();
@@ -208,7 +213,11 @@ export function useRunStreaming(p: Args) {
       }
       const halted: Message[] = [
         ...current,
-        { role: "assistant", content: "*Response halted by user.*" },
+        {
+          role: "assistant",
+          content: "*Response halted by user.*",
+          ...(versions.length > 0 ? { versions } : {}),
+        },
       ];
       if (!ephemeral) {
         void patchSessionApi(sessionId, { history: halted }).catch((error) =>
@@ -251,27 +260,59 @@ export function useRunStreaming(p: Args) {
     });
   };
 
-  const confirmTruncateAndRetry = async () => {
-    const confirmation = p.truncateConfirm;
-    p.setTruncateConfirm(null);
-    p.setEditingUserIndex(null);
+  const rerunFrom = (
+    userIndex: number,
+    message: string,
+    versions?: MessageVersion[],
+  ) => {
     const sessionId = p.activeSessionId;
-    if (!confirmation || !sessionId || !p.modelSendReady) return;
-    const row = p.messages[confirmation.userIndex];
-    if (!row || row.role !== "user") return;
-    const message =
-      confirmation.kind === "edit" ? confirmation.text : row.content;
+    const row = p.messages[userIndex];
+    if (!sessionId || !p.modelSendReady || row?.role !== "user") return;
     if (!message.trim()) return;
-    await runTurn(
+    return runTurn(
       sessionId,
-      p.messages.slice(0, confirmation.userIndex),
+      p.messages.slice(0, userIndex),
       message,
       row.attachments?.filter(
         (attachment): attachment is ImageAttachment =>
           attachment.kind === "image",
       ) ?? [],
-      { rebuildModelMessages: true },
+      { rebuildModelMessages: true, versions },
     );
+  };
+
+  /** Reruns the user message before a reply and keeps the reply as a version. */
+  const regenerate = async (assistantIndex: number) => {
+    const reply = p.messages[assistantIndex];
+    if (reply?.role !== "assistant") return;
+    const userIndex = p.messages.findLastIndex(
+      (message, index) => index < assistantIndex && message.role === "user",
+    );
+    const { content, steps, attachments, versions = [] } = reply;
+    await rerunFrom(userIndex, p.messages[userIndex]?.content ?? "", [
+      ...versions,
+      { content, steps, attachments },
+    ]);
+  };
+
+  const requestRegenerate = (assistantIndex: number) => {
+    p.setEditingUserIndex(null);
+    if (assistantIndex < p.messages.length - 1) {
+      p.setTruncateConfirm({ kind: "regenerate", assistantIndex });
+    } else {
+      void regenerate(assistantIndex);
+    }
+  };
+
+  const confirmTruncate = async () => {
+    const confirmation = p.truncateConfirm;
+    p.setTruncateConfirm(null);
+    p.setEditingUserIndex(null);
+    if (confirmation?.kind === "edit") {
+      await rerunFrom(confirmation.userIndex, confirmation.text);
+    } else if (confirmation?.kind === "regenerate") {
+      await regenerate(confirmation.assistantIndex);
+    }
   };
 
   const toggleDebug = () => {
@@ -298,7 +339,8 @@ export function useRunStreaming(p: Args) {
     runPending: sessionRunBusy,
     stopGeneration,
     sendMessage,
-    confirmTruncateAndRetry,
+    requestRegenerate,
+    confirmTruncate,
     toggleDebug,
     pendingImages: images.pendingImages,
     imageError: images.imageError,

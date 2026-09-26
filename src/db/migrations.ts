@@ -76,6 +76,16 @@ export function migrateSkillInvocationColumns(db: Database) {
   }
 }
 
+export function migrateMessagesVersionsColumn(db: Database) {
+  const cols = db.query("PRAGMA table_info(messages)").all() as {
+    name: string;
+  }[];
+  if (cols.length === 0) return;
+  if (!cols.some((c) => c.name === "versions")) {
+    db.run("ALTER TABLE messages ADD COLUMN versions TEXT");
+  }
+}
+
 export function migrateOpenRouterCatalog(db: Database) {
   db.transaction(() => {
     const columns = db.query("PRAGMA table_info(openrouter_models)").all() as {
@@ -162,5 +172,6 @@ export function runMigrations(db: Database) {
   migrateRemoveAgents(db);
   migrateMessagesAttachmentsColumn(db);
   migrateSkillInvocationColumns(db);
+  migrateMessagesVersionsColumn(db);
   if (tableExists(db, "messages")) migrateAttachmentMetadata(db);
 }

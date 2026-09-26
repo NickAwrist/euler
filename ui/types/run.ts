@@ -33,12 +33,17 @@ export interface Message {
   content: string;
   steps?: MessageStep[];
   attachments?: MessageAttachment[];
+  /** Earlier replies replaced by Regenerate, oldest first. */
+  versions?: MessageVersion[];
 }
 
-/** Confirm truncate + retry/edit from run UI */
+/** An earlier reply replaced by Regenerate. */
+export type MessageVersion = Pick<Message, "content" | "steps" | "attachments">;
+
+/** Confirm deleting later messages before an edit or regenerate. */
 export type TruncateConfirmState =
   | { kind: "edit"; userIndex: number; text: string }
-  | { kind: "retry"; userIndex: number }
+  | { kind: "regenerate"; assistantIndex: number }
   | null;
 
 export type { SessionSummary } from "../../src/schemas/sessions";

@@ -1,10 +1,12 @@
 import type { MessageAttachment } from "../attachments/types";
+import type { MessageVersion } from "../schemas/run";
 
 export type WireMessage = {
   role: string;
   content: string;
   steps?: unknown;
   attachments?: MessageAttachment[];
+  versions?: MessageVersion[];
 };
 
 export type SessionRow = {
