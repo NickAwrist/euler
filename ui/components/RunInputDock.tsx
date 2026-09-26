@@ -200,7 +200,7 @@ export function RunInputDock({
       )}
     >
       {workspace.kind === "local" && (
-        <div className="pointer-events-auto flex w-full max-w-3xl items-center gap-2 px-1 text-xs text-muted-foreground">
+        <div className="pointer-events-auto flex w-full max-w-[var(--chat-width)] items-center gap-2 px-1 text-xs text-muted-foreground">
           <Folder size={13} />
           <span className="min-w-0 truncate" title={workspace.path}>
             Working in {workspace.label}
@@ -243,7 +243,7 @@ export function RunInputDock({
           addPendingImages(files);
         }}
         className={cx(
-          "pointer-events-auto relative flex w-full max-w-3xl flex-col gap-1 rounded-xl border bg-surface px-[10px] py-1 transition-[border-color,background-color,box-shadow] duration-150 ease-out focus-within:border-border focus-within:shadow-[0_0_0_1px_var(--color-accent-ring)]",
+          "pointer-events-auto relative flex w-full max-w-[var(--chat-width)] flex-col gap-1 rounded-xl border bg-surface px-[10px] py-1 transition-[border-color,background-color,box-shadow] duration-150 ease-out focus-within:border-border focus-within:shadow-[0_0_0_1px_var(--color-accent-ring)]",
           isFileDragActive
             ? "border-accent/60 bg-accent-soft-strong shadow-[0_0_0_3px_var(--color-accent-ring)]"
             : "border-border-subtle",

@@ -16,7 +16,7 @@ import { safeStorage } from "../../lib/safeStorage";
 const clampWidth = (width: number) =>
   Math.min(maxWidth(), Math.max(MIN_WIDTH, width));
 const defaultWidth = () => clampWidth(Math.min(window.innerWidth * 0.42, 560));
-function initialWidth() {
+export function initialArtifactWidth() {
   const stored = Number(safeStorage.getItem(WIDTH_KEY));
   if (stored >= MIN_WIDTH && Number.isFinite(stored)) {
     return clampWidth(stored);
@@ -29,8 +29,14 @@ export function ArtifactSidebar({
   children,
   open,
   onClose,
-}: { children: ReactNode; open: boolean; onClose: () => void }) {
-  const [width, setWidth] = useState(initialWidth);
+  onWidthChange,
+}: {
+  children: ReactNode;
+  open: boolean;
+  onClose: () => void;
+  onWidthChange: (width: number) => void;
+}) {
+  const [width, setWidth] = useState(initialArtifactWidth);
   const [availableWidth, setAvailableWidth] = useState(maxWidth);
   const [resizing, setResizing] = useState(false);
   const drag = useRef<{ x: number; width: number } | null>(null);
@@ -65,15 +71,19 @@ export function ArtifactSidebar({
     if (resizing) return;
     safeStorage.setItem(WIDTH_KEY, String(width));
   }, [width, resizing]);
+  useEffect(() => onWidthChange(width), [width, onWidthChange]);
 
   useEffect(() => {
     if (!resizing) return;
     const { cursor, userSelect } = document.body.style;
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
+    // The chat follows the drag directly instead of easing behind it.
+    document.documentElement.setAttribute("data-window-resizing", "");
     return () => {
       document.body.style.cursor = cursor;
       document.body.style.userSelect = userSelect;
+      document.documentElement.removeAttribute("data-window-resizing");
     };
   }, [resizing]);
   return (
@@ -93,11 +103,9 @@ export function ArtifactSidebar({
       }}
       style={{ "--artifact-width": `${width}px` } as CSSProperties}
       className={cx(
-        "relative z-20 flex h-full outline-none w-[var(--artifact-width)] shrink-0 flex-col border-l border-border-subtle bg-background transition-[margin-right,translate] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-        "max-[900px]:absolute max-[900px]:inset-y-0 max-[900px]:right-0 max-[900px]:z-40 max-[900px]:mr-0 max-[900px]:w-full",
-        open
-          ? "mr-0 max-[900px]:translate-x-0"
-          : "pointer-events-none mr-[calc(-1*var(--artifact-width))] max-[900px]:translate-x-full",
+        "absolute inset-y-0 right-0 z-20 flex outline-none w-[var(--artifact-width)] flex-col border-l border-border-subtle bg-background transition-[translate] duration-[var(--sidebar-duration)] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
+        "max-[900px]:z-40 max-[900px]:w-full",
+        open ? "translate-x-0" : "pointer-events-none translate-x-full",
         resizing && "transition-none",
       )}
     >

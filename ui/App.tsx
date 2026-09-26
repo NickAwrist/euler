@@ -1,6 +1,7 @@
 import { Bug, EyeOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArtifactContext } from "./components/Artifacts/ArtifactContext";
+import { initialArtifactWidth } from "./components/Artifacts/ArtifactSidebar";
 import { WorkspaceArtifacts } from "./components/Artifacts/WorkspaceArtifacts";
 import { workspaceArtifactSource } from "./components/Artifacts/api";
 import { useWorkspaceHasFiles } from "./components/Artifacts/useWorkspaceHasFiles";
@@ -25,6 +26,8 @@ import type { RunCommandName } from "./components/runCommands";
 import { useAppKeybinds } from "./hooks/useAppKeybinds";
 import { useMobileLayout } from "./hooks/useMobileLayout";
 import { useRunApp } from "./hooks/useRunApp";
+import { useViewportWidth } from "./hooks/useViewportWidth";
+import { CHAT_LIST_WIDTH, chatInsets } from "./lib/chatInsets";
 import { downloadBlob } from "./lib/downloadBlob";
 import {
   formatRunTranscript,
@@ -36,6 +39,7 @@ import {
   parseRoute,
   sessionPath,
 } from "./lib/navigation";
+import { CHAT_MAX_WIDTHS, loadAppearance } from "./persist/appearance";
 import { fetchSession } from "./persist/sessions";
 import { cx } from "./styles";
 
@@ -158,6 +162,23 @@ function ChatView({
   const filesOpen =
     artifactsOpen &&
     (hasFiles === true || openedSessionId === app.activeSessionId);
+  // Settings unmounts this view, so the saved appearance is current on mount.
+  const [appearance] = useState(loadAppearance);
+  const [artifactsWidth, setArtifactsWidth] = useState(initialArtifactWidth);
+  const viewportWidth = useViewportWidth();
+  // Mobile panels are drawers over the chat.
+  const insets = mobileLayout
+    ? { left: 0, right: 0 }
+    : chatInsets({
+        viewportWidth,
+        chatMaxWidth: CHAT_MAX_WIDTHS[appearance.chatWidth],
+        chatList: { open: chatsOpen, makeRoom: appearance.shiftForChatList },
+        artifacts: {
+          open: filesOpen,
+          width: artifactsWidth,
+          makeRoom: appearance.shiftForArtifacts,
+        },
+      });
   const toggleFiles = () => {
     setArtifactsOpen(!filesOpen);
     if (!filesOpen) setOpenedSessionId(app.activeSessionId);
@@ -262,20 +283,15 @@ function ChatView({
           className={cx(
             "h-full w-[260px] min-w-[260px] shrink-0 overflow-hidden bg-background motion-reduce:transition-none",
             // Mobile <= 900px: overlay drawer
-            "max-[900px]:fixed max-[900px]:top-0 max-[900px]:bottom-0 max-[900px]:left-0 max-[900px]:z-30 max-[900px]:w-[min(85vw,300px)] max-[900px]:shadow-[4px_0_24px_rgba(0,0,0,0.35)] max-[900px]:transform-gpu max-[900px]:transition-transform max-[900px]:duration-300 max-[900px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
+            "max-[900px]:fixed max-[900px]:top-0 max-[900px]:bottom-0 max-[900px]:left-0 max-[900px]:z-30 max-[900px]:w-[min(85vw,300px)] max-[900px]:shadow-[4px_0_24px_rgba(0,0,0,0.35)] max-[900px]:transform-gpu max-[900px]:transition-transform max-[900px]:duration-[var(--sidebar-duration)] max-[900px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
             app.sidebarOpen
               ? "max-[900px]:translate-x-0"
               : "max-[900px]:-translate-x-full",
-            // Medium desktop 901px - 1319px: moves chat over so sidebar never covers chat
-            "min-[901px]:max-[1319px]:relative min-[901px]:max-[1319px]:transition-[margin-left] min-[901px]:max-[1319px]:duration-300 min-[901px]:max-[1319px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
+            // Desktop: slides over the chat; chatInsets moves the chat when needed
+            "min-[901px]:absolute min-[901px]:inset-y-0 min-[901px]:left-0 min-[901px]:z-20 min-[901px]:transition-transform min-[901px]:duration-[var(--sidebar-duration)] min-[901px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
             app.sidebarCollapsed
-              ? "min-[901px]:max-[1319px]:pointer-events-none min-[901px]:max-[1319px]:-ml-[260px] min-[901px]:max-[1319px]:border-r-0"
-              : "min-[901px]:max-[1319px]:pointer-events-auto min-[901px]:max-[1319px]:ml-0 min-[901px]:max-[1319px]:border-r min-[901px]:max-[1319px]:border-border-subtle",
-            // Wide desktop >= 1320px: screen has plenty of gutter space, slides in without moving the chat
-            "min-[1320px]:absolute min-[1320px]:inset-y-0 min-[1320px]:left-0 min-[1320px]:z-20 min-[1320px]:transition-transform min-[1320px]:duration-300 min-[1320px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
-            app.sidebarCollapsed
-              ? "min-[1320px]:pointer-events-none min-[1320px]:-translate-x-full min-[1320px]:border-r-0"
-              : "min-[1320px]:pointer-events-auto min-[1320px]:translate-x-0 min-[1320px]:border-r min-[1320px]:border-border-subtle",
+              ? "min-[901px]:pointer-events-none min-[901px]:-translate-x-full min-[901px]:border-r-0"
+              : "min-[901px]:pointer-events-auto min-[901px]:translate-x-0 min-[901px]:border-r min-[901px]:border-border-subtle",
           )}
         >
           <Sidebar
@@ -326,10 +342,8 @@ function ChatView({
         />
 
         <main
-          className={cx(
-            "relative h-full min-h-0 min-w-0 flex-1 bg-background transition-[margin-left] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
-            filesOpen && !app.sidebarCollapsed && "min-[1320px]:ml-[260px]",
-          )}
+          style={{ marginLeft: insets.left, marginRight: insets.right }}
+          className="relative h-full min-h-0 min-w-0 flex-1 bg-background transition-[margin] duration-[var(--sidebar-duration)] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
         >
           {app.activeSessionId && app.userSettings.showDebugButton && (
             <button
@@ -337,10 +351,13 @@ function ChatView({
               onClick={app.toggleDebug}
               title="Debug inspector"
               aria-label="Debug inspector"
-              className={cx(
-                "absolute top-[calc((var(--workspace-header-height)-2.25rem-1px)/2)] z-10 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground",
-                filesOpen ? "right-2" : "right-14",
-              )}
+              // Keep clear of the artifacts panel, which may overlay the chat.
+              style={{
+                right: filesOpen
+                  ? Math.max(8, artifactsWidth + 8 - insets.right)
+                  : 56,
+              }}
+              className="absolute top-[calc((var(--workspace-header-height)-2.25rem-1px)/2)] z-10 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
             >
               <Bug size={16} />
             </button>
@@ -348,12 +365,14 @@ function ChatView({
           {app.isEphemeral && (
             <span
               title="Not saved. Messages and files are deleted when you leave."
-              className={cx(
-                "absolute left-14 top-4 z-10 inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-background px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-amber-400",
-                !app.sidebarCollapsed &&
-                  !filesOpen &&
-                  "min-[1320px]:left-[calc(260px+1rem)]",
-              )}
+              // Keep clear of the chat list, which may overlay the chat.
+              style={{
+                left:
+                  chatsOpen && !mobileLayout
+                    ? Math.max(56, CHAT_LIST_WIDTH + 16 - insets.left)
+                    : 56,
+              }}
+              className="absolute top-4 z-10 inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-background px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-amber-400"
             >
               <EyeOff size={12} />
               Ephemeral
@@ -446,6 +465,7 @@ function ChatView({
             onOpen={openFile}
             onBack={() => setSelectedFile(null)}
             onClose={() => setArtifactsOpen(false)}
+            onWidthChange={setArtifactsWidth}
           />
         )}
       </div>

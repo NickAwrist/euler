@@ -65,6 +65,7 @@ function DemoWorkspace({ alternate }: { alternate: boolean }) {
           onOpen={openFile}
           onBack={() => setPath(null)}
           onClose={() => setOpen(false)}
+          onWidthChange={() => {}}
         />
       </div>
     </ArtifactContext.Provider>

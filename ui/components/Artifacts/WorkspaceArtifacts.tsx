@@ -14,6 +14,7 @@ export function WorkspaceArtifacts({
   onOpen,
   onBack,
   onClose,
+  onWidthChange,
 }: {
   source: ArtifactSource;
   open: boolean;
@@ -23,6 +24,7 @@ export function WorkspaceArtifacts({
   onOpen: (path: string) => void;
   onBack: () => void;
   onClose: () => void;
+  onWidthChange: (width: number) => void;
 }) {
   const cache = useMemo(
     () => new ArtifactPreviewCache(source),
@@ -34,7 +36,11 @@ export function WorkspaceArtifacts({
     if (open) setActivated(true);
   }, [open]);
   return (
-    <ArtifactSidebar open={open} onClose={onClose}>
+    <ArtifactSidebar
+      open={open}
+      onClose={onClose}
+      onWidthChange={onWidthChange}
+    >
       {(open || activated) && (
         <>
           <div hidden={path !== null} className="min-h-0 flex-1">

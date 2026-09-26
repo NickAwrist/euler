@@ -2,6 +2,7 @@ import type { SettingsTab } from "../../types";
 
 export const SETTINGS_TABS: readonly { id: SettingsTab; label: string }[] = [
   { id: "general", label: "General" },
+  { id: "appearance", label: "Appearance" },
   { id: "ollama", label: "Ollama" },
   { id: "openrouter", label: "OpenRouter" },
   { id: "image-generation", label: "Image Generation" },

@@ -490,3 +490,36 @@ test("view navigation desktop expires settings approval when a later guard cance
     );
   }
 });
+
+test("view navigation desktop guards unsaved appearance and applies it only on Save and leave", async ({
+  page,
+}) => {
+  await mockApp(page);
+  await page.goto("/settings/appearance");
+  await page.getByLabel("Font style", { exact: true }).selectOption("serif");
+  await page.getByRole("button", { name: "Back to chat" }).click();
+  const dialog = page.getByRole("dialog", { name: "Leave settings?" });
+  await expect(
+    dialog.getByRole("list", { name: "Changed settings" }),
+  ).toContainText("Font style");
+  await expect(page.locator("html")).toHaveAttribute("data-font", "default");
+  await dialog
+    .getByRole("button", { name: "Discard changes", exact: true })
+    .click();
+  await expect(page).not.toHaveURL(/settings/);
+  await expect(page.locator("html")).toHaveAttribute("data-font", "default");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: "Appearance", exact: true }).click();
+  await expect(page.getByLabel("Font style", { exact: true })).toHaveValue(
+    "default",
+  );
+  await page.getByLabel("Font style", { exact: true }).selectOption("geist");
+  await page.getByRole("button", { name: "Back to chat" }).click();
+  await dialog
+    .getByRole("button", { name: "Save & leave", exact: true })
+    .click();
+  await expect(page).not.toHaveURL(/settings/);
+  await expect(page.locator("html")).toHaveAttribute("data-font", "geist");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-font", "geist");
+});

@@ -102,7 +102,7 @@ export function AssistantMessageBubble({
       >
         <div className="h-px w-9 max-[640px]:w-8 shrink-0 rounded-full bg-border-subtle/70" />
       </div>
-      <div className="max-w-[min(100%,42rem)] min-w-0 pt-2">
+      <div className="max-w-full min-w-0 pt-2">
         <div className="-mx-2 rounded-lg px-2">
           {thinking && (
             <div className="mb-2">

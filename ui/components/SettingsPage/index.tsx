@@ -4,6 +4,7 @@ import { addNavigationGuard } from "../../lib/navigation";
 import { cx } from "../../styles";
 import { BackToChatButton } from "../BackToChatButton";
 import { Button } from "../Button";
+import { AppearanceSettingsTab } from "./AppearanceSettingsTab";
 import { GeneralSettingsTab } from "./GeneralSettingsTab";
 import { ImageGenerationTab } from "./ImageGenerationTab";
 import { OllamaSettingsTab } from "./OllamaSettingsTab";
@@ -96,6 +97,13 @@ export function SettingsPage(props: SettingsPageProps) {
             <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
               {p.error || environment.error}
             </div>
+          )}
+
+          {tab === "appearance" && (
+            <AppearanceSettingsTab
+              appearance={p.appearance}
+              onChange={p.setAppearance}
+            />
           )}
 
           {tab === "general" && (

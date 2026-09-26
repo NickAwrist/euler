@@ -3,8 +3,10 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App";
 import { initializeNavigation } from "./lib/navigation";
+import { applyAppearance, loadAppearance } from "./persist/appearance";
 
 initializeNavigation();
+applyAppearance(loadAppearance());
 
 const Root =
   import.meta.env.DEV && window.location.pathname === "/dev/settings"
