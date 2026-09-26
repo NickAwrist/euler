@@ -42,11 +42,7 @@ export function ThinkingBlock({
         onClick={() => setExpanded(!open)}
         className="-ml-1 inline-flex items-center gap-1.5 rounded-md px-1 py-0.5 text-[0.8125rem] text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ring"
       >
-        <Brain
-          size={14}
-          aria-hidden
-          className={cx(active && "animate-pulse")}
-        />
+        <Brain size={14} aria-hidden />
         <span className="tabular-nums">{label}</span>
         <ChevronRight
           size={13}
