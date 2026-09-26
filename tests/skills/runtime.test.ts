@@ -3,6 +3,7 @@ import type { SkillRow } from "../../src/db";
 import {
   findExplicitSkillNames,
   renderSkillsPrompt,
+  stripSkillReferences,
 } from "../../src/skills/runtime";
 
 const skill: SkillRow = {
@@ -56,5 +57,14 @@ describe("skill runtime", () => {
 
     expect(prompt).toContain('"name":"release-notes"');
     expect(prompt).not.toContain(skill.instructions);
+  });
+
+  test("strips only references to known skills", () => {
+    expect(
+      stripSkillReferences(
+        "$release-notes Summarize $unknown, then budget $5",
+        new Set(["release-notes"]),
+      ),
+    ).toBe("Summarize $unknown, then budget $5");
   });
 });

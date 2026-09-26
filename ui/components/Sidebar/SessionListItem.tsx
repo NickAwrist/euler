@@ -3,9 +3,11 @@ import { useState } from "react";
 import { cx } from "../../styles";
 import type { SessionSummary } from "../../types";
 import { FloatingOptionsMenu } from "../FloatingOptionsMenu";
+import { formatSessionTime } from "./sessionDates";
 
 type Props = {
   session: SessionSummary;
+  now: number;
   active: boolean;
   openMenu: { id: string; anchorRect: DOMRect } | null;
   setOpenMenu: (menu: { id: string; anchorRect: DOMRect } | null) => void;
@@ -17,6 +19,7 @@ type Props = {
 
 export function SessionListItem({
   session,
+  now,
   active,
   openMenu,
   setOpenMenu,
@@ -30,7 +33,7 @@ export function SessionListItem({
   const menuOpen = openMenu?.id === session.id;
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_32px] items-stretch border-b border-border-subtle last:border-b-0">
+    <div className="group grid grid-cols-[minmax(0,1fr)_32px] items-stretch border-b border-border-subtle last:border-b-0">
       <button
         type="button"
         onClick={() => {
@@ -46,9 +49,13 @@ export function SessionListItem({
           <div className="overflow-hidden text-[0.8125rem] leading-[1.35] text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
             {session.preview || "New chat"}
           </div>
-          <div className="mt-0.5 text-[0.6875rem] text-muted-foreground">
-            {new Date(session.updatedAt).toLocaleString()}
-          </div>
+          <time
+            dateTime={new Date(session.updatedAt).toISOString()}
+            title={new Date(session.updatedAt).toLocaleString()}
+            className="mt-0.5 block text-[0.6875rem] text-muted-foreground"
+          >
+            {formatSessionTime(session.updatedAt, now)}
+          </time>
         </div>
       </button>
       <div className="relative flex items-start justify-center pr-0.5 pt-1.5">
@@ -56,7 +63,10 @@ export function SessionListItem({
           type="button"
           className={cx(
             "inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-transparent text-muted-foreground transition-[color,background-color,transform] duration-150 ease-out hover:bg-muted hover:text-foreground active:scale-[0.94] active:bg-muted/70",
-            menuOpen && "bg-muted text-foreground",
+            // Pointer devices reveal the menu on row hover or focus; touch devices always show it.
+            menuOpen
+              ? "bg-muted text-foreground"
+              : "pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 pointer-fine:group-focus-within:opacity-100",
           )}
           aria-expanded={menuOpen}
           aria-haspopup="menu"

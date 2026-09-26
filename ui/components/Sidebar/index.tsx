@@ -6,9 +6,10 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { useState } from "react";
-import { cx } from "../../styles";
+import { eyebrowText } from "../../styles";
 import { Button } from "../Button";
 import { SessionListItem } from "./SessionListItem";
+import { groupSessionsByDate } from "./sessionDates";
 import type { SidebarProps } from "./types";
 
 export function Sidebar({
@@ -28,6 +29,7 @@ export function Sidebar({
     id: string;
     anchorRect: DOMRect;
   } | null>(null);
+  const now = Date.now();
 
   return (
     <div className="grid h-full w-[260px] min-w-[260px] grid-rows-[auto_minmax(0,1fr)_auto] overflow-x-hidden px-2.5 pb-3">
@@ -66,18 +68,26 @@ export function Sidebar({
           onScroll={() => setOpenMenu(null)}
         >
           <div className="w-[calc(260px-1.25rem)] min-w-[calc(260px-1.25rem)] shrink-0">
-            {sessions.map((session) => (
-              <SessionListItem
-                key={session.id}
-                session={session}
-                active={session.id === activeSessionId}
-                openMenu={openMenu}
-                setOpenMenu={setOpenMenu}
-                onSelectSession={onSelectSession}
-                onRenameSession={onRenameSession}
-                onExportSession={onExportSession}
-                onDeleteSession={onDeleteSession}
-              />
+            {groupSessionsByDate(sessions, now).map((group) => (
+              <section key={group.label}>
+                <h3 className={`${eyebrowText} px-2 pb-1 pt-3`}>
+                  {group.label}
+                </h3>
+                {group.sessions.map((session) => (
+                  <SessionListItem
+                    key={session.id}
+                    session={session}
+                    now={now}
+                    active={session.id === activeSessionId}
+                    openMenu={openMenu}
+                    setOpenMenu={setOpenMenu}
+                    onSelectSession={onSelectSession}
+                    onRenameSession={onRenameSession}
+                    onExportSession={onExportSession}
+                    onDeleteSession={onDeleteSession}
+                  />
+                ))}
+              </section>
             ))}
 
             {sessions.length === 0 && (
