@@ -211,8 +211,14 @@ for (const device of ["desktop", "mobile"] as const) {
         message: "Keep this draft",
       });
       await expect(model).toBeDisabled();
+      await expect(input).toHaveValue("");
+      await input.fill("Draft while running");
+      await input.press("Enter");
+      await expect(input).toHaveValue("Draft while running");
+      expect(runs).toHaveLength(1);
       await page.getByRole("button", { name: "Stop generation" }).click();
       await expect(model).toBeEnabled();
+      await expect(input).toHaveValue("Draft while running");
       finishRun.resolve();
 
       // A refreshed catalog must not silently replace the selected model.

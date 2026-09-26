@@ -234,7 +234,8 @@ export function useRunStreaming(p: Args) {
 
     const attachments = await images.uploadPendingImages(sessionId);
     if (!attachments) return;
-    setInput("");
+    // Keep anything typed while attachments were uploading.
+    setInput((current) => (current === input ? "" : current));
     images.clearPendingImages();
     await runTurn(sessionId, p.messages, message, attachments, {
       rebuildModelMessages: false,
