@@ -24,6 +24,7 @@ import {
 import { completeSkillToken, findActiveSkillToken } from "./skillPicker";
 
 export function RunInputDock({
+  centered,
   ollamaModels,
   ollamaConnected,
   modelsLoadError,
@@ -50,6 +51,7 @@ export function RunInputDock({
   onRunCommand,
   onFooterHeightChange,
 }: {
+  centered: boolean;
   ollamaModels: ModelOption[];
   ollamaConnected: boolean | null;
   modelsLoadError: string | null;
@@ -170,6 +172,10 @@ export function RunInputDock({
     return () => window.removeEventListener("resize", onResize);
   }, [syncInputHeight]);
 
+  useEffect(() => {
+    if (centered) inputRef.current?.focus({ preventScroll: true });
+  }, [centered]);
+
   useLayoutEffect(() => {
     const el = footerRef.current;
     if (!el) return;
@@ -186,7 +192,12 @@ export function RunInputDock({
   return (
     <div
       ref={footerRef}
-      className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col items-center gap-2 border-t border-border-subtle/60 bg-background/[0.16] px-5 pb-4 pt-3 shadow-[0_-1px_0_0_rgba(255,255,255,0.03)] backdrop-blur-xl backdrop-saturate-125 max-[640px]:px-3.5 max-[640px]:pb-3.5 max-[640px]:pt-2.5"
+      className={cx(
+        "pointer-events-none absolute inset-x-0 z-10 flex flex-col items-center gap-2 border-t px-5 pb-4 pt-3 transition-[bottom,translate] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none max-[640px]:px-3.5 max-[640px]:pb-3.5 max-[640px]:pt-2.5",
+        centered
+          ? "bottom-1/2 translate-y-1/2 border-transparent"
+          : "bottom-0 border-border-subtle/60 bg-background/[0.16] shadow-[0_-1px_0_0_rgba(255,255,255,0.03)] backdrop-blur-xl backdrop-saturate-125",
+      )}
     >
       {workspace.kind === "local" && (
         <div className="pointer-events-auto flex w-full max-w-3xl items-center gap-2 px-1 text-xs text-muted-foreground">

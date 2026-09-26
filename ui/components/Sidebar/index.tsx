@@ -20,7 +20,6 @@ export function Sidebar({
   onRenameSession,
   onExportSession,
   onDeleteSession,
-  isLoading,
   onCustomization,
   onSettings,
   onUsage,
@@ -47,7 +46,6 @@ export function Sidebar({
           <Button
             variant="secondary"
             onClick={onNewSession}
-            loading={isLoading}
             icon={Plus}
             className="flex-1 !bg-surface font-semibold"
           >

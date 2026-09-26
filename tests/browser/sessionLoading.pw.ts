@@ -143,25 +143,22 @@ test("session loading distinguishes loading, errors, and loaded empty", async ({
         : { json: { id: "a", history: [], model: "test" } },
     );
   });
+  const emptyChat = page.getByRole("heading", {
+    name: "What are we working on?",
+  });
   await page.goto("/run/a");
   await expect(
     page.getByText("Loading conversation…", { exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByText("Start the session with a message below."),
-  ).toHaveCount(0);
+  await expect(emptyChat).toHaveCount(0);
   history.resolve();
   await expect(
     page.getByText("History unavailable", { exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByText("Start the session with a message below."),
-  ).toHaveCount(0);
+  await expect(emptyChat).toHaveCount(0);
   fail = false;
   await page.getByRole("button", { name: "Retry", exact: true }).click();
-  await expect(
-    page.getByText("Start the session with a message below."),
-  ).toBeVisible();
+  await expect(emptyChat).toBeVisible();
 });
 
 test("session loading never replaces streamed completion with an older pending snapshot", async ({

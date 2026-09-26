@@ -6,7 +6,6 @@ type UseAppKeybindsOptions = {
   sessions: SessionSummary[];
   activeSessionId: string | null;
   switchToSession: (id: string) => void | Promise<void>;
-  createSession: () => void | Promise<void>;
   setSidebarOpen: Dispatch<SetStateAction<boolean>>;
   setSidebarCollapsed: Dispatch<SetStateAction<boolean>>;
   goToHome: () => void | Promise<void>;
@@ -70,10 +69,10 @@ export function useAppKeybinds(opts: UseAppKeybindsOptions) {
         return;
       }
 
-      // Ctrl+E new session
+      // Ctrl+E new chat
       if (k === "e" && !e.shiftKey) {
         suppress(e);
-        o.createSession();
+        o.goToHome();
         return;
       }
 

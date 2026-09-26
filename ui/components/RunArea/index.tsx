@@ -1,4 +1,4 @@
-import { ArrowDown, Bot } from "lucide-react";
+import { ArrowDown } from "lucide-react";
 import { memo, useLayoutEffect, useRef } from "react";
 import { useStickToBottom } from "use-stick-to-bottom";
 import { IconButton } from "../IconButton";
@@ -95,12 +95,6 @@ export const RunArea = memo(function RunArea({
             >
               Loading conversation…
             </p>
-          )}
-          {sessionLoadState === "empty" && messages.length === 0 && !isBusy && (
-            <div className="flex items-center gap-2 bg-transparent py-8 text-[0.875rem] text-muted-foreground">
-              <Bot size={14} />
-              <p>Start the session with a message below.</p>
-            </div>
           )}
 
           <MessageHistory
