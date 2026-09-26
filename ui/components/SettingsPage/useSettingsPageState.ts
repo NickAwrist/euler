@@ -4,6 +4,7 @@ import type {
   ComfyUIConfigPayload,
   ModelOption,
   SearXNGConfigPayload,
+  SettingsTab,
 } from "../../types";
 import { parseSize, sizeKey } from "./constants";
 import type {
@@ -226,77 +227,52 @@ export function useSettingsPageState({
   );
 
   const changes = useMemo((): SettingChange[] => {
-    const settingChanges: (SettingChange & { changed: boolean })[] = [
-      {
-        tab: "general",
-        label: "Name",
-        changed: settings.name !== currentSettings.name,
-      },
-      {
-        tab: "general",
-        label: "Location",
-        changed: settings.location !== currentSettings.location,
-      },
-      {
-        tab: "general",
-        label: "Preferred response formats",
-        changed: settings.preferredFormats !== currentSettings.preferredFormats,
-      },
-      {
-        tab: "general",
-        label: "Include current date",
-        changed:
-          settings.includeCurrentDate !== currentSettings.includeCurrentDate,
-      },
-      {
-        tab: "general",
-        label: "System prompt",
-        changed: settings.systemPrompt !== currentSettings.systemPrompt,
-      },
-      {
-        tab: "general",
-        label: "Default model",
-        changed: settings.defaultModel !== currentSettings.defaultModel,
-      },
-      {
-        tab: "general",
-        label: "Display debug button",
-        changed: settings.showDebugButton !== currentSettings.showDebugButton,
-      },
-      {
-        tab: "ollama",
-        label: "Ollama server URL",
-        changed: ollamaUri !== ollamaHost,
-      },
-      {
-        tab: "image-generation",
-        label: "ComfyUI server URL",
-        changed: comfyUri !== comfyuiHost,
-      },
-      {
-        tab: "image-generation",
-        label: "Default checkpoint model",
-        changed: comfyModel !== comfyuiDefaultModel,
-      },
-      {
-        tab: "image-generation",
-        label: "Default image size",
-        changed: comfySize !== savedComfySize,
-      },
-      {
-        tab: "image-generation",
-        label: "Negative prompt",
-        changed: comfyNegative !== comfyuiNegativePrompt,
-      },
-      {
-        tab: "web-search",
-        label: "SearXNG server URL",
-        changed: searxngUri !== searxngHost,
-      },
+    const settingChanges: [SettingsTab, string, boolean][] = [
+      ["general", "Name", settings.name !== currentSettings.name],
+      ["general", "Location", settings.location !== currentSettings.location],
+      [
+        "general",
+        "Preferred response formats",
+        settings.preferredFormats !== currentSettings.preferredFormats,
+      ],
+      [
+        "general",
+        "Include current date",
+        settings.includeCurrentDate !== currentSettings.includeCurrentDate,
+      ],
+      [
+        "general",
+        "System prompt",
+        settings.systemPrompt !== currentSettings.systemPrompt,
+      ],
+      [
+        "general",
+        "Default model",
+        settings.defaultModel !== currentSettings.defaultModel,
+      ],
+      [
+        "general",
+        "Display debug button",
+        settings.showDebugButton !== currentSettings.showDebugButton,
+      ],
+      ["ollama", "Ollama server URL", ollamaUri !== ollamaHost],
+      ["image-generation", "ComfyUI server URL", comfyUri !== comfyuiHost],
+      [
+        "image-generation",
+        "Default checkpoint model",
+        comfyModel !== comfyuiDefaultModel,
+      ],
+      ["image-generation", "Default image size", comfySize !== savedComfySize],
+      [
+        "image-generation",
+        "Negative prompt",
+        comfyNegative !== comfyuiNegativePrompt,
+      ],
+      ["web-search", "SearXNG server URL", searxngUri !== searxngHost],
     ];
     return settingChanges
-      .filter((change) => change.changed)
-      .map(({ tab, label }) => ({ tab, label }));
+      .filter(([, , changed]) => changed)
+      .map(([tab, label]) => ({ tab, label }));
   }, [
     settings,
     currentSettings,

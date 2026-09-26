@@ -147,12 +147,15 @@ export function GeneralSettingsTab({
 
         <div className="flex items-start gap-3 pt-1">
           <EnableSwitch
+            id="includeCurrentDate"
             label="Include current date"
             checked={settings.includeCurrentDate}
             onChange={(checked) => onFieldChange("includeCurrentDate", checked)}
           />
           <div className="space-y-0.5">
-            <p className={labelClass}>Include current date</p>
+            <label htmlFor="includeCurrentDate" className={labelClass}>
+              Include current date
+            </label>
             <p className={hintClass}>
               Include today&apos;s date in the system prompt so models know what
               day it is.
@@ -213,16 +216,17 @@ export function GeneralSettingsTab({
         </summary>
         <div className="mt-3 flex items-start gap-3 text-[0.8125rem] text-muted-foreground">
           <EnableSwitch
+            id="showDebugButton"
             label="Display debug button"
             checked={settings.showDebugButton}
             onChange={(checked) => onFieldChange("showDebugButton", checked)}
           />
-          <span>
+          <label htmlFor="showDebugButton">
             Display debug button
             <span className="mt-1 block text-xs">
               Inspect model context and request details.
             </span>
-          </span>
+          </label>
         </div>
       </details>
     </div>

@@ -79,7 +79,8 @@ for (const device of ["desktop", "mobile"] as const) {
       await page.getByRole("button", { name: "General", exact: true }).click();
       await expect(page.getByPlaceholder("Enter your name")).toHaveValue("");
 
-      await page.getByRole("switch", { name: "Include current date" }).click();
+      // The visible label toggles the switch.
+      await page.getByText("Include current date", { exact: true }).click();
       await save.click();
       await expect(save).toBeHidden();
       await expect(
