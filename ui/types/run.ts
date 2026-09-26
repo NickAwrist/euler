@@ -22,10 +22,14 @@ export interface MessageStep {
     totalDurationMs?: number;
     loadDurationMs?: number;
     tokensPerSecond?: number;
+    thinkingDurationMs?: number;
   };
   result?: string;
   error?: string;
   childRun?: SubagentRun;
+  /** ISO timestamps set by the server when the step begins and ends. */
+  startedAt?: string;
+  endedAt?: string;
 }
 
 export interface Message {

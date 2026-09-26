@@ -15,6 +15,8 @@ export type LlmMetrics = {
   totalDurationMs?: number;
   loadDurationMs?: number;
   tokensPerSecond?: number;
+  /** Time from the model request to its last reasoning token. */
+  thinkingDurationMs?: number;
 };
 
 export type Step = {
