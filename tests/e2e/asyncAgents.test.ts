@@ -68,7 +68,11 @@ test("server-owned turns queue input at boundaries and survive HTTP disconnectio
   }
 });
 
-for (const scenario of ["async-agents", "agent-question"] as const) {
+for (const scenario of [
+  "async-agents",
+  "agent-question",
+  "blocking-question",
+] as const) {
   test(`${scenario}: durable child wakes the parent without another user message`, async () => {
     setOpenRouterApiKey("test");
     setOpenRouterScenario(scenario);
@@ -110,7 +114,7 @@ for (const scenario of ["async-agents", "agent-question"] as const) {
         agentRuntime.store.inbox(main.id).find((m) => m.kind === "result")
           ?.deliveredAt,
       ).toBeNumber();
-      if (scenario === "agent-question")
+      if (scenario !== "async-agents")
         expect(
           agentRuntime.store.inbox(main.id).some((m) => m.kind === "question"),
         ).toBe(true);
@@ -259,6 +263,56 @@ test("a ready child keeps its context for follow-ups until it is dismissed", asy
     expect(() =>
       agentRuntime.enqueue(dismissed, main.id, "message", "Again"),
     ).toThrow("no longer accepting messages");
+  } finally {
+    await agentRuntime.deleteSession(TEST_USER_ID, id);
+    await close();
+  }
+});
+
+test("rewinding keeps reports from subagents that stay in the conversation", async () => {
+  setOpenRouterApiKey("test");
+  setOpenRouterScenario("async-agents");
+  const { url, close } = await startTestServer();
+  const headers = userHeaders(undefined, {
+    "Content-Type": "application/json",
+  });
+  const post = (path: string, body = {}) =>
+    fetch(url + path, { method: "POST", headers, body: JSON.stringify(body) });
+  const created = await post("/api/sessions", { model });
+  const { id } = (await created.json()) as { id: string };
+  const agents = () => agentRuntime.store.list(TEST_USER_ID, id);
+  const users = () =>
+    getMessagesForSession(TEST_USER_ID, id).filter((m) => m.role === "user");
+  try {
+    await post(`/api/sessions/${id}/messages`, { content: "Research", model });
+    await until(
+      () =>
+        getMessagesForSession(TEST_USER_ID, id).some(
+          (m) => m.content === "The background result is 42.",
+        ) && !agentRuntime.busy(TEST_USER_ID, id),
+    );
+    await post(`/api/sessions/${id}/messages`, { content: "Second", model });
+    await until(
+      () => users().length === 2 && !agentRuntime.busy(TEST_USER_ID, id),
+    );
+    const main = agents().find((a) => a.kind === "main")!;
+    const child = agents().find((a) => a.kind === "general")!;
+    const position = getMessagesForSession(TEST_USER_ID, id).findIndex(
+      (m) => m.content === "Second",
+    );
+
+    // The child reports while the rewind is in progress.
+    const rewound = agentRuntime.rewind(TEST_USER_ID, id, { position });
+    agentRuntime.enqueue(main, child.id, "result", "Late result");
+    await rewound;
+    await until(
+      () =>
+        agentRuntime.store
+          .get(main.id)!
+          .history.some((m) => String(m.content).includes("Late result")) &&
+        !agentRuntime.busy(TEST_USER_ID, id),
+    );
+    expect(agentRuntime.store.get(child.id)?.status).toBe("idle");
   } finally {
     await agentRuntime.deleteSession(TEST_USER_ID, id);
     await close();

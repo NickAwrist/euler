@@ -2,6 +2,7 @@ export type OpenRouterScenario =
   | "async-agents"
   | "agent-question"
   | "blocking-agent"
+  | "blocking-question"
   | "streaming"
   | "reasoning"
   | "thinking-tags"
@@ -79,7 +80,8 @@ export async function handleOpenRouterRequest(
   if (
     scenario === "async-agents" ||
     scenario === "agent-question" ||
-    scenario === "blocking-agent"
+    scenario === "blocking-agent" ||
+    scenario === "blocking-question"
   ) {
     const messages = body.messages as Array<{
       role: string;
@@ -115,7 +117,7 @@ export async function handleOpenRouterRequest(
           kind: "general",
           title: "Research",
           task: "Find the answer",
-          wait: scenario === "blocking-agent",
+          wait: scenario.startsWith("blocking"),
         });
       if (messages.some((m) => m.content.includes('kind="result"')))
         return sse([
@@ -137,7 +139,7 @@ export async function handleOpenRouterRequest(
         "[DONE]",
       ]);
     }
-    if (scenario === "agent-question" && !called("ask_parent"))
+    if (scenario.endsWith("question") && !called("ask_parent"))
       return call("ask_parent", { question: "May I proceed?" });
     await new Promise((resolve) => setTimeout(resolve, asyncAgentDelay));
     return sse([chunk({ content: "42" }, "stop"), "[DONE]"]);

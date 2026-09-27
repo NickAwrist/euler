@@ -76,11 +76,12 @@ export class AgentRuntime {
   >();
   private temporaryHistory = new Map<string, WireMessageInput[]>();
   private deleting = new Set<string>();
+  private rewinding = new Set<string>();
   resync(owner: string, sessionId: string) {
     eventHub.publish(owner, { type: "resync", sessionId, agentId: "" });
   }
   isChanging(sessionId: string) {
-    return this.deleting.has(sessionId);
+    return this.deleting.has(sessionId) || this.rewinding.has(sessionId);
   }
   private scheduled = false;
   private waitingForChild = new Set<string>();
@@ -242,7 +243,7 @@ export class AgentRuntime {
         this.active.has(agent.id) ||
         isFinalAgent(agent) ||
         agent.held ||
-        this.deleting.has(agent.sessionId) ||
+        this.isChanging(agent.sessionId) ||
         !this.pending(agent)
       )
         continue;
@@ -718,9 +719,15 @@ export class AgentRuntime {
             this.waitingForChild.add(agent.id);
             this.schedule();
             try {
+              // A child that asks a question waits on this caller, so return
+              // and let its question arrive through the inbox.
               await this.until(() => {
                 const current = this.store.get(child.id);
-                return !current || !isWorkingAgent(current);
+                return (
+                  !current ||
+                  current.status === "waiting" ||
+                  !isWorkingAgent(current)
+                );
               }, signal);
               if (!signal.aborted) {
                 const current = this.store.get(child.id);
@@ -840,19 +847,21 @@ export class AgentRuntime {
         "BAD_REQUEST",
         "Rewind must target a user message",
       );
-    if (this.deleting.has(sessionId))
+    if (this.isChanging(sessionId))
       throw new ApiError(
         409,
         "CONFLICT",
         "The conversation is already being changed",
       );
-    this.deleting.add(sessionId);
+    this.rewinding.add(sessionId);
+    const rewound = new Set<string>();
     let current = main;
     try {
       await this.cancel(main);
       for (const agent of this.store.list(owner, sessionId))
         if (agent.kind !== "main" && agent.spawnPosition >= request.position) {
           await this.cancel(agent, "Conversation rewound");
+          rewound.add(agent.id);
           agent.spawnPosition = -1;
           this.status(agent);
         }
@@ -878,12 +887,20 @@ export class AgentRuntime {
         ),
       );
       current.versions = request.versions;
+      // Drop queued user input and reports from rewound agents; reports from
+      // agents that stay in the conversation are still owed to the model.
       this.store.deliver(
-        this.store.inbox(main.id).filter((m) => m.deliveredAt === null),
+        this.store
+          .inbox(main.id)
+          .filter(
+            (m) =>
+              m.deliveredAt === null &&
+              (m.kind === "user" || rewound.has(m.sender)),
+          ),
       );
       this.saveHistory(current, current.history);
     } finally {
-      this.deleting.delete(sessionId);
+      this.rewinding.delete(sessionId);
     }
     this.resync(owner, sessionId);
     this.enqueue(

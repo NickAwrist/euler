@@ -28,7 +28,9 @@ workspaceService.setAgentLifecycle({
   isBusy: (owner, session) => agentRuntime.busy(owner, session),
   onExpire: (owner, session) => agentRuntime.deleteSession(owner, session),
 });
-void workspaceService.initialize().then(() => agentRuntime.recover());
+// Recover before the server accepts requests so no live turn looks interrupted.
+agentRuntime.recover();
+void workspaceService.initialize();
 
 const DEFAULT_FRONTEND_PORTS = [5173, 5174];
 const allowedFrontendPorts = Array.from(

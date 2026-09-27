@@ -379,7 +379,7 @@ sequenceDiagram
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
-| `spawn_agent` | `kind`, `title`, `task`, optional `wait` (default `false`) | With `wait: false`, the agent ID immediately. With `wait: true`, the agent's final answer, as `run_subagent` does today. `browser` agents always start with `wait: false`. |
+| `spawn_agent` | `kind`, `title`, `task`, optional `wait` (default `false`) | With `wait: false`, the agent ID immediately. With `wait: true`, the agent's final answer, as `run_subagent` does today. If the agent calls `ask_parent` first, the call returns with status `waiting` and the question arrives in the caller's inbox. `browser` agents always start with `wait: false`. |
 | `send_message` | `to` (agent ID), `content` | Confirmation, or an error if the agent is final. |
 | `cancel_agent` | `agentId`, `reason` | Confirmation. The reason appears on the card. |
 

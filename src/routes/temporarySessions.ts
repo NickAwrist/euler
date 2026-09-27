@@ -183,6 +183,7 @@ router.delete("/:id", async (req, res) => {
     sendApiError(res, 404, "NOT_FOUND", "Temporary chat not found");
     return;
   }
+  await agentRuntime.deleteSession(ownerUuid, req.params.id);
   res.json({ ok: true });
 });
 
@@ -191,7 +192,6 @@ router.get("/:id/file", async (req, res) => {
   if (!ownerUuid) return;
   const requestedPath =
     typeof req.query.path === "string" ? req.query.path : "";
-  await agentRuntime.deleteSession(ownerUuid, req.params.id);
   try {
     const workspace = await workspaceService.resolveTemporary(
       ownerUuid,

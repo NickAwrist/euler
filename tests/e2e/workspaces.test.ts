@@ -334,6 +334,19 @@ test("temporary chats keep server-owned history for their lease", async () => {
     const state = await waitForActivation(lease.id);
     expect(state.history?.map((m) => m.role)).toEqual(["user", "assistant"]);
     expect(agentRuntime.busy(TEST_USER_ID, lease.id)).toBeFalse();
+    await fetch(
+      `${url}/api/temporary-sessions/${lease.id}/file?path=missing.txt`,
+      { headers: userHeaders() },
+    );
+    expect(agentRuntime.snapshot(TEST_USER_ID, lease.id).history).toHaveLength(
+      2,
+    );
+    const closed = await fetch(`${url}/api/temporary-sessions/${lease.id}`, {
+      method: "DELETE",
+      headers: userHeaders(),
+    });
+    expect(closed.status).toBe(200);
+    expect(agentRuntime.store.list(TEST_USER_ID, lease.id)).toEqual([]);
   } finally {
     await agentRuntime.deleteSession(TEST_USER_ID, lease.id);
     await workspaceService.deleteTemporary(TEST_USER_ID, lease.id);
