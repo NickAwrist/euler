@@ -18,7 +18,6 @@ export type SessionRow = {
   updated_at: number;
   title: string | null;
   model: string | null;
-  model_messages: string | null;
   session_directory: string | null;
   workspace_kind: "sandbox" | "local";
 };

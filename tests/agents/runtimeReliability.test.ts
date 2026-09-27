@@ -5,6 +5,7 @@ import type { OutputAttachment } from "../../src/attachments/types";
 import { setOpenRouterApiKey, setSearXNGHost } from "../../src/db";
 import { AgentStore } from "../../src/db/agents";
 import { createSessionRow, getSessionById } from "../../src/db/sessions";
+import { eventHub } from "../../src/events/eventHub";
 import { GenerateImageTool } from "../../src/tools/generate_image";
 import { workspaceService } from "../../src/workspaces/WorkspaceService";
 import {
@@ -152,16 +153,13 @@ test("model selection and message acceptance commit together and survive reload"
 
 for (const temporary of [false, true]) {
   test(`${temporary ? "temporary" : "retained"} child outputs survive waiting and result delivery without depending on reply text`, async () => {
-    let runtime = new AgentRuntime();
+    const runtime = new AgentRuntime();
     const main = await session(runtime, temporary);
-    main.held = true;
-    runtime.store.save(main);
     const child = {
       ...main,
       id: crypto.randomUUID(),
       parentId: main.id,
       kind: "general" as const,
-      held: false,
     };
     runtime.store.save(child, temporary);
     setSearXNGHost("http://searxng.test");
@@ -194,39 +192,25 @@ for (const temporary of [false, true]) {
       if (!temporary)
         expect(new AgentStore().get(child.id)?.pendingOutputs).toEqual(outputs);
       runtime.enqueue(child, main.id, "message", "Finish");
-      await until(() =>
-        runtime.store.inbox(main.id).some((m) => m.kind === "result"),
-      );
-      const report = runtime.store
-        .inbox(main.id)
-        .find((m) => m.kind === "result")!;
-      expect(report.attachments).toEqual(outputs);
-      expect(report.content).not.toContain("child.png");
-      if (!temporary) {
-        runtime = new AgentRuntime();
-        runtime.recover();
-        expect(
-          runtime.store.inbox(main.id).find((m) => m.kind === "result")
-            ?.attachments,
-        ).toEqual(outputs);
-      }
-      runtime.deliver(runtime.store.get(main.id)!);
+      const report = () =>
+        runtime.store.inbox(main.id).find((m) => m.kind === "result");
       await until(
         () =>
-          runtime.snapshot(owner, main.sessionId).history.length === 1 &&
-          !runtime.busy(owner, main.sessionId),
+          report()?.deliveredAt != null && !runtime.busy(owner, main.sessionId),
       );
-      expect(
-        runtime.snapshot(owner, main.sessionId).history[0]?.attachments,
-      ).toEqual(outputs);
+      expect(report()?.attachments).toEqual(outputs);
+      expect(report()?.content).not.toContain("child.png");
+      const { history } = runtime.snapshot(owner, main.sessionId);
+      const replies = history.length;
+      expect(history.at(-1)?.attachments).toEqual(outputs);
       runtime.send(runtime.store.get(main.id)!, {
         content: "Thanks",
         attachmentIds: [],
       });
       await until(
         () =>
-          runtime.snapshot(owner, main.sessionId).history.length === 3 &&
-          !runtime.busy(owner, main.sessionId),
+          runtime.snapshot(owner, main.sessionId).history.length ===
+            replies + 2 && !runtime.busy(owner, main.sessionId),
       );
       expect(
         runtime.snapshot(owner, main.sessionId).history.at(-1)?.attachments ??
@@ -246,9 +230,9 @@ test("restart preserves outputs already delivered to an interrupted parent exact
     { kind: "generated_image", url: "/api/comfyui/view/child.png" },
   ];
   main.status = "running";
-  main.partial = { role: "assistant", content: "Partial reply", steps: [] };
   main.pendingOutputs = outputs;
   first.store.save(main);
+  first.store.saveReply(main, "Partial reply");
   const recovered = new AgentRuntime();
   try {
     recovered.recover();
@@ -260,5 +244,40 @@ test("restart preserves outputs already delivered to an interrupted parent exact
     expect(recovered.store.get(main.id)?.pendingOutputs).toEqual([]);
   } finally {
     await recovered.deleteSession(owner, main.sessionId);
+  }
+});
+
+test("a failure while recording an activation does not stop the runtime", async () => {
+  const runtime = new AgentRuntime();
+  const main = await session(runtime);
+  setOpenRouterScenario("streaming");
+  const publish = eventHub.publish.bind(eventHub);
+  const fault = spyOn(eventHub, "publish").mockImplementation(
+    (target, event) => {
+      if (event.type === "activation_ended") throw new Error("disk full");
+      publish(target, event);
+    },
+  );
+  const errors = spyOn(console, "error").mockImplementation(() => {});
+  const settled = (length: number) =>
+    runtime.snapshot(owner, main.sessionId).history.length === length &&
+    !runtime.busy(owner, main.sessionId);
+  try {
+    runtime.send(main, { content: "Hello", attachmentIds: [] });
+    await until(() => settled(2) && errors.mock.calls.length > 0);
+    expect(errors).toHaveBeenCalledWith(
+      "Agent activation failed",
+      expect.any(Error),
+    );
+    fault.mockRestore();
+    runtime.send(runtime.store.get(main.id)!, {
+      content: "Again",
+      attachmentIds: [],
+    });
+    await until(() => settled(4));
+  } finally {
+    fault.mockRestore();
+    errors.mockRestore();
+    await runtime.deleteSession(owner, main.sessionId);
   }
 });

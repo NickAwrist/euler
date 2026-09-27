@@ -37,11 +37,12 @@ function applyEvent(
       thinking: state.activation.thinking + event.thinkingDelta,
     };
   if (event.type === "step" && event.activationId === state.activation?.id) {
-    const step = event.steps.at(-1);
+    const steps = [...state.activation.steps];
+    steps[event.position] = event.step;
     next.activation = {
       ...state.activation,
-      steps: event.steps,
-      ...(step?.kind === "llm_call" && step.status === "running"
+      steps,
+      ...(event.step.kind === "llm_call" && event.step.status === "running"
         ? { content: "", thinking: "" }
         : {}),
     };
@@ -172,7 +173,7 @@ export function useAgentEvents(
   }, []);
   const steps = (state.activation?.steps ?? []).filter(
     (step): step is Record<string, unknown> & MessageStep =>
-      typeof step.kind === "string",
+      typeof step?.kind === "string",
   );
   return {
     agents: state.agents,

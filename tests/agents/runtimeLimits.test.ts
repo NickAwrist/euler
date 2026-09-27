@@ -270,3 +270,23 @@ test("a blocking spawn does not prevent answering children that occupy all child
     await runtime.deleteSession(owner, main.sessionId);
   }
 });
+
+test("stopping a waiting subagent withdraws its unanswered question", async () => {
+  const runtime = new AgentRuntime();
+  const main = await session(runtime);
+  const waiting = child(runtime, main);
+  waiting.status = "waiting";
+  runtime.store.save(waiting);
+  try {
+    runtime.enqueue(main, waiting.id, "question", "May I proceed?");
+    // Hold it before the scheduler runs, so the main agent does not answer.
+    runtime.store.hold(main.id, true);
+    await runtime.cancel(waiting);
+    expect(runtime.store.get(waiting.id)?.status).toBe("cancelled");
+    expect(
+      runtime.store.undelivered(main.id).some((m) => m.kind === "question"),
+    ).toBe(false);
+  } finally {
+    await runtime.deleteSession(owner, main.sessionId);
+  }
+});

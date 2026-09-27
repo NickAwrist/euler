@@ -32,7 +32,9 @@ export const AgentEventSchema = z
       z.object({
         type: z.literal("step"),
         activationId: z.string(),
-        steps: z.array(WireStepSchema),
+        /** The step's index in the activation's open segment. */
+        position: z.number().int().nonnegative(),
+        step: WireStepSchema,
       }),
       z.object({
         type: z.literal("activation_ended"),

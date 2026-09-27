@@ -16,19 +16,19 @@ import { ModelMessageSchema } from "../schemas/modelMessages";
 import {
   MessageVersionSchema,
   RunMetadataSchema,
-  WireMessageSchema,
   WireStepSchema,
 } from "../schemas/run";
 import { getDb, transaction } from "./connection";
 
-const RecordSchema = AgentSchema.extend({
+/** `held` is derived from held messages, so records do not store it. */
+const RecordSchema = AgentSchema.omit({ held: true }).extend({
   history: z.array(ModelMessageSchema),
   pendingOutputs: z.array(OutputAttachmentSchema).default([]),
-  partial: WireMessageSchema.optional(),
   lastSummaryAt: z.number().default(0),
+  /** The last `background_agents` summary the main agent's model received. */
+  lastSummary: z.string().default(""),
   checkpoints: z.record(z.string(), z.number()).default({}),
   versions: z.array(MessageVersionSchema).optional(),
-  held: z.boolean(),
   /** Deliveries of agent or runtime messages since the user last acted. */
   automaticTurns: z.number().default(0),
   config: z.object({
@@ -41,7 +41,7 @@ type ModelMessage = z.infer<typeof ModelMessageSchema>;
 export type AgentRecord = Omit<z.infer<typeof RecordSchema>, "history"> & {
   history: readonly ModelMessage[];
 };
-export type AgentSteps = z.infer<typeof WireStepSchema>[];
+export type AgentStep = z.infer<typeof WireStepSchema>;
 
 type MessageRow = {
   id: number;
@@ -73,13 +73,28 @@ const toMessage = (row: MessageRow): InboxMessage =>
     deliveredAt: row.delivered_at,
   });
 /** Image bytes stay in the attachment store, not in saved history. */
-const withoutImageData = ({
-  images,
-  ...message
-}: LlmMessage): Omit<LlmMessage, "images"> & { images?: ImageAttachment[] } =>
-  images
-    ? { ...message, images: images.map((i) => ImageAttachmentSchema.parse(i)) }
+export const withoutImageData = (
+  message: LlmMessage | ModelMessage,
+): Omit<LlmMessage, "images"> & { images?: ImageAttachment[] } =>
+  message.images
+    ? {
+        ...message,
+        images: message.images.map((i) => ImageAttachmentSchema.parse(i)),
+      }
     : message;
+const storedJson = (message: LlmMessage | ModelMessage) =>
+  JSON.stringify(withoutImageData(message));
+/** A message without image bytes; one without images is kept as is. */
+const toHistory = (message: LlmMessage | ModelMessage): ModelMessage =>
+  message.images
+    ? {
+        ...message,
+        images: message.images.map((image) => ({
+          ...ImageAttachmentSchema.parse(image),
+          data: "",
+        })),
+      }
+    : (message as ModelMessage);
 const placeholders = (values: readonly unknown[]) =>
   values.map(() => "?").join(", ");
 
@@ -93,8 +108,11 @@ export class AgentStore {
   private records = new Map<string, AgentRecord>();
   private temporary = new Map<string, AgentRecord>();
   private temporaryInbox: InboxMessage[] = [];
-  private temporarySteps = new Map<string, Map<string, AgentSteps>>();
+  /** Steps by agent, keyed by activation and position in insertion order. */
+  private temporarySteps = new Map<string, Map<string, AgentStep>>();
   private nextTemporaryId = -Number.MAX_SAFE_INTEGER;
+  /** The history each record last saved, which `saveHistory` compares against. */
+  private savedHistory = new WeakMap<AgentRecord, readonly ModelMessage[]>();
 
   cachedSessions(): Set<string> {
     return new Set([...this.records.values()].map((agent) => agent.sessionId));
@@ -110,22 +128,40 @@ export class AgentStore {
           ...structuredClone({ ...agent, history: [] }),
           history: agent.history,
         },
+        savedHistory: this.savedHistory.get(agent),
         temporary: this.temporary.has(agent.id),
       }));
-    const inbox = structuredClone(this.temporaryInbox);
+    const sessionAgents = () =>
+      new Set(
+        [...this.temporary.values()]
+          .filter((agent) => agent.sessionId === sessionId)
+          .map((agent) => agent.id),
+      );
+    const agents = sessionAgents();
+    const inbox = structuredClone(
+      this.temporaryInbox.filter((m) => agents.has(m.agentId)),
+    );
+    // Steps are saved outside transactions, which only remove whole agents' steps.
     const steps = new Map(this.temporarySteps);
     const nextId = this.nextTemporaryId;
     return () => {
+      // Includes agents created since the checkpoint.
+      const current = sessionAgents();
+      this.temporaryInbox = [
+        ...this.temporaryInbox.filter((m) => !current.has(m.agentId)),
+        ...inbox,
+      ];
       this.release(sessionId);
       for (const [id, agent] of this.temporary)
         if (agent.sessionId === sessionId) this.temporary.delete(id);
-      for (const { agent, saved, temporary } of records) {
-        for (const key of ["partial", "versions", "interruption"] as const)
+      for (const { agent, saved, savedHistory, temporary } of records) {
+        for (const key of ["versions", "interruption"] as const)
           delete agent[key];
         Object.assign(agent, saved);
+        if (savedHistory) this.savedHistory.set(agent, savedHistory);
+        else this.savedHistory.delete(agent);
         (temporary ? this.temporary : this.records).set(agent.id, agent);
       }
-      this.temporaryInbox = inbox;
       this.temporarySteps = steps;
       this.nextTemporaryId = nextId;
     };
@@ -135,26 +171,20 @@ export class AgentStore {
     const cached = this.temporary.get(id) ?? this.records.get(id);
     if (cached) return cached;
     const row = getDb()
-      .query(
-        "SELECT a.status, a.history, a.data, s.model_messages FROM agents a JOIN sessions s ON s.id = a.session_id WHERE a.id = ?",
-      )
-      .get(id) as {
-      status: string;
-      history: string;
-      data: string;
-      model_messages: string | null;
-    } | null;
+      .query("SELECT status, data FROM agents WHERE id = ?")
+      .get(id) as { status: string; data: string } | null;
     if (!row) return undefined;
-    const data = AgentSchema.passthrough().parse({
+    const history = getDb()
+      .query(
+        "SELECT message FROM agent_history WHERE agent_id = ? ORDER BY position",
+      )
+      .all(id) as { message: string }[];
+    const agent = RecordSchema.parse({
       ...JSON.parse(row.data),
       status: row.status,
+      history: history.map((message) => JSON.parse(message.message)),
     });
-    const agent = RecordSchema.parse({
-      ...data,
-      history: JSON.parse(
-        data.kind === "main" ? (row.model_messages ?? "[]") : row.history,
-      ),
-    });
+    this.savedHistory.set(agent, agent.history);
     this.records.set(id, agent);
     return agent;
   }
@@ -195,7 +225,15 @@ export class AgentStore {
           },
       ),
       ...this.temporaryAgents(ownerUuid, sessionId),
-    ].map((agent) => AgentSchema.parse(agent));
+    ].map((agent) => this.present(agent));
+  }
+  /** An agent as clients see it. */
+  present(agent: Omit<Agent, "held">): Agent {
+    return AgentSchema.parse({ ...agent, held: this.isHeld(agent.id) });
+  }
+  /** Whether messages wait on the user to deliver them. */
+  isHeld(agentId: string) {
+    return this.hasWakingMessage(agentId, true);
   }
   /** The owner's chats that have an agent in one of `statuses`. */
   sessionsWithStatus(
@@ -234,57 +272,99 @@ export class AgentStore {
       [agent.id, agent.sessionId, status, JSON.stringify(data)],
     );
   }
-  saveHistory(agent: AgentRecord, history: LlmMessage[]) {
-    const stored = history.map(withoutImageData);
-    agent.history = stored.map(({ images, ...message }) =>
-      images
-        ? {
-            ...message,
-            images: images.map((image) => ({ ...image, data: "" })),
-          }
-        : message,
+  /**
+   * Writes only the messages that changed since the last save. A message is
+   * never changed once in a history, and one without images is kept as is, so
+   * an unchanged message is usually the saved object and otherwise has the
+   * same stored form.
+   */
+  saveHistory(
+    agent: AgentRecord,
+    history: readonly (LlmMessage | ModelMessage)[],
+  ) {
+    const saved = this.savedHistory.get(agent) ?? [];
+    const changed = new Set<number>();
+    history.forEach((message, position) => {
+      const previous = saved[position];
+      if (
+        previous !== message &&
+        (!previous || storedJson(message) !== storedJson(previous))
+      )
+        changed.add(position);
+    });
+    if (
+      !this.temporary.has(agent.id) &&
+      (changed.size || history.length < saved.length)
+    )
+      transaction(() => {
+        getDb().run(
+          "DELETE FROM agent_history WHERE agent_id = ? AND position >= ?",
+          [agent.id, history.length],
+        );
+        const upsert = getDb().query(
+          "INSERT INTO agent_history (agent_id, position, message) VALUES (?, ?, ?) ON CONFLICT(agent_id, position) DO UPDATE SET message = excluded.message",
+        );
+        for (const position of changed)
+          upsert.run(agent.id, position, storedJson(history[position]!));
+      });
+    agent.history = history.map((message, position) =>
+      changed.has(position) ? toHistory(message) : saved[position]!,
     );
-    if (this.temporary.has(agent.id)) return;
-    const json = JSON.stringify(stored);
-    if (agent.kind === "main")
-      getDb().run(
-        "UPDATE sessions SET model_messages = ? WHERE id = ? AND owner_uuid = ?",
-        [json, agent.sessionId, agent.ownerUuid],
-      );
-    else
-      getDb().run("UPDATE agents SET history = ? WHERE id = ?", [
-        json,
-        agent.id,
-      ]);
+    this.savedHistory.set(agent, agent.history);
   }
   /** Drops a chat's cached records once no runtime work holds them. */
   release(sessionId: string) {
     for (const [id, agent] of this.records)
       if (agent.sessionId === sessionId) this.records.delete(id);
   }
-  /** The agent's trace across its activations, oldest first. */
-  steps(agentId: string): AgentSteps {
+  /** The agent's saved steps across its activations, oldest first. */
+  steps(agentId: string): AgentStep[] {
     const temporary = this.temporarySteps.get(agentId);
-    if (temporary) return [...temporary.values()].flat();
+    if (temporary) return [...temporary.values()];
     return (
       getDb()
-        .query(
-          "SELECT steps FROM agent_steps WHERE agent_id = ? ORDER BY rowid",
-        )
-        .all(agentId) as { steps: string }[]
-    ).flatMap((row) => WireStepSchema.array().parse(JSON.parse(row.steps)));
+        .query("SELECT step FROM agent_steps WHERE agent_id = ? ORDER BY rowid")
+        .all(agentId) as { step: string }[]
+    ).map((row) => WireStepSchema.parse(JSON.parse(row.step)));
   }
-  saveSteps(agent: AgentRecord, activationId: string, steps: AgentSteps) {
+  /** Saves one step of an activation, adding it or replacing its last state. */
+  saveStep(
+    agent: AgentRecord,
+    activationId: string,
+    position: number,
+    step: AgentStep,
+  ) {
     if (this.temporary.has(agent.id)) {
-      const activations = this.temporarySteps.get(agent.id) ?? new Map();
-      activations.set(activationId, steps);
-      this.temporarySteps.set(agent.id, activations);
+      const steps = this.temporarySteps.get(agent.id) ?? new Map();
+      steps.set(`${activationId}:${position}`, step);
+      this.temporarySteps.set(agent.id, steps);
       return;
     }
     getDb().run(
-      "INSERT INTO agent_steps (agent_id, activation_id, steps) VALUES (?, ?, ?) ON CONFLICT(agent_id, activation_id) DO UPDATE SET steps = excluded.steps",
-      [agent.id, activationId, JSON.stringify(steps)],
+      "INSERT INTO agent_steps (agent_id, activation_id, position, step) VALUES (?, ?, ?, ?) ON CONFLICT(agent_id, activation_id, position) DO UPDATE SET step = excluded.step",
+      [agent.id, activationId, position, JSON.stringify(step)],
     );
+  }
+  /** The main agent's reply text since its last transcript segment. */
+  reply(agentId: string): string | undefined {
+    const row = getDb()
+      .query("SELECT content FROM agent_replies WHERE agent_id = ?")
+      .get(agentId) as { content: string } | null;
+    return row?.content;
+  }
+  /** Keeps the open reply for restart recovery, which temporary chats lack. */
+  saveReply(agent: AgentRecord, content: string) {
+    if (this.temporary.has(agent.id)) return;
+    getDb().run(
+      "INSERT INTO agent_replies (agent_id, content) VALUES (?, ?) ON CONFLICT(agent_id) DO UPDATE SET content = excluded.content",
+      [agent.id, content],
+    );
+  }
+  /** Removes a main agent's open segment once it is in the transcript. */
+  clearSegment(agent: AgentRecord) {
+    this.temporarySteps.delete(agent.id);
+    getDb().run("DELETE FROM agent_steps WHERE agent_id = ?", [agent.id]);
+    getDb().run("DELETE FROM agent_replies WHERE agent_id = ?", [agent.id]);
   }
   remove(agent: AgentRecord) {
     this.records.delete(agent.id);

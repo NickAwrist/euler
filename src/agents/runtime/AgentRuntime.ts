@@ -1,27 +1,27 @@
 import type { OutputAttachment } from "../../attachments/types";
 import { DEFAULT_RUN_MODEL } from "../../constants";
+import { createAgentRecord } from "../../db/agentRecord";
 import { type AgentRecord, AgentStore } from "../../db/agents";
 import {
   appendRuntimeMessage,
+  countMessagesForSession,
   getMessagesForSession,
   getSessionById,
-  parseModelMessages,
   patchSessionRow,
   truncateSessionMessages,
 } from "../../db/sessions";
 import { type Unsequenced, eventHub } from "../../events/eventHub";
 import { ApiError } from "../../http/errors";
 import {
-  type Agent,
-  AgentSchema,
   type InboxMessage,
+  type RewindRequest,
   type SendMessageRequest,
+  type TurnSettings,
   WORKING_STATUSES,
   isFinalAgent,
   isWorkingAgent,
 } from "../../schemas/agents";
 import type { Activation } from "../../schemas/events";
-import { ModelMessageSchema } from "../../schemas/modelMessages";
 import type { WireMessageInput } from "../../schemas/run";
 import type { BaseTool } from "../../tools/BaseTool";
 import { AskParentTool } from "../../tools/ask_parent";
@@ -59,6 +59,8 @@ export class AgentRuntime {
   private temporaryHistory = new Map<string, WireMessageInput[]>();
   private deleting = new Set<string>();
   private rewinding = new Set<string>();
+  /** Agents being cancelled, which must not start again before it settles. */
+  private stopping = new Set<string>();
   private transactions = new RuntimeTransaction();
   resync(owner: string, sessionId: string) {
     this.emit(owner, { type: "resync", sessionId, agentId: "" });
@@ -98,12 +100,14 @@ export class AgentRuntime {
   }
   private atomically<T>(sessionId: string, write: () => T): T {
     const restore = this.store.checkpoint(sessionId);
+    // A temporary transcript only grows, unless a rewind replaces it.
     const history = this.temporaryHistory.get(sessionId);
-    const saved = history ? structuredClone(history) : undefined;
+    const length = history?.length ?? 0;
     return this.transactions.run(write, () => {
       restore();
-      if (saved) this.temporaryHistory.set(sessionId, saved);
-      else this.temporaryHistory.delete(sessionId);
+      if (!history) return this.temporaryHistory.delete(sessionId);
+      history.length = length;
+      this.temporaryHistory.set(sessionId, history);
     });
   }
   private emit(owner: string, event: Unsequenced) {
@@ -128,11 +132,7 @@ export class AgentRuntime {
     if (existing) return existing;
     const session = getSessionById(owner, sessionId);
     if (!session && !temporary) throw new Error("Session not found");
-    const history =
-      parseModelMessages(session?.model_messages ?? null) ??
-      getMessagesForSession(owner, sessionId).filter((m) => m.role !== "event");
-    const agent: AgentRecord = {
-      id: crypto.randomUUID(),
+    const agent = createAgentRecord({
       ownerUuid: owner,
       sessionId,
       parentId: null,
@@ -141,20 +141,10 @@ export class AgentRuntime {
       status: "idle",
       model: session?.model ?? DEFAULT_RUN_MODEL,
       spawnPosition: 0,
-      createdAt: Date.now(),
-      endedAt: null,
       activity: "",
-      history: [],
-      pendingOutputs: [],
-      checkpoints: {},
-      // Agents that ended before this chat's main agent existed need no summary.
-      lastSummaryAt: Date.now(),
-      held: false,
-      automaticTurns: 0,
       config: {},
-    };
+    });
     this.store.save(agent, temporary);
-    this.store.saveHistory(agent, ModelMessageSchema.array().parse(history));
     if (temporary) this.temporaryHistory.set(sessionId, []);
     return agent;
   }
@@ -168,7 +158,7 @@ export class AgentRuntime {
       queued: main
         ? this.store.undelivered(main.id).filter((m) => m.kind === "user")
         : [],
-      held: main ? this.held(main) : false,
+      held: main ? this.store.isHeld(main.id) : false,
       history:
         this.temporaryHistory.get(sessionId) ??
         getMessagesForSession(owner, sessionId),
@@ -179,13 +169,6 @@ export class AgentRuntime {
       .sessionsWithStatus(owner, WORKING_STATUSES)
       .has(sessionId);
   }
-  /** Whether messages wait on the user to deliver them. */
-  private held(agent: Pick<Agent, "id" | "held">) {
-    return (
-      (agent.held && this.store.hasWakingMessage(agent.id, false)) ||
-      this.store.hasWakingMessage(agent.id, true)
-    );
-  }
   private status(agent: AgentRecord) {
     this.store.save(agent);
     this.notify();
@@ -193,21 +176,14 @@ export class AgentRuntime {
       type: "agent_status",
       sessionId: agent.sessionId,
       agentId: agent.id,
-      agent: AgentSchema.parse({ ...agent, held: this.held(agent) }),
+      agent: this.store.present(agent),
     });
   }
   /** Queues the user's message for the main agent with the settings sent with it. */
   send(record: AgentRecord, request: SendMessageRequest) {
     const main = this.store.get(record.id) ?? record;
     return this.atomically(main.sessionId, () => {
-      if (request.model) {
-        main.model = request.model;
-        patchSessionRow(main.ownerUuid, main.sessionId, { model: main.model });
-      }
-      main.config = {
-        metadata: request.metadata,
-        reasoningEffort: request.reasoningEffort,
-      };
+      this.configure(main, request);
       const queued = main.status === "running";
       const message = this.enqueue(
         main,
@@ -218,6 +194,17 @@ export class AgentRuntime {
       );
       return { message, queued };
     });
+  }
+  /** Applies the composer settings a user turn was sent with. */
+  private configure(main: AgentRecord, settings: TurnSettings) {
+    if (settings.model) {
+      main.model = settings.model;
+      patchSessionRow(main.ownerUuid, main.sessionId, { model: main.model });
+    }
+    main.config = {
+      metadata: settings.metadata,
+      reasoningEffort: settings.reasoningEffort,
+    };
   }
   enqueue(
     record: AgentRecord,
@@ -239,17 +226,13 @@ export class AgentRuntime {
       attachments,
       wakes: !["progress", "status"].includes(kind),
     });
-    if (kind === "user") {
-      this.resetBudget(agent);
-      this.store.save(agent);
-    }
+    if (kind === "user") this.resetBudget(agent);
     this.emit(agent.ownerUuid, {
       type: "inbox_queued",
       sessionId: agent.sessionId,
       agentId: agent.id,
       messages: [message],
     });
-    if (agent.held) this.status(agent);
     this.notify();
     this.transactions.defer(() => this.schedule());
     return message;
@@ -264,22 +247,24 @@ export class AgentRuntime {
       pending.some((m) => m.wakes) && !pending.some((m) => m.kind === "user")
     );
   }
+  /** Resets the chat's automatic turns and releases every held message. */
   private resetBudget(main: AgentRecord) {
     main.automaticTurns = 0;
+    this.store.save(main);
     for (const agent of this.store.list(main.ownerUuid, main.sessionId)) {
       if (isFinalAgent(agent)) continue;
-      agent.held = false;
+      const held = this.store.isHeld(agent.id);
       this.store.hold(agent.id, false);
-      this.status(agent);
+      if (held) this.status(agent);
     }
   }
   /**
    * Holds the agent's pending messages and the main agent's. A main agent with
    * nothing pending gets a note, so Deliver is offered when only a child paused.
+   * Messages that arrive later are held by the scheduler's budget check.
    */
   private pauseForBudget(agent: AgentRecord, main: AgentRecord) {
     for (const target of new Set([agent, main])) {
-      target.held = true;
       if (!this.active.has(target.id)) target.status = "idle";
       if (!this.store.undelivered(target.id).some((m) => m.wakes))
         this.enqueue(
@@ -288,6 +273,7 @@ export class AgentRuntime {
           "message",
           "Automatic work paused at the automatic-turn limit. Continue from saved context when the user resumes.",
         );
+      this.store.hold(target.id, true);
       this.status(target);
     }
   }
@@ -327,7 +313,11 @@ export class AgentRuntime {
     this.scheduled = true;
     queueMicrotask(() => {
       this.scheduled = false;
-      this.pump();
+      try {
+        this.pump();
+      } catch (error) {
+        console.error("Agent scheduling failed", error);
+      }
     });
   }
   private pump() {
@@ -336,8 +326,8 @@ export class AgentRuntime {
       if (
         !agent ||
         this.active.has(id) ||
+        this.stopping.has(id) ||
         isFinalAgent(agent) ||
-        agent.held ||
         this.isChanging(agent.sessionId)
       )
         continue;
@@ -381,19 +371,50 @@ export class AgentRuntime {
         thinking: "",
         steps: [],
       };
-      // Install the lock before activation starts, including workspace resolution.
-      const promise = Promise.resolve()
-        .then(() => this.activate(agent, controller.signal, partial))
-        .finally(() => {
+      const run = async () => {
+        try {
+          await this.activate(agent, controller.signal, partial);
+        } catch (error) {
+          this.contain(agent.id, error);
+        } finally {
           this.active.delete(agent.id);
           this.release(agent.sessionId);
           this.notify();
           this.schedule();
-        });
+        }
+      };
+      // Install the lock before activation starts, including workspace resolution.
+      const promise = Promise.resolve()
+        .then(run)
+        .catch((error) => console.error("Agent scheduling failed", error));
       this.active.set(agent.id, { controller, promise, partial });
     }
     for (const sessionId of this.store.cachedSessions())
       this.release(sessionId);
+  }
+  /**
+   * An activation records its own errors, so one escaping it means recording
+   * failed, such as a database error. It must not stop the runtime.
+   */
+  private contain(agentId: string, error: unknown) {
+    console.error("Agent activation failed", error);
+    try {
+      const agent = this.store.get(agentId);
+      if (!agent || !isWorkingAgent(agent)) return;
+      agent.status = "idle";
+      agent.interruption =
+        error instanceof Error ? error.message : String(error);
+      this.status(agent);
+    } catch (followup) {
+      console.error("Could not record the failed activation", followup);
+    }
+  }
+  /** The number of transcript messages, without loading them. */
+  private transcriptLength(sessionId: string) {
+    return (
+      this.temporaryHistory.get(sessionId)?.length ??
+      countMessagesForSession(sessionId)
+    );
   }
   private append(agent: AgentRecord, message: WireMessageInput) {
     const temporary = this.temporaryHistory.get(agent.sessionId);
@@ -425,6 +446,7 @@ export class AgentRuntime {
         append: (record, message) => this.append(record, message),
         atomically: (sessionId, write) => this.atomically(sessionId, write),
         isDeleting: (sessionId) => this.deleting.has(sessionId),
+        transcriptLength: (sessionId) => this.transcriptLength(sessionId),
         allowModelCall: (record) => this.allowModelCall(record),
         tools: (record, abort, wait, model) =>
           this.tools(record, abort, wait, model),
@@ -494,30 +516,18 @@ export class AgentRuntime {
     model: string,
     signal: AbortSignal,
   ): Promise<SpawnResult> {
-    const child: AgentRecord = {
-      ...parent,
-      id: crypto.randomUUID(),
+    const child = createAgentRecord({
+      ownerUuid: parent.ownerUuid,
+      sessionId: parent.sessionId,
       parentId: parent.id,
       kind: request.kind,
       title: request.title,
       status: "queued",
       model,
-      spawnPosition: (
-        this.temporaryHistory.get(parent.sessionId) ??
-        getMessagesForSession(parent.ownerUuid, parent.sessionId)
-      ).length,
-      createdAt: Date.now(),
-      endedAt: null,
-      history: [],
-      pendingOutputs: [],
-      partial: undefined,
-      interruption: undefined,
-      versions: undefined,
-      checkpoints: {},
+      spawnPosition: this.transcriptLength(parent.sessionId),
       activity: request.prompt,
-      held: false,
-      automaticTurns: 0,
-    };
+      config: parent.config,
+    });
     this.atomically(parent.sessionId, () => {
       this.store.save(child, this.temporaryHistory.has(parent.sessionId));
       this.status(child);
@@ -547,10 +557,16 @@ export class AgentRuntime {
       }, signal);
       if (signal.aborted) return { agentId: child.id };
       const current = this.store.get(child.id);
+      const report =
+        current && !isWorkingAgent(current)
+          ? this.receiveReport(parent, child.id)
+          : undefined;
       return {
         agentId: child.id,
         status: current?.status,
-        result: current?.activity,
+        ...(report?.kind === "failure"
+          ? { error: report.content }
+          : { result: current?.activity }),
       };
     } finally {
       await this.until(() => {
@@ -562,6 +578,24 @@ export class AgentRuntime {
       }, signal);
       this.waitingForChild.delete(parent.id);
     }
+  }
+  /** A blocking spawn returns the child's report, so it is not delivered again. */
+  private receiveReport(record: AgentRecord, childId: string) {
+    const parent = this.store.get(record.id) ?? record;
+    return this.atomically(parent.sessionId, () => {
+      const reports = this.store
+        .undelivered(parent.id)
+        .filter(
+          (m) =>
+            m.sender === childId &&
+            (m.kind === "result" || m.kind === "failure"),
+        );
+      for (const report of reports)
+        parent.pendingOutputs.push(...report.attachments);
+      this.store.deliver(reports);
+      this.store.save(parent);
+      return reports.at(-1);
+    });
   }
   private recordControl(agent: AgentRecord, content: string) {
     const message = this.store.enqueue({
@@ -580,23 +614,32 @@ export class AgentRuntime {
     // Dismissing a ready subagent ends it as done rather than stopped.
     const ready = agent.status === "idle" && !this.active.has(agent.id);
     this.recordControl(agent, reason);
-    if (agent.kind === "main") this.store.hold(agent.id, true);
-    agent.held = true;
-    this.store.save(agent);
-    const active = this.active.get(agent.id);
-    active?.controller.abort();
-    await active?.promise;
+    // Input already queued waits for Deliver; a subagent's is dropped below.
+    this.store.hold(agent.id, true);
+    this.stopping.add(agent.id);
+    try {
+      const active = this.active.get(agent.id);
+      active?.controller.abort();
+      await active?.promise;
+    } finally {
+      this.stopping.delete(agent.id);
+    }
     const current = this.store.get(agent.id);
     if (!current) return;
     current.interruption = undefined;
     current.status =
       agent.kind === "main" ? "idle" : ready ? "completed" : "cancelled";
-    if (current.kind === "main") current.held = false;
     // A dismissed agent keeps its last result as its summary.
     if (!ready) current.activity = reason;
     if (current.kind !== "main") {
       current.endedAt = Date.now();
       this.store.deliver(this.store.undelivered(current.id));
+      // Nobody is left to receive an answer to its question.
+      this.store.deliver(
+        this.store
+          .undelivered(current.parentId ?? "")
+          .filter((m) => m.sender === current.id && m.kind === "question"),
+      );
     }
     this.status(current);
     this.schedule();
@@ -623,11 +666,7 @@ export class AgentRuntime {
   async rewind(
     owner: string,
     sessionId: string,
-    request: {
-      position: number;
-      content?: string;
-      versions?: WireMessageInput["versions"];
-    },
+    request: RewindRequest,
     temporary = false,
   ) {
     const main = this.main(owner, sessionId, temporary);
@@ -679,6 +718,9 @@ export class AgentRuntime {
         );
         current.pendingOutputs = [];
         current.versions = request.versions;
+        // The summaries the model saw may be gone, so the next one is sent.
+        current.lastSummary = "";
+        this.configure(current, request);
         this.store.save(current);
         // Drop queued user input and reports from rewound agents; reports from
         // agents that stay in the conversation are still owed to the model.
@@ -713,11 +755,15 @@ export class AgentRuntime {
       this.store.withStatus(status),
     )) {
       const pending = this.store.undelivered(agent.id);
+      const reply =
+        agent.kind === "main" ? this.store.reply(agent.id) : undefined;
+      const steps = agent.kind === "main" ? this.store.steps(agent.id) : [];
+      const replying = reply !== undefined || steps.length > 0;
       // Nothing was in progress: a waiting agent still waits for its answer.
       if (
         (agent.status === "idle" || agent.status === "waiting") &&
         !pending.length &&
-        (agent.kind !== "main" || !agent.partial)
+        !replying
       )
         continue;
       this.atomically(agent.sessionId, () => {
@@ -739,14 +785,16 @@ export class AgentRuntime {
             });
         }
         if (agent.kind === "main") {
-          if (agent.partial) {
+          if (replying) {
             this.append(agent, {
-              ...agent.partial,
+              role: "assistant",
+              content: `${reply ?? ""}\n\n*Response interrupted by server restart.*`,
+              steps,
               attachments: agent.pendingOutputs,
-              content: `${agent.partial.content}\n\n*Response interrupted by server restart.*`,
             });
             agent.pendingOutputs = [];
           }
+          this.store.clearSegment(agent);
           // Nothing starts solely because the server restarted.
           this.store.hold(agent.id, true);
         } else {
@@ -764,9 +812,7 @@ export class AgentRuntime {
           agent.interruption = agent.activity;
           history.push({ role: "user", content: agent.activity });
         }
-        agent.partial = undefined;
         agent.status = "idle";
-        agent.held = false;
         this.store.saveHistory(agent, history);
         this.status(agent);
       });

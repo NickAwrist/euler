@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { type Response, Router } from "express";
 import { agentRuntime } from "../agents/runtime/AgentRuntime";
 import { getOpenRouterApiKey } from "../db";
 import { getAttachment } from "../db/attachments";
@@ -6,10 +6,30 @@ import { getSessionById, markSessionViewed } from "../db/sessions";
 import { sendApiError } from "../http/errors";
 import { sendValidationError } from "../http/validation";
 import { resolveModelSelection } from "../llm";
-import { EditQueuedMessageSchema } from "../schemas/agents";
-import { RewindSchema, SendMessageSchema } from "../schemas/agents";
+import {
+  EditQueuedMessageSchema,
+  RewindSchema,
+  SendMessageSchema,
+} from "../schemas/agents";
 import { requireUserId } from "../userIdentity";
 import { workspaceService } from "../workspaces/WorkspaceService";
+
+/** Sends an error for a model that cannot run and returns false. */
+function modelAvailable(res: Response, model: string) {
+  if (
+    resolveModelSelection(model).provider === "openrouter" &&
+    !getOpenRouterApiKey()
+  ) {
+    sendApiError(
+      res,
+      400,
+      "BAD_REQUEST",
+      "Configure an OpenRouter API key in Settings before using this model",
+    );
+    return false;
+  }
+  return true;
+}
 
 export function agentActions(temporary = false) {
   const router = Router();
@@ -62,16 +82,7 @@ export function agentActions(temporary = false) {
       return;
     }
     const main = agentRuntime.main(owner, req.params.id, temporary);
-    const selection = resolveModelSelection(body.model ?? main.model);
-    if (selection.provider === "openrouter" && !getOpenRouterApiKey()) {
-      sendApiError(
-        res,
-        400,
-        "BAD_REQUEST",
-        "Configure an OpenRouter API key in Settings before using this model",
-      );
-      return;
-    }
+    if (!modelAvailable(res, body.model ?? main.model)) return;
     const { message, queued } = agentRuntime.send(main, body);
     res.status(202).json({ messageId: message.id, queued });
   });
@@ -163,6 +174,8 @@ export function agentActions(temporary = false) {
       sendValidationError(res, parsed.error);
       return;
     }
+    const main = agentRuntime.main(owner, req.params.id, temporary);
+    if (!modelAvailable(res, parsed.data.model ?? main.model)) return;
     await agentRuntime.rewind(owner, req.params.id, parsed.data, temporary);
     res.json({ ok: true });
   });

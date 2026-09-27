@@ -5,7 +5,7 @@ import type {
 } from "../../attachments/types";
 import type { AgentRecord, AgentStore } from "../../db/agents";
 import { getAttachment } from "../../db/attachments";
-import { getMessagesForSession, getSessionById } from "../../db/sessions";
+import { getSessionById } from "../../db/sessions";
 import type { Unsequenced } from "../../events/eventHub";
 import type { LlmMessage } from "../../llm";
 import { isFinalAgent } from "../../schemas/agents";
@@ -29,6 +29,7 @@ export interface ActivationHost {
   append(agent: AgentRecord, message: WireMessageInput): void;
   atomically(sessionId: string, write: () => void): void;
   isDeleting(sessionId: string): boolean;
+  transcriptLength(sessionId: string): number;
   allowModelCall(agent: AgentRecord): boolean;
   tools(
     agent: AgentRecord,
@@ -45,12 +46,15 @@ export interface ActivationHost {
   ): unknown;
 }
 
-/** The saved history with image bytes loaded back from the attachment store. */
+/**
+ * The saved history with image bytes loaded back from the attachment store.
+ * Other messages stay the saved objects, so saving them again writes nothing.
+ */
 function historyWithImages(agent: AgentRecord): LlmMessage[] {
-  return agent.history.map((message) => ({
-    ...message,
-    ...(message.images
+  return agent.history.map((message) =>
+    message.images
       ? {
+          ...message,
           images: message.images.flatMap((image) => {
             const stored = getAttachment(agent.ownerUuid, image.id);
             return stored?.sessionId === agent.sessionId
@@ -63,8 +67,8 @@ function historyWithImages(agent: AgentRecord): LlmMessage[] {
               : [];
           }),
         }
-      : {}),
-  }));
+      : message,
+  );
 }
 
 export async function runActivation(
@@ -85,10 +89,10 @@ export async function runActivation(
   let outcome: "done" | "aborted" | "error" | "paused" = "done";
   let segmentStart = 0;
   const summarySince = agent.lastSummaryAt;
-  let lastSummaryText = "";
   let ctx: RunContext | undefined;
   let changedFiles: WorkspaceFileAttachment[] = [];
   let attachmentStart = 0;
+  let savedReply = "";
   const closeSegment = () => {
     if (
       agent.kind !== "main" ||
@@ -110,7 +114,8 @@ export async function runActivation(
     agent.pendingOutputs = [];
     attachmentStart = ctx?.outputAttachments.length ?? 0;
     agent.versions = undefined;
-    agent.partial = undefined;
+    host.store.clearSegment(agent);
+    savedReply = "";
     host.store.save(agent);
     segmentStart = ctx?.steps.length ?? 0;
     partial.steps = [];
@@ -162,38 +167,33 @@ export async function runActivation(
       model,
       "",
       (context, step) => {
-        const allSteps = context.wireSteps();
-        partial.steps = allSteps.slice(segmentStart);
-        // A main agent's steps are stored with its transcript segments.
-        if (agent.kind !== "main")
-          host.store.saveSteps(agent, partial.id, allSteps);
-        agent.partial = {
-          role: "assistant",
-          content: partial.content,
-          steps: partial.steps,
-        };
+        const position = context.steps.indexOf(step) - segmentStart;
+        if (position < 0) return;
+        const wire = context.wireStep(step);
+        partial.steps[position] = wire;
+        // A main agent's rows last until its segment reaches the transcript.
+        host.store.saveStep(agent, partial.id, position, wire);
+        // Saved with each step, so a restart loses at most one call's text.
+        if (agent.kind === "main" && partial.content !== savedReply) {
+          host.store.saveReply(agent, partial.content);
+          savedReply = partial.content;
+        }
         if (step.kind === "llm_call" && step.status === "running") {
           partial.content = "";
           partial.thinking = "";
         }
-        host.store.save(agent);
         host.emit(agent.ownerUuid, {
           type: "step",
           sessionId: agent.sessionId,
           agentId: agent.id,
           activationId: partial.id,
-          steps: partial.steps,
+          position,
+          step: wire,
         });
       },
       (contentDelta, thinkingDelta) => {
         partial.content += contentDelta;
         partial.thinking += thinkingDelta;
-        // Saved with the next step, so a restart loses at most one call's text.
-        agent.partial = {
-          role: "assistant",
-          content: partial.content,
-          steps: partial.steps,
-        };
         host.emit(agent.ownerUuid, {
           type: "delta",
           sessionId: agent.sessionId,
@@ -215,10 +215,10 @@ export async function runActivation(
     model.beforeModelCall = async () => {
       // The write only appends to the model history.
       const savedHistoryLength = model.history.length;
-      const savedPartial = structuredClone(partial);
+      // Delivery replaces the partial's fields rather than mutating them.
+      const savedPartial = { ...partial };
       const savedSegmentStart = segmentStart;
       const savedAttachmentStart = attachmentStart;
-      const savedSummary = lastSummaryText;
       try {
         host.atomically(agent.sessionId, () => {
           paused = !host.allowModelCall(agent);
@@ -227,13 +227,11 @@ export async function runActivation(
             .undelivered(agent.id)
             .filter((m) => !m.held);
           const agents = host.store.list(agent.ownerUuid, agent.sessionId);
+          let summarized = false;
           for (const message of messages) {
             if (message.kind === "user") {
               closeSegment();
-              const position = (
-                host.temporaryHistory.get(agent.sessionId) ??
-                getMessagesForSession(agent.ownerUuid, agent.sessionId)
-              ).length;
+              const position = host.transcriptLength(agent.sessionId);
               agent.checkpoints[String(position)] = model.history.length;
               const attachments = message.attachmentIds
                 .map((id) => getAttachment(agent.ownerUuid, id))
@@ -273,14 +271,17 @@ export async function runActivation(
                 (a) => a.endedAt === null || a.endedAt > summarySince,
               ),
             );
-            if (summary !== lastSummaryText) {
-              model.history.push({ role: "user", content: summary });
-              lastSummaryText = summary;
+            if (summary !== agent.lastSummary) {
+              if (summary)
+                model.history.push({ role: "user", content: summary });
+              agent.lastSummary = summary;
               agent.lastSummaryAt = Date.now();
+              summarized = true;
             }
           }
           host.store.deliver(messages);
-          host.store.save(agent);
+          // A step with nothing delivered leaves the record unchanged.
+          if (messages.length || summarized) host.store.save(agent);
           host.store.saveHistory(agent, model.history);
         });
         return !paused;
@@ -289,7 +290,6 @@ export async function runActivation(
         Object.assign(partial, savedPartial);
         segmentStart = savedSegmentStart;
         attachmentStart = savedAttachmentStart;
-        lastSummaryText = savedSummary;
         throw error;
       }
     };
@@ -309,10 +309,11 @@ export async function runActivation(
     // A subagent stays ready for follow-ups until it is dismissed.
     else agent.status = waiting ? "waiting" : "idle";
     if (paused && !signal.aborted) outcome = "paused";
-    agent.activity = paused
-      ? "Automatic work paused. Waiting for the user to continue."
-      : result;
-    if (isFinalAgent(agent)) agent.endedAt = Date.now();
+    // A main agent's reply is in the transcript.
+    if (agent.kind !== "main")
+      agent.activity = paused
+        ? "Automatic work paused. Waiting for the user to continue."
+        : result;
     const outputAttachments = ctx.outputAttachments;
     host.atomically(agent.sessionId, () => {
       if (agent.kind !== "main")
@@ -356,7 +357,6 @@ export async function runActivation(
       });
     }
   } finally {
-    if (agent.kind !== "main") agent.partial = undefined;
     if (isFinalAgent(agent)) agent.endedAt = Date.now();
     host.status(agent);
     host.emit(agent.ownerUuid, {

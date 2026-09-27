@@ -1,10 +1,11 @@
 import type { Database } from "bun:sqlite";
+import { DEFAULT_RUN_MODEL } from "../constants";
+import { createAgentRecord } from "./agentRecord";
 
 const AGENTS = `CREATE TABLE agents (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
   status TEXT NOT NULL,
-  history TEXT NOT NULL DEFAULT '[]',
   data TEXT NOT NULL
 )`;
 const AGENT_MESSAGES = `CREATE TABLE agent_messages (
@@ -20,12 +21,25 @@ const AGENT_MESSAGES = `CREATE TABLE agent_messages (
   created_at INTEGER NOT NULL,
   delivered_at INTEGER
 )`;
-/** One row per activation, so a step write stays proportional to that activation. */
+/** One row per model message, so saving history writes only what changed. */
+const AGENT_HISTORY = `CREATE TABLE agent_history (
+  agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+  position INTEGER NOT NULL,
+  message TEXT NOT NULL,
+  PRIMARY KEY (agent_id, position)
+)`;
+/** One row per trace step, so saving a step writes only that step. */
 const AGENT_STEPS = `CREATE TABLE agent_steps (
   agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
   activation_id TEXT NOT NULL,
-  steps TEXT NOT NULL,
-  PRIMARY KEY (agent_id, activation_id)
+  position INTEGER NOT NULL,
+  step TEXT NOT NULL,
+  PRIMARY KEY (agent_id, activation_id, position)
+)`;
+/** The main agent's reply text since its last transcript segment. */
+const AGENT_REPLIES = `CREATE TABLE agent_replies (
+  agent_id TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,
+  content TEXT NOT NULL
 )`;
 const INDEXES = `
   CREATE INDEX IF NOT EXISTS idx_agents_session ON agents(session_id, status);
@@ -44,34 +58,124 @@ const columns = (db: Database, table: string) =>
 /** Creates the agent tables and upgrades tables from earlier versions. */
 export function createAgentTables(db: Database) {
   const agentColumns = columns(db, "agents");
-  if (!agentColumns.length) db.run(`${AGENTS}; ${AGENT_MESSAGES}; ${INDEXES}`);
+  if (!agentColumns.length)
+    db.run(
+      `${AGENTS}; ${AGENT_MESSAGES}; ${AGENT_HISTORY}; ${AGENT_STEPS}; ${AGENT_REPLIES}`,
+    );
   else if (!agentColumns.includes("status")) moveDataIntoColumns(db);
-  else {
-    if (!columns(db, "agent_messages").includes("attachments"))
-      db.run(
-        "ALTER TABLE agent_messages ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'",
-      );
-    db.run(INDEXES);
-  }
-  if (!columns(db, "agent_steps").length) createStepTable(db);
+  else if (!columns(db, "agent_messages").includes("attachments"))
+    db.run(
+      "ALTER TABLE agent_messages ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'",
+    );
+  db.run(INDEXES);
+  if (!columns(db, "agent_steps").includes("position")) moveSteps(db);
+  if (!columns(db, "agent_replies").length) moveReplies(db);
+  if (columns(db, "sessions").includes("model_messages")) moveHistory(db);
 }
 
 /**
- * Records from before steps had their own table kept a subagent's whole trace
- * in `data`, and a subagent error ended it as `failed`. Errors now leave the
- * agent ready, so those agents become ready again.
+ * A main agent's open reply was once kept in `data`, with its steps. Subagent
+ * records kept one too, but their trace is already in `agent_steps`.
  */
-function createStepTable(db: Database) {
+function moveReplies(db: Database) {
   db.transaction(() => {
-    db.run(`${AGENT_STEPS};
-      INSERT INTO agent_steps (agent_id, activation_id, steps)
-      SELECT id, 'migrated', json_extract(data, '$.steps') FROM agents
-      WHERE json_extract(data, '$.kind') != 'main'
-        AND json_array_length(data, '$.steps') > 0;
-      UPDATE agents SET data = json_remove(data, '$.steps')
-      WHERE json_type(data, '$.steps') IS NOT NULL;
-      UPDATE agents SET status = 'idle', data = json_set(data, '$.endedAt', NULL)
-      WHERE status = 'failed';`);
+    db.run(`${AGENT_REPLIES};
+      INSERT INTO agent_replies (agent_id, content)
+      SELECT id, coalesce(json_extract(data, '$.partial.content'), '')
+      FROM agents WHERE json_extract(data, '$.kind') = 'main'
+        AND json_type(data, '$.partial') = 'object';
+      INSERT INTO agent_steps (agent_id, activation_id, position, step)
+      SELECT a.id, 'migrated', s.key, s.value
+      FROM agents a, json_each(a.data, '$.partial.steps') s
+      WHERE json_extract(a.data, '$.kind') = 'main'
+        AND json_type(a.data, '$.partial.steps') = 'array'
+      ORDER BY a.rowid, s.key;
+      UPDATE agents SET data = json_remove(data, '$.partial')
+      WHERE json_type(data, '$.partial') IS NOT NULL;`);
+  })();
+}
+
+/**
+ * Traces were once a JSON array per activation in `agent_steps`, and before
+ * that a subagent's whole trace in `data`, when an error ended a subagent as
+ * `failed`. Errors now leave the agent ready, so those agents become ready.
+ */
+function moveSteps(db: Database) {
+  const arrays = columns(db, "agent_steps").length > 0;
+  db.transaction(() => {
+    if (arrays) db.run("ALTER TABLE agent_steps RENAME TO agent_step_arrays");
+    db.run(AGENT_STEPS);
+    if (arrays)
+      db.run(`INSERT INTO agent_steps (agent_id, activation_id, position, step)
+        SELECT a.agent_id, a.activation_id, s.key, s.value
+        FROM agent_step_arrays a, json_each(a.steps) s ORDER BY a.rowid, s.key;
+        DROP TABLE agent_step_arrays;`);
+    else
+      db.run(`INSERT INTO agent_steps (agent_id, activation_id, position, step)
+        SELECT a.id, 'migrated', s.key, s.value
+        FROM agents a, json_each(a.data, '$.steps') s
+        WHERE json_extract(a.data, '$.kind') != 'main'
+        ORDER BY a.rowid, s.key;
+        UPDATE agents SET data = json_remove(data, '$.steps')
+        WHERE json_type(data, '$.steps') IS NOT NULL;
+        UPDATE agents SET status = 'idle', data = json_set(data, '$.endedAt', NULL)
+        WHERE status = 'failed';`);
+  })();
+}
+
+/**
+ * Model history was once one JSON array: `sessions.model_messages` for the
+ * main agent and `agents.history` for a subagent. Chats from before agents
+ * existed get a main agent so their model history is kept.
+ */
+function moveHistory(db: Database) {
+  const subagentHistory = columns(db, "agents").includes("history");
+  const chats = db
+    .query(
+      `SELECT id, owner_uuid, model FROM sessions s
+       WHERE model_messages IS NOT NULL AND NOT EXISTS (
+         SELECT 1 FROM agents a
+         WHERE a.session_id = s.id AND json_extract(a.data, '$.kind') = 'main')`,
+    )
+    .all() as { id: string; owner_uuid: string; model: string | null }[];
+  const insertAgent = db.prepare(
+    "INSERT INTO agents (id, session_id, status, data) VALUES (?, ?, 'idle', ?)",
+  );
+  db.transaction(() => {
+    if (!columns(db, "agent_history").length) db.run(AGENT_HISTORY);
+    for (const chat of chats) {
+      const {
+        history: _history,
+        status: _status,
+        ...main
+      } = createAgentRecord({
+        ownerUuid: chat.owner_uuid,
+        sessionId: chat.id,
+        parentId: null,
+        kind: "main",
+        title: "Euler",
+        status: "idle",
+        model: chat.model ?? DEFAULT_RUN_MODEL,
+        spawnPosition: 0,
+        activity: "",
+        config: {},
+      });
+      insertAgent.run(main.id, chat.id, JSON.stringify(main));
+    }
+    // Unreadable history cannot be recovered, so it starts empty.
+    db.run(`WITH sources AS (
+        SELECT a.id, CASE WHEN json_extract(a.data, '$.kind') = 'main'
+          THEN s.model_messages ELSE ${subagentHistory ? "a.history" : "'[]'"}
+          END AS history
+        FROM agents a JOIN sessions s ON s.id = a.session_id)
+      INSERT INTO agent_history (agent_id, position, message)
+      SELECT sources.id, h.key, h.value FROM sources, json_each(
+        CASE WHEN json_valid(sources.history)
+          THEN CASE WHEN json_type(sources.history) = 'array'
+            THEN sources.history ELSE '[]' END
+          ELSE '[]' END) h;
+      ALTER TABLE sessions DROP COLUMN model_messages;`);
+    if (subagentHistory) db.run("ALTER TABLE agents DROP COLUMN history");
   })();
 }
 
@@ -84,7 +188,13 @@ function moveDataIntoColumns(db: Database) {
   db.run("PRAGMA foreign_keys = OFF");
   try {
     db.transaction(() => {
-      db.run(`${AGENTS.replace("agents", "agents_next")};
+      db.run(`CREATE TABLE agents_next (
+          id TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+          status TEXT NOT NULL,
+          history TEXT NOT NULL DEFAULT '[]',
+          data TEXT NOT NULL
+        );
         INSERT INTO agents_next (id, session_id, status, history, data)
         SELECT id, session_id, json_extract(data, '$.status'),
           coalesce(json_extract(data, '$.history'), '[]'),

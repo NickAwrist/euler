@@ -28,16 +28,15 @@ test("restart preserves an interrupted main reply without retrying and repairs c
   const first = new AgentRuntime();
   const main = first.main(owner, id);
   main.status = "running";
-  main.partial = { role: "assistant", content: "Partial response", steps: [] };
-  main.held = true;
   first.store.save(main);
+  first.store.saveReply(main, "Partial response");
+  const step = { kind: "llm_call", status: "running", turnIndex: 0 };
+  first.store.saveStep(main, "activation", 0, step);
   const child = {
     ...main,
     id: crypto.randomUUID(),
     kind: "general" as const,
     parentId: main.id,
-    partial: undefined,
-    held: false,
     title: "Recovery",
     history: [
       {
@@ -61,6 +60,8 @@ test("restart preserves an interrupted main reply without retrying and repairs c
     "Partial response",
   );
   expect(getMessagesForSession(owner, id)[0]?.content).toContain("interrupted");
+  expect(getMessagesForSession(owner, id)[0]?.steps).toEqual([step]);
+  expect(recovered.store.steps(main.id)).toEqual([]);
   expect(recovered.store.get(main.id)?.status).toBe("idle");
   expect(recovered.store.get(child.id)?.status).toBe("idle");
   expect(new AgentStore().get(child.id)?.interruption).toContain(
@@ -248,8 +249,8 @@ test("recovery rolls back transcript and state together if persistence fails", a
   const first = new AgentRuntime();
   const main = first.main(owner, id);
   main.status = "running";
-  main.partial = { role: "assistant", content: "Partial reply", steps: [] };
   first.store.save(main);
+  first.store.saveReply(main, "Partial reply");
   const recovered = new AgentRuntime();
   const fault = spyOn(recovered.store, "saveHistory").mockImplementation(() => {
     throw new Error("Injected recovery failure");

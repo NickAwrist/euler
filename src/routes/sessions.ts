@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { Router } from "express";
 import { agentRuntime } from "../agents/runtime/AgentRuntime";
+import { withoutImageData } from "../db/agents";
 import {
   appendSessionEvent,
   createSessionRow,
@@ -8,7 +9,6 @@ import {
   getMessagesForSession,
   getSessionById,
   listSessionSummaries,
-  parseModelMessages,
   patchSessionRow,
 } from "../db/index";
 import { downloadWorkspaceFile } from "../http/downloadWorkspaceFile";
@@ -272,7 +272,7 @@ router.get("/:id", (req, res) => {
     customTitle: row.title,
     history,
     modelMessages: stripReasoningFromModelMessages(
-      parseModelMessages(row.model_messages),
+      agentRuntime.main(ownerUuid, id).history.map(withoutImageData),
     ),
     model: row.model,
     workspace: workspaceService.presentation(row),

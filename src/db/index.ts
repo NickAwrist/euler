@@ -15,7 +15,6 @@ export {
   getMessagesForSession,
   getSessionById,
   listSessionSummaries,
-  parseModelMessages,
   patchSessionRow,
   countMessagesForSession,
   appendSessionEvent,

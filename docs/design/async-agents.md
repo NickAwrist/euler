@@ -13,8 +13,9 @@ that exercises background work, a second user message, reload, and agent details
 Implementation notes:
 
 - Agent and inbox payloads use validated JSON columns with indexed relationship
-  columns and cascading foreign keys. Main-agent model history stays in
-  `sessions.model_messages`; subagent history lives in its agent record.
+  columns and cascading foreign keys. Every agent's model history is stored one
+  row per message in `agent_history`, and its trace one row per step in
+  `agent_steps`, so a save writes only the messages or step that changed.
 - `transcript_appended` carries each closed segment and its activation ID. There
   is no separate `segment_closed` event.
 - The runtime snapshot is also available at `GET /api/sessions/:id/runtime`.
@@ -223,7 +224,7 @@ Inbox messages are events, and the same rule applies to every agent, main includ
 | Running, model call streaming | Queued. If the call requests tools, the message is delivered after those tools finish. If the call ends with final text, the activation continues with another model call instead of ending. |
 | Running, tool executing | Queued until the tool returns. A long `bash` command or a `wait: true` spawn delays delivery. Meanwhile the Agents panel marks the message as queued. |
 | Main activation stopped by the user | Messages already queued when Stop was pressed are held, not delivered automatically, because Stop means "stop". The chat shows "Agent updates waiting" with a Deliver action, and they are also delivered with the user's next message. Messages that arrive after the stop wake the main agent normally. |
-| Automatic-turn budget reached | Held, as after a Stop. |
+| Automatic-turn budget reached | Held, as after a Stop. Automatic messages that arrive while the budget is spent are held as they arrive. Holding is a property of messages; an agent is paused while it has held messages. |
 | Sender cancelled by a rewind | Its undelivered messages are dropped. |
 | Server restart | Interrupted agents become Ready without starting work. Pending main input is held for explicit delivery; pending child input is retained in its context and marked interrupted. |
 
@@ -260,7 +261,7 @@ The system prompt states that envelopes are reports from agents or the runtime, 
 
 ### Pending-agent summary
 
-The first delivery of each main-agent activation includes a summary of the chat's live and recently finished subagents. Later deliveries include it again when a subagent's status has changed. It goes in the delivered input rather than the system prompt, so prompt caching stays effective:
+A delivery to the main agent includes a summary of the chat's live and recently finished subagents when it differs from the last summary the main agent received, which is stored on its record. A chat with no subagents to report gets no summary. A rewind clears the stored summary, so the next delivery sends it again. It goes in the delivered input rather than the system prompt, so prompt caching stays effective:
 
 ```text
 <background_agents>
@@ -269,7 +270,7 @@ The first delivery of each main-agent activation includes a summary of the chat'
 </background_agents>
 ```
 
-The summary lists live agents and agents that ended since the previous summary. It carries the latest `progress` text and the card's activity line. This is how the main agent answers progress questions and knows what it has already reported.
+The summary lists live agents and agents that ended since the previous summary. It carries a shortened latest activity line, since results arrive in full as messages. This is how the main agent answers progress questions and knows what it has already reported.
 
 ## Activations
 
@@ -295,8 +296,10 @@ flowchart TD
 ```
 
 - Only one activation runs per agent. The main agent and its subagents run concurrently.
-- The model history is persisted after every tool result, not only at the end. A restart then loses at most one model call.
-- A subagent's trace is stored per activation in `agent_steps`, so each step write is proportional to the current activation. Status events and snapshots carry agent status only; the trace is served with the agent detail.
+- The model history is persisted after every tool result, not only at the end. A restart then loses at most one model call. Only messages that changed are written.
+- Each step is stored as its own `agent_steps` row, and a `step` event carries only that step. A subagent's rows are its trace, served with the agent detail. A main agent's rows, and its reply text in `agent_replies`, last until its segment reaches the transcript, so a restart can keep the open segment.
+- An agent's record is saved when it changes, such as on a status change or a delivery, not on every step.
+- Nothing written or sent per step grows with the length of the conversation or the activation.
 - **Terminal tools** end the activation after their result is stored: `ask_parent` and, in phase 2, `request_human_control`. `BaseAgent.run` gains a way for a tool result to request this, replacing the idea of a stop flag on `RunContext`.
 - An abort (Stop in the UI or `cancel_agent`) uses the existing `AbortSignal` path. Cancelling the main agent's activation does not cancel its subagents. Cancelling a subagent is explicit.
 - Tool calls within an activation still run one at a time, as in `BaseAgent.run` today.
@@ -380,7 +383,7 @@ sequenceDiagram
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
-| `spawn_agent` | `kind`, `title`, `prompt`, optional `wait` (default `false`) | With `wait: false`, the agent ID immediately. With `wait: true`, waits for an answer unless incoming parent input or waiting children require Euler to continue first. If the agent calls `ask_parent` first, the call returns with status `waiting` and the question arrives in the caller's inbox. `browser` agents always start with `wait: false`. |
+| `spawn_agent` | `kind`, `title`, `prompt`, optional `wait` (default `false`) | With `wait: false`, the agent ID immediately. With `wait: true`, waits for an answer unless incoming parent input or waiting children require Euler to continue first. A result or failure returned this way is not delivered again as a message. If the agent calls `ask_parent` first, the call returns with status `waiting` and the question arrives in the caller's inbox. `browser` agents always start with `wait: false`. |
 | `send_message` | `to` (agent ID), `content` | Confirmation, or an error if the agent is final. |
 | `cancel_agent` | `agentId`, `reason` | Confirmation. The reason appears on the card. |
 
@@ -453,7 +456,7 @@ Opening a chat updates `last_viewed_at`. The sidebar's order continues to use `u
 | Endpoint | Purpose |
 | --- | --- |
 | `POST /api/sessions/:id/messages` | `{ content, attachmentIds, model, reasoningEffort, metadata }`. Stores the user message, enqueues it, and returns `{ messageId, queued }`. |
-| `POST /api/sessions/:id/rewind` | `{ position, content?, versions? }`. Edit and regenerate. Cancels and deletes agents spawned at or after `position`, truncates, then enqueues. |
+| `POST /api/sessions/:id/rewind` | `{ position, content?, versions?, model?, reasoningEffort?, metadata? }`. Edit and regenerate, with the composer settings a new message carries. Cancels and deletes agents spawned at or after `position`, truncates, then enqueues. |
 | `POST /api/sessions/:id/stop` | Aborts the main activation. |
 | `GET /api/sessions/:id` | Existing session payload plus `agents` and the in-progress activation's partial state. |
 | `GET /api/sessions/:id/agents/:agentId` | Agents panel detail: inbox and steps. |
@@ -474,7 +477,7 @@ The UI opens one fetch-based SSE stream per tab with the `x-euler-user-id` heade
 | --- | --- |
 | `activation_started` | `sessionId`, `agentId`, `activationId`, `trigger` (`user`, `agent`, `recovery`) |
 | `delta` | `activationId`, content and thinking deltas |
-| `step` | `activationId`, step snapshot |
+| `step` | `activationId`, the changed step and its position in the open segment |
 | `segment_closed` | `activationId`, stored assistant message, delivered rows that follow it |
 | `activation_ended` | `activationId`, outcome (`done`, `aborted`, `error`), stored message IDs |
 | `inbox_queued` | `sessionId`, `agentId`, IDs of queued messages, for the queued markers in the Agents panel |
@@ -496,9 +499,10 @@ erDiagram
   sessions ||--o{ agents : owns
   agents ||--o{ agent_messages : "inbox"
   agents ||--o{ agents : "parent of"
+  agents ||--o{ agent_history : "model history"
+  agents ||--o{ agent_steps : "trace"
   sessions {
     text id PK
-    text model_messages "main agent history, unchanged"
     int last_activity_at "new"
     int last_viewed_at "new"
   }
@@ -513,11 +517,20 @@ erDiagram
     text title
     text status
     text model
-    text model_messages "JSON history, null for main"
-    text steps "JSON, for the Agents panel"
     int spawn_position "transcript position of the spawning reply"
     int created_at
     int ended_at
+  }
+  agent_history {
+    text agent_id FK
+    int position
+    text message "one model message"
+  }
+  agent_steps {
+    text agent_id FK
+    text activation_id
+    int position
+    text step "one trace step"
   }
   agent_messages {
     int id PK
@@ -531,7 +544,7 @@ erDiagram
   }
 ```
 
-- The main agent's model history stays in `sessions.model_messages`. The main agent also has an `agents` row, so the inbox and status apply to it uniformly.
+- Every chat has a main agent row, so history, the inbox, and status apply to it and to subagents uniformly. A startup migration moves `sessions.model_messages` and subagent history JSON into `agent_history`, creating main agents for older chats.
 - `agents` and `agent_messages` cascade on session deletion, after the runtime has cancelled live agents.
 - `spawn_position` tells a rewind which agents to cancel and delete.
 - Persisting `messages` becomes append-and-update by message ID instead of rewriting by position, because agents and the user can now add rows concurrently.
@@ -543,7 +556,7 @@ erDiagram
 | Main agent's reply ends | Subagents keep running. |
 | User sends a message | Wakes the main agent, or is delivered at its next step boundary if it is replying. |
 | Stop in the composer | Aborts the main activation only. Messages queued at that moment are held. |
-| Stop agent | Cancels that subagent and its pending inbox. |
+| Stop agent | Cancels that subagent and its pending inbox, and withdraws its unanswered question. |
 | Edit or regenerate | Cancels and deletes agents with `spawn_position` at or after the rewind point, including their inboxes and reports, then rewinds. The confirmation dialog names them. |
 | Delete chat | Cancels all agents, waits for activations to settle, then deletes. Browser data is untouched (phase 2). |
 | Change workspace | Rejected with 409 while any agent is live, as it is during a turn today. |

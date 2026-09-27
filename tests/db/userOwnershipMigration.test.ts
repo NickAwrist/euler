@@ -70,7 +70,9 @@ test("migrations remove legacy agents while preserving sessions", () => {
   ).toEqual([
     { name: "agents" },
     { name: "agent_messages" },
+    { name: "agent_history" },
     { name: "agent_steps" },
+    { name: "agent_replies" },
   ]);
   expect(db.query("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(

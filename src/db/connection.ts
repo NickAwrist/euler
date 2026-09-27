@@ -28,7 +28,6 @@ export function getDb(): Database {
       updated_at INTEGER NOT NULL,
       title TEXT,
       model TEXT,
-      model_messages TEXT,
       session_directory TEXT,
       workspace_kind TEXT NOT NULL DEFAULT 'sandbox'
     );

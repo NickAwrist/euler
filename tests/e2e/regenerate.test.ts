@@ -3,6 +3,7 @@ import "../setup";
 import { expect, test } from "bun:test";
 import { setOpenRouterApiKey } from "../../src/db";
 import type { WireMessageInput } from "../../src/schemas/run";
+import { getOpenRouterRequests } from "../helpers/mockOpenRouter";
 import { startTestServer, userHeaders } from "../helpers/server";
 
 const model = "openrouter:openai/gpt-5.6-terra";
@@ -47,10 +48,23 @@ test("a regenerated reply keeps the replies it replaced", async () => {
           position: 0,
           content: "Hello",
           versions: [{ content: first!.content, steps: first!.steps }],
+          model: "openrouter:anthropic/claude-sonnet-5",
+          reasoningEffort: "high",
         })
       ).status,
     ).toBe(200);
     await waitForActivation(sessionId);
+    // A regenerated reply uses the settings it was requested with.
+    expect(getOpenRouterRequests().at(-1)?.body).toMatchObject({
+      model: "anthropic/claude-sonnet-5",
+      reasoning: { effort: "high" },
+    });
+    const session = await fetch(`${url}/api/sessions/${sessionId}`, {
+      headers: userHeaders(),
+    });
+    expect(((await session.json()) as { model: string }).model).toBe(
+      "openrouter:anthropic/claude-sonnet-5",
+    );
     const regenerated = await storedHistory(sessionId);
     expect(regenerated).toHaveLength(2);
     expect(regenerated[1]?.versions).toEqual([

@@ -14,7 +14,12 @@ const SpawnAgentArgs = z.object({
   wait: z.boolean().optional(),
 });
 export type SpawnRequest = z.infer<typeof SpawnAgentArgs>;
-export type SpawnResult = { agentId: string; status?: string; result?: string };
+export type SpawnResult = {
+  agentId: string;
+  status?: string;
+  result?: string;
+  error?: string;
+};
 
 export class SpawnAgentTool extends BaseTool {
   constructor(private spawn: (request: SpawnRequest) => Promise<SpawnResult>) {

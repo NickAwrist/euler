@@ -65,7 +65,7 @@ export function getSessionById(
 ): SessionRow | null {
   const row = getDb()
     .query(
-      "SELECT id, owner_uuid, created_at, updated_at, title, model, model_messages, session_directory, workspace_kind FROM sessions WHERE owner_uuid = ? AND id = ?",
+      "SELECT id, owner_uuid, created_at, updated_at, title, model, session_directory, workspace_kind FROM sessions WHERE owner_uuid = ? AND id = ?",
     )
     .get(ownerUuid, id) as SessionRow | null;
   return row ?? null;
@@ -176,18 +176,6 @@ function messageColumns(m: WireMessage) {
   };
 }
 
-export function parseModelMessages(
-  json: string | null,
-): Array<Record<string, unknown>> | null {
-  if (json == null || json === "") return null;
-  try {
-    const v = JSON.parse(json) as unknown;
-    return Array.isArray(v) ? (v as Array<Record<string, unknown>>) : null;
-  } catch {
-    return null;
-  }
-}
-
 export function createSessionRow(
   ownerUuid: string,
   id: string,
@@ -196,7 +184,7 @@ export function createSessionRow(
 ): SessionRow {
   const db = getDb();
   db.run(
-    "INSERT INTO sessions (id, owner_uuid, created_at, updated_at, title, model, model_messages) VALUES (?, ?, ?, ?, NULL, ?, NULL)",
+    "INSERT INTO sessions (id, owner_uuid, created_at, updated_at, title, model) VALUES (?, ?, ?, ?, NULL, ?)",
     [id, ownerUuid, now, now, model],
   );
   return {
@@ -206,7 +194,6 @@ export function createSessionRow(
     updated_at: now,
     title: null,
     model,
-    model_messages: null,
     session_directory: null,
     workspace_kind: "sandbox",
   };
@@ -227,7 +214,6 @@ export function patchSessionRow(
   patch: {
     title?: string | null;
     model?: string | null;
-    model_messages?: Array<Record<string, unknown>> | null;
     session_directory?: string | null;
     workspace_kind?: "sandbox" | "local";
     updated_at?: number;
@@ -243,27 +229,11 @@ export function patchSessionRow(
       ? patch.session_directory
       : existing.session_directory;
   const workspaceKind = patch.workspace_kind ?? existing.workspace_kind;
-  let modelMessagesJson: string | null = existing.model_messages;
-  if (patch.model_messages !== undefined) {
-    modelMessagesJson =
-      patch.model_messages == null
-        ? null
-        : JSON.stringify(patch.model_messages);
-  }
   const updatedAt = patch.updated_at ?? Date.now();
 
   getDb().run(
-    "UPDATE sessions SET title = ?, model = ?, model_messages = ?, session_directory = ?, workspace_kind = ?, updated_at = ? WHERE owner_uuid = ? AND id = ?",
-    [
-      title,
-      model,
-      modelMessagesJson,
-      sessionDirectory,
-      workspaceKind,
-      updatedAt,
-      ownerUuid,
-      id,
-    ],
+    "UPDATE sessions SET title = ?, model = ?, session_directory = ?, workspace_kind = ?, updated_at = ? WHERE owner_uuid = ? AND id = ?",
+    [title, model, sessionDirectory, workspaceKind, updatedAt, ownerUuid, id],
   );
   return true;
 }

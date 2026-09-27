@@ -374,10 +374,20 @@ export class BaseAgent {
 
     // OpenRouter reasoning blocks are needed for immediate tool continuation,
     // but replaying them on later user turns adds large provider metadata to input.
-    this.history = this.history.map(
-      ({ reasoning: _reasoning, reasoning_details: _details, ...message }) =>
-        message,
-    );
+    // Messages without reasoning stay the same objects, so they are not saved again.
+    this.history = this.history.map((message) => {
+      if (
+        message.reasoning === undefined &&
+        message.reasoning_details === undefined
+      )
+        return message;
+      const {
+        reasoning: _reasoning,
+        reasoning_details: _details,
+        ...stripped
+      } = message;
+      return stripped;
+    });
 
     if (!signal?.aborted) {
       const completeStep = ctx.beginStep({ kind: "complete", turnIndex });

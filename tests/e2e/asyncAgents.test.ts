@@ -49,6 +49,13 @@ test("server-owned turns queue input at boundaries and survive HTTP disconnectio
       "user",
       "assistant",
     ]);
+    // A chat without subagents never receives a subagent summary.
+    expect(
+      agentRuntime.store
+        .list(TEST_USER_ID, id)
+        .find((a) => a.kind === "main")
+        ?.history.some((m) => m.content.includes("<background_agents>")),
+    ).toBe(false);
     expect(
       (
         await post(`/api/sessions/${id}/messages`, {
@@ -118,6 +125,25 @@ for (const scenario of [
         expect(
           agentRuntime.store.inbox(main.id).some((m) => m.kind === "question"),
         ).toBe(true);
+      // An unchanged subagent summary is not sent again on the next turn.
+      const summaries = () =>
+        agentRuntime.store
+          .get(main.id)!
+          .history.filter((m) => m.content.startsWith("<background_agents>"))
+          .length;
+      const sent = summaries();
+      const before = getMessagesForSession(TEST_USER_ID, id).length;
+      await fetch(`${url}/api/sessions/${id}/messages`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ content: "Thanks", model }),
+      });
+      await until(
+        () =>
+          getMessagesForSession(TEST_USER_ID, id).length === before + 2 &&
+          !agentRuntime.busy(TEST_USER_ID, id),
+      );
+      expect(summaries()).toBe(sent);
     } finally {
       await agentRuntime.deleteSession(TEST_USER_ID, id);
       await close();
@@ -353,6 +379,14 @@ test("a blocking spawn returns the child's result to the same reply", async () =
       status: "idle",
       result: "42",
     });
+    // The spawn returned the result, so it is not delivered a second time.
+    expect(main.history.some((m) => m.content.includes('kind="result"'))).toBe(
+      false,
+    );
+    expect(
+      agentRuntime.store.inbox(main.id).find((m) => m.kind === "result")
+        ?.deliveredAt,
+    ).toBeNumber();
   } finally {
     await agentRuntime.deleteSession(TEST_USER_ID, id);
     await close();

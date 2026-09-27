@@ -76,12 +76,18 @@ export function useRunStreaming(p: Args) {
     attachments: ImageAttachment[],
     options: { rebuildModelMessages: boolean; versions?: MessageVersion[] },
   ) => {
+    const settings = {
+      model: p.selectedModel,
+      reasoningEffort: p.reasoningEffort,
+      metadata: buildRunMetadata(p.userSettingsRef.current),
+    };
     try {
       if (options.rebuildModelMessages) {
         await agentAction(
           sessionId,
           "rewind",
           {
+            ...settings,
             position: priorMessages.length,
             content: message,
             versions: options.versions,
@@ -93,11 +99,9 @@ export function useRunStreaming(p: Args) {
           sessionId,
           "messages",
           {
+            ...settings,
             content: message,
             attachmentIds: attachments.map((a) => a.id),
-            model: p.selectedModel,
-            reasoningEffort: p.reasoningEffort,
-            metadata: buildRunMetadata(p.userSettingsRef.current),
           },
           p.isEphemeral,
         );
