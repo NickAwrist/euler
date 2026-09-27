@@ -17,7 +17,6 @@ const base: Agent = {
   createdAt: 1,
   endedAt: null,
   activity: "",
-  steps: [],
   held: false,
   interruption: "Interrupted by server restart. Ready for new instructions.",
 };
@@ -26,13 +25,11 @@ export default function AgentsDemo() {
     base,
     {
       ...base,
-      id: "failed",
+      id: "errored",
       title: "Local analysis",
       model: "qwen3:8b",
-      status: "failed",
-      interruption: undefined,
+      interruption: "Model unavailable",
       activity: "Model unavailable",
-      endedAt: 2,
     },
     {
       ...base,

@@ -53,7 +53,7 @@ export function AgentTraceModal({
     (m) => m.kind === "task",
   )?.content;
   // Server step records, trusted like transcript steps in useAgentEvents.
-  const steps = (detail?.agent.steps ?? []) as unknown as MessageStep[];
+  const steps = (detail?.steps ?? []) as unknown as MessageStep[];
   return (
     <StepsModal
       steps={steps}

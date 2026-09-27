@@ -20,6 +20,13 @@ const AGENT_MESSAGES = `CREATE TABLE agent_messages (
   created_at INTEGER NOT NULL,
   delivered_at INTEGER
 )`;
+/** One row per activation, so a step write stays proportional to that activation. */
+const AGENT_STEPS = `CREATE TABLE agent_steps (
+  agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+  activation_id TEXT NOT NULL,
+  steps TEXT NOT NULL,
+  PRIMARY KEY (agent_id, activation_id)
+)`;
 const INDEXES = `
   CREATE INDEX IF NOT EXISTS idx_agents_session ON agents(session_id, status);
   CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);
@@ -34,24 +41,45 @@ const columns = (db: Database, table: string) =>
     (c) => c.name,
   );
 
-/**
- * Creates the agent tables. Tables from before status and delivery had their
- * own columns kept everything in `data`; their rows are moved into the columns.
- */
+/** Creates the agent tables and upgrades tables from earlier versions. */
 export function createAgentTables(db: Database) {
   const agentColumns = columns(db, "agents");
-  if (!agentColumns.length) {
-    db.run(`${AGENTS}; ${AGENT_MESSAGES}; ${INDEXES}`);
-    return;
-  }
-  if (agentColumns.includes("status")) {
+  if (!agentColumns.length) db.run(`${AGENTS}; ${AGENT_MESSAGES}; ${INDEXES}`);
+  else if (!agentColumns.includes("status")) moveDataIntoColumns(db);
+  else {
     if (!columns(db, "agent_messages").includes("attachments"))
       db.run(
         "ALTER TABLE agent_messages ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'",
       );
     db.run(INDEXES);
-    return;
   }
+  if (!columns(db, "agent_steps").length) createStepTable(db);
+}
+
+/**
+ * Records from before steps had their own table kept a subagent's whole trace
+ * in `data`, and a subagent error ended it as `failed`. Errors now leave the
+ * agent ready, so those agents become ready again.
+ */
+function createStepTable(db: Database) {
+  db.transaction(() => {
+    db.run(`${AGENT_STEPS};
+      INSERT INTO agent_steps (agent_id, activation_id, steps)
+      SELECT id, 'migrated', json_extract(data, '$.steps') FROM agents
+      WHERE json_extract(data, '$.kind') != 'main'
+        AND json_array_length(data, '$.steps') > 0;
+      UPDATE agents SET data = json_remove(data, '$.steps')
+      WHERE json_type(data, '$.steps') IS NOT NULL;
+      UPDATE agents SET status = 'idle', data = json_set(data, '$.endedAt', NULL)
+      WHERE status = 'failed';`);
+  })();
+}
+
+/**
+ * Tables from before status and delivery had their own columns kept
+ * everything in `data`; their rows are moved into the columns.
+ */
+function moveDataIntoColumns(db: Database) {
   // Swapping tables with foreign keys must happen outside a transaction.
   db.run("PRAGMA foreign_keys = OFF");
   try {

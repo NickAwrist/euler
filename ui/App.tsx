@@ -45,7 +45,7 @@ import {
   parseRoute,
   sessionPath,
 } from "./lib/navigation";
-import { agentAction } from "./persist/agents";
+import { cancelAgent } from "./persist/agents";
 import { CHAT_MAX_WIDTHS, loadAppearance } from "./persist/appearance";
 import { fetchSession } from "./persist/sessions";
 import { cx } from "./styles";
@@ -99,12 +99,7 @@ function ChatView({
   const selectedAgent = app.agents.find((a) => a.id === selectedAgentId);
   const stopAgent = async (id: string) => {
     if (app.activeSessionId) {
-      await agentAction(
-        app.activeSessionId,
-        `agents/${encodeURIComponent(id)}/cancel`,
-        {},
-        app.isEphemeral,
-      );
+      await cancelAgent(app.activeSessionId, id, app.isEphemeral);
       await app.refreshRuntime();
     }
   };

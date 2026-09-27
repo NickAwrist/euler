@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { AgentSchema, InboxMessageSchema } from "../../src/schemas/agents";
 import { ActivationSchema } from "../../src/schemas/events";
-import { WireMessageSchema } from "../../src/schemas/run";
+import { WireMessageSchema, WireStepSchema } from "../../src/schemas/run";
 import { apiJson, apiVoid } from "../lib/api";
 export const runtimePath = (id: string, temporary = false) =>
   `/api/${temporary ? "temporary-sessions" : "sessions"}/${encodeURIComponent(id)}`;
@@ -36,12 +36,24 @@ export async function fetchAgent(
   temporary = false,
 ) {
   return z
-    .object({ agent: AgentSchema, messages: z.array(InboxMessageSchema) })
+    .object({
+      agent: AgentSchema,
+      steps: z.array(WireStepSchema),
+      messages: z.array(InboxMessageSchema),
+    })
     .parse(
       await apiJson(
         `${runtimePath(id, temporary)}/agents/${encodeURIComponent(agentId)}`,
       ),
     );
+}
+export function cancelAgent(id: string, agentId: string, temporary = false) {
+  return agentAction(
+    id,
+    `agents/${encodeURIComponent(agentId)}/cancel`,
+    {},
+    temporary,
+  );
 }
 export function removeQueuedMessage(
   id: string,

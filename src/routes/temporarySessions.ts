@@ -166,15 +166,8 @@ router.post("/:id/reveal", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
-  if (agentRuntime.busy(ownerUuid, req.params.id)) {
-    sendApiError(
-      res,
-      409,
-      "CONFLICT",
-      "Stop the current turn before closing this temporary chat",
-    );
-    return;
-  }
+  // Settle every agent before its workspace is removed.
+  await agentRuntime.deleteSession(ownerUuid, req.params.id);
   const deleted = await workspaceService.deleteTemporary(
     ownerUuid,
     req.params.id,
@@ -183,7 +176,6 @@ router.delete("/:id", async (req, res) => {
     sendApiError(res, 404, "NOT_FOUND", "Temporary chat not found");
     return;
   }
-  await agentRuntime.deleteSession(ownerUuid, req.params.id);
   res.json({ ok: true });
 });
 

@@ -37,13 +37,12 @@ test("session loading: interrupted agents show their reason and fixed model", as
     trace.getByText("openai/gpt-5.6-terra", { exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.getByRole("button", { name: "Ended 1" }).click();
-  const failed = page.getByRole("button", { name: /^Local analysis/ });
+  const errored = page.getByRole("button", { name: /^Local analysis/ });
   await expect(
-    failed.getByRole("img", { name: "Model unavailable" }),
+    errored.getByRole("img", { name: "Model unavailable" }),
   ).toBeVisible();
-  await expect(failed.locator('img[src="/icons/ollama.svg"]')).toBeVisible();
-  await expect(failed).toContainText("qwen3:8b");
+  await expect(errored.locator('img[src="/icons/ollama.svg"]')).toBeVisible();
+  await expect(errored).toContainText("qwen3:8b");
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -57,6 +56,7 @@ test("session loading: interrupted agents show their reason and fixed model", as
     path: testInfo.outputPath("agent-status-desktop.png"),
   });
   await page.getByRole("button", { name: "Dismiss Research" }).click();
+  await page.getByRole("button", { name: "Ended 1" }).click();
   await expect(page.getByRole("button", { name: /^Research/ })).toContainText(
     "Done",
   );

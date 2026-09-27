@@ -67,7 +67,11 @@ test("migrations remove legacy agents while preserving sessions", () => {
         "SELECT name FROM sqlite_master WHERE type = 'table' AND (name LIKE 'agent%' OR name = 'user_settings')",
       )
       .all(),
-  ).toEqual([{ name: "agents" }, { name: "agent_messages" }]);
+  ).toEqual([
+    { name: "agents" },
+    { name: "agent_messages" },
+    { name: "agent_steps" },
+  ]);
   expect(db.query("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(
     (db.query("PRAGMA foreign_keys").get() as { foreign_keys: number })

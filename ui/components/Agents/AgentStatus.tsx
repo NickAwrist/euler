@@ -7,14 +7,11 @@ const STATUS_LABELS: Record<Agent["status"], string> = {
   waiting: "Waiting for Euler",
   idle: "Ready",
   completed: "Done",
-  failed: "Failed",
   cancelled: "Stopped",
 };
 
 export function AgentStatus({ agent }: { agent: Agent }) {
-  const problem =
-    agent.interruption ||
-    (agent.status === "failed" ? agent.activity || "Agent failed" : undefined);
+  const problem = agent.interruption;
   const label = agent.interruption
     ? "Interrupted"
     : agent.held && !isFinalAgent(agent)

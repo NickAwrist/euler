@@ -252,6 +252,12 @@ test("a ready child keeps its context for follow-ups until it is dismissed", asy
     expect(
       followedUp.history.filter((m) => m.role === "assistant"),
     ).toHaveLength(2);
+    // The trace spans both activations and is served only with the agent detail.
+    const detail = (await (
+      await fetch(`${url}/api/sessions/${id}/agents/${child.id}`, { headers })
+    ).json()) as { agent: object; steps: { kind: string }[] };
+    expect(detail.agent).not.toHaveProperty("steps");
+    expect(detail.steps.filter((s) => s.kind === "llm_call")).toHaveLength(2);
 
     expect(
       (await post(`/api/sessions/${id}/agents/${child.id}/cancel`)).status,
@@ -406,41 +412,43 @@ test("Stop holds input already queued until Deliver, and invalid rewind is rejec
   }
 });
 
-test("deleting a chat settles its main and child activations before deleting durable state", async () => {
-  setOpenRouterApiKey("test");
-  setOpenRouterScenario("async-agents");
-  const { url, close } = await startTestServer();
-  const headers = userHeaders(undefined, {
-    "Content-Type": "application/json",
-  });
-  const created = await fetch(`${url}/api/sessions`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ model }),
-  });
-  const { id } = (await created.json()) as { id: string };
-  try {
-    await fetch(`${url}/api/sessions/${id}/messages`, {
+for (const temporary of [false, true])
+  test(`deleting a ${temporary ? "temporary" : "retained"} chat settles its main and child activations before deleting it`, async () => {
+    setOpenRouterApiKey("test");
+    setOpenRouterScenario("async-agents");
+    const { url, close } = await startTestServer();
+    const headers = userHeaders(undefined, {
+      "Content-Type": "application/json",
+    });
+    const base = `${url}/api/${temporary ? "temporary-sessions" : "sessions"}`;
+    const created = await fetch(base, {
       method: "POST",
       headers,
-      body: JSON.stringify({ content: "Research", model }),
+      body: JSON.stringify({ model }),
     });
-    await until(() =>
-      agentRuntime.store
-        .list(TEST_USER_ID, id)
-        .some((a) => a.kind === "general" && a.status === "running"),
-    );
-    const response = await fetch(`${url}/api/sessions/${id}`, {
-      method: "DELETE",
-      headers,
-    });
-    expect(response.ok).toBe(true);
-    expect(agentRuntime.store.list(TEST_USER_ID, id)).toEqual([]);
-    expect((await fetch(`${url}/api/sessions/${id}`, { headers })).status).toBe(
-      404,
-    );
-  } finally {
-    await agentRuntime.deleteSession(TEST_USER_ID, id);
-    await close();
-  }
-});
+    const { id } = (await created.json()) as { id: string };
+    try {
+      await fetch(`${base}/${id}/messages`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ content: "Research", model }),
+      });
+      await until(() =>
+        agentRuntime.store
+          .list(TEST_USER_ID, id)
+          .some((a) => a.kind === "general" && a.status === "running"),
+      );
+      const response = await fetch(`${base}/${id}`, {
+        method: "DELETE",
+        headers,
+      });
+      expect(response.ok).toBe(true);
+      expect(agentRuntime.store.list(TEST_USER_ID, id)).toEqual([]);
+      expect((await fetch(`${base}/${id}/runtime`, { headers })).status).toBe(
+        404,
+      );
+    } finally {
+      await agentRuntime.deleteSession(TEST_USER_ID, id);
+      await close();
+    }
+  });

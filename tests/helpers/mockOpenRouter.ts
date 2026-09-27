@@ -79,7 +79,9 @@ export async function handleOpenRouterRequest(
   const body = (await request.json()) as Record<string, unknown>;
   requests.push({ headers: request.headers, body });
 
-  if (scenario === "endless-tools")
+  if (scenario === "endless-tools") {
+    // Yield like real network I/O so an unbounded loop cannot starve timers.
+    await Bun.sleep(1);
     return sse([
       chunk(
         {
@@ -96,6 +98,7 @@ export async function handleOpenRouterRequest(
       ),
       "[DONE]",
     ]);
+  }
 
   if (
     scenario === "async-agents" ||

@@ -34,6 +34,9 @@ export function migrateChildRuns(db: Database) {
   const insertAgent = db.prepare(
     "INSERT INTO agents (id, session_id, status, data) VALUES (?, ?, 'completed', ?)",
   );
+  const insertSteps = db.prepare(
+    "INSERT INTO agent_steps (agent_id, activation_id, steps) VALUES (?, 'migrated', ?)",
+  );
   const insertTask = db.prepare(
     "INSERT INTO agent_messages (agent_id, sender, kind, content, wakes, created_at, delivered_at) VALUES (?, 'runtime', 'task', ?, 1, ?, ?)",
   );
@@ -82,13 +85,15 @@ export function migrateChildRuns(db: Database) {
               createdAt,
               endedAt: time(step.endedAt) ?? createdAt,
               activity: text(step.result),
-              steps: extract(stepList(run.steps), -1, id),
               held: false,
-              modelCalls: 0,
               checkpoints: {},
               lastSummaryAt: 0,
               config: {},
             }),
+          );
+          insertSteps.run(
+            id,
+            JSON.stringify(extract(stepList(run.steps), -1, id)),
           );
           if (prompt) insertTask.run(id, prompt, createdAt, createdAt);
           return step;

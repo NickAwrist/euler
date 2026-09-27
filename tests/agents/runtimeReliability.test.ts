@@ -78,6 +78,43 @@ for (const resume of ["deliver", "message"] as const) {
   });
 }
 
+test("a child error reports failure and leaves the child ready with its context", async () => {
+  const runtime = new AgentRuntime();
+  const main = await session(runtime);
+  const worker = {
+    ...main,
+    id: crypto.randomUUID(),
+    parentId: main.id,
+    kind: "general" as const,
+    history: [],
+    checkpoints: {},
+  };
+  runtime.store.save(worker);
+  setOpenRouterScenario("rate-limit");
+  try {
+    runtime.enqueue(worker, main.id, "message", "First assignment");
+    await until(() =>
+      runtime.store.inbox(main.id).some((m) => m.kind === "failure"),
+    );
+    const errored = runtime.store.get(worker.id)!;
+    expect(errored.status).toBe("idle");
+    expect(errored.endedAt).toBeNull();
+    expect(errored.interruption).toBe(errored.activity);
+    setOpenRouterScenario("streaming");
+    runtime.enqueue(worker, main.id, "message", "Try again");
+    await until(() =>
+      runtime.store.inbox(main.id).some((m) => m.kind === "result"),
+    );
+    const recovered = runtime.store.get(worker.id)!;
+    expect(recovered.interruption).toBeUndefined();
+    expect(
+      recovered.history.some((m) => m.content.includes("First assignment")),
+    ).toBe(true);
+  } finally {
+    await runtime.deleteSession(owner, main.sessionId);
+  }
+});
+
 test("model selection and message acceptance commit together and survive reload", async () => {
   const runtime = new AgentRuntime();
   const main = await session(runtime);

@@ -51,8 +51,9 @@ test("legacy nested subagent runs become ended agents and leave the transcript",
     createdAt: Date.parse("2026-01-01T00:00:00.000Z"),
     endedAt: Date.parse("2026-01-01T00:00:05.000Z"),
   });
-  expect(survey.steps).toHaveLength(2);
-  expect(JSON.stringify(survey.steps)).not.toContain("childRun");
+  const steps = new AgentStore().steps(survey.id);
+  expect(steps).toHaveLength(2);
+  expect(JSON.stringify(steps)).not.toContain("childRun");
   expect(byTitle("Nested")).toMatchObject({
     parentId: survey.id,
     spawnPosition: -1,

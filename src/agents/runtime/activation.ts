@@ -16,7 +16,7 @@ import { workspaceService } from "../../workspaces/WorkspaceService";
 import { agentManager, buildServerRunPromptContext } from "../agentManager";
 import {
   INBOX_DIRECTIVES,
-  agentEnvelope,
+  inboxModelContent,
   pendingSummary,
 } from "./agentContext";
 import { changedWorkspaceFiles } from "./workspaceOutputs";
@@ -86,7 +86,6 @@ export async function runActivation(
   let segmentStart = 0;
   const summarySince = agent.lastSummaryAt;
   let lastSummaryText = "";
-  const previousSteps = agent.kind === "main" ? [] : agent.steps;
   let ctx: RunContext | undefined;
   let changedFiles: WorkspaceFileAttachment[] = [];
   let attachmentStart = 0;
@@ -165,7 +164,9 @@ export async function runActivation(
       (context, step) => {
         const allSteps = context.wireSteps();
         partial.steps = allSteps.slice(segmentStart);
-        agent.steps = [...previousSteps, ...allSteps];
+        // A main agent's steps are stored with its transcript segments.
+        if (agent.kind !== "main")
+          host.store.saveSteps(agent, partial.id, allSteps);
         agent.partial = {
           role: "assistant",
           content: partial.content,
@@ -212,7 +213,8 @@ export async function runActivation(
     model.hasPendingInput = () =>
       !waiting && host.store.hasWakingMessage(agent.id, false);
     model.beforeModelCall = async () => {
-      const savedHistory = structuredClone(model.history);
+      // The write only appends to the model history.
+      const savedHistoryLength = model.history.length;
       const savedPartial = structuredClone(partial);
       const savedSegmentStart = segmentStart;
       const savedAttachmentStart = attachmentStart;
@@ -261,10 +263,7 @@ export async function runActivation(
             } else
               model.history.push({
                 role: "user",
-                content:
-                  message.kind === "task"
-                    ? message.content
-                    : agentEnvelope(message, agents),
+                content: inboxModelContent(message, agents),
               });
             agent.pendingOutputs.push(...message.attachments);
           }
@@ -286,7 +285,7 @@ export async function runActivation(
         });
         return !paused;
       } catch (error) {
-        model.history = savedHistory;
+        model.history.length = savedHistoryLength;
         Object.assign(partial, savedPartial);
         segmentStart = savedSegmentStart;
         attachmentStart = savedAttachmentStart;
@@ -335,8 +334,9 @@ export async function runActivation(
     });
   } catch (error) {
     outcome = signal.aborted ? "aborted" : "error";
+    // An error ends the activation, not the agent: it keeps its context.
     agent.status =
-      agent.kind === "main" ? "idle" : signal.aborted ? "cancelled" : "failed";
+      signal.aborted && agent.kind !== "main" ? "cancelled" : "idle";
     agent.activity = error instanceof Error ? error.message : String(error);
     ctx?.failLastRunningStep(agent.activity);
     if (agent.kind === "main") {
@@ -348,7 +348,7 @@ export async function runActivation(
       });
     } else if (!signal.aborted && agent.parentId) {
       const parent = host.store.get(agent.parentId);
-      agent.endedAt = Date.now();
+      agent.interruption = agent.activity;
       host.atomically(agent.sessionId, () => {
         host.store.save(agent);
         if (parent && !host.isDeleting(agent.sessionId))

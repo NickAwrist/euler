@@ -3,7 +3,7 @@ import {
   MAX_IMAGES_PER_MESSAGE,
   OutputAttachmentSchema,
 } from "../attachments/types";
-import { MessageVersionSchema, RunMetadataSchema, WireStepSchema } from "./run";
+import { MessageVersionSchema, RunMetadataSchema } from "./run";
 
 export const AgentStatusSchema = z.enum([
   "queued",
@@ -11,7 +11,6 @@ export const AgentStatusSchema = z.enum([
   "waiting",
   "idle",
   "completed",
-  "failed",
   "cancelled",
 ]);
 export const AgentSchema = z.object({
@@ -29,7 +28,6 @@ export const AgentSchema = z.object({
   endedAt: z.number().nullable(),
   activity: z.string(),
   interruption: z.string().optional(),
-  steps: z.array(WireStepSchema),
 });
 export type Agent = z.infer<typeof AgentSchema>;
 export const InboxMessageSchema = z.object({
@@ -79,7 +77,6 @@ export const RewindSchema = z
 export type AgentStatus = z.infer<typeof AgentStatusSchema>;
 export const FINAL_STATUSES: readonly AgentStatus[] = [
   "completed",
-  "failed",
   "cancelled",
 ];
 /** Queued, running, or blocked on a reply. A ready subagent is `idle`. */

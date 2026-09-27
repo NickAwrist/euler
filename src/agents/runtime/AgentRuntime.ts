@@ -37,14 +37,18 @@ import {
 } from "../../tools/spawn_agent";
 import { RuntimeTransaction } from "./RuntimeTransaction";
 import { runActivation } from "./activation";
-import { agentEnvelope } from "./agentContext";
+import { inboxModelContent } from "./agentContext";
 
 /** Activations one owner may run at once. */
 const MAX_RUNNING_PER_OWNER = 4;
 /** Running or waiting subagents admitted in one chat; queued work waits. */
 const MAX_ACTIVE_SUBAGENTS = 3;
-/** Model calls across a chat between user messages or explicit delivery. */
-const MAX_AUTOMATIC_MODEL_CALLS = 10;
+/**
+ * Deliveries of agent or runtime messages across a chat between user messages
+ * or explicit delivery. Tool continuations are not counted: the budget bounds
+ * agents waking each other, not how long one activation works.
+ */
+const MAX_AUTOMATIC_TURNS = 10;
 
 export class AgentRuntime {
   readonly store = new AgentStore();
@@ -140,14 +144,13 @@ export class AgentRuntime {
       createdAt: Date.now(),
       endedAt: null,
       activity: "",
-      steps: [],
       history: [],
       pendingOutputs: [],
       checkpoints: {},
       // Agents that ended before this chat's main agent existed need no summary.
       lastSummaryAt: Date.now(),
       held: false,
-      modelCalls: 0,
+      automaticTurns: 0,
       config: {},
     };
     this.store.save(agent, temporary);
@@ -252,13 +255,17 @@ export class AgentRuntime {
     return message;
   }
   private budgetOwner(agent: AgentRecord) {
-    const main =
-      agent.kind === "main" ? agent : this.store.get(agent.parentId ?? "");
-    if (!main) throw new Error("Parent unavailable");
-    return main;
+    return agent.kind === "main" ? agent : this.store.get(agent.parentId ?? "");
+  }
+  /** Whether the agent's next delivery is agent or runtime work, not user input. */
+  private deliversAutomaticWork(agent: AgentRecord) {
+    const pending = this.store.undelivered(agent.id).filter((m) => !m.held);
+    return (
+      pending.some((m) => m.wakes) && !pending.some((m) => m.kind === "user")
+    );
   }
   private resetBudget(main: AgentRecord) {
-    main.modelCalls = 0;
+    main.automaticTurns = 0;
     for (const agent of this.store.list(main.ownerUuid, main.sessionId)) {
       if (isFinalAgent(agent)) continue;
       agent.held = false;
@@ -266,7 +273,10 @@ export class AgentRuntime {
       this.status(agent);
     }
   }
-  /** Keep a continuation in the inbox, including when only tool history remains. */
+  /**
+   * Holds the agent's pending messages and the main agent's. A main agent with
+   * nothing pending gets a note, so Deliver is offered when only a child paused.
+   */
   private pauseForBudget(agent: AgentRecord, main: AgentRecord) {
     for (const target of new Set([agent, main])) {
       target.held = true;
@@ -276,23 +286,20 @@ export class AgentRuntime {
           target,
           "runtime",
           "message",
-          "Automatic work paused at the model-call limit. Continue from saved context when the user resumes.",
+          "Automatic work paused at the automatic-turn limit. Continue from saved context when the user resumes.",
         );
       this.status(target);
     }
   }
   private allowModelCall(agent: AgentRecord): boolean {
+    if (!this.deliversAutomaticWork(agent)) return true;
     const main = this.budgetOwner(agent);
-    if (
-      agent.kind === "main" &&
-      this.store.undelivered(agent.id).some((m) => m.kind === "user" && !m.held)
-    )
-      return true;
-    if (main.modelCalls >= MAX_AUTOMATIC_MODEL_CALLS) {
+    if (!main) throw new Error("Parent unavailable");
+    if (main.automaticTurns >= MAX_AUTOMATIC_TURNS) {
       this.pauseForBudget(agent, main);
       return false;
     }
-    main.modelCalls++;
+    main.automaticTurns++;
     this.store.save(main);
     return true;
   }
@@ -335,12 +342,11 @@ export class AgentRuntime {
       )
         continue;
       const main = this.budgetOwner(agent);
-      const userInput =
-        agent.kind === "main" &&
-        this.store
-          .undelivered(agent.id)
-          .some((m) => m.kind === "user" && !m.held);
-      if (main.modelCalls >= MAX_AUTOMATIC_MODEL_CALLS && !userInput) {
+      if (!main) continue;
+      if (
+        main.automaticTurns >= MAX_AUTOMATIC_TURNS &&
+        this.deliversAutomaticWork(agent)
+      ) {
         this.atomically(agent.sessionId, () =>
           this.pauseForBudget(agent, main),
         );
@@ -508,10 +514,9 @@ export class AgentRuntime {
       interruption: undefined,
       versions: undefined,
       checkpoints: {},
-      steps: [],
       activity: request.prompt,
       held: false,
-      modelCalls: 0,
+      automaticTurns: 0,
     };
     this.atomically(parent.sessionId, () => {
       this.store.save(child, this.temporaryHistory.has(parent.sessionId));
@@ -708,8 +713,9 @@ export class AgentRuntime {
       this.store.withStatus(status),
     )) {
       const pending = this.store.undelivered(agent.id);
+      // Nothing was in progress: a waiting agent still waits for its answer.
       if (
-        agent.status === "idle" &&
+        (agent.status === "idle" || agent.status === "waiting") &&
         !pending.length &&
         (agent.kind !== "main" || !agent.partial)
       )
@@ -749,7 +755,7 @@ export class AgentRuntime {
             agent.pendingOutputs.push(...message.attachments);
             history.push({
               role: "user",
-              content: agentEnvelope(message, peers),
+              content: inboxModelContent(message, peers),
             });
           }
           this.store.deliver(pending);

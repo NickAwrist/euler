@@ -104,14 +104,14 @@ test("restart preserves an interrupted main reply without retrying and repairs c
   await recovered.deleteSession(owner, id);
 });
 
-test("the automatic model-call budget holds updates and a user message resets it", async () => {
+test("the automatic-turn budget holds updates and a user message resets it", async () => {
   setOpenRouterApiKey("test");
   const id = crypto.randomUUID();
   createSessionRow(owner, id, Date.now(), model);
   await workspaceService.provisionRetained(owner, id);
   const runtime = new AgentRuntime();
   const main = runtime.main(owner, id);
-  main.modelCalls = 10;
+  main.automaticTurns = 10;
   runtime.store.save(main);
   runtime.enqueue(main, "runtime", "result", "Ready");
   await until(() => runtime.snapshot(owner, id).held);
@@ -122,7 +122,7 @@ test("the automatic model-call budget holds updates and a user message resets it
       getMessagesForSession(owner, id).length === 2 &&
       !runtime.snapshot(owner, id).activation,
   );
-  expect(runtime.store.get(main.id)?.modelCalls).toBe(0);
+  expect(runtime.store.get(main.id)?.automaticTurns).toBe(0);
   expect(
     runtime.store.inbox(main.id).every((m) => m.deliveredAt !== null),
   ).toBe(true);
@@ -185,6 +185,14 @@ test("restart retains queued and waiting agents and their input without starting
     });
     return agent;
   });
+  const asking = {
+    ...main,
+    id: crypto.randomUUID(),
+    parentId: main.id,
+    kind: "general" as const,
+    status: "waiting" as const,
+  };
+  first.store.save(asking);
   first.store.enqueue({
     agentId: main.id,
     sender: "user",
@@ -214,6 +222,11 @@ test("restart retains queued and waiting agents and their input without starting
       ).toHaveLength(1);
       expect(recovered.store.undelivered(agent.id)).toHaveLength(0);
     }
+    // Waiting with nothing pending was never interrupted: it still awaits its answer.
+    const stillAsking = recovered.store.get(asking.id)!;
+    expect(stillAsking.status).toBe("waiting");
+    expect(stillAsking.interruption).toBeUndefined();
+    expect(stillAsking.history).toHaveLength(main.history.length);
     setOpenRouterApiKey("test");
     recovered.enqueue(
       recovered.store.get(children[0]!.id)!,

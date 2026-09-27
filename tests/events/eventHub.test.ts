@@ -108,3 +108,23 @@ test("a throwing client cannot interrupt delivery to healthy clients", () => {
   expect(healthy.chunks).toHaveLength(2);
   healthy.end();
 });
+
+test("replay is bounded by size so large step events cannot grow it without limit", () => {
+  const hub = new EventHub();
+  const cursor = hub.sequence("a");
+  const large = {
+    type: "session_activity",
+    sessionId: "chat-a",
+    agentId: "x".repeat(1024 * 1024),
+  } as const;
+  for (let i = 0; i < 5; i++) hub.publish("a", large);
+  const stale = new Client();
+  hub.attach("a", stale.response(), cursor);
+  expect(stale.chunks).toHaveLength(1);
+  expect(stale.chunks[0]).toContain('"type":"resync"');
+  stale.end();
+  const recent = new Client();
+  hub.attach("a", recent.response(), cursor + 3);
+  expect(recent.chunks).toHaveLength(2);
+  recent.end();
+});

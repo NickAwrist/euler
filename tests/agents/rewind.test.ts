@@ -47,7 +47,6 @@ for (const temporary of [false, true]) {
           spawnPosition: 1,
           status: "completed" as const,
           history: [],
-          steps: [],
         };
         runtime.store.save(ended, temporary);
         const working = {

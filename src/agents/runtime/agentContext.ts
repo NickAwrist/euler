@@ -13,6 +13,12 @@ export function agentEnvelope(message: InboxMessage, agents: AgentRecord[]) {
     : message.content;
   return `<agent_message from="${escapeEnvelope(message.sender)}" name="${escapeEnvelope(sender?.title ?? "Runtime")}" kind="${message.kind}">\n${escapeEnvelope(content)}\n</agent_message>`;
 }
+/** A delivered message as model input. A task is the parent's own prompt. */
+export const inboxModelContent = (
+  message: InboxMessage,
+  agents: AgentRecord[],
+) =>
+  message.kind === "task" ? message.content : agentEnvelope(message, agents);
 export function pendingSummary(agents: AgentRecord[]) {
   return `<background_agents>\n${agents
     .filter((a) => a.kind !== "main")

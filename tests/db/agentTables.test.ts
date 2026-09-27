@@ -103,3 +103,40 @@ test("adds output attachments to existing inboxes without changing messages", ()
     db.close();
   }
 });
+
+test("moves subagent traces into per-activation rows and makes failed agents ready", () => {
+  const db = new Database(":memory:");
+  try {
+    db.run("CREATE TABLE sessions (id TEXT PRIMARY KEY)");
+    createAgentTables(db);
+    db.run("DROP TABLE agent_steps");
+    const step = { kind: "llm_call", status: "done" };
+    for (const [id, status, data] of [
+      ["main", "idle", { kind: "main", steps: [step] }],
+      ["child", "idle", { kind: "general", steps: [step, step] }],
+      ["broken", "failed", { kind: "general", steps: [], endedAt: 5 }],
+    ] as const)
+      db.run(
+        "INSERT INTO agents (id, session_id, status, data) VALUES (?, 'chat', ?, ?)",
+        [id, status, JSON.stringify(data)],
+      );
+    createAgentTables(db);
+    createAgentTables(db);
+    expect(db.query("SELECT agent_id, steps FROM agent_steps").all()).toEqual([
+      { agent_id: "child", steps: JSON.stringify([step, step]) },
+    ]);
+    expect(
+      db.query("SELECT id, status, data FROM agents ORDER BY rowid").all(),
+    ).toEqual([
+      { id: "main", status: "idle", data: '{"kind":"main"}' },
+      { id: "child", status: "idle", data: '{"kind":"general"}' },
+      {
+        id: "broken",
+        status: "idle",
+        data: '{"kind":"general","endedAt":null}',
+      },
+    ]);
+  } finally {
+    db.close();
+  }
+});

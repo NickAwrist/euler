@@ -17,6 +17,7 @@ import {
   MessageVersionSchema,
   RunMetadataSchema,
   WireMessageSchema,
+  WireStepSchema,
 } from "../schemas/run";
 import { getDb, transaction } from "./connection";
 
@@ -28,13 +29,19 @@ const RecordSchema = AgentSchema.extend({
   checkpoints: z.record(z.string(), z.number()).default({}),
   versions: z.array(MessageVersionSchema).optional(),
   held: z.boolean(),
-  modelCalls: z.number().default(0),
+  /** Deliveries of agent or runtime messages since the user last acted. */
+  automaticTurns: z.number().default(0),
   config: z.object({
     reasoningEffort: z.string().optional(),
     metadata: RunMetadataSchema.optional(),
   }),
 });
-export type AgentRecord = z.infer<typeof RecordSchema>;
+type ModelMessage = z.infer<typeof ModelMessageSchema>;
+/** History is replaced by `saveHistory`, never mutated, so a checkpoint can share it. */
+export type AgentRecord = Omit<z.infer<typeof RecordSchema>, "history"> & {
+  history: readonly ModelMessage[];
+};
+export type AgentSteps = z.infer<typeof WireStepSchema>[];
 
 type MessageRow = {
   id: number;
@@ -86,6 +93,7 @@ export class AgentStore {
   private records = new Map<string, AgentRecord>();
   private temporary = new Map<string, AgentRecord>();
   private temporaryInbox: InboxMessage[] = [];
+  private temporarySteps = new Map<string, Map<string, AgentSteps>>();
   private nextTemporaryId = -Number.MAX_SAFE_INTEGER;
 
   cachedSessions(): Set<string> {
@@ -98,10 +106,14 @@ export class AgentStore {
       .filter((agent) => agent.sessionId === sessionId)
       .map((agent) => ({
         agent,
-        saved: structuredClone(agent),
+        saved: {
+          ...structuredClone({ ...agent, history: [] }),
+          history: agent.history,
+        },
         temporary: this.temporary.has(agent.id),
       }));
     const inbox = structuredClone(this.temporaryInbox);
+    const steps = new Map(this.temporarySteps);
     const nextId = this.nextTemporaryId;
     return () => {
       this.release(sessionId);
@@ -114,6 +126,7 @@ export class AgentStore {
         (temporary ? this.temporary : this.records).set(agent.id, agent);
       }
       this.temporaryInbox = inbox;
+      this.temporarySteps = steps;
       this.nextTemporaryId = nextId;
     };
   }
@@ -249,9 +262,34 @@ export class AgentStore {
     for (const [id, agent] of this.records)
       if (agent.sessionId === sessionId) this.records.delete(id);
   }
+  /** The agent's trace across its activations, oldest first. */
+  steps(agentId: string): AgentSteps {
+    const temporary = this.temporarySteps.get(agentId);
+    if (temporary) return [...temporary.values()].flat();
+    return (
+      getDb()
+        .query(
+          "SELECT steps FROM agent_steps WHERE agent_id = ? ORDER BY rowid",
+        )
+        .all(agentId) as { steps: string }[]
+    ).flatMap((row) => WireStepSchema.array().parse(JSON.parse(row.steps)));
+  }
+  saveSteps(agent: AgentRecord, activationId: string, steps: AgentSteps) {
+    if (this.temporary.has(agent.id)) {
+      const activations = this.temporarySteps.get(agent.id) ?? new Map();
+      activations.set(activationId, steps);
+      this.temporarySteps.set(agent.id, activations);
+      return;
+    }
+    getDb().run(
+      "INSERT INTO agent_steps (agent_id, activation_id, steps) VALUES (?, ?, ?) ON CONFLICT(agent_id, activation_id) DO UPDATE SET steps = excluded.steps",
+      [agent.id, activationId, JSON.stringify(steps)],
+    );
+  }
   remove(agent: AgentRecord) {
     this.records.delete(agent.id);
     this.temporary.delete(agent.id);
+    this.temporarySteps.delete(agent.id);
     this.temporaryInbox = this.temporaryInbox.filter(
       (m) => m.agentId !== agent.id && m.sender !== agent.id,
     );

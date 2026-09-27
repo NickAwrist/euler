@@ -33,7 +33,6 @@ function child(runtime: AgentRuntime, main: AgentRecord): AgentRecord {
     parentId: main.id,
     kind: "general",
     history: [],
-    steps: [],
     checkpoints: {},
   };
   runtime.store.save(record);
@@ -84,7 +83,7 @@ test("the budget covers child calls and retains paused follow-ups until the user
   const runtime = new AgentRuntime();
   const main = await session(runtime);
   const worker = child(runtime, main);
-  main.modelCalls = 10;
+  main.automaticTurns = 10;
   runtime.store.save(main);
   try {
     runtime.enqueue(worker, main.id, "message", "New assignment");
@@ -100,7 +99,7 @@ test("the budget covers child calls and retains paused follow-ups until the user
         .get(worker.id)
         ?.history.some((m) => m.content.includes("New assignment")),
     ).toBe(true);
-    expect(runtime.store.get(main.id)?.modelCalls).toBeGreaterThan(0);
+    expect(runtime.store.get(main.id)?.automaticTurns).toBeGreaterThan(0);
   } finally {
     await runtime.deleteSession(owner, main.sessionId);
   }
@@ -214,36 +213,30 @@ test("failed initial-prompt persistence rolls back the spawned agent", async () 
   }
 });
 
-test("a child tool loop pauses with a resumable continuation instead of reporting completion", async () => {
-  const runtime = new AgentRuntime();
-  const main = await session(runtime);
-  const worker = child(runtime, main);
-  setOpenRouterScenario("endless-tools");
-  try {
-    runtime.enqueue(worker, main.id, "message", "Work until finished");
-    await until(
-      () =>
-        runtime.store.get(worker.id)?.held === true &&
-        !runtime.busy(owner, main.sessionId),
-    );
-    expect(getOpenRouterRequests()).toHaveLength(10);
-    expect(
-      runtime.store.inbox(main.id).filter((m) => m.kind === "result"),
-    ).toHaveLength(0);
-    expect(runtime.store.undelivered(worker.id)).toHaveLength(1);
-    expect(
-      runtime.store.get(worker.id)?.history.filter((m) => m.role === "tool"),
-    ).toHaveLength(10);
-    setOpenRouterScenario("streaming");
-    runtime.deliver(main);
-    await until(() =>
-      runtime.store.inbox(main.id).some((m) => m.kind === "result"),
-    );
-    expect(runtime.store.get(worker.id)?.held).toBe(false);
-  } finally {
-    await runtime.deleteSession(owner, main.sessionId);
-  }
-});
+for (const target of ["main", "child"] as const)
+  test(`${target} tool continuations do not spend the automatic-turn budget`, async () => {
+    const runtime = new AgentRuntime();
+    const main = await session(runtime);
+    const worker = child(runtime, main);
+    setOpenRouterScenario("endless-tools");
+    try {
+      if (target === "main")
+        runtime.send(main, {
+          content: "Work until finished",
+          model,
+          attachmentIds: [],
+        });
+      else runtime.enqueue(worker, main.id, "message", "Work until finished");
+      await until(() => getOpenRouterRequests().length > 15);
+      // Only the child's delivery from Euler is automatic; user input is exempt.
+      expect(runtime.store.get(main.id)?.automaticTurns).toBe(
+        target === "main" ? 0 : 1,
+      );
+      expect(runtime.snapshot(owner, main.sessionId).held).toBe(false);
+    } finally {
+      await runtime.deleteSession(owner, main.sessionId);
+    }
+  });
 
 test("a blocking spawn does not prevent answering children that occupy all child slots", async () => {
   const runtime = new AgentRuntime();

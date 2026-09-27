@@ -139,7 +139,7 @@ export function agentActions(temporary = false) {
       .flatMap((a) => agentRuntime.store.inbox(a.id))
       .filter((m) => m.agentId === agent.id || m.sender === agent.id)
       .sort((a, b) => a.createdAt - b.createdAt || a.id - b.id);
-    res.json({ agent, messages });
+    res.json({ agent, steps: agentRuntime.store.steps(agent.id), messages });
   });
   router.post("/:id/agents/:agentId/cancel", async (req, res) => {
     const owner = requireUserId(req, res);
