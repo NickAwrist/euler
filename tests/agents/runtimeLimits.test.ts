@@ -288,6 +288,28 @@ test("a blocking spawn does not prevent answering children that occupy all child
   }
 });
 
+test("the user's reason says whether a subagent was dismissed or stopped", async () => {
+  const runtime = new AgentRuntime();
+  const main = await session(runtime);
+  const ready = child(runtime, main);
+  ready.status = "idle";
+  const waiting = child(runtime, main);
+  waiting.status = "waiting";
+  for (const agent of [ready, waiting]) runtime.store.save(agent);
+  const reason = (id: string) =>
+    runtime.store.inbox(id).find((m) => m.kind === "control")?.content;
+  try {
+    await runtime.cancel(ready);
+    await runtime.cancel(waiting);
+    expect(runtime.store.get(ready.id)?.status).toBe("completed");
+    expect(reason(ready.id)).toBe("Dismissed by user");
+    expect(runtime.store.get(waiting.id)?.status).toBe("cancelled");
+    expect(reason(waiting.id)).toBe("Stopped by user");
+  } finally {
+    await runtime.deleteSession(owner, main.sessionId);
+  }
+});
+
 test("stopping a waiting subagent withdraws its unanswered question", async () => {
   const runtime = new AgentRuntime();
   const main = await session(runtime);

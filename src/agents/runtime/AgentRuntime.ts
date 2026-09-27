@@ -620,11 +620,13 @@ export class AgentRuntime {
     });
     this.store.deliver([message]);
   }
-  async cancel(record: AgentRecord, reason = "Stopped by user") {
+  async cancel(record: AgentRecord, requestedReason?: string) {
     const agent = this.store.get(record.id) ?? record;
     if (isFinalAgent(agent)) return;
     // Dismissing a ready subagent ends it as done rather than stopped.
     const ready = agent.status === "idle" && !this.active.has(agent.id);
+    const reason =
+      requestedReason ?? (ready ? "Dismissed by user" : "Stopped by user");
     this.recordControl(agent, reason);
     // Input already queued waits for Deliver; a subagent's is dropped below.
     this.store.hold(agent.id, true);
