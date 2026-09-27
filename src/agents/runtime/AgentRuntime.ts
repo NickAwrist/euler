@@ -138,7 +138,8 @@ export class AgentRuntime {
       steps: [],
       history: ModelMessageSchema.array().parse(history),
       checkpoints: {},
-      lastSummaryAt: 0,
+      // Agents that ended before this chat's main agent existed need no summary.
+      lastSummaryAt: Date.now(),
       held: false,
       wakes: 0,
       config: {},
@@ -253,8 +254,10 @@ export class AgentRuntime {
         continue;
       }
       if (this.runningCount(agent.ownerUuid) >= 4) {
-        agent.status = "queued";
-        this.status(agent);
+        if (agent.status !== "queued") {
+          agent.status = "queued";
+          this.status(agent);
+        }
         continue;
       }
       const controller = new AbortController();
@@ -455,12 +458,12 @@ export class AgentRuntime {
         (contentDelta, thinkingDelta) => {
           partial.content += contentDelta;
           partial.thinking += thinkingDelta;
+          // Saved with the next step, so a restart loses at most one call's text.
           agent.partial = {
             role: "assistant",
             content: partial.content,
             steps: partial.steps,
           };
-          this.store.save(agent);
           eventHub.publish(agent.ownerUuid, {
             type: "delta",
             sessionId: agent.sessionId,
@@ -674,7 +677,6 @@ export class AgentRuntime {
             title: { type: "string" },
             task: { type: "string" },
             wait: { type: "boolean" },
-            model: { type: "string" },
           },
           ["kind", "title", "task"],
         ),
@@ -694,8 +696,7 @@ export class AgentRuntime {
             kind: "general",
             title: text(args, "title"),
             status: "queued",
-            model:
-              typeof args.model === "string" ? args.model : activationModel,
+            model: activationModel,
             spawnPosition: (
               this.temporaryHistory.get(agent.sessionId) ??
               getMessagesForSession(agent.ownerUuid, agent.sessionId)

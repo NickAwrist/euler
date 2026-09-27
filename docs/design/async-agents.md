@@ -149,7 +149,7 @@ The **agent runtime** is a new server singleton and the only thing that starts a
 | `general` | Main agent | Existing tools except spawning, plus `send_message` to its parent and `ask_parent` | Main agent |
 | `browser` (phase 2) | Main agent | Browser tools only, plus `send_message`, `ask_parent`, `request_human_control` | Main agent, user through handoff |
 
-Only the main agent spawns subagents in this version, as `run_subagent` works today. Subagents share the chat's workspace and model unless `spawn_agent` specifies a model.
+Only the main agent spawns subagents in this version, as `run_subagent` works today. Subagents share the chat's workspace and the model of the activation that spawned them. The model can't choose another one, so a subagent never runs on a model the user didn't pick.
 
 ### Status
 
@@ -383,7 +383,7 @@ sequenceDiagram
 | `send_message` | `to` (agent ID), `content` | Confirmation, or an error if the agent is final. |
 | `cancel_agent` | `agentId`, `reason` | Confirmation. The reason appears on the card. |
 
-`run_subagent` is removed. Blocking and background subagents then share one implementation, and blocking subagents also appear in the Agents panel.
+`run_subagent` is removed. Blocking and background subagents then share one implementation, and blocking subagents also appear in the Agents panel. A startup migration turns each old `run_subagent` trace (its step's `childRun`) into an ended agent, so old traces open in the agent trace modal.
 
 ### Subagents
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { isWorkingAgent } from "../../../src/schemas/agents";
 import type { AgentEvent } from "../../../src/schemas/events";
 import { agentAction } from "../../persist/agents";
 import { type RuntimeSnapshot, fetchRuntime } from "../../persist/agents";
@@ -86,9 +87,26 @@ export function useAgentEvents(
   const views = useRef(new Map<string, RuntimeSnapshot>());
   const recent = useRef<AgentEvent[]>([]);
   const publish = (id: string, value: RuntimeSnapshot) => {
+    const previous = views.current.get(id);
     views.current.set(id, value);
     if (current.current.sessionId !== id) return;
+    // Events for other agents, such as a subagent's tokens, only advance the sequence.
+    if (
+      previous &&
+      previous.agents === value.agents &&
+      previous.activation === value.activation &&
+      previous.queued === value.queued &&
+      previous.held === value.held &&
+      previous.history === value.history
+    )
+      return;
     setState(value);
+    if (
+      previous &&
+      previous.history === value.history &&
+      !previous.activation === !value.activation
+    )
+      return;
     current.current.setMessages((value.history ?? []) as Message[]);
     if (
       !current.current.temporary &&
@@ -133,7 +151,13 @@ export function useAgentEvents(
       if (view) publishRef.current(event.sessionId, applyEvent(view, event));
       else if (event.sessionId === current.current.sessionId)
         void refreshRef.current().catch(console.error);
-      if (event.type === "activation_ended" || event.type === "agent_status")
+      // The session list only shows whether a chat has working agents.
+      const before = view?.agents.find((a) => a.id === event.agentId);
+      if (
+        event.type === "activation_ended" ||
+        (event.type === "agent_status" &&
+          (!before || isWorkingAgent(before) !== isWorkingAgent(event.agent)))
+      )
         void current.current.refreshSessions();
     });
     return () => controller.abort();

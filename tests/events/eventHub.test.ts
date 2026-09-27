@@ -6,6 +6,7 @@ class Client extends EventEmitter {
   chunks: string[] = [];
   writableEnded = false;
   destroyed = false;
+  writableLength = 0;
   setHeader() {}
   flushHeaders() {}
   write(chunk: string) {
@@ -59,13 +60,14 @@ test("event replay is ordered, owner scoped, and requests resync for an expired 
   stale.end();
 });
 
-test("publishing to a client that ended before its close event does not throw", () => {
+test("a slow client stays connected until its buffer overflows, then publishing skips it", () => {
   const hub = new EventHub();
   const client = new Client();
   hub.attach("a", client.response());
-  // The socket ends on backpressure, but "close" arrives later.
-  client.write = () => {
+  // Backpressure alone keeps the client; "close" arrives after end.
+  client.write = (chunk: string) => {
     if (client.writableEnded) throw new Error("write after end");
+    client.writableLength += chunk.length;
     return false;
   };
   client.end = () => {
@@ -76,6 +78,9 @@ test("publishing to a client that ended before its close event does not throw", 
     sessionId: "chat-a",
     agentId: "main-a",
   } as const;
+  hub.publish("a", event);
+  expect(client.writableEnded).toBe(false);
+  client.writableLength = 1024 * 1024;
   hub.publish("a", event);
   expect(client.writableEnded).toBe(true);
   expect(() => hub.publish("a", event)).not.toThrow();

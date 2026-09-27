@@ -24,16 +24,6 @@ export function getLiveStepMeta(
   }
 
   const toolName = step.toolName ? startCase(step.toolName) : null;
-  const isSubagentTool =
-    step.kind === "tool_call" && step.childRun !== undefined;
-
-  if (isSubagentTool) {
-    return {
-      label: "Agent",
-      detail: toolName,
-    };
-  }
-
   if (step.kind === "tool_call") {
     return {
       label: "Tool",

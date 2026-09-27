@@ -20,9 +20,6 @@ function collectLlmMetrics(
 ): NonNullable<MessageStep["metrics"]>[] {
   for (const step of steps ?? []) {
     if (step.kind === "llm_call" && step.metrics) out.push(step.metrics);
-    if (step.childRun?.steps?.length) {
-      collectLlmMetrics(step.childRun.steps, out);
-    }
   }
   return out;
 }

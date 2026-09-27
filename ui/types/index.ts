@@ -8,7 +8,6 @@ export type {
   MessageStep,
   MessageVersion,
   SessionSummary,
-  SubagentRun,
   TruncateConfirmState,
 } from "./run";
 export type { ModelOption, ModelReasoning } from "./models";

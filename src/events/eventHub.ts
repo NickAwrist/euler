@@ -6,6 +6,8 @@ type Unsequenced = AgentEvent extends infer E
     ? Omit<E, "sequence">
     : never
   : never;
+/** Output a slow client may buffer before it is dropped. */
+const MAX_BUFFERED_BYTES = 1024 * 1024;
 export class EventHub {
   private users = new Map<
     string,
@@ -38,8 +40,9 @@ export class EventHub {
   /** A disconnected client must never throw into the runtime publishing to it. */
   private write(client: Response, chunk: string) {
     if (client.writableEnded || client.destroyed) return;
-    // A client that falls behind is dropped and reconnects with Last-Event-ID.
-    if (!client.write(chunk)) client.end();
+    client.write(chunk);
+    // A client far behind is dropped and reconnects with Last-Event-ID.
+    if (client.writableLength > MAX_BUFFERED_BYTES) client.end();
   }
   attach(owner: string, response: Response, lastId?: number) {
     const state = this.user(owner);
