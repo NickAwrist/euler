@@ -19,6 +19,7 @@ export type SpawnResult = {
   status?: string;
   result?: string;
   error?: string;
+  note?: string;
 };
 
 export class SpawnAgentTool extends BaseTool {

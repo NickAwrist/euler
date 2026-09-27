@@ -94,7 +94,7 @@ describe("workspace service", () => {
     let busy = true;
     workspaces.setAgentLifecycle({
       isBusy: () => busy,
-      onExpire: async () => {},
+      onExpire: (_owner, _session, remove) => remove(),
     });
     await workspaces.cleanupExpired();
     await fs.access(lease.hostPath);

@@ -35,6 +35,7 @@ import {
   type SpawnRequest,
   type SpawnResult,
 } from "../../tools/spawn_agent";
+import { missingToolResults } from "../toolResults";
 import { RuntimeTransaction } from "./RuntimeTransaction";
 import { runActivation } from "./activation";
 import { inboxModelContent } from "./agentContext";
@@ -125,6 +126,9 @@ export class AgentRuntime {
   }
 
   main(owner: string, sessionId: string, temporary = false): AgentRecord {
+    // Its agents are gone, so one must not be created for a chat being deleted.
+    if (this.deleting.has(sessionId))
+      throw new ApiError(409, "CONFLICT", "The conversation is being deleted");
     queueMicrotask(() => this.release(sessionId));
     const existing = this.store
       .list(owner, sessionId)
@@ -375,7 +379,7 @@ export class AgentRuntime {
         try {
           await this.activate(agent, controller.signal, partial);
         } catch (error) {
-          this.contain(agent.id, error);
+          this.contain(agent, error);
         } finally {
           this.active.delete(agent.id);
           this.release(agent.sessionId);
@@ -396,10 +400,12 @@ export class AgentRuntime {
    * An activation records its own errors, so one escaping it means recording
    * failed, such as a database error. It must not stop the runtime.
    */
-  private contain(agentId: string, error: unknown) {
+  private contain(record: AgentRecord, error: unknown) {
     console.error("Agent activation failed", error);
+    // Clients may have missed the activation's end, so they reload its chat.
+    this.resync(record.ownerUuid, record.sessionId);
     try {
-      const agent = this.store.get(agentId);
+      const agent = this.store.get(record.id);
       if (!agent || !isWorkingAgent(agent)) return;
       agent.status = "idle";
       agent.interruption =
@@ -462,10 +468,11 @@ export class AgentRuntime {
     agent: AgentRecord,
     signal: AbortSignal,
     wait: () => void,
-    activationModel: string,
+    currentModel: () => string,
   ): BaseTool[] {
-    const message = new SendMessageTool((request) =>
-      this.sendMessage(agent, request),
+    const message = new SendMessageTool(
+      (request) => this.sendMessage(agent, request),
+      agent.kind !== "main",
     );
     if (agent.kind !== "main")
       return [
@@ -480,7 +487,7 @@ export class AgentRuntime {
     return [
       message,
       new SpawnAgentTool((request) =>
-        this.spawn(agent, request, activationModel, signal),
+        this.spawn(agent, request, currentModel(), signal),
       ),
       new CancelAgentTool(async (agentId, reason) => {
         const child = this.store.get(agentId);
@@ -555,18 +562,22 @@ export class AgentRuntime {
               ))
         );
       }, signal);
-      if (signal.aborted) return { agentId: child.id };
       const current = this.store.get(child.id);
-      const report =
-        current && !isWorkingAgent(current)
-          ? this.receiveReport(parent, child.id)
-          : undefined;
+      if (signal.aborted || !current) return { agentId: child.id };
+      // Its activity is not a result yet: it may still be the prompt.
+      if (isWorkingAgent(current))
+        return {
+          agentId: child.id,
+          status: current.status,
+          note: "Still working. Its questions and result arrive as messages.",
+        };
+      const report = this.receiveReport(parent, child.id);
       return {
         agentId: child.id,
-        status: current?.status,
+        status: current.status,
         ...(report?.kind === "failure"
           ? { error: report.content }
-          : { result: current?.activity }),
+          : { result: current.activity }),
       };
     } finally {
       await this.until(() => {
@@ -651,7 +662,15 @@ export class AgentRuntime {
     this.resetBudget(agent);
     this.schedule();
   }
-  async deleteSession(owner: string, sessionId: string) {
+  /**
+   * Cancels and removes the chat's agents, then runs `remove`, which deletes
+   * the chat itself, before anything can start in the chat again.
+   */
+  async deleteSession<T>(
+    owner: string,
+    sessionId: string,
+    remove?: () => Promise<T>,
+  ): Promise<T | undefined> {
     this.deleting.add(sessionId);
     try {
       for (const agent of this.store.list(owner, sessionId)) {
@@ -659,6 +678,7 @@ export class AgentRuntime {
         this.store.remove(agent);
       }
       this.temporaryHistory.delete(sessionId);
+      return await remove?.();
     } finally {
       this.deleting.delete(sessionId);
     }
@@ -750,40 +770,21 @@ export class AgentRuntime {
     }
   }
   recover() {
-    const agents = ["running", "queued", "waiting", "idle"] as const;
-    for (const agent of agents.flatMap((status) =>
-      this.store.withStatus(status),
-    )) {
+    for (const agent of this.store.interrupted()) {
+      this.store.failRunningSteps(agent.id, "Interrupted by server restart");
       const pending = this.store.undelivered(agent.id);
       const reply =
         agent.kind === "main" ? this.store.reply(agent.id) : undefined;
       const steps = agent.kind === "main" ? this.store.steps(agent.id) : [];
       const replying = reply !== undefined || steps.length > 0;
-      // Nothing was in progress: a waiting agent still waits for its answer.
-      if (
-        (agent.status === "idle" || agent.status === "waiting") &&
-        !pending.length &&
-        !replying
-      )
-        continue;
       this.atomically(agent.sessionId, () => {
-        const history = [...agent.history];
-        const calls =
-          history.findLast((m) => m.role === "assistant")?.tool_calls ?? [];
-        for (const call of calls) {
-          if (
-            call.id &&
-            !history.some(
-              (m) => m.role === "tool" && m.tool_call_id === call.id,
-            )
-          )
-            history.push({
-              role: "tool",
-              tool_call_id: call.id,
-              content:
-                "Interrupted by a server restart. Check the current state before retrying.",
-            });
-        }
+        const history = [
+          ...agent.history,
+          ...missingToolResults(
+            agent.history,
+            "Interrupted by a server restart. Check the current state before retrying.",
+          ),
+        ];
         if (agent.kind === "main") {
           if (replying) {
             this.append(agent, {

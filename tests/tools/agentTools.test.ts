@@ -12,7 +12,7 @@ test("agent tools reject invalid arguments before invoking runtime actions", asy
   });
   const send = new SendMessageTool(() => {
     calls++;
-  });
+  }, true);
   const ask = new AskParentTool(() => {
     calls++;
   });
@@ -52,4 +52,12 @@ test("agent tools reject invalid arguments before invoking runtime actions", asy
     ).text,
   ).toContain("child");
   expect(calls).toBe(1);
+});
+
+test("a main agent's messages always wake the subagent they name", async () => {
+  const sent: unknown[] = [];
+  const send = new SendMessageTool((request) => sent.push(request), false);
+  await send.execute({ to: "child", content: "Retry", kind: "progress" });
+  expect(sent).toEqual([{ to: "child", content: "Retry" }]);
+  await expect(send.execute({ content: "No recipient" })).rejects.toThrow();
 });

@@ -59,7 +59,12 @@ export class WorkspaceService {
   private readonly temporaryLeases = new Map<string, TemporaryWorkspaceLease>();
   private agentLifecycle = {
     isBusy: (_owner: string, _session: string) => false,
-    onExpire: async (_owner: string, _session: string) => {},
+    /** Settles the chat's agents and runs `remove` before anything restarts. */
+    onExpire: (
+      _owner: string,
+      _session: string,
+      remove: () => Promise<unknown>,
+    ): Promise<unknown> => remove(),
   };
   setAgentLifecycle(lifecycle: typeof this.agentLifecycle) {
     this.agentLifecycle = lifecycle;
@@ -97,8 +102,9 @@ export class WorkspaceService {
         lease.expiresAt <= Date.now() &&
         !this.agentLifecycle.isBusy(lease.ownerUuid, lease.id)
       ) {
-        await this.agentLifecycle.onExpire(lease.ownerUuid, lease.id);
-        await this.deleteTemporary(lease.ownerUuid, lease.id);
+        await this.agentLifecycle.onExpire(lease.ownerUuid, lease.id, () =>
+          this.deleteTemporary(lease.ownerUuid, lease.id),
+        );
       }
     }
     await Promise.all([

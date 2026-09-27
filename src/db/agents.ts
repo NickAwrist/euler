@@ -252,11 +252,24 @@ export class AgentStore {
         .map((a) => a.sessionId),
     ]);
   }
-  withStatus(status: AgentStatus): AgentRecord[] {
+  /**
+   * Agents a restart interrupted: working ones, and ready or waiting ones with
+   * undelivered messages or a main agent's open reply. Others are not loaded.
+   */
+  interrupted(): AgentRecord[] {
     return (
-      getDb().query("SELECT id FROM agents WHERE status = ?").all(status) as {
-        id: string;
-      }[]
+      getDb()
+        .query(
+          `SELECT id FROM agents a WHERE a.status IN ('running', 'queued')
+            OR (a.status IN ('idle', 'waiting') AND (
+              EXISTS (SELECT 1 FROM agent_messages m
+                WHERE m.agent_id = a.id AND m.delivered_at IS NULL)
+              OR EXISTS (SELECT 1 FROM agent_replies r WHERE r.agent_id = a.id)
+              OR (json_extract(a.data, '$.kind') = 'main'
+                AND EXISTS (SELECT 1 FROM agent_steps s WHERE s.agent_id = a.id))))
+          ORDER BY a.rowid`,
+        )
+        .all() as { id: string }[]
     ).flatMap((row) => this.get(row.id) ?? []);
   }
   /** Saves everything except history, which `saveHistory` writes. */
@@ -343,6 +356,13 @@ export class AgentStore {
     getDb().run(
       "INSERT INTO agent_steps (agent_id, activation_id, position, step) VALUES (?, ?, ?, ?) ON CONFLICT(agent_id, activation_id, position) DO UPDATE SET step = excluded.step",
       [agent.id, activationId, position, JSON.stringify(step)],
+    );
+  }
+  /** Ends steps that a restart left running as failed. */
+  failRunningSteps(agentId: string, error: string) {
+    getDb().run(
+      "UPDATE agent_steps SET step = json_set(step, '$.status', 'error', '$.error', ?, '$.endedAt', ?) WHERE agent_id = ? AND json_extract(step, '$.status') = 'running'",
+      [error, new Date().toISOString(), agentId],
     );
   }
   /** The main agent's reply text since its last transcript segment. */

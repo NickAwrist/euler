@@ -259,13 +259,13 @@ test("a blocking spawn does not prevent answering children that occupy all child
         .view(owner, main.sessionId)
         .filter((a) => a.kind === "general" && a.status === "queued"),
     ).toHaveLength(1);
-    expect(
-      runtime.store
-        .get(main.id)
-        ?.history.some(
-          (m) => m.role === "tool" && m.content.includes('"status":"queued"'),
-        ),
-    ).toBe(true);
+    const spawned = runtime.store
+      .get(main.id)
+      ?.history.find(
+        (m) => m.role === "tool" && m.content.includes('"status":"queued"'),
+      );
+    // The child's activity is still its prompt, which is not a result.
+    expect(JSON.parse(spawned!.content)).not.toHaveProperty("result");
   } finally {
     await runtime.deleteSession(owner, main.sessionId);
   }

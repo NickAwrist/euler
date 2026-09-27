@@ -341,9 +341,10 @@ router.delete("/:id", async (req, res) => {
     sendApiError(res, 404, "NOT_FOUND", "Session not found");
     return;
   }
-  await agentRuntime.deleteSession(ownerUuid, row.id);
-  await workspaceService.trashRetained(ownerUuid, row.id);
-  const ok = deleteSessionRow(ownerUuid, req.params.id);
+  const ok = await agentRuntime.deleteSession(ownerUuid, row.id, async () => {
+    await workspaceService.trashRetained(ownerUuid, row.id);
+    return deleteSessionRow(ownerUuid, row.id);
+  });
   if (!ok) {
     sendApiError(res, 404, "NOT_FOUND", "Session not found");
     return;

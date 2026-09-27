@@ -25,7 +25,7 @@ import {
 import { completeSkillToken, findActiveSkillToken } from "./skillPicker";
 
 export function RunInputDock({
-  queuedInput,
+  notices,
   centered,
   ollamaModels,
   ollamaConnected,
@@ -53,7 +53,7 @@ export function RunInputDock({
   onRunCommand,
   onFooterHeightChange,
 }: {
-  queuedInput?: ReactNode;
+  notices?: ReactNode;
   centered: boolean;
   ollamaModels: ModelOption[];
   ollamaConnected: boolean | null;
@@ -210,9 +210,9 @@ export function RunInputDock({
           </span>
         </div>
       )}
-      {queuedInput && (
-        <div className="pointer-events-auto w-full max-w-[var(--chat-width)]">
-          {queuedInput}
+      {notices && (
+        <div className="pointer-events-auto w-full max-w-[var(--chat-width)] space-y-2">
+          {notices}
         </div>
       )}
       <form

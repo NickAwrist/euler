@@ -150,7 +150,7 @@ The **agent runtime** is a new server singleton and the only thing that starts a
 | `general` | Main agent | Existing tools except spawning, plus `send_message` to its parent and `ask_parent` | Main agent |
 | `browser` (phase 2) | Main agent | Browser tools only, plus `send_message`, `ask_parent`, `request_human_control` | Main agent, user through handoff |
 
-Only the main agent spawns subagents in this version, as `run_subagent` works today. Subagents share the chat's workspace and the model of the activation that spawned them. The model can't choose another one, so a subagent never runs on a model the user didn't pick.
+Only the main agent spawns subagents in this version, as `run_subagent` works today. Subagents share the chat's workspace and the model of the model call that spawned them, and keep it: changing the composer's model affects only the main agent, so the composer notes when live subagents use a different one. The model can't choose another one, so a subagent never runs on a model the user didn't pick.
 
 ### Status
 
@@ -226,7 +226,7 @@ Inbox messages are events, and the same rule applies to every agent, main includ
 | Main activation stopped by the user | Messages already queued when Stop was pressed are held, not delivered automatically, because Stop means "stop". The chat shows "Agent updates waiting" with a Deliver action, and they are also delivered with the user's next message. Messages that arrive after the stop wake the main agent normally. |
 | Automatic-turn budget reached | Held, as after a Stop. Automatic messages that arrive while the budget is spent are held as they arrive. Holding is a property of messages; an agent is paused while it has held messages. |
 | Sender cancelled by a rewind | Its undelivered messages are dropped. |
-| Server restart | Interrupted agents become Ready without starting work. Pending main input is held for explicit delivery; pending child input is retained in its context and marked interrupted. |
+| Server restart | Interrupted agents become Ready without starting work. Pending main input is held for explicit delivery; pending child input is retained in its context and marked interrupted. Recovery loads only agents that were working or had pending input or an open reply. |
 
 `progress` and `status` messages never trigger a delivery by themselves. They go along with the next one.
 
@@ -239,7 +239,7 @@ Inbox messages are events, and the same rule applies to every agent, main includ
 
 ### User messages
 
-User messages follow the same rule. A message sent while the main agent is replying is delivered at its next step boundary, so it can steer the reply in progress. Until then it shows above the composer as queued, where it can be edited or removed. If the main agent is idle, the message wakes it, as today.
+User messages follow the same rule. A message sent while the main agent is replying is delivered at its next step boundary, so it can steer the reply in progress. The model and reasoning settings it was sent with apply from that step's model call. Until then it shows above the composer as queued, where it can be edited or removed. If the main agent is idle, the message wakes it, as today.
 
 ### Segments
 
@@ -270,7 +270,7 @@ A delivery to the main agent includes a summary of the chat's live and recently 
 </background_agents>
 ```
 
-The summary lists live agents and agents that ended since the previous summary. It carries a shortened latest activity line, since results arrive in full as messages. This is how the main agent answers progress questions and knows what it has already reported.
+The summary lists live agents and agents that ended since the previous summary. Working agents carry a shortened latest activity line, since results arrive in full as messages. Ready agents list only their name and status, because their latest activity is a result already delivered, unless an interruption such as a restart ended their last activation without a report. This is how the main agent answers progress questions and knows what it has already reported.
 
 ## Activations
 
@@ -383,7 +383,7 @@ sequenceDiagram
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
-| `spawn_agent` | `kind`, `title`, `prompt`, optional `wait` (default `false`) | With `wait: false`, the agent ID immediately. With `wait: true`, waits for an answer unless incoming parent input or waiting children require Euler to continue first. A result or failure returned this way is not delivered again as a message. If the agent calls `ask_parent` first, the call returns with status `waiting` and the question arrives in the caller's inbox. `browser` agents always start with `wait: false`. |
+| `spawn_agent` | `kind`, `title`, `prompt`, optional `wait` (default `false`) | With `wait: false`, the agent ID immediately. With `wait: true`, waits for an answer unless incoming parent input or waiting children require Euler to continue first. A result or failure returned this way is not delivered again as a message. A call that returns before the agent finishes carries its status and a note instead of a result. If the agent calls `ask_parent` first, the call returns with status `waiting` and the question arrives in the caller's inbox. `browser` agents always start with `wait: false`. |
 | `send_message` | `to` (agent ID), `content` | Confirmation, or an error if the agent is final. |
 | `cancel_agent` | `agentId`, `reason` | Confirmation. The reason appears on the card. |
 

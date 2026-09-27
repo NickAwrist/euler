@@ -269,6 +269,11 @@ test("a failure while recording an activation does not stop the runtime", async 
       "Agent activation failed",
       expect.any(Error),
     );
+    // The end event was lost, so clients are told to reload the chat.
+    expect(fault).toHaveBeenCalledWith(
+      owner,
+      expect.objectContaining({ type: "resync", sessionId: main.sessionId }),
+    );
     fault.mockRestore();
     runtime.send(runtime.store.get(main.id)!, {
       content: "Again",
@@ -280,4 +285,52 @@ test("a failure while recording an activation does not stop the runtime", async 
     errors.mockRestore();
     await runtime.deleteSession(owner, main.sessionId);
   }
+});
+
+test("a message sent mid-reply switches the main agent's model from the next call", async () => {
+  const runtime = new AgentRuntime();
+  const main = await session(runtime);
+  setOpenRouterScenario("delayed-stream");
+  const requests = getOpenRouterRequests();
+  const start = requests.length;
+  try {
+    runtime.send(main, { content: "First", attachmentIds: [] });
+    await until(() => requests.length > start);
+    const { queued } = runtime.send(runtime.store.get(main.id)!, {
+      content: "Second",
+      model: "openrouter:anthropic/claude-test",
+      attachmentIds: [],
+    });
+    expect(queued).toBe(true);
+    await until(
+      () =>
+        runtime.snapshot(owner, main.sessionId).history.length === 4 &&
+        !runtime.busy(owner, main.sessionId),
+    );
+    expect(requests.slice(start).map((r) => r.body.model)).toEqual([
+      "openai/gpt-5.6-terra",
+      "anthropic/claude-test",
+    ]);
+  } finally {
+    await runtime.deleteSession(owner, main.sessionId);
+  }
+});
+
+test("a chat stays locked until the caller has deleted it", async () => {
+  const runtime = new AgentRuntime();
+  const main = await session(runtime);
+  const locked = await runtime.deleteSession(
+    owner,
+    main.sessionId,
+    async () => {
+      // Stop, Deliver, and queued edits would otherwise recreate the main agent.
+      expect(() => runtime.main(owner, main.sessionId)).toThrow(
+        "being deleted",
+      );
+      return runtime.isChanging(main.sessionId);
+    },
+  );
+  expect(locked).toBe(true);
+  expect(runtime.store.list(owner, main.sessionId)).toEqual([]);
+  expect(runtime.isChanging(main.sessionId)).toBe(false);
 });

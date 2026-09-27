@@ -25,15 +25,21 @@ const preview = (text: string) =>
   text.length > SUMMARY_ACTIVITY_CHARS
     ? `${text.slice(0, SUMMARY_ACTIVITY_CHARS)}…`
     : text;
-/** The subagents' current state, or nothing when there are none to report. */
+/**
+ * The subagents' current state, or nothing when there are none to report. A
+ * ready agent's latest activity is its delivered result, so it is left out
+ * unless an interruption, such as a restart, ended its last activation.
+ */
 export function pendingSummary(agents: AgentRecord[]) {
   const children = agents.filter((a) => a.kind !== "main");
   if (!children.length) return "";
   return `<background_agents>\n${children
-    .map(
-      (a) =>
-        `${a.id} · ${escapeEnvelope(a.title)} · ${a.status === "idle" ? "ready for follow-ups" : a.status}\nlatest: ${escapeEnvelope(preview(a.activity))}`,
-    )
+    .map((a) => {
+      const line = `${a.id} · ${escapeEnvelope(a.title)} · ${a.status === "idle" ? "ready for follow-ups" : a.status}`;
+      return a.status === "idle" && !a.interruption
+        ? line
+        : `${line}\nlatest: ${escapeEnvelope(preview(a.activity))}`;
+    })
     .join("\n")}\n</background_agents>`;
 }
 export const INBOX_DIRECTIVES =

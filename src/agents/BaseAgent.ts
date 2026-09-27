@@ -16,6 +16,7 @@ import {
   textToolResult,
 } from "../tools/BaseTool";
 import { toolErrorToString } from "../tools/errors";
+import { missingToolResults } from "./toolResults";
 
 const log = logger.child({ component: "BaseAgent" });
 
@@ -350,25 +351,12 @@ export class BaseAgent {
     } while (toolCalls.length || this.hasPendingInput?.());
 
     if (signal?.aborted) {
-      const pendingCalls =
-        this.history.findLast((message) => message.role === "assistant")
-          ?.tool_calls ?? [];
-      for (const call of pendingCalls) {
-        if (
-          call.id &&
-          !this.history.some(
-            (message) =>
-              message.role === "tool" && message.tool_call_id === call.id,
-          )
-        ) {
-          this.history.push({
-            role: "tool",
-            tool_call_id: call.id,
-            content:
-              "Cancelled. Check the current state before retrying any operation.",
-          });
-        }
-      }
+      this.history.push(
+        ...missingToolResults(
+          this.history,
+          "Cancelled. Check the current state before retrying any operation.",
+        ),
+      );
       this.checkpoint?.();
     }
 

@@ -26,7 +26,8 @@ import { workspaceService } from "./workspaces/WorkspaceService";
 getDb();
 workspaceService.setAgentLifecycle({
   isBusy: (owner, session) => agentRuntime.busy(owner, session),
-  onExpire: (owner, session) => agentRuntime.deleteSession(owner, session),
+  onExpire: (owner, session, remove) =>
+    agentRuntime.deleteSession(owner, session, remove),
 });
 // Recover before the server accepts requests so no live turn looks interrupted.
 agentRuntime.recover();

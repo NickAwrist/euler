@@ -167,10 +167,10 @@ router.delete("/:id", async (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
   // Settle every agent before its workspace is removed.
-  await agentRuntime.deleteSession(ownerUuid, req.params.id);
-  const deleted = await workspaceService.deleteTemporary(
+  const deleted = await agentRuntime.deleteSession(
     ownerUuid,
     req.params.id,
+    () => workspaceService.deleteTemporary(ownerUuid, req.params.id),
   );
   if (!deleted) {
     sendApiError(res, 404, "NOT_FOUND", "Temporary chat not found");

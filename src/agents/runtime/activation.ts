@@ -35,7 +35,7 @@ export interface ActivationHost {
     agent: AgentRecord,
     signal: AbortSignal,
     wait: () => void,
-    model: string,
+    model: () => string,
   ): BaseTool[];
   enqueue(
     agent: AgentRecord,
@@ -160,7 +160,7 @@ export async function runActivation(
         () => {
           waiting = true;
         },
-        model.model,
+        () => model.model,
       ),
     );
     ctx = new RunContext(
@@ -284,6 +284,9 @@ export async function runActivation(
           if (messages.length || summarized) host.store.save(agent);
           host.store.saveHistory(agent, model.history);
         });
+        // A user message sent during the activation may have changed these.
+        model.model = agent.model;
+        model.reasoningEffort = agent.config.reasoningEffort;
         return !paused;
       } catch (error) {
         model.history.length = savedHistoryLength;

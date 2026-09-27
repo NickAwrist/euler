@@ -60,7 +60,10 @@ test("restart preserves an interrupted main reply without retrying and repairs c
     "Partial response",
   );
   expect(getMessagesForSession(owner, id)[0]?.content).toContain("interrupted");
-  expect(getMessagesForSession(owner, id)[0]?.steps).toEqual([step]);
+  // The step a restart cut off is shown as failed, not running forever.
+  expect(getMessagesForSession(owner, id)[0]?.steps).toMatchObject([
+    { ...step, status: "error", error: "Interrupted by server restart" },
+  ]);
   expect(recovered.store.steps(main.id)).toEqual([]);
   expect(recovered.store.get(main.id)?.status).toBe("idle");
   expect(recovered.store.get(child.id)?.status).toBe("idle");
@@ -268,4 +271,42 @@ test("recovery rolls back transcript and state together if persistence fails", a
     fault.mockRestore();
     await recovered.deleteSession(owner, id);
   }
+});
+
+test("restart loads only agents with work to recover", async () => {
+  const id = crypto.randomUUID();
+  createSessionRow(owner, id, Date.now(), model);
+  const store = new AgentStore();
+  const runtime = new AgentRuntime();
+  const main = runtime.main(owner, id);
+  const agent = (kind: "main" | "general", status: "idle" | "waiting") => {
+    const record = { ...main, id: crypto.randomUUID(), kind, status };
+    store.save(record);
+    return record;
+  };
+  // A ready subagent's steps are its trace, not an open reply.
+  const traced = agent("general", "idle");
+  store.saveStep(traced, "activation", 0, {
+    kind: "complete",
+    status: "done",
+    turnIndex: 0,
+  });
+  agent("general", "waiting");
+  const pending = agent("general", "idle");
+  store.enqueue({
+    agentId: pending.id,
+    sender: main.id,
+    kind: "message",
+    content: "Follow-up",
+    wakes: true,
+    attachmentIds: [],
+  });
+  const replying = agent("main", "idle");
+  store.saveReply(replying, "Partial");
+  const recovering = new AgentStore()
+    .interrupted()
+    .filter((a) => a.sessionId === id)
+    .map((a) => a.id);
+  expect(recovering).toEqual([pending.id, replying.id]);
+  await runtime.deleteSession(owner, id);
 });

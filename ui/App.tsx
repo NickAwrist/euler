@@ -5,6 +5,7 @@ import { AgentContext } from "./components/Agents/AgentContext";
 import { AgentTraceModal } from "./components/Agents/AgentTraceModal";
 import { AgentsList } from "./components/Agents/AgentsList";
 import { QueuedMessages } from "./components/Agents/QueuedMessages";
+import { SubagentModelNotice } from "./components/Agents/SubagentModelNotice";
 import { ArtifactContext } from "./components/Artifacts/ArtifactContext";
 import { initialArtifactWidth } from "./components/Artifacts/ArtifactSidebar";
 import { WorkspaceArtifacts } from "./components/Artifacts/WorkspaceArtifacts";
@@ -458,15 +459,21 @@ function ChatView({
             </section>
 
             <RunInputDock
-              queuedInput={
+              notices={
                 app.activeSessionId ? (
-                  <QueuedMessages
-                    sessionId={app.activeSessionId}
-                    temporary={app.isEphemeral}
-                    messages={app.queuedMessages}
-                    held={app.heldUpdates}
-                    refresh={app.refreshRuntime}
-                  />
+                  <>
+                    <SubagentModelNotice
+                      agents={app.agents}
+                      model={app.selectedModel}
+                    />
+                    <QueuedMessages
+                      sessionId={app.activeSessionId}
+                      temporary={app.isEphemeral}
+                      messages={app.queuedMessages}
+                      held={app.heldUpdates}
+                      refresh={app.refreshRuntime}
+                    />
+                  </>
                 ) : undefined
               }
               centered={composerCentered}
