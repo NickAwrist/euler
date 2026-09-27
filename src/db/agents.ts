@@ -26,7 +26,7 @@ const RecordSchema = AgentSchema.extend({
   checkpoints: z.record(z.string(), z.number()).default({}),
   versions: z.array(MessageVersionSchema).optional(),
   held: z.boolean(),
-  wakes: z.number(),
+  modelCalls: z.number().default(0),
   config: z.object({
     reasoningEffort: z.string().optional(),
     metadata: RunMetadataSchema.optional(),

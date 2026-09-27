@@ -27,6 +27,7 @@ export const DEFAULT_SYSTEM_PROMPT = [
 
 /** Appended to a subagent's prompt, after the user's template. */
 export const SUBAGENT_DIRECTIVES = [
+  "You are a reusable subagent. Keep context across messages; your parent may give you follow-ups or different work. Answer the current prompt, then remain available until dismissed.",
   "<subagent>",
   "You are running as a subagent. Your final response is read by the parent agent, not a human.",
   "- Report exactly what the task asks for, including file paths, relevant verbatim excerpts, and command output the parent needs.",

@@ -179,20 +179,20 @@ stateDiagram-v2
 - `cancelled`: a working subagent was stopped.
 - `completed`, `failed`, and `cancelled` are final. A final agent keeps its history for its trace and rejects new messages.
 
-When a subagent's model loop ends with a text answer and no pending question, that answer becomes its `result` message to the parent and the subagent becomes ready. It doesn't need a separate `finish` tool. The limit of three subagents per chat counts working agents only (`queued`, `running`, `waiting`); ready agents hold no activation slot.
+When a subagent's model loop ends with a text answer and no pending question, that answer becomes its `result` message to the parent and the subagent becomes ready. It doesn't need a separate `finish` tool. Three subagents per chat may be running or waiting for an answer. New prompts and follow-ups beyond that limit queue until a slot opens; queued and ready agents hold no child slot. A subagent is a reusable conversation, not a single task. Its initial prompt starts that conversation, and later messages can assign different work.
 
-The UI labels these states Working (`queued`, `running`), Waiting for Euler, Ready, Done (`completed`), Stopped (`cancelled`), and Failed. Ready agents show Dismiss instead of Stop. Ended agents are dimmed and open only their trace.
+The UI labels these states Queued (`queued`), Working (`running`), Waiting for Euler, Ready, Done (`completed`), Stopped (`cancelled`), and Failed. Ready agents show Dismiss instead of Stop. Ended agents are dimmed and open only their trace.
 
 ### Limits
 
 | Limit | Initial value | Behavior when reached |
 | --- | --- | --- |
-| Working subagents per chat | 3 | `spawn_agent` returns an error the model can explain to the user. |
+| Admitted subagents per chat | 3 | New agents and follow-ups queue while three children are running or waiting for an answer. |
 | Concurrent activations per user | 4 | Extra activations wait in `queued`. |
 | Browser agents per user | 1 | `spawn_agent` returns `browser_busy` naming the chat that holds the browser. |
-| Agent-initiated main activations between user messages | 10 | Further wakes are held. The chat shows "Agent updates waiting" with a Deliver action, and they are also delivered with the next user message. |
+| Automatic model calls per chat between user messages | 10 | Counts calls across Euler and its subagents, including tool continuations and mid-activation messages. The main call consuming user input is exempt. Further work pauses with saved context and pending input until Deliver or a new user message. |
 
-The last limit prevents two agents from messaging each other forever at the user's expense. User messages reset it.
+The model-call budget bounds automatic work across the chat, including tool loops and messages delivered while an activation is already running. User messages and Deliver reset it. In-flight model calls finish, but another call must pass the budget check. Paused agents keep their history and a continuation in their inbox; a pause does not send a false completion report.
 
 ## Inboxes and messages
 
@@ -218,14 +218,14 @@ Inbox messages are events, and the same rule applies to every agent, main includ
 
 | Recipient when a waking message arrives | What happens |
 | --- | --- |
-| Idle, or `waiting` for this message | The runtime wakes it and a new activation starts, subject to the activation slots and the wake limit. |
+| Idle, or `waiting` for this message | The runtime wakes it and a new activation starts, subject to the activation slots and the model-call budget. |
 | Running, between steps | Delivered before the next model call. |
 | Running, model call streaming | Queued. If the call requests tools, the message is delivered after those tools finish. If the call ends with final text, the activation continues with another model call instead of ending. |
 | Running, tool executing | Queued until the tool returns. A long `bash` command or a `wait: true` spawn delays delivery. Meanwhile the Agents panel marks the message as queued. |
 | Main activation stopped by the user | Messages already queued when Stop was pressed are held, not delivered automatically, because Stop means "stop". The chat shows "Agent updates waiting" with a Deliver action, and they are also delivered with the user's next message. Messages that arrive after the stop wake the main agent normally. |
-| Wake limit reached | Held, as after a Stop. |
+| Model-call budget reached | Held, as after a Stop. |
 | Sender cancelled by a rewind | Its undelivered messages are dropped. |
-| Server restart | Pending messages stay in the inbox. Recovery wakes agents that have waking messages pending. |
+| Server restart | Interrupted agents become Ready without starting work. Pending main input is held for explicit delivery; pending child input is retained in its context and marked interrupted. |
 
 `progress` and `status` messages never trigger a delivery by themselves. They go along with the next one.
 
@@ -314,9 +314,9 @@ sequenceDiagram
   User->>UI: Benchmark the three queue libraries
   UI->>RT: POST messages
   RT->>Main: activation (user message)
-  Main->>RT: spawn_agent(general, task)
+  Main->>RT: spawn_agent(general, prompt)
   RT-->>Main: agentId
-  RT->>Sub: activation (task)
+  RT->>Sub: activation (initial prompt)
   Main-->>UI: reply with status row
   User->>UI: How's it going?
   UI->>RT: POST messages
@@ -362,7 +362,7 @@ sequenceDiagram
   User->>RT: Check the release notes and review my config
   RT->>Main: activation (user message)
   Main->>RT: spawn_agent(general, release notes)
-  RT->>Sub: activation (task)
+  RT->>Sub: activation (initial prompt)
   Main->>Main: read_file(config.ts)
   Main->>Main: read_file(send.ts) starts
   Sub-->>RT: final answer
@@ -379,7 +379,7 @@ sequenceDiagram
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
-| `spawn_agent` | `kind`, `title`, `task`, optional `wait` (default `false`) | With `wait: false`, the agent ID immediately. With `wait: true`, the agent's final answer, as `run_subagent` does today. If the agent calls `ask_parent` first, the call returns with status `waiting` and the question arrives in the caller's inbox. `browser` agents always start with `wait: false`. |
+| `spawn_agent` | `kind`, `title`, `prompt`, optional `wait` (default `false`) | With `wait: false`, the agent ID immediately. With `wait: true`, waits for an answer unless incoming parent input or waiting children require Euler to continue first. If the agent calls `ask_parent` first, the call returns with status `waiting` and the question arrives in the caller's inbox. `browser` agents always start with `wait: false`. |
 | `send_message` | `to` (agent ID), `content` | Confirmation, or an error if the agent is final. |
 | `cancel_agent` | `agentId`, `reason` | Confirmation. The reason appears on the card. |
 
@@ -401,7 +401,7 @@ The system prompt for subagents tells them to use `progress` sparingly, at meani
 
 The transcript is the conversation between the user and Euler, plus one status row per subagent. Everything else about agents is in the agent trace.
 
-The chat's `messages` table stays the user-visible transcript, with its existing `user`, `assistant`, and `event` roles. Agents add no transcript roles or rows. Their messages, questions, results, failures, and cancellations are stored in `agent_messages` and on the `agents` row. The agent trace shows the task and the agent's steps.
+The chat's `messages` table stays the user-visible transcript, with its existing `user`, `assistant`, and `event` roles. Agents add no transcript roles or rows. Their messages, questions, results, failures, and cancellations are stored in `agent_messages` and on the `agents` row. The agent trace shows the initial prompt and the agent's steps.
 
 - The **status row** is rendered from the `spawn_agent` step of the reply that started the agent. It shows the agent's icon, title, and status, and Stop while the agent is live. Clicking it opens the agent trace. It has no activity line, elapsed time, or message text. Its live status comes from agent status events, not from the stored step.
 - Questions, results, and failures reach the user only through the main agent's reply, which restates what matters.
@@ -413,7 +413,7 @@ The chat's `messages` table stays the user-visible transcript, with its existing
 The artifact sidebar shows a SegmentedControl, **Files | Agents**, once the chat has a subagent. Having a subagent also makes the sidebar toggle available when the workspace has no files.
 
 - The list groups every subagent in the chat under **Active** (working or waiting for Euler), **Ready** (Euler can message it), and **Ended**, each newest first, so an agent started early in a long chat stays easy to find. Each heading shows its count. Empty groups are hidden, and Ended starts collapsed.
-- Each row is the status row plus a one-line summary of the agent's latest activity: its task, latest message, or result.
+- Each row is the status row plus a one-line summary of the agent's latest activity: its initial prompt, latest message, or result.
 - The Agents tab label counts working agents.
 
 ### Agent trace
@@ -421,7 +421,7 @@ The artifact sidebar shows a SegmentedControl, **Files | Agents**, once the chat
 Clicking a status row or list row opens the agent in the execution trace modal used for replies:
 
 - The header shows the agent's title and status, Stop while the agent is live, and copy trace results.
-- The body shows the agent's task, token and cost metrics, and its numbered steps. Questions and messages the agent sends appear as its tool calls.
+- The body shows the agent's initial prompt, token and cost metrics, and its numbered steps. Questions and messages the agent sends appear as its tool calls.
 - The trace refreshes every second while the agent is live and stops polling once it is final.
 - Escape or Close returns focus to the status row.
 
@@ -433,7 +433,7 @@ Clicking a status row or list row opens the agent in the execution trace modal u
 | Stop agent | Status row, Agents list row, agent trace header | Cancels that subagent. Its status row reads Cancelled; nothing is added to the transcript. |
 | Status row | Transcript, Agents list | Opens the agent trace. |
 | Send | Composer | Always enabled for persisted chats. Mid-reply, the message shows as queued until its step boundary. |
-| Deliver | "Agent updates waiting" notice | Delivers held messages after a Stop or when the wake limit was reached. |
+| Deliver | "Agent updates waiting" notice | Delivers held messages after a Stop or when the model-call budget was reached. |
 
 ### Sidebar and unread state
 
@@ -458,7 +458,7 @@ Opening a chat updates `last_viewed_at`. The sidebar's order continues to use `u
 | `GET /api/sessions/:id/agents/:agentId` | Agents panel detail: inbox and steps. |
 | `POST /api/sessions/:id/agents/:agentId/cancel` | Stop agent. |
 | `DELETE /api/sessions/:id/messages/:messageId` | Remove a queued user message before delivery. |
-| `POST /api/sessions/:id/deliver` | Deliver messages held after a Stop or the wake limit. |
+| `POST /api/sessions/:id/deliver` | Deliver messages held after a Stop or the model-call budget. |
 | `GET /api/events` | The per-user SSE stream. |
 
 `POST /api/runs`, `/api/runs/active/:id`, `/api/runs/stream/:id`, and `/api/runs/abort` are removed with their UI callers. `/api/runs/debug-prompt` moves under sessions, unchanged.
@@ -551,20 +551,20 @@ erDiagram
 
 ### Restart recovery
 
-On startup, the runtime scans agents that aren't final:
+On startup, recovery preserves reusable agents but starts no model calls:
 
-1. A main agent that was mid-activation: its partial reply is kept and marked interrupted, as an aborted reply is today. It is not retried automatically, because the user may no longer want it. Pending inbox messages are processed normally.
-2. A general subagent that was running: resumes from its persisted history. If the last stored message is an assistant tool call without a result, the runtime adds the result "Interrupted by a server restart. Check the current state before retrying." A tool with side effects may have partly run, and the subagent must not repeat it blindly.
-3. `queued` and `waiting` agents keep their state.
-4. Any agent with waking messages still pending is woken, the main agent included.
-5. Browser agents (phase 2) move to `waiting` with the browser under user control.
+1. Interrupted main replies are kept and marked interrupted. Pending main input is held until Deliver or a new user message.
+2. Running, queued, and waiting subagents become Ready with the same ID and saved history. Pending child messages are moved into that history followed by an interruption notice, so they are context rather than automatically resumed work.
+3. Missing tool results are repaired with an interruption message. Tools may have partly performed side effects; new instructions must not blindly repeat them.
+4. Ready agents remain available for new prompts through `send_message`. Final agents remain final. Temporary chats still end with the server process.
+5. Each recovery transition commits its history, inbox changes, and status together. Creating an agent and enqueueing its initial prompt also commit together.
 
 ## Security
 
 - Every agent, message, and event is scoped by owner UUID and chat. A message can only be addressed to an agent in the same chat.
 - User authority never travels as message text. Stop, resume, rewind, and phase 2 control transfer are API actions the runtime records as `control` messages. An agent cannot send `control`.
 - Subagent output is untrusted input to the main agent. Envelopes mark it, and the main agent's prompt forbids treating it as user instruction. This matters most for the browser agent, which reads arbitrary pages.
-- Cost limits bound the number of agents, concurrent activations, and wakes without the user.
+- Cost limits bound the number of agents, concurrent activations, and model calls without the user.
 
 ## Prior art
 
@@ -603,7 +603,7 @@ Steps 1–3 ship together in the first MVP commit. Follow-up commits contain fix
    - rewind and delete rules, and restart recovery
 
    Remove `run_subagent`.
-3. **Messaging.** Add `send_message` in both directions, `ask_parent`, progress messages, and the wake limit.
+3. **Messaging.** Add `send_message` in both directions, `ask_parent`, progress messages, and the model-call budget.
 4. **Browser use** ([phase 2](browser-use.md)).
 
 ### Verification
@@ -612,8 +612,8 @@ Steps 1–3 ship together in the first MVP commit. Follow-up commits contain fix
   - inbox ordering and exactly-once delivery across a simulated crash
   - wake rules per message kind
   - the race between a reply ending and a message arriving, both orders
-  - held messages after Stop and after the wake limit
-  - the wake limit itself
+  - held messages after Stop and after the model-call budget
+  - the model-call budget itself
   - rewind cancellation by `spawn_position` and dropping of its undelivered messages
   - recovery of an orphaned tool call
 - Runtime tests with a scripted model:
@@ -643,7 +643,7 @@ Open questions:
 
 - Should the main agent be able to wait for a background agent within one activation, for example "wait up to 2 minutes"? The current design says no: it ends its reply and gets woken, or receives the result at a step boundary if it is still working.
 - Should a user message sent mid-reply steer that reply, as designed here, or wait until the reply ends?
-- Is 10 agent-initiated main activations per user message the right budget, or should the budget be cost-based?
+- Is 10 automatic model calls per chat between user messages the right budget, or should the budget be cost-based?
 - Should finished agents' histories expire, or live as long as the chat?
 
 ### Runtime storage and output ownership

@@ -26,6 +26,7 @@ export interface ActivationHost {
   append(agent: AgentRecord, message: WireMessageInput): void;
   atomically(sessionId: string, write: () => void): void;
   isDeleting(sessionId: string): boolean;
+  allowModelCall(agent: AgentRecord): boolean;
   tools(
     agent: AgentRecord,
     signal: AbortSignal,
@@ -69,11 +70,6 @@ export async function runActivation(
   partial: Activation,
 ) {
   agent.status = "running";
-  if (
-    agent.kind === "main" &&
-    !host.store.undelivered(agent.id).some((m) => m.kind === "user")
-  )
-    agent.wakes++;
   host.status(agent);
   host.emit(agent.ownerUuid, {
     type: "activation_started",
@@ -81,7 +77,7 @@ export async function runActivation(
     agentId: agent.id,
     activation: partial,
   });
-  let outcome: "done" | "aborted" | "error" = "done";
+  let outcome: "done" | "aborted" | "error" | "paused" = "done";
   let segmentStart = 0;
   const summarySince = agent.lastSummaryAt;
   let lastSummaryText = "";
@@ -145,6 +141,7 @@ export async function runActivation(
     model.history = historyWithImages(agent);
     model.systemPrompt += `\n\n${INBOX_DIRECTIVES}`;
     let waiting = false;
+    let paused = false;
     model.addTools(
       host.tools(
         agent,
@@ -215,6 +212,8 @@ export async function runActivation(
       const savedSummary = lastSummaryText;
       try {
         host.atomically(agent.sessionId, () => {
+          paused = !host.allowModelCall(agent);
+          if (paused) return;
           const messages = host.store
             .undelivered(agent.id)
             .filter((m) => !m.held);
@@ -277,6 +276,7 @@ export async function runActivation(
           host.store.save(agent);
           host.store.saveHistory(agent, model.history);
         });
+        return !paused;
       } catch (error) {
         model.history = savedHistory;
         Object.assign(partial, savedPartial);
@@ -295,18 +295,21 @@ export async function runActivation(
         agent.sessionId,
         host.temporaryHistory.has(agent.sessionId),
       );
-    closeSegment();
+    host.atomically(agent.sessionId, closeSegment);
     if (signal.aborted) {
       outcome = "aborted";
       agent.status = agent.kind === "main" ? "idle" : "cancelled";
     }
     // A subagent stays ready for follow-ups until it is dismissed.
     else agent.status = waiting ? "waiting" : "idle";
-    agent.activity = result;
+    if (paused && !signal.aborted) outcome = "paused";
+    agent.activity = paused
+      ? "Automatic work paused. Waiting for the user to continue."
+      : result;
     if (isFinalAgent(agent)) agent.endedAt = Date.now();
     host.atomically(agent.sessionId, () => {
       host.store.save(agent);
-      if (agent.status === "idle" && agent.parentId) {
+      if (!paused && agent.status === "idle" && agent.parentId) {
         const parent = host.store.get(agent.parentId);
         if (parent && !host.isDeleting(agent.sessionId))
           host.enqueue(parent, agent.id, "result", result);
@@ -331,6 +334,7 @@ export async function runActivation(
       });
     }
   } finally {
+    if (agent.kind !== "main") agent.partial = undefined;
     if (isFinalAgent(agent)) agent.endedAt = Date.now();
     host.status(agent);
     host.emit(agent.ownerUuid, {

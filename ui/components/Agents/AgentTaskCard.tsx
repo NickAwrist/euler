@@ -9,7 +9,7 @@ import { cx } from "../../styles";
 import { IconButton } from "../IconButton";
 import { useAgents } from "./AgentContext";
 const STATUS_LABELS: Record<Agent["status"], string> = {
-  queued: "Working",
+  queued: "Queued",
   running: "Working",
   waiting: "Waiting for Euler",
   idle: "Ready",
@@ -17,7 +17,8 @@ const STATUS_LABELS: Record<Agent["status"], string> = {
   failed: "Failed",
   cancelled: "Stopped",
 };
-export const agentStatusLabel = (agent: Agent) => STATUS_LABELS[agent.status];
+export const agentStatusLabel = (agent: Agent) =>
+  agent.held && !isFinalAgent(agent) ? "Paused" : STATUS_LABELS[agent.status];
 /** Stops a working agent or dismisses a ready one. */
 export function AgentStopButton({ agent }: { agent: Agent }) {
   const { stop } = useAgents();

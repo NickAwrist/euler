@@ -115,13 +115,10 @@ export function agentActions(temporary = false) {
     const owner = requireUserId(req, res);
     if (!owner) return;
     const main = agentRuntime.main(owner, req.params.id, temporary);
-    if (
-      !agentRuntime.store.removeQueued(main.id, Number(req.params.messageId))
-    ) {
+    if (!agentRuntime.removeQueued(main, Number(req.params.messageId))) {
       sendApiError(res, 409, "CONFLICT", "Message was already delivered");
       return;
     }
-    agentRuntime.resync(owner, req.params.id);
     res.json({ ok: true });
   });
   router.get("/:id/runtime", (req, res) => {

@@ -35,13 +35,14 @@ import {
 } from "../../tools/spawn_agent";
 import { RuntimeTransaction } from "./RuntimeTransaction";
 import { runActivation } from "./activation";
+import { agentEnvelope } from "./agentContext";
 
 /** Activations one owner may run at once. */
 const MAX_RUNNING_PER_OWNER = 4;
-/** Subagents that may work at once in one chat. */
-const MAX_WORKING_SUBAGENTS = 3;
-/** Wakes without user input before the main agent's inbox is held. */
-const MAX_UNATTENDED_WAKES = 10;
+/** Running or waiting subagents admitted in one chat; queued work waits. */
+const MAX_ACTIVE_SUBAGENTS = 3;
+/** Model calls across a chat between user messages or explicit delivery. */
+const MAX_AUTOMATIC_MODEL_CALLS = 10;
 
 export class AgentRuntime {
   readonly store = new AgentStore();
@@ -143,7 +144,7 @@ export class AgentRuntime {
       // Agents that ended before this chat's main agent existed need no summary.
       lastSummaryAt: Date.now(),
       held: false,
-      wakes: 0,
+      modelCalls: 0,
       config: {},
     };
     this.store.save(agent, temporary);
@@ -226,9 +227,7 @@ export class AgentRuntime {
       wakes: !["progress", "status"].includes(kind),
     });
     if (kind === "user") {
-      agent.held = false;
-      agent.wakes = 0;
-      this.store.hold(agent.id, false);
+      this.resetBudget(agent);
       this.store.save(agent);
     }
     this.emit(agent.ownerUuid, {
@@ -238,8 +237,73 @@ export class AgentRuntime {
       messages: [message],
     });
     if (agent.held) this.status(agent);
+    this.notify();
     this.transactions.defer(() => this.schedule());
     return message;
+  }
+  private budgetOwner(agent: AgentRecord) {
+    const main =
+      agent.kind === "main" ? agent : this.store.get(agent.parentId ?? "");
+    if (!main) throw new Error("Parent unavailable");
+    return main;
+  }
+  private resetBudget(main: AgentRecord) {
+    main.modelCalls = 0;
+    for (const agent of this.store.list(main.ownerUuid, main.sessionId)) {
+      if (isFinalAgent(agent)) continue;
+      agent.held = false;
+      this.store.hold(agent.id, false);
+      this.status(agent);
+    }
+  }
+  /** Keep a continuation in the inbox, including when only tool history remains. */
+  private pauseForBudget(agent: AgentRecord, main: AgentRecord) {
+    for (const target of new Set([agent, main])) {
+      target.held = true;
+      if (!this.active.has(target.id)) target.status = "idle";
+      if (!this.store.undelivered(target.id).some((m) => m.wakes))
+        this.enqueue(
+          target,
+          "runtime",
+          "message",
+          "Automatic work paused at the model-call limit. Continue from saved context when the user resumes.",
+        );
+      this.status(target);
+    }
+  }
+  private allowModelCall(agent: AgentRecord): boolean {
+    const main = this.budgetOwner(agent);
+    if (
+      agent.kind === "main" &&
+      this.store.undelivered(agent.id).some((m) => m.kind === "user" && !m.held)
+    )
+      return true;
+    if (main.modelCalls >= MAX_AUTOMATIC_MODEL_CALLS) {
+      this.pauseForBudget(agent, main);
+      return false;
+    }
+    main.modelCalls++;
+    this.store.save(main);
+    return true;
+  }
+  removeQueued(record: AgentRecord, messageId: number): boolean {
+    const agent = this.store.get(record.id) ?? record;
+    let removed = false;
+    this.atomically(agent.sessionId, () => {
+      removed = this.store.removeQueued(agent.id, messageId);
+      if (!removed) return;
+      if (
+        agent.status === "queued" &&
+        !this.active.has(agent.id) &&
+        !this.store.hasWakingMessage(agent.id, false)
+      ) {
+        agent.status = "idle";
+        this.status(agent);
+      }
+      this.resync(agent.ownerUuid, agent.sessionId);
+      this.transactions.defer(() => this.schedule());
+    });
+    return removed;
   }
   private schedule() {
     if (this.scheduled) return;
@@ -260,13 +324,33 @@ export class AgentRuntime {
         this.isChanging(agent.sessionId)
       )
         continue;
-      if (agent.kind === "main" && agent.wakes >= MAX_UNATTENDED_WAKES) {
-        agent.held = true;
-        this.status(agent);
+      const main = this.budgetOwner(agent);
+      const userInput =
+        agent.kind === "main" &&
+        this.store
+          .undelivered(agent.id)
+          .some((m) => m.kind === "user" && !m.held);
+      if (main.modelCalls >= MAX_AUTOMATIC_MODEL_CALLS && !userInput) {
+        this.atomically(agent.sessionId, () =>
+          this.pauseForBudget(agent, main),
+        );
         continue;
       }
-      if (this.runningCount(agent.ownerUuid) >= MAX_RUNNING_PER_OWNER) {
-        if (agent.status !== "queued") {
+      const children = this.store.list(agent.ownerUuid, agent.sessionId);
+      const childSlotUnavailable =
+        agent.kind !== "main" &&
+        agent.status !== "waiting" &&
+        children.filter(
+          (child) =>
+            child.kind !== "main" &&
+            (child.status === "waiting" || this.active.has(child.id)),
+        ).length >= MAX_ACTIVE_SUBAGENTS;
+      if (
+        childSlotUnavailable ||
+        this.runningCount(agent.ownerUuid) >= MAX_RUNNING_PER_OWNER
+      ) {
+        // A waiting child already owns a child slot, even while awaiting an owner slot.
+        if (agent.status !== "queued" && agent.status !== "waiting") {
           agent.status = "queued";
           this.status(agent);
         }
@@ -325,6 +409,7 @@ export class AgentRuntime {
         append: (record, message) => this.append(record, message),
         atomically: (sessionId, write) => this.atomically(sessionId, write),
         isDeleting: (sessionId) => this.deleting.has(sessionId),
+        allowModelCall: (record) => this.allowModelCall(record),
         tools: (record, abort, wait, model) =>
           this.tools(record, abort, wait, model),
         enqueue: (record, sender, kind, content) =>
@@ -393,15 +478,6 @@ export class AgentRuntime {
     model: string,
     signal: AbortSignal,
   ): Promise<SpawnResult> {
-    if (
-      this.store
-        .list(parent.ownerUuid, parent.sessionId)
-        .filter((a) => a.kind !== "main" && isWorkingAgent(a)).length >=
-      MAX_WORKING_SUBAGENTS
-    )
-      throw new Error(
-        `${MAX_WORKING_SUBAGENTS} subagents are already working in this chat`,
-      );
     const child: AgentRecord = {
       ...parent,
       id: crypto.randomUUID(),
@@ -421,24 +497,35 @@ export class AgentRuntime {
       versions: undefined,
       checkpoints: {},
       steps: [],
-      activity: request.task,
+      activity: request.prompt,
       held: false,
-      wakes: 0,
+      modelCalls: 0,
     };
-    this.store.save(child, this.temporaryHistory.has(parent.sessionId));
-    this.status(child);
-    this.enqueue(child, parent.id, "task", request.task);
+    this.atomically(parent.sessionId, () => {
+      this.store.save(child, this.temporaryHistory.has(parent.sessionId));
+      this.status(child);
+      this.enqueue(child, parent.id, "task", request.prompt);
+    });
     if (!request.wait) return { agentId: child.id };
     // A blocking caller releases its scheduler slot so the child can start.
     this.waitingForChild.add(parent.id);
     this.schedule();
     try {
-      // A child that asks a question waits on this caller, so return
-      // and let its question arrive through the inbox.
+      // Return for incoming input or a child waiting on Euler, including
+      // other children that occupy the slots this new child needs.
       await this.until(() => {
         const current = this.store.get(child.id);
         return (
-          !current || current.status === "waiting" || !isWorkingAgent(current)
+          !current ||
+          current.status === "waiting" ||
+          !isWorkingAgent(current) ||
+          this.store.hasWakingMessage(parent.id, false) ||
+          (current.status === "queued" &&
+            this.store
+              .list(parent.ownerUuid, parent.sessionId)
+              .some(
+                (peer) => peer.kind !== "main" && peer.status === "waiting",
+              ))
         );
       }, signal);
       if (signal.aborted) return { agentId: child.id };
@@ -449,10 +536,13 @@ export class AgentRuntime {
         result: current?.activity,
       };
     } finally {
-      await this.until(
-        () => this.runningCount(parent.ownerUuid) < MAX_RUNNING_PER_OWNER,
-        signal,
-      );
+      await this.until(() => {
+        if (this.runningCount(parent.ownerUuid) >= MAX_RUNNING_PER_OWNER)
+          return false;
+        // Claim the slot before another waiter checks availability.
+        this.waitingForChild.delete(parent.id);
+        return true;
+      }, signal);
       this.waitingForChild.delete(parent.id);
     }
   }
@@ -497,10 +587,7 @@ export class AgentRuntime {
   deliver(record: AgentRecord) {
     const agent = this.store.get(record.id) ?? record;
     this.recordControl(agent, "Deliver held messages");
-    agent.held = false;
-    agent.wakes = 0;
-    this.store.hold(agent.id, false);
-    this.status(agent);
+    this.resetBudget(agent);
     this.schedule();
   }
   async deleteSession(owner: string, sessionId: string) {
@@ -600,47 +687,63 @@ export class AgentRuntime {
     }
   }
   recover() {
-    for (const agent of this.store.withStatus("running")) {
-      const calls =
-        agent.history.filter((m) => m.role === "assistant").at(-1)
-          ?.tool_calls ?? [];
-      const interrupted = calls.flatMap((call) =>
-        call.id &&
-        !agent.history.some(
-          (m) => m.role === "tool" && m.tool_call_id === call.id,
-        )
-          ? [
-              {
-                role: "tool",
-                tool_call_id: call.id,
-                content:
-                  "Interrupted by a server restart. Check the current state before retrying.",
-              },
-            ]
-          : [],
-      );
-      if (interrupted.length)
-        this.store.saveHistory(agent, [...agent.history, ...interrupted]);
-      if (agent.kind === "main" && agent.partial) {
-        this.append(agent, {
-          ...agent.partial,
-          content: `${agent.partial.content}
-
-*Response interrupted by server restart.*`,
-        });
+    const agents = ["running", "queued", "waiting", "idle"] as const;
+    for (const agent of agents.flatMap((status) =>
+      this.store.withStatus(status),
+    )) {
+      const pending = this.store.undelivered(agent.id);
+      if (
+        agent.status === "idle" &&
+        !pending.length &&
+        (agent.kind !== "main" || !agent.partial)
+      )
+        continue;
+      this.atomically(agent.sessionId, () => {
+        const history = [...agent.history];
+        const calls =
+          history.findLast((m) => m.role === "assistant")?.tool_calls ?? [];
+        for (const call of calls) {
+          if (
+            call.id &&
+            !history.some(
+              (m) => m.role === "tool" && m.tool_call_id === call.id,
+            )
+          )
+            history.push({
+              role: "tool",
+              tool_call_id: call.id,
+              content:
+                "Interrupted by a server restart. Check the current state before retrying.",
+            });
+        }
+        if (agent.kind === "main") {
+          if (agent.partial)
+            this.append(agent, {
+              ...agent.partial,
+              content: `${agent.partial.content}\n\n*Response interrupted by server restart.*`,
+            });
+          // Nothing starts solely because the server restarted.
+          this.store.hold(agent.id, true);
+        } else {
+          const peers = this.store.list(agent.ownerUuid, agent.sessionId);
+          for (const message of pending)
+            history.push({
+              role: "user",
+              content: agentEnvelope(message, peers),
+            });
+          this.store.deliver(pending);
+          agent.activity =
+            "Interrupted by server restart. Ready for new instructions.";
+          history.push({ role: "user", content: agent.activity });
+        }
         agent.partial = undefined;
-      }
-      agent.status = agent.kind === "main" ? "idle" : "queued";
-      this.store.save(agent);
-      if (agent.kind !== "main")
-        this.enqueue(
-          agent,
-          "runtime",
-          "message",
-          "Resume after server restart. Check state before repeating side effects.",
-        );
+        agent.status = "idle";
+        agent.held = false;
+        this.store.saveHistory(agent, history);
+        this.status(agent);
+      });
+      this.release(agent.sessionId);
     }
-    this.schedule();
   }
 }
 export const agentRuntime = new AgentRuntime();

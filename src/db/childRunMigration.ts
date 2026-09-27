@@ -84,7 +84,7 @@ export function migrateChildRuns(db: Database) {
               activity: text(step.result),
               steps: extract(stepList(run.steps), -1, id),
               held: false,
-              wakes: 0,
+              modelCalls: 0,
               checkpoints: {},
               lastSummaryAt: 0,
               config: {},

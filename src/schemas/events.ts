@@ -37,7 +37,7 @@ export const AgentEventSchema = z
       z.object({
         type: z.literal("activation_ended"),
         activationId: z.string(),
-        outcome: z.enum(["done", "aborted", "error"]),
+        outcome: z.enum(["done", "aborted", "error", "paused"]),
       }),
       z.object({
         type: z.literal("transcript_appended"),

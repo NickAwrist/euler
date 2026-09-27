@@ -23,12 +23,12 @@ test("agent tools reject invalid arguments before invoking runtime actions", asy
     spawn.execute({
       kind: "general",
       title: "ok",
-      task: "task",
+      prompt: "prompt",
       wait: "false",
     }),
   ).rejects.toThrow();
   await expect(
-    spawn.execute({ kind: "nested", title: "ok", task: "task" }),
+    spawn.execute({ kind: "nested", title: "ok", prompt: "prompt" }),
   ).rejects.toThrow();
   await expect(
     send.execute({ content: " ", kind: "progress" }),
@@ -46,7 +46,7 @@ test("agent tools reject invalid arguments before invoking runtime actions", asy
       await spawn.execute({
         kind: "general",
         title: "ok",
-        task: "task",
+        prompt: "prompt",
         wait: false,
       })
     ).text,

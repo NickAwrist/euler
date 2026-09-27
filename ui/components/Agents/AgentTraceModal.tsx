@@ -47,7 +47,9 @@ export function AgentTraceModal({
       clearInterval(timer);
     };
   }, [sessionId, temporary, agent.id, agent.status, working]);
-  const task = detail?.messages.find((m) => m.kind === "task")?.content;
+  const initialPrompt = detail?.messages.find(
+    (m) => m.kind === "task",
+  )?.content;
   // Server step records, trusted like transcript steps in useAgentEvents.
   const steps = (detail?.agent.steps ?? []) as unknown as MessageStep[];
   return (
@@ -63,9 +65,9 @@ export function AgentTraceModal({
           {error}
         </p>
       )}
-      {task && (
+      {initialPrompt && (
         <p className="mb-4 whitespace-pre-wrap break-words rounded-xl border border-border-subtle bg-muted/25 p-3 text-[0.8125rem] text-muted-foreground">
-          {task}
+          {initialPrompt}
         </p>
       )}
       {detail && steps.length === 0 && (

@@ -6,6 +6,7 @@ export type OpenRouterScenario =
   | "streaming"
   | "reasoning"
   | "thinking-tags"
+  | "endless-tools"
   | "tool-loop"
   | "tool-outputs"
   | "delayed-stream"
@@ -77,6 +78,24 @@ export async function handleOpenRouterRequest(
   const body = (await request.json()) as Record<string, unknown>;
   requests.push({ headers: request.headers, body });
 
+  if (scenario === "endless-tools")
+    return sse([
+      chunk(
+        {
+          tool_calls: [
+            {
+              index: 0,
+              id: `loop-${requests.length}`,
+              type: "function",
+              function: { name: "missing_tool", arguments: "{}" },
+            },
+          ],
+        },
+        "tool_calls",
+      ),
+      "[DONE]",
+    ]);
+
   if (
     scenario === "async-agents" ||
     scenario === "agent-question" ||
@@ -116,7 +135,7 @@ export async function handleOpenRouterRequest(
         return call("spawn_agent", {
           kind: "general",
           title: "Research",
-          task: "Find the answer",
+          prompt: "Find the answer",
           wait: scenario.startsWith("blocking"),
         });
       if (messages.some((m) => m.content.includes('kind="result"')))

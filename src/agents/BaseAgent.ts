@@ -31,7 +31,7 @@ export class BaseAgent {
   TOOL_MAP: Record<string, BaseTool>;
 
   plan?: Plan;
-  beforeModelCall?: () => Promise<void>;
+  beforeModelCall?: () => Promise<boolean>;
   checkpoint?: () => void;
   hasPendingInput?: () => boolean;
 
@@ -158,7 +158,7 @@ export class BaseAgent {
     do {
       if (signal?.aborted) break;
 
-      await this.beforeModelCall?.();
+      if ((await this.beforeModelCall?.()) === false) return fullContent;
       if (signal?.aborted) break;
 
       const llmStep = ctx.beginStep({ kind: "llm_call", turnIndex });

@@ -10,7 +10,7 @@ import {
 const SpawnAgentArgs = z.object({
   kind: z.literal("general"),
   title: z.string().trim().min(1),
-  task: z.string().trim().min(1),
+  prompt: z.string().trim().min(1),
   wait: z.boolean().optional(),
 });
 export type SpawnRequest = z.infer<typeof SpawnAgentArgs>;
@@ -20,7 +20,7 @@ export class SpawnAgentTool extends BaseTool {
   constructor(private spawn: (request: SpawnRequest) => Promise<SpawnResult>) {
     super(
       "spawn_agent",
-      "Start a durable general subagent. Include context and success criteria. It reports back when done, then stays ready: send_message wakes it with a follow-up and it keeps its context. Dismiss it with cancel_agent when it is no longer needed.",
+      "Create a reusable general subagent with an initial prompt. Include the context it needs. It keeps its identity and conversation history: use send_message for follow-ups or different work. After a server restart it remains available but does not resume automatically. Dismiss it with cancel_agent when no longer needed.",
     );
   }
 
@@ -32,11 +32,11 @@ export class SpawnAgentTool extends BaseTool {
         description: this.description,
         parameters: {
           type: "object",
-          required: ["kind", "title", "task"],
+          required: ["kind", "title", "prompt"],
           properties: {
             kind: { type: "string", enum: ["general"] },
             title: { type: "string" },
-            task: { type: "string" },
+            prompt: { type: "string" },
             wait: { type: "boolean" },
           },
         },
