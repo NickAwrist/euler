@@ -54,11 +54,17 @@ export const WebSourceAttachmentSchema = z.object({
   url: z.url({ protocol: /^https?$/ }),
 });
 
-export const MessageAttachmentSchema = z.discriminatedUnion("kind", [
-  ImageAttachmentSchema,
+export const OutputAttachmentSchema = z.discriminatedUnion("kind", [
   WorkspaceFileAttachmentSchema,
   GeneratedImageAttachmentSchema,
   WebSourceAttachmentSchema,
+]);
+
+export type OutputAttachment = z.infer<typeof OutputAttachmentSchema>;
+
+export const MessageAttachmentSchema = z.discriminatedUnion("kind", [
+  ImageAttachmentSchema,
+  ...OutputAttachmentSchema.options,
 ]);
 
 export type MessageAttachment = z.infer<typeof MessageAttachmentSchema>;

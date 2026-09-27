@@ -9,6 +9,7 @@ export type OpenRouterScenario =
   | "endless-tools"
   | "tool-loop"
   | "tool-outputs"
+  | "child-outputs"
   | "delayed-stream"
   | "unauthorized"
   | "rate-limit"
@@ -314,11 +315,23 @@ export async function handleOpenRouterRequest(
   if (scenario === "tool-loop") {
     return sse([chunk({ content: "Finished after tool." }, "stop"), "[DONE]"]);
   }
-  if (scenario === "tool-outputs" && requests.length === 1) {
+  if (
+    (scenario === "tool-outputs" || scenario === "child-outputs") &&
+    requests.length === 1
+  ) {
     // The repeated search returns the same source to exercise deduplication.
     const calls = [
       ["generate_image", { prompt: "A lighthouse" }],
       ["web_search", { query: "lighthouses" }],
+      ...(scenario === "child-outputs"
+        ? ([
+            [
+              "create_file",
+              { path: "report.txt", content: "Lighthouse report" },
+            ],
+            ["ask_parent", { question: "May I finish?" }],
+          ] as const)
+        : []),
       ["web_search", { query: "lighthouses" }],
     ] as const;
     return sse([

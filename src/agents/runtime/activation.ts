@@ -1,5 +1,8 @@
 import { RunContext } from "../../RunContext";
-import type { WorkspaceFileAttachment } from "../../attachments/types";
+import type {
+  OutputAttachment,
+  WorkspaceFileAttachment,
+} from "../../attachments/types";
 import type { AgentRecord, AgentStore } from "../../db/agents";
 import { getAttachment } from "../../db/attachments";
 import { getMessagesForSession, getSessionById } from "../../db/sessions";
@@ -38,6 +41,7 @@ export interface ActivationHost {
     sender: string,
     kind: "result" | "failure",
     content: string,
+    attachments?: OutputAttachment[],
   ): unknown;
 }
 
@@ -98,11 +102,13 @@ export async function runActivation(
       content: partial.content,
       steps: partial.steps,
       attachments: [
+        ...agent.pendingOutputs,
         ...(ctx?.outputAttachments.slice(attachmentStart) ?? []),
         ...changedFiles,
       ],
       versions: agent.versions,
     });
+    agent.pendingOutputs = [];
     attachmentStart = ctx?.outputAttachments.length ?? 0;
     agent.versions = undefined;
     agent.partial = undefined;
@@ -260,6 +266,7 @@ export async function runActivation(
                     ? message.content
                     : agentEnvelope(message, agents),
               });
+            agent.pendingOutputs.push(...message.attachments);
           }
           if (agent.kind === "main") {
             const summary = pendingSummary(
@@ -289,13 +296,12 @@ export async function runActivation(
     };
     const result = await model.run("", ctx);
     host.store.saveHistory(agent, model.history);
-    if (agent.kind === "main")
-      changedFiles = await changedWorkspaceFiles(
-        workspace,
-        ctx.writtenFiles,
-        agent.sessionId,
-        host.temporaryHistory.has(agent.sessionId),
-      );
+    changedFiles = await changedWorkspaceFiles(
+      workspace,
+      ctx.writtenFiles,
+      agent.sessionId,
+      host.temporaryHistory.has(agent.sessionId),
+    );
     host.atomically(agent.sessionId, closeSegment);
     if (signal.aborted) {
       outcome = "aborted";
@@ -308,13 +314,24 @@ export async function runActivation(
       ? "Automatic work paused. Waiting for the user to continue."
       : result;
     if (isFinalAgent(agent)) agent.endedAt = Date.now();
+    const outputAttachments = ctx.outputAttachments;
     host.atomically(agent.sessionId, () => {
-      host.store.save(agent);
+      if (agent.kind !== "main")
+        agent.pendingOutputs.push(...outputAttachments, ...changedFiles);
       if (!paused && agent.status === "idle" && agent.parentId) {
         const parent = host.store.get(agent.parentId);
-        if (parent && !host.isDeleting(agent.sessionId))
-          host.enqueue(parent, agent.id, "result", result);
+        if (parent && !host.isDeleting(agent.sessionId)) {
+          host.enqueue(
+            parent,
+            agent.id,
+            "result",
+            result,
+            agent.pendingOutputs,
+          );
+          agent.pendingOutputs = [];
+        }
       }
+      host.store.save(agent);
     });
   } catch (error) {
     outcome = signal.aborted ? "aborted" : "error";
@@ -323,8 +340,12 @@ export async function runActivation(
     agent.activity = error instanceof Error ? error.message : String(error);
     ctx?.failLastRunningStep(agent.activity);
     if (agent.kind === "main") {
-      partial.content ||= `Error: ${agent.activity}`;
-      closeSegment();
+      host.atomically(agent.sessionId, () => {
+        // Keep failed input available for Deliver without immediately retrying it.
+        if (!signal.aborted) host.store.hold(agent.id, true);
+        partial.content ||= `Error: ${agent.activity}`;
+        closeSegment();
+      });
     } else if (!signal.aborted && agent.parentId) {
       const parent = host.store.get(agent.parentId);
       agent.endedAt = Date.now();

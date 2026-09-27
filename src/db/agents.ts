@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   type ImageAttachment,
   ImageAttachmentSchema,
+  OutputAttachmentSchema,
 } from "../attachments/types";
 import type { LlmMessage } from "../llm";
 import {
@@ -21,6 +22,7 @@ import { getDb, transaction } from "./connection";
 
 const RecordSchema = AgentSchema.extend({
   history: z.array(ModelMessageSchema),
+  pendingOutputs: z.array(OutputAttachmentSchema).default([]),
   partial: WireMessageSchema.optional(),
   lastSummaryAt: z.number().default(0),
   checkpoints: z.record(z.string(), z.number()).default({}),
@@ -43,11 +45,12 @@ type MessageRow = {
   wakes: number;
   held: number;
   attachment_ids: string;
+  attachments: string;
   created_at: number;
   delivered_at: number | null;
 };
 const MESSAGE_COLUMNS =
-  "id, agent_id, sender, kind, content, wakes, held, attachment_ids, created_at, delivered_at";
+  "id, agent_id, sender, kind, content, wakes, held, attachment_ids, attachments, created_at, delivered_at";
 const toMessage = (row: MessageRow): InboxMessage =>
   InboxMessageSchema.parse({
     id: row.id,
@@ -58,6 +61,7 @@ const toMessage = (row: MessageRow): InboxMessage =>
     wakes: row.wakes === 1,
     held: row.held === 1,
     attachmentIds: JSON.parse(row.attachment_ids),
+    attachments: JSON.parse(row.attachments),
     createdAt: row.created_at,
     deliveredAt: row.delivered_at,
   });
@@ -311,10 +315,14 @@ export class AgentStore {
     );
   }
   enqueue(
-    message: Omit<InboxMessage, "id" | "createdAt" | "deliveredAt" | "held">,
+    message: Omit<
+      InboxMessage,
+      "id" | "createdAt" | "deliveredAt" | "held" | "attachments"
+    > & { attachments?: InboxMessage["attachments"] },
   ): InboxMessage {
     const row: InboxMessage = {
       ...message,
+      attachments: message.attachments ?? [],
       id: 0,
       createdAt: Date.now(),
       deliveredAt: null,
@@ -326,7 +334,7 @@ export class AgentStore {
     } else
       row.id = Number(
         getDb().run(
-          "INSERT INTO agent_messages (agent_id, sender, kind, content, wakes, attachment_ids, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          "INSERT INTO agent_messages (agent_id, sender, kind, content, wakes, attachment_ids, attachments, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
           [
             row.agentId,
             row.sender,
@@ -334,6 +342,7 @@ export class AgentStore {
             row.content,
             row.wakes ? 1 : 0,
             JSON.stringify(row.attachmentIds),
+            JSON.stringify(row.attachments),
             row.createdAt,
           ],
         ).lastInsertRowid,

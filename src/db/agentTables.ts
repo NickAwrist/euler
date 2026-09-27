@@ -16,6 +16,7 @@ const AGENT_MESSAGES = `CREATE TABLE agent_messages (
   wakes INTEGER NOT NULL CHECK (wakes IN (0, 1)),
   held INTEGER NOT NULL DEFAULT 0 CHECK (held IN (0, 1)),
   attachment_ids TEXT NOT NULL DEFAULT '[]',
+  attachments TEXT NOT NULL DEFAULT '[]',
   created_at INTEGER NOT NULL,
   delivered_at INTEGER
 )`;
@@ -44,6 +45,10 @@ export function createAgentTables(db: Database) {
     return;
   }
   if (agentColumns.includes("status")) {
+    if (!columns(db, "agent_messages").includes("attachments"))
+      db.run(
+        "ALTER TABLE agent_messages ADD COLUMN attachments TEXT NOT NULL DEFAULT '[]'",
+      );
     db.run(INDEXES);
     return;
   }

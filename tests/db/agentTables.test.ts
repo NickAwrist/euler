@@ -79,3 +79,27 @@ test("migrates legacy inbox columns without changing IDs, delivery, or foreign k
     db.close();
   }
 });
+
+test("adds output attachments to existing inboxes without changing messages", () => {
+  const db = new Database(":memory:");
+  try {
+    db.run("CREATE TABLE sessions (id TEXT PRIMARY KEY)");
+    createAgentTables(db);
+    db.run("ALTER TABLE agent_messages DROP COLUMN attachments");
+    db.run(
+      "INSERT INTO agents (id, session_id, status, data) VALUES ('agent', 'chat', 'idle', '{}')",
+    );
+    db.run(
+      "INSERT INTO agent_messages (agent_id, sender, kind, content, wakes, created_at) VALUES ('agent', 'child', 'result', 'Done', 1, 123)",
+    );
+    createAgentTables(db);
+    createAgentTables(db);
+    expect(
+      db
+        .query("SELECT content, attachments, delivered_at FROM agent_messages")
+        .get(),
+    ).toEqual({ content: "Done", attachments: "[]", delivered_at: null });
+  } finally {
+    db.close();
+  }
+});

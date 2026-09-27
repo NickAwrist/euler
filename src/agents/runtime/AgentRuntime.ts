@@ -1,3 +1,4 @@
+import type { OutputAttachment } from "../../attachments/types";
 import { DEFAULT_RUN_MODEL } from "../../constants";
 import { type AgentRecord, AgentStore } from "../../db/agents";
 import {
@@ -5,6 +6,7 @@ import {
   getMessagesForSession,
   getSessionById,
   parseModelMessages,
+  patchSessionRow,
   truncateSessionMessages,
 } from "../../db/sessions";
 import { type Unsequenced, eventHub } from "../../events/eventHub";
@@ -90,11 +92,11 @@ export class AgentRuntime {
       for (const check of [...this.waiters]) check();
     });
   }
-  private atomically(sessionId: string, write: () => void) {
+  private atomically<T>(sessionId: string, write: () => T): T {
     const restore = this.store.checkpoint(sessionId);
     const history = this.temporaryHistory.get(sessionId);
     const saved = history ? structuredClone(history) : undefined;
-    this.transactions.run(write, () => {
+    return this.transactions.run(write, () => {
       restore();
       if (saved) this.temporaryHistory.set(sessionId, saved);
       else this.temporaryHistory.delete(sessionId);
@@ -140,6 +142,7 @@ export class AgentRuntime {
       activity: "",
       steps: [],
       history: [],
+      pendingOutputs: [],
       checkpoints: {},
       // Agents that ended before this chat's main agent existed need no summary.
       lastSummaryAt: Date.now(),
@@ -193,20 +196,25 @@ export class AgentRuntime {
   /** Queues the user's message for the main agent with the settings sent with it. */
   send(record: AgentRecord, request: SendMessageRequest) {
     const main = this.store.get(record.id) ?? record;
-    if (request.model) main.model = request.model;
-    main.config = {
-      metadata: request.metadata,
-      reasoningEffort: request.reasoningEffort,
-    };
-    const queued = main.status === "running";
-    const message = this.enqueue(
-      main,
-      "user",
-      "user",
-      request.content,
-      request.attachmentIds,
-    );
-    return { message, queued };
+    return this.atomically(main.sessionId, () => {
+      if (request.model) {
+        main.model = request.model;
+        patchSessionRow(main.ownerUuid, main.sessionId, { model: main.model });
+      }
+      main.config = {
+        metadata: request.metadata,
+        reasoningEffort: request.reasoningEffort,
+      };
+      const queued = main.status === "running";
+      const message = this.enqueue(
+        main,
+        "user",
+        "user",
+        request.content,
+        request.attachmentIds,
+      );
+      return { message, queued };
+    });
   }
   enqueue(
     record: AgentRecord,
@@ -214,6 +222,7 @@ export class AgentRuntime {
     kind: InboxMessage["kind"],
     content: string,
     attachmentIds: string[] = [],
+    attachments: OutputAttachment[] = [],
   ) {
     const agent = this.store.get(record.id);
     if (!agent || isFinalAgent(agent) || this.deleting.has(agent.sessionId))
@@ -224,6 +233,7 @@ export class AgentRuntime {
       kind,
       content,
       attachmentIds,
+      attachments,
       wakes: !["progress", "status"].includes(kind),
     });
     if (kind === "user") {
@@ -412,8 +422,8 @@ export class AgentRuntime {
         allowModelCall: (record) => this.allowModelCall(record),
         tools: (record, abort, wait, model) =>
           this.tools(record, abort, wait, model),
-        enqueue: (record, sender, kind, content) =>
-          this.enqueue(record, sender, kind, content),
+        enqueue: (record, sender, kind, content, attachments) =>
+          this.enqueue(record, sender, kind, content, [], attachments),
       },
       agent,
       signal,
@@ -493,6 +503,7 @@ export class AgentRuntime {
       createdAt: Date.now(),
       endedAt: null,
       history: [],
+      pendingOutputs: [],
       partial: undefined,
       interruption: undefined,
       versions: undefined,
@@ -661,6 +672,7 @@ export class AgentRuntime {
             ([position]) => Number(position) < request.position,
           ),
         );
+        current.pendingOutputs = [];
         current.versions = request.versions;
         this.store.save(current);
         // Drop queued user input and reports from rewound agents; reports from
@@ -721,20 +733,25 @@ export class AgentRuntime {
             });
         }
         if (agent.kind === "main") {
-          if (agent.partial)
+          if (agent.partial) {
             this.append(agent, {
               ...agent.partial,
+              attachments: agent.pendingOutputs,
               content: `${agent.partial.content}\n\n*Response interrupted by server restart.*`,
             });
+            agent.pendingOutputs = [];
+          }
           // Nothing starts solely because the server restarted.
           this.store.hold(agent.id, true);
         } else {
           const peers = this.store.list(agent.ownerUuid, agent.sessionId);
-          for (const message of pending)
+          for (const message of pending) {
+            agent.pendingOutputs.push(...message.attachments);
             history.push({
               role: "user",
               content: agentEnvelope(message, peers),
             });
+          }
           this.store.deliver(pending);
           agent.activity =
             "Interrupted by server restart. Ready for new instructions.";

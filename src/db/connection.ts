@@ -99,6 +99,6 @@ export function resetDbConnection(): void {
 }
 
 /** Runs `write` in one transaction; a nested call becomes a savepoint. */
-export function transaction(write: () => void) {
-  getDb().transaction(write)();
+export function transaction<T>(write: () => T): T {
+  return getDb().transaction(write)();
 }

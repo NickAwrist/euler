@@ -8,7 +8,10 @@ export const escapeEnvelope = (text: string) =>
     .replaceAll('"', "&quot;");
 export function agentEnvelope(message: InboxMessage, agents: AgentRecord[]) {
   const sender = agents.find((a) => a.id === message.sender);
-  return `<agent_message from="${escapeEnvelope(message.sender)}" name="${escapeEnvelope(sender?.title ?? "Runtime")}" kind="${message.kind}">\n${escapeEnvelope(message.content)}\n</agent_message>`;
+  const content = message.attachments.length
+    ? `${message.content}\nOutputs: ${JSON.stringify(message.attachments)}`
+    : message.content;
+  return `<agent_message from="${escapeEnvelope(message.sender)}" name="${escapeEnvelope(sender?.title ?? "Runtime")}" kind="${message.kind}">\n${escapeEnvelope(content)}\n</agent_message>`;
 }
 export function pendingSummary(agents: AgentRecord[]) {
   return `<background_agents>\n${agents

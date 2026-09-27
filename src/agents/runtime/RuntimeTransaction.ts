@@ -9,12 +9,13 @@ export class RuntimeTransaction {
     else effect();
   }
 
-  run(write: () => void, rollback: () => void) {
+  run<T>(write: () => T, rollback: () => void): T {
     const parent = this.effects;
     const effects: (() => void)[] = [];
     this.effects = effects;
+    let result: T;
     try {
-      transaction(write);
+      result = transaction(write);
     } catch (error) {
       rollback();
       throw error;
@@ -23,5 +24,6 @@ export class RuntimeTransaction {
     }
     if (parent) parent.push(...effects);
     else for (const effect of effects) effect();
+    return result;
   }
 }

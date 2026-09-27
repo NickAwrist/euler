@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { MAX_IMAGES_PER_MESSAGE } from "../attachments/types";
+import {
+  MAX_IMAGES_PER_MESSAGE,
+  OutputAttachmentSchema,
+} from "../attachments/types";
 import { MessageVersionSchema, RunMetadataSchema, WireStepSchema } from "./run";
 
 export const AgentStatusSchema = z.enum([
@@ -50,6 +53,7 @@ export const InboxMessageSchema = z.object({
   deliveredAt: z.number().nullable(),
   held: z.boolean().default(false),
   attachmentIds: z.array(z.string()).default([]),
+  attachments: z.array(OutputAttachmentSchema).default([]),
 });
 export type InboxMessage = z.infer<typeof InboxMessageSchema>;
 export const SendMessageSchema = z
