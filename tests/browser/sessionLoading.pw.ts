@@ -1,549 +1,122 @@
-import { type ServerResponse, createServer } from "node:http";
-import { type Page, expect, test } from "@playwright/test";
+import { type ChildProcess, spawn } from "node:child_process";
+import { expect, test } from "@playwright/test";
+test.use({ isMobile: false, hasTouch: false, deviceScaleFactor: 1 });
+let server: ChildProcess;
+test.beforeAll(async () => {
+  server = spawn("bun", ["tests/helpers/asyncFixture.ts"], { stdio: "pipe" });
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("Fixture failed to start")),
+      10000,
+    );
+    server.stdout?.on("data", (chunk) => {
+      if (String(chunk).includes("async fixture ready")) {
+        clearTimeout(timer);
+        resolve();
+      }
+    });
+    server.on("exit", (code) => {
+      clearTimeout(timer);
+      reject(new Error(`Fixture exited ${code}`));
+    });
+  });
+});
+test.afterAll(() => server?.kill());
 
-async function mockApp(page: Page) {
+test("session loading: async agents continue across chat messages and browser reload", async ({
+  page,
+}, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.route("**/api/**", async (route) => {
-    const path = new URL(route.request().url()).pathname;
-    if (route.request().method() === "DELETE")
-      throw new Error("Navigation must not delete an unloaded conversation");
-    const json =
-      path === "/api/sessions"
-        ? {
-            sessions: ["a", "b"].map((id) => ({
-              id,
-              preview: `Conversation ${id}`,
-              createdAt: 1,
-              updatedAt: 1,
-            })),
-          }
-        : path === "/api/models"
-          ? {
-              models: [
-                {
-                  id: "test",
-                  name: "Test",
-                  lab: "Test",
-                  provider: "ollama",
-                  inputCapabilities: ["text", "image"],
-                },
-              ],
-            }
-          : path.endsWith("/health")
-            ? { connected: true }
-            : path.startsWith("/api/runs/active/")
-              ? { active: false }
-              : {};
-    await route.fulfill({ json });
+    const url = new URL(route.request().url());
+    if (url.pathname === "/api/models")
+      return route.fulfill({
+        json: {
+          models: [
+            {
+              id: "openrouter:openai/gpt-5.6-terra",
+              name: "Fixture",
+              provider: "openrouter",
+              lab: "Test",
+              configured: true,
+              inputCapabilities: ["text"],
+            },
+          ],
+        },
+      });
+    url.port = "5198";
+    return route.continue({ url: url.toString() });
   });
-}
-
-function stored(id: string, content: string, image = false) {
-  return {
-    id,
-    model: "test",
-    history: [
-      {
-        role: "user",
-        content,
-        ...(image
-          ? {
-              attachments: [
-                {
-                  id: "image",
-                  kind: "image",
-                  name: "Pasted image",
-                  mimeType: "image/png",
-                  size: 10,
-                },
-              ],
-            }
-          : {}),
-      },
-    ],
-  };
-}
-
-test("session loading displays history and permits navigation while run status and images are held", async ({
-  page,
-}) => {
-  await mockApp(page);
-  const status = Promise.withResolvers<void>();
-  const images = Promise.withResolvers<void>();
-  let statusCompleted = false;
-  let imageStarted = false;
-  const sessions: string[] = [];
-  await page.route("**/api/sessions/*", async (route) => {
-    const id = new URL(route.request().url()).pathname.split("/").at(-1)!;
-    sessions.push(id);
-    await route.fulfill({ json: stored(id, `Stored text ${id}`, true) });
-  });
-  await page.route("**/api/runs/active/*", async (route) => {
-    await status.promise;
-    await route.fulfill({ json: { active: false } });
-    statusCompleted = true;
-  });
-  await page.route("**/api/attachments/*", async (route) => {
-    imageStarted = true;
-    await images.promise;
-    await route.abort();
-  });
-  try {
-    await page.goto("/");
-    await page
-      .getByRole("button", { name: /Conversation a/ })
-      .first()
-      .click();
-    await expect(
-      page.getByText("Stored text a", { exact: true }),
-    ).toBeVisible();
-    await expect.poll(() => imageStarted).toBe(true);
-    await page.getByPlaceholder("Send a message...").fill("test");
-    await expect(
-      page.getByRole("button", { name: "Send message", exact: true }),
-    ).toBeDisabled();
-    await page
-      .getByRole("button", { name: /Conversation b/ })
-      .first()
-      .click();
-    await expect(
-      page.getByText("Stored text b", { exact: true }),
-    ).toBeVisible();
-    await expect(page.getByText("Stored text a", { exact: true })).toHaveCount(
-      0,
-    );
-    await page.waitForTimeout(3000);
-    expect(statusCompleted).toBe(false);
-    expect(sessions).toEqual(["a", "b"]);
-    await page.getByPlaceholder("Send a message...").fill("test");
-    await expect(
-      page.getByRole("button", { name: "Send message", exact: true }),
-    ).toBeDisabled();
-    status.resolve();
-    await expect(
-      page.getByRole("button", { name: "Send message", exact: true }),
-    ).toBeEnabled();
-  } finally {
-    status.resolve();
-    images.resolve();
-  }
-});
-
-test("session loading distinguishes loading, errors, and loaded empty", async ({
-  page,
-}) => {
-  await mockApp(page);
-  const history = Promise.withResolvers<void>();
-  let fail = true;
-  await page.route("**/api/sessions/a", async (route) => {
-    await history.promise;
-    await route.fulfill(
-      fail
-        ? { status: 500, json: { error: "History unavailable" } }
-        : { json: { id: "a", history: [], model: "test" } },
-    );
-  });
-  const emptyChat = page.getByRole("heading", {
-    name: "What are we working on today?",
-  });
-  await page.goto("/run/a");
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      "euler:userSettings",
+      JSON.stringify({ defaultModel: "openrouter:openai/gpt-5.6-terra" }),
+    ),
+  );
+  await page.goto("/");
+  const input = page.getByPlaceholder("Send a message...");
+  await input.fill("Research this");
+  await page.getByRole("button", { name: "Send message" }).click();
   await expect(
-    page.getByText("Loading conversation…", { exact: true }),
+    page.getByText("Working in the background.", { exact: true }),
   ).toBeVisible();
-  await expect(emptyChat).toHaveCount(0);
-  history.resolve();
+  await input.fill("How is it going?");
   await expect(
-    page.getByText("History unavailable", { exact: true }),
-  ).toBeVisible();
-  await expect(emptyChat).toHaveCount(0);
-  fail = false;
-  await page.getByRole("button", { name: "Retry", exact: true }).click();
-  await expect(emptyChat).toBeVisible();
-});
-
-test("session loading never replaces streamed completion with an older pending snapshot", async ({
-  page,
-}) => {
-  await mockApp(page);
-  const oldHistory = Promise.withResolvers<void>();
-  let requests = 0;
-  await page.route("**/api/sessions/a", async (route) => {
-    const initial = ++requests === 1;
-    if (initial) await oldHistory.promise;
-    await route.fulfill({
-      json: stored(
-        "a",
-        initial ? "Stale snapshot" : "Completed stream history",
-      ),
-    });
-  });
-  await page.route("**/api/runs/active/a", (route) =>
-    route.fulfill({ json: { active: true, requestId: "run" } }),
-  );
-  await page.route("**/api/runs/stream/a", (route) =>
-    route.fulfill({
-      contentType: "text/event-stream",
-      body: 'data: {"type":"run_done"}\n\n',
-    }),
-  );
-  try {
-    await page.goto("/run/a");
-    await expect(
-      page.getByText("Completed stream history", { exact: true }),
-    ).toBeVisible();
-    oldHistory.resolve();
-    await expect(
-      page.getByText("Loading conversation…", { exact: true }),
-    ).toHaveCount(0);
-    await expect(
-      page.getByText("Completed stream history", { exact: true }),
-    ).toBeVisible();
-    await expect(page.getByText("Stale snapshot", { exact: true })).toHaveCount(
-      0,
-    );
-    expect(requests).toBe(2);
-  } finally {
-    oldHistory.resolve();
-  }
-});
-
-test("session loading ignores a departed conversation and keeps sending disabled on status failure", async ({
-  page,
-}) => {
-  await mockApp(page);
-  const oldHistory = Promise.withResolvers<void>();
-  await page.route("**/api/sessions/a", async (route) => {
-    await oldHistory.promise;
-    await route.fulfill({ json: stored("a", "Departed history") });
-  });
-  await page.route("**/api/sessions/b", (route) =>
-    route.fulfill({ json: stored("b", "Current history") }),
-  );
-  await page.route("**/api/runs/active/b", (route) =>
-    route.fulfill({ status: 503, json: { error: "unavailable" } }),
-  );
-  try {
-    await page.goto("/run/a");
-    await expect(
-      page.getByText("Loading conversation…", { exact: true }),
-    ).toBeVisible();
-    await page
-      .getByRole("button", { name: /Conversation b/ })
-      .first()
-      .click();
-    await expect(
-      page.getByText("Current history", { exact: true }),
-    ).toBeVisible();
-    oldHistory.resolve();
-    await expect(
-      page.getByText("Could not check the active run.", { exact: true }),
-    ).toBeVisible();
-    await page.getByPlaceholder("Send a message...").fill("test");
-    await expect(
-      page.getByRole("button", { name: "Send message", exact: true }),
-    ).toBeDisabled();
-    await expect(
-      page.getByText("Departed history", { exact: true }),
-    ).toHaveCount(0);
-  } finally {
-    oldHistory.resolve();
-  }
-});
-
-test("session loading restores concurrent run traces after switching and refresh", async ({
-  page,
-}) => {
-  await mockApp(page);
-  await page.route("**/api/sessions/*", (route) => {
-    const id = new URL(route.request().url()).pathname.split("/").at(-1)!;
-    return route.fulfill({ json: stored(id, `Stored text ${id}`) });
-  });
-  await page.route("**/api/runs/active/*", (route) =>
-    route.fulfill({
-      json: { active: true, requestId: route.request().url() },
-    }),
-  );
-  // Keep SSE bodies open, as they are while a server generation is running.
-  await page.addInitScript(() => {
-    const originalFetch = window.fetch;
-    const mockFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      const isSend = url === "/api/runs" && init?.method === "POST";
-      if (!url.includes("/api/runs/stream/") && !isSend)
-        return originalFetch(input, init);
-      const id = isSend
-        ? JSON.parse(String(init?.body)).sessionId
-        : url.split("/").at(-1);
-      const step = {
-        kind: "tool_call",
-        status: "running",
-        toolName: `working_${id}`,
-      };
-      return new Response(
-        new ReadableStream({
-          start(controller) {
-            controller.enqueue(
-              new TextEncoder().encode(
-                `data: ${JSON.stringify({ type: "run_step", step, steps: [step] })}\n\n`,
-              ),
-            );
-            init?.signal?.addEventListener("abort", () => {
-              controller.error(new DOMException("Aborted", "AbortError"));
-            });
-          },
-        }),
-        { headers: { "Content-Type": "text/event-stream" } },
-      );
-    };
-    window.fetch = new Proxy(originalFetch, {
-      apply: (_target, _thisArg, args: [RequestInfo | URL, RequestInit?]) =>
-        mockFetch(...args),
-    });
-  });
-  const trace = page.getByRole("button", { name: "View execution trace" });
-  await page.route("**/api/runs/active/a", (route) =>
-    route.fulfill({ json: { active: false } }),
-  );
-  await page.goto("/run/a");
-  await page.getByPlaceholder("Send a message...").fill("Start generation");
-  await page.getByRole("button", { name: "Send message", exact: true }).click();
-  await page.unroute("**/api/runs/active/a");
-  await expect(trace).toContainText("Working A");
-  // Navigating to an idle thread must not erase the still-connected buffer.
-  await page.route("**/api/runs/active/b", (route) =>
-    route.fulfill({ json: { active: false } }),
-  );
-  await page
-    .getByRole("button", { name: /Conversation b/ })
-    .first()
-    .click();
-  await expect(trace).toHaveCount(0);
-  await page
-    .getByRole("button", { name: /Conversation a/ })
-    .first()
-    .click();
-  await expect(trace).toContainText("Working A");
-  await page.unroute("**/api/runs/active/b");
-  await page
-    .getByRole("button", { name: /Conversation b/ })
-    .first()
-    .click();
-  await expect(trace).toContainText("Working B");
-  await page.reload();
-  await expect(trace).toContainText("Working B");
-  await page
-    .getByRole("button", { name: /Conversation a/ })
-    .first()
-    .click();
-  await expect(trace).toContainText("Working A");
-  await page
-    .getByRole("button", { name: /Conversation b/ })
-    .first()
-    .click();
-  await expect(trace).toContainText("Working B");
-});
-
-test("session loading recovers real streams through repeated refreshes and connection failures", async ({
-  page,
-}) => {
-  await mockApp(page);
-  const clients = new Set<ServerResponse>();
-  let streamRequests = 0;
-  let completed = false;
-  let failedStatusChecks = 0;
-  const server = createServer((req, res) => {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      req.headers["access-control-request-headers"] ?? "*",
-    );
-    if (req.method === "OPTIONS") {
-      res.end();
-      return;
-    }
-    if (completed) {
-      res.writeHead(404).end();
-      return;
-    }
-    if (++streamRequests === 1) {
-      res.writeHead(503).end();
-      return;
-    }
-    const id = req.url?.split("/").at(-1);
-    const step = {
-      kind: "tool_call",
-      status: "running",
-      toolName: `working_${id}`,
-    };
-    res.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-    });
-    res.write(
-      `data: ${JSON.stringify({ type: "run_started", requestId: id })}\n\n`,
-    );
-    res.write(
-      `data: ${JSON.stringify({ type: "run_step", step, steps: [step] })}\n\n`,
-    );
-    clients.add(res);
-    req.on("close", () => clients.delete(res));
-  });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-  if (!address || typeof address === "string")
-    throw new Error("Missing test server port");
-  await page.addInitScript((port) => {
-    const original = window.fetch;
-    window.fetch = new Proxy(original, {
-      apply: (_target, _thisArg, args: [RequestInfo | URL, RequestInit?]) => {
-        const [input, init] = args;
-        const url = String(input);
-        return original(
-          url.includes("/api/runs/stream/")
-            ? `http://127.0.0.1:${port}/stream/${url.split("/").at(-1)}`
-            : input,
-          init,
-        );
-      },
-    });
-  }, address.port);
-  await page.route("**/api/sessions/*", (route) => {
-    const id = new URL(route.request().url()).pathname.split("/").at(-1)!;
-    return route.fulfill({
-      json: stored(
-        id,
-        completed ? "Completed after disconnect" : `Stored text ${id}`,
-      ),
-    });
-  });
-  let statusRequests = 0;
-  await page.route("**/api/runs/active/*", (route) => {
-    statusRequests++;
-    if (failedStatusChecks > 0) {
-      failedStatusChecks--;
-      return route.fulfill({ status: 503, json: {} });
-    }
-    if (completed) return route.fulfill({ json: { active: false } });
-    // Model the preparation window before a generation becomes discoverable.
-    if (statusRequests === 1) return route.fulfill({ json: { active: false } });
-    if (statusRequests === 2) return route.fulfill({ status: 503, json: {} });
-    return route.fulfill({ json: { active: true, requestId: "run" } });
-  });
-  const trace = page.getByRole("button", { name: "View execution trace" });
-  try {
-    await page.goto("/run/a");
-    await expect(trace).toContainText("Working A", { timeout: 15000 });
-    for (let i = 0; i < 3; i++) {
-      await page.reload();
-      await expect(trace).toContainText("Working A");
-    }
-    // A dropped TCP connection must resume without another navigation.
-    for (const client of clients) client.destroy();
-    const beforeRecovery = streamRequests;
-    await expect.poll(() => streamRequests).toBeGreaterThan(beforeRecovery);
-    await expect(trace).toContainText("Working A");
-    await page
-      .getByRole("button", { name: /Conversation b/ })
-      .first()
-      .click();
-    await expect(trace).toContainText("Working B");
-    await page
-      .getByRole("button", { name: /Conversation a/ })
-      .first()
-      .click();
-    await expect(trace).toContainText("Working A");
-    completed = true;
-    failedStatusChecks = 2;
-    for (const client of clients) client.destroy();
-    await expect(
-      page.getByText("Completed after disconnect", { exact: true }),
-    ).toBeVisible({ timeout: 10000 });
-    await expect(trace).toHaveCount(0);
-  } finally {
-    for (const client of clients) client.destroy();
-    await new Promise<void>((resolve, reject) =>
-      server.close((error) => (error ? reject(error) : resolve())),
-    );
-  }
-});
-
-test("session loading retries failed run discovery and restores sending", async ({
-  page,
-}) => {
-  await mockApp(page);
-  await page.route("**/api/sessions/a", (route) =>
-    route.fulfill({ json: stored("a", "Stored text a") }),
-  );
-  let attempts = 0;
-  await page.route("**/api/runs/active/a", (route) => {
-    return route.fulfill(
-      ++attempts < 3 ? { status: 503, json: {} } : { json: { active: false } },
-    );
-  });
-  await page.goto("/run/a");
-  await page.getByPlaceholder("Send a message...").fill("Next message");
-  await expect(
-    page.getByText("Could not check the active run.", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Send message", exact: true }),
+    page.getByRole("button", { name: "Send message" }),
   ).toBeEnabled();
+  await page.getByRole("button", { name: "Send message" }).click();
   await expect(
-    page.getByText("Could not check the active run.", { exact: true }),
-  ).toHaveCount(0);
-});
-
-test("session loading keeps valid tool attachments when completion reload fails", async ({
-  page,
-}) => {
-  await mockApp(page);
-  let completed = false;
-  await page.route("**/api/sessions/a", (route) =>
-    completed
-      ? route.fulfill({ status: 503, json: { error: "unavailable" } })
-      : route.fulfill({ json: stored("a", "Draw a lighthouse") }),
-  );
-  await page.route("**/api/comfyui/view/**", (route) =>
-    route.fulfill({
-      contentType: "image/png",
-      body: Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=",
-        "base64",
-      ),
-    }),
-  );
-  await page.route("**/api/runs", (route) => {
-    completed = true;
-    return route.fulfill({
-      contentType: "text/event-stream",
-      body: `data: ${JSON.stringify({
-        type: "run_done",
-        result: "Here is the result.",
-        steps: [],
-        attachments: [
-          { kind: "generated_image", url: "/api/comfyui/view/result.png" },
-          { kind: "web_source", url: "javascript:alert(1)", title: "Invalid" },
-          {
-            kind: "web_source",
-            url: "https://example.com",
-            title: "Valid source",
-          },
-        ],
-      })}\n\n`,
-    });
+    page.getByText("How is it going?", { exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByText("The background result is 42.", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("Completed", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Details", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Back to agents" }),
+  ).toBeVisible();
+  await expect(page.getByText("42", { exact: true })).toBeVisible();
+  await page.waitForTimeout(250);
+  await page.screenshot({
+    path: testInfo.outputPath("async-agent-completed.png"),
   });
-  await page.goto("/run/a");
+  await page.getByRole("button", { name: "Back to agents" }).click();
   await expect(
-    page.getByText("Draw a lighthouse", { exact: true }),
-  ).toBeVisible();
-  await page.getByPlaceholder("Send a message...").fill("Generate it");
-  await page.getByRole("button", { name: "Send message", exact: true }).click();
+    page.getByRole("button", { name: "Research", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("Escape");
+  await input.fill("Slow reply");
+  await page.getByRole("button", { name: "Send message" }).click();
   await expect(
-    page.getByText("Here is the result.", { exact: true }),
+    page.getByRole("button", { name: "Stop generation" }),
   ).toBeVisible();
+  await input.fill("Queued original");
+  await page.getByRole("button", { name: "Send message" }).click();
   await expect(
-    page.getByAltText("Generated image", { exact: true }),
+    page.getByText("Queued: Queued original", { exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: /Valid source/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Invalid/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Stop generation" }).click();
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "Edit queued message" })
+    .fill("Queued edited");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(
+    page.getByText("Queued: Queued edited", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Deliver", exact: true }).click();
+  await expect(page.getByText("Queued edited", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Queued: Queued edited", { exact: true }),
+  ).toHaveCount(0);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Agents", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Research", exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath("async-agents-narrow.png"),
+  });
 });

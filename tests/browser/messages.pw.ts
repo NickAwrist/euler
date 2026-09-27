@@ -97,7 +97,8 @@ test("mobile message actions and code layout", async ({ page }, testInfo) => {
   expect(bounds?.width).toBeLessThan(260);
   const trigger = await tracedMore.boundingBox();
   if (!bounds || !trigger) throw new Error("Missing menu or trigger");
-  expect(trigger.y - (bounds.y + bounds.height)).toBeCloseTo(6, 0);
+  // Touch press scaling and device-pixel rounding can shift the anchor by a pixel.
+  expect(Math.abs(trigger.y - (bounds.y + bounds.height) - 6)).toBeLessThan(1);
   expect(bounds.x).toBeLessThanOrEqual(trigger.x + trigger.width);
   expect(bounds.x + bounds.width).toBeGreaterThanOrEqual(trigger.x);
   await page.screenshot({ path: testInfo.outputPath("mobile-actions.png") });

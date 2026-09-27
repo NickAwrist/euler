@@ -2,26 +2,33 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import cors from "cors";
 import express from "express";
+import { agentRuntime } from "./agents/runtime/AgentRuntime";
 import { getDb } from "./db/index";
 import { envConfig } from "./env";
+import { eventHub } from "./events/eventHub";
 import { errorHandler, sendApiError } from "./http/errors";
 import attachmentsRoutes from "./routes/attachments";
 import comfyuiRoutes from "./routes/comfyui";
+import debugPromptRoutes from "./routes/debugPrompt";
 import directoriesRoutes from "./routes/directories";
 import faviconsRoutes from "./routes/favicons";
 import modelsRoutes from "./routes/models";
 import ollamaRoutes from "./routes/ollama";
-import runRoutes from "./routes/runs";
 import searxngRoutes from "./routes/searxng";
 import sessionRoutes from "./routes/sessions";
 import settingsRoutes from "./routes/settings";
 import skillsRoutes from "./routes/skills";
 import temporarySessionRoutes from "./routes/temporarySessions";
 import usageRoutes from "./routes/usage";
+import { requireUserId } from "./userIdentity";
 import { workspaceService } from "./workspaces/WorkspaceService";
 
 getDb();
-void workspaceService.initialize();
+workspaceService.setAgentLifecycle({
+  isBusy: (owner, session) => agentRuntime.busy(owner, session),
+  onExpire: (owner, session) => agentRuntime.deleteSession(owner, session),
+});
+void workspaceService.initialize().then(() => agentRuntime.recover());
 
 const DEFAULT_FRONTEND_PORTS = [5173, 5174];
 const allowedFrontendPorts = Array.from(
@@ -50,9 +57,18 @@ app.use("/api/favicons", faviconsRoutes);
 app.use("/api/ollama", ollamaRoutes);
 app.use("/api/searxng", searxngRoutes);
 app.use("/api/models", modelsRoutes);
+app.use("/api/sessions", debugPromptRoutes);
 app.use("/api/sessions", sessionRoutes);
 app.use("/api/temporary-sessions", temporarySessionRoutes);
-app.use("/api/runs", runRoutes);
+app.get("/api/events", (req, res) => {
+  const owner = requireUserId(req, res);
+  if (owner)
+    eventHub.attach(
+      owner,
+      res,
+      Number(req.headers["last-event-id"]) || undefined,
+    );
+});
 
 const distPath = join(process.cwd(), "dist");
 const indexPath = join(distPath, "index.html");

@@ -49,8 +49,7 @@ for (const device of ["desktop", "mobile"] as const) {
     let sessionModel = "openrouter:anthropic/claude-sonnet";
     let catalog = models;
     let sessionReads = 0;
-    const runs: { model: string; message: string }[] = [];
-    let finishRun = Promise.withResolvers<void>();
+    const runs: { model: string; content: string }[] = [];
     await page.route("**/api/**", async (route) => {
       const path = new URL(route.request().url()).pathname;
       if (
@@ -75,12 +74,14 @@ for (const device of ["desktop", "mobile"] as const) {
             },
           },
         });
-      if (path === "/api/runs" && route.request().method() === "POST") {
+      if (
+        path === "/api/sessions/selector/messages" &&
+        route.request().method() === "POST"
+      ) {
         runs.push(route.request().postDataJSON());
-        await finishRun.promise;
         await route.fulfill({
-          contentType: "text/event-stream",
-          body: 'data: {"type":"run_done"}\n\n',
+          status: 202,
+          json: { messageId: runs.length, queued: false },
         });
         return;
       }
@@ -107,8 +108,15 @@ for (const device of ["desktop", "mobile"] as const) {
                     },
                   ],
                 }
-              : path.startsWith("/api/runs/active/")
-                ? { active: false }
+              : path.endsWith("/runtime")
+                ? {
+                    agents: [],
+                    activation: null,
+                    queued: [],
+                    held: false,
+                    sequence: 0,
+                    history: [],
+                  }
                 : path.endsWith("/health")
                   ? { connected: true }
                   : {};
@@ -228,27 +236,14 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect.poll(() => runs.length).toBe(1);
       expect(runs[0]).toMatchObject({
         model: "gemma4:e4b",
-        message: "Keep this draft",
+        content: "Keep this draft",
       });
-      await expect(model).toBeDisabled();
       await expect(input).toHaveValue("");
-      await input.fill("Draft while running");
+      await input.fill("Draft after submission");
       await input.press("Enter");
-      await expect(input).toHaveValue("Draft while running");
-      expect(runs).toHaveLength(1);
-      await page.getByRole("button", { name: "Stop generation" }).click();
-      await expect(model).toBeEnabled();
-      await expect(input).toHaveValue("Draft while running");
-      finishRun.resolve();
-
-      // A run that finishes on its own keeps the draft too.
-      finishRun = Promise.withResolvers<void>();
-      await page.getByRole("button", { name: "Send message" }).click();
       await expect.poll(() => runs.length).toBe(2);
-      await input.fill("Draft after completion");
-      finishRun.resolve();
-      await expect(model).toBeEnabled();
-      await expect(input).toHaveValue("Draft after completion");
+      expect(runs[1]?.content).toBe("Draft after submission");
+      await expect(input).toHaveValue("");
 
       // A refreshed catalog must not silently replace the selected model.
       catalog = models.filter((entry) => entry.provider === "openrouter");
@@ -290,7 +285,6 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect(input).toHaveValue("Keep this unsent draft");
       expect(errors).toEqual([]);
     } finally {
-      finishRun.resolve();
       await page.close();
     }
   });

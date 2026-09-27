@@ -2,6 +2,8 @@ import type { MessageAttachment } from "../attachments/types";
 import type { MessageVersion } from "../schemas/run";
 
 export type WireMessage = {
+  id?: number;
+  activationId?: string;
   role: string;
   content: string;
   steps?: unknown;

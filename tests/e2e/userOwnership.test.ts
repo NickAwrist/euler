@@ -39,16 +39,17 @@ describe("browser UUID ownership", () => {
         ).status,
       ).toBe(404);
 
-      const forbiddenRun = await fetch(`${url}/api/runs`, {
-        method: "POST",
-        headers: userHeaders(USER_B, { "Content-Type": "application/json" }),
-        body: JSON.stringify({
-          sessionId: sessionA.id,
-          message: "Hello",
-          history: [],
-          model: "llama3:latest",
-        }),
-      });
+      const forbiddenRun = await fetch(
+        `${url}/api/sessions/${sessionA.id}/messages`,
+        {
+          method: "POST",
+          headers: userHeaders(USER_B, { "Content-Type": "application/json" }),
+          body: JSON.stringify({
+            content: "Hello",
+            model: "llama3:latest",
+          }),
+        },
+      );
       expect(forbiddenRun.status).toBe(404);
 
       await fetch(`${url}/api/ollama/config`, {

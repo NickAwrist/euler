@@ -3,15 +3,13 @@ import {
   type FormEvent,
   type MutableRefObject,
   type SetStateAction,
-  useCallback,
-  useLayoutEffect,
-  useRef,
   useState,
 } from "react";
 import type { ImageAttachment } from "../../../src/attachments/types";
-import { abortRun } from "../../persist/runs";
-import { patchSessionApi } from "../../persist/sessions";
+import { agentAction } from "../../persist/agents";
+import { buildRunMetadata } from "../../persist/userSettings";
 import type { UserSettings } from "../../persist/userSettings";
+import { useAgentEvents } from "./useAgentEvents";
 
 import type {
   DebugData,
@@ -20,14 +18,8 @@ import type {
   MessageVersion,
   TruncateConfirmState,
 } from "../../types";
-import { executeRunTurn } from "./executeRunTurn";
-import type { RunFlightApi } from "./runTypes";
-import { createEmptyStreamBuffer } from "./streamBuffer";
 import { usePendingImages } from "./usePendingImages";
 import { useRunDebug } from "./useRunDebug";
-import { useRunFlight } from "./useRunFlight";
-import { useRunResume } from "./useRunResume";
-import { useTurnBuffer } from "./useTurnBuffer";
 
 type Args = {
   messages: Message[];
@@ -50,7 +42,6 @@ type Args = {
   setEditingUserIndex: Dispatch<SetStateAction<number | null>>;
   truncateConfirm: TruncateConfirmState;
   setTruncateConfirm: Dispatch<SetStateAction<TruncateConfirmState>>;
-  runFlightRef: MutableRefObject<RunFlightApi | null>;
   supportsImageInput: boolean;
   isEphemeral: boolean;
   startSession: () => Promise<string>;
@@ -58,72 +49,12 @@ type Args = {
 
 export function useRunStreaming(p: Args) {
   const [input, setInput] = useState("");
-  const [streamingStep, setStreamingStep] = useState<MessageStep | null>(null);
-  const [streamingSteps, setStreamingSteps] = useState<MessageStep[]>([]);
-  const [streamingContent, setStreamingContent] = useState("");
-  const [streamingThinking, setStreamingThinking] = useState("");
-  const [runPending, setRunPending] = useState(false);
-
-  const rawRunPendingRef = useRef(false);
-  const inFlightSessionIdRef = useRef<string | null>(null);
-  const inFlightEphemeralRef = useRef(false);
-  const { streamBufferRef, turnMessagesSnapshotRef, turnVersionsRef } =
-    useTurnBuffer();
-
-  p.debugOpenRef.current = p.debugOpen;
-
-  const clearStreamingUi = useCallback(() => {
-    setStreamingStep(null);
-    setStreamingSteps([]);
-    setStreamingContent("");
-    setStreamingThinking("");
-  }, []);
-
-  useLayoutEffect(() => {
-    p.bindStreamingReset(clearStreamingUi);
-  }, [p.bindStreamingReset, clearStreamingUi]);
-
-  const {
-    abortControllerRef,
-    activeRequestIdRef,
-    inFlightSessionId,
-    setInFlightSessionId,
-    reconnectToStream,
-  } = useRunFlight(
-    {
-      activeSessionIdRef: p.activeSessionIdRef,
-      modelMessagesRef: p.modelMessagesRef,
-      setMessages: p.setMessages,
-      refreshSessions: p.refreshSessions,
-      streamBufferRef,
-      clearStreamingUi,
-      setStreamingStep,
-      setStreamingSteps,
-      setStreamingContent,
-      setStreamingThinking,
-      setRunPending,
-    },
-    p.runFlightRef,
-    rawRunPendingRef,
-    inFlightSessionIdRef,
-    inFlightEphemeralRef,
-    turnMessagesSnapshotRef,
+  const events = useAgentEvents(
+    p.activeSessionId,
+    p.isEphemeral,
+    p.setMessages,
+    p.refreshSessions,
   );
-
-  useRunResume({
-    abortControllerRef,
-    activeRequestIdRef,
-    activeSessionIdRef: p.activeSessionIdRef,
-    isEphemeralRef: p.isEphemeralRef,
-    modelMessagesRef: p.modelMessagesRef,
-    rawRunPendingRef,
-    inFlightSessionIdRef,
-    reconnectToStream,
-    setMessages: p.setMessages,
-    clearStreamingUi,
-    refreshSessions: p.refreshSessions,
-  });
-
   const fetchDebugData = useRunDebug({
     userSettingsRef: p.userSettingsRef,
     isEphemeralRef: p.isEphemeralRef,
@@ -136,96 +67,51 @@ export function useRunStreaming(p: Args) {
     isEphemeral: p.isEphemeral,
   });
 
-  const runTurn = (
+  const runTurn = async (
     sessionId: string,
     priorMessages: Message[],
     message: string,
     attachments: ImageAttachment[],
     options: { rebuildModelMessages: boolean; versions?: MessageVersion[] },
-  ) =>
-    executeRunTurn(
-      {
-        activeSessionIdRef: p.activeSessionIdRef,
-        isEphemeralRef: p.isEphemeralRef,
-        userSettingsRef: p.userSettingsRef,
-        modelMessagesRef: p.modelMessagesRef,
-        debugOpenRef: p.debugOpenRef,
-        modelSendReady: p.modelSendReady,
-        selectedModel: p.selectedModel,
-        reasoningEffort: p.reasoningEffort,
-        setMessages: p.setMessages,
-        refreshSessions: p.refreshSessions,
-      },
-      {
-        abortControllerRef,
-        activeRequestIdRef,
-        inFlightSessionIdRef,
-        inFlightEphemeralRef,
-        rawRunPendingRef,
-        streamBufferRef,
-        turnMessagesSnapshotRef,
-        turnVersionsRef,
-        setInFlightSessionId,
-        setRunPending,
-        setStreamingStep,
-        setStreamingSteps,
-        setStreamingContent,
-        setStreamingThinking,
-        clearStreamingUi,
-        reconnectToStream,
-        fetchDebugData,
-      },
-      sessionId,
-      priorMessages,
-      message,
-      attachments,
-      options,
-    );
-
-  const stopGeneration = () => {
-    const controller = abortControllerRef.current;
-    if (!controller) return;
-
-    const requestId = activeRequestIdRef.current;
-    const sessionId = inFlightSessionIdRef.current;
-    const ephemeral = inFlightEphemeralRef.current;
-    const versions = turnVersionsRef.current;
-    if (requestId) {
-      void abortRun(requestId).catch(() => {});
-    }
-
-    controller.abort();
-    abortControllerRef.current = null;
-    activeRequestIdRef.current = null;
-    inFlightSessionIdRef.current = null;
-    inFlightEphemeralRef.current = false;
-    rawRunPendingRef.current = false;
-    streamBufferRef.current = createEmptyStreamBuffer();
-    turnMessagesSnapshotRef.current = null;
-    turnVersionsRef.current = [];
-    setInFlightSessionId(null);
-    setRunPending(false);
-    clearStreamingUi();
-
-    p.setMessages((current) => {
-      if (!sessionId || p.activeSessionIdRef.current !== sessionId) {
-        return current;
-      }
-      const halted: Message[] = [
-        ...current,
-        {
-          role: "assistant",
-          content: "*Response halted by user.*",
-          ...(versions.length > 0 ? { versions } : {}),
-        },
-      ];
-      if (!ephemeral) {
-        void patchSessionApi(sessionId, { history: halted }).catch((error) =>
-          console.error(error),
+  ) => {
+    try {
+      if (options.rebuildModelMessages) {
+        await agentAction(
+          sessionId,
+          "rewind",
+          {
+            position: priorMessages.length,
+            content: message,
+            versions: options.versions,
+          },
+          p.isEphemeral,
+        );
+      } else {
+        await agentAction(
+          sessionId,
+          "messages",
+          {
+            content: message,
+            attachmentIds: attachments.map((a) => a.id),
+            model: p.selectedModel,
+            reasoningEffort: p.reasoningEffort,
+            metadata: buildRunMetadata(p.userSettingsRef.current),
+          },
+          p.isEphemeral,
         );
       }
-      return halted;
-    });
+      await events.refresh();
+    } catch (error) {
+      images.setImageError(
+        error instanceof Error ? error.message : "Could not send message",
+      );
+    }
+  };
+  const stopGeneration = () => {
+    if (p.activeSessionId)
+      void agentAction(p.activeSessionId, "stop", {}, p.isEphemeral)
+        .then(events.refresh)
+        .catch(console.error);
   };
 
   const sendMessage = async (event?: FormEvent) => {
@@ -297,7 +183,15 @@ export function useRunStreaming(p: Args) {
 
   const requestRegenerate = (assistantIndex: number) => {
     p.setEditingUserIndex(null);
-    if (assistantIndex < p.messages.length - 1) {
+    if (
+      assistantIndex < p.messages.length - 1 ||
+      events.agents.some(
+        (agent) =>
+          agent.kind !== "main" &&
+          agent.spawnPosition >= assistantIndex &&
+          ["queued", "running", "waiting"].includes(agent.status),
+      )
+    ) {
       p.setTruncateConfirm({ kind: "regenerate", assistantIndex });
     } else {
       void regenerate(assistantIndex);
@@ -323,20 +217,10 @@ export function useRunStreaming(p: Args) {
     p.setDebugOpen((open) => !open);
   };
 
-  const sessionRunBusy =
-    images.uploadPending ||
-    ((runPending || streamingStep !== null || streamingSteps.length > 0) &&
-      inFlightSessionId !== null &&
-      inFlightSessionId === p.activeSessionId);
-
   return {
+    ...events,
     input,
     setInput,
-    streamingStep,
-    streamingSteps,
-    streamingContent,
-    streamingThinking,
-    runPending: sessionRunBusy,
     stopGeneration,
     sendMessage,
     requestRegenerate,

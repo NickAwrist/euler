@@ -33,6 +33,8 @@ export interface MessageStep {
 }
 
 export interface Message {
+  id?: number;
+  activationId?: string;
   role: "user" | "assistant" | "event";
   content: string;
   steps?: MessageStep[];

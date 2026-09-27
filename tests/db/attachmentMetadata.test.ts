@@ -5,7 +5,7 @@ import { getDb, resetDbConnection } from "../../src/db";
 import { migrateAttachmentMetadata } from "../../src/db/attachmentMetadataMigration";
 import { createImageAttachment, getAttachment } from "../../src/db/attachments";
 import { createSessionRow } from "../../src/db/sessions";
-import { createRunPersistence } from "../../src/run/runPersistence";
+import { appendRuntimeMessage } from "../../src/db/sessions";
 
 const image = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -71,24 +71,17 @@ test("initial and final run persistence store attachment metadata while preservi
       data,
     });
     const row = getAttachment(ownerUuid, attachment.id)!;
-    const persistence = createRunPersistence({
-      ownerUuid,
-      sessionId,
-      model: "test",
-      ephemeral: false,
+    appendRuntimeMessage(ownerUuid, sessionId, {
+      role: "user",
+      content: "pasted image",
+      attachments: [row],
     });
-    persistence.saveInitial([], "pasted image", [row], null);
     const read = () =>
       getDb()
         .query(
           "SELECT attachments FROM messages WHERE session_id = ? AND position = 0",
         )
         .get(sessionId);
-    expect(read()).toEqual({ attachments: JSON.stringify([attachment]) });
-    persistence.saveFinal(
-      [{ role: "user", content: "pasted image", attachments: [row] }],
-      null,
-    );
     expect(read()).toEqual({ attachments: JSON.stringify([attachment]) });
     expect(getAttachment(ownerUuid, attachment.id)?.data).toEqual(data);
   } finally {

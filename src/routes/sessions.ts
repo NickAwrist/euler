@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import { Router } from "express";
+import { agentRuntime } from "../agents/runtime/AgentRuntime";
+import { getDb } from "../db/connection";
 import {
-  type WireMessage,
   appendSessionEvent,
   createSessionRow,
   deleteSessionRow,
@@ -10,7 +11,6 @@ import {
   listSessionSummaries,
   parseModelMessages,
   patchSessionRow,
-  persistSessionMessages,
 } from "../db/index";
 import { downloadWorkspaceFile } from "../http/downloadWorkspaceFile";
 import { errorMessage, sendApiError } from "../http/errors";
@@ -29,9 +29,11 @@ import {
   WorkspaceError,
   workspaceService,
 } from "../workspaces/WorkspaceService";
+import { agentActions } from "./agentActions";
 import { artifactRoutes } from "./artifacts";
 
 const router = Router();
+router.use(agentActions(false));
 router.use("/:id/workspace/artifacts", artifactRoutes(false));
 
 router.post("/:id/workspace/select-directory", async (req, res) => {
@@ -42,7 +44,7 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
     sendApiError(res, 404, "NOT_FOUND", "Session not found");
     return;
   }
-  if (workspaceService.isTurnActive(ownerUuid, row.id)) {
+  if (agentRuntime.busy(ownerUuid, row.id)) {
     sendApiError(
       res,
       409,
@@ -63,7 +65,7 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
   }
   try {
     const path = await workspaceService.canonicalDirectory(parsed.data.path);
-    if (workspaceService.isTurnActive(ownerUuid, row.id)) {
+    if (agentRuntime.busy(ownerUuid, row.id)) {
       sendApiError(
         res,
         409,
@@ -106,7 +108,7 @@ router.post("/:id/workspace/use-sandbox", async (req, res) => {
     sendApiError(res, 404, "NOT_FOUND", "Session not found");
     return;
   }
-  if (workspaceService.isTurnActive(ownerUuid, row.id)) {
+  if (agentRuntime.busy(ownerUuid, row.id)) {
     sendApiError(
       res,
       409,
@@ -244,6 +246,18 @@ router.get("/", (req, res) => {
       updatedAt: r.updated_at,
       customTitle: r.title,
       preview: r.preview,
+      badge: agentRuntime.store
+        .list(ownerUuid, r.id)
+        .some((a) => ["queued", "running"].includes(a.status))
+        ? "working"
+        : (() => {
+            const row = getDb()
+              .query(
+                "SELECT last_activity_at > last_viewed_at AS unread FROM sessions WHERE id = ?",
+              )
+              .get(r.id) as { unread: number };
+            return row.unread ? "unread" : null;
+          })(),
     })),
   });
 });
@@ -259,6 +273,7 @@ router.get("/:id", (req, res) => {
   }
   const history = getMessagesForSession(ownerUuid, id);
   res.json({
+    ...agentRuntime.snapshot(ownerUuid, id),
     id: row.id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -290,6 +305,7 @@ router.post("/", async (req, res) => {
     deleteSessionRow(ownerUuid, id);
     throw error;
   }
+  agentRuntime.main(ownerUuid, id);
   res.status(201).json({ id, createdAt: now, updatedAt: now });
 });
 
@@ -310,23 +326,6 @@ router.patch("/:id", (req, res) => {
   const body = parsed.data;
   const now = Date.now();
 
-  if (Array.isArray(body.history)) {
-    const hist = body.history as WireMessage[];
-    const mm =
-      "modelMessages" in body
-        ? body.modelMessages === null || body.modelMessages === undefined
-          ? null
-          : Array.isArray(body.modelMessages)
-            ? (body.modelMessages as Array<Record<string, unknown>>)
-            : parseModelMessages(row.model_messages)
-        : parseModelMessages(row.model_messages);
-    const runModel =
-      typeof body.model === "string" && body.model.trim()
-        ? body.model.trim()
-        : undefined;
-    persistSessionMessages(ownerUuid, id, hist, mm, now, runModel);
-  }
-
   const patch: Parameters<typeof patchSessionRow>[2] = { updated_at: now };
   if ("customTitle" in body) {
     const t = body.customTitle;
@@ -337,24 +336,7 @@ router.patch("/:id", (req, res) => {
           ? t.trim() || null
           : null;
   }
-  if (
-    "model" in body &&
-    body.model !== undefined &&
-    !Array.isArray(body.history)
-  ) {
-    const m = body.model;
-    patch.model =
-      m === null ? null : typeof m === "string" ? m.trim() || null : null;
-  }
-  if ("modelMessages" in body && !Array.isArray(body.history)) {
-    const mm = body.modelMessages;
-    patch.model_messages =
-      mm === null || mm === undefined
-        ? null
-        : Array.isArray(mm)
-          ? (mm as Array<Record<string, unknown>>)
-          : null;
-  }
+  if (body.model !== undefined) patch.model = body.model?.trim() || null;
   patchSessionRow(ownerUuid, id, patch);
   res.json({ ok: true });
 });
@@ -367,15 +349,7 @@ router.delete("/:id", async (req, res) => {
     sendApiError(res, 404, "NOT_FOUND", "Session not found");
     return;
   }
-  if (workspaceService.isTurnActive(ownerUuid, row.id)) {
-    sendApiError(
-      res,
-      409,
-      "CONFLICT",
-      "Stop the current turn before deleting this chat",
-    );
-    return;
-  }
+  await agentRuntime.deleteSession(ownerUuid, row.id);
   await workspaceService.trashRetained(ownerUuid, row.id);
   const ok = deleteSessionRow(ownerUuid, req.params.id);
   if (!ok) {

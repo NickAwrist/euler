@@ -1,3 +1,4 @@
+import { waitForActivation } from "../helpers/activation";
 import "../setup";
 import { expect, test } from "bun:test";
 import { setOpenRouterApiKey } from "../../src/db";
@@ -28,21 +29,29 @@ test("a regenerated reply keeps the replies it replaced", async () => {
     const created = await post("/api/sessions", { model });
     const { id: sessionId } = (await created.json()) as { id: string };
     const run = async (body: Record<string, unknown>) => {
-      const response = await post("/api/runs", { sessionId, model, ...body });
-      expect(response.status).toBe(200);
-      await response.text();
+      const response = await post(`/api/sessions/${sessionId}/messages`, {
+        model,
+        content: body.message,
+      });
+      expect(response.status).toBe(202);
+      await waitForActivation(sessionId);
       return storedHistory(sessionId);
     };
 
     const [, first] = await run({ message: "Hello", history: [] });
     expect(first?.versions).toBeUndefined();
 
-    const regenerated = await run({
-      message: "Hello",
-      history: [],
-      modelMessages: null,
-      versions: [{ content: first!.content, steps: first!.steps }],
-    });
+    expect(
+      (
+        await post(`/api/sessions/${sessionId}/rewind`, {
+          position: 0,
+          content: "Hello",
+          versions: [{ content: first!.content, steps: first!.steps }],
+        })
+      ).status,
+    ).toBe(200);
+    await waitForActivation(sessionId);
+    const regenerated = await storedHistory(sessionId);
     expect(regenerated).toHaveLength(2);
     expect(regenerated[1]?.versions).toEqual([
       { content: first!.content, steps: first!.steps },

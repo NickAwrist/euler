@@ -18,7 +18,6 @@ import {
   sessionPath,
 } from "../../lib/navigation";
 import { safeStorage } from "../../lib/safeStorage";
-import { getActiveRun } from "../../persist/runs";
 import {
   createSessionApi,
   createTemporarySessionApi,
@@ -37,7 +36,7 @@ import type {
   TruncateConfirmState,
 } from "../../types";
 import type { ModelOption } from "../../types";
-import type { RunFlightApi, SessionLoadState } from "./runTypes";
+import type { SessionLoadState } from "./runTypes";
 import { useSessionPreferences } from "./useSessionPreferences";
 
 const ACTIVE_SESSION_STORAGE_KEY = "activeSessionId";
@@ -82,7 +81,6 @@ type Args = {
   modelMessagesRef: MutableRefObject<Array<Record<string, unknown>> | null>;
   activeSessionIdRef: MutableRefObject<string | null>;
   isEphemeralRef: MutableRefObject<boolean>;
-  runFlightRef: MutableRefObject<RunFlightApi | null>;
   onNavigate?: () => void;
 };
 
@@ -194,8 +192,7 @@ export function useSessionsAndNavigation(p: Args) {
   const canDiscardEmptySession =
     p.messages.length === 0 &&
     sessionLoadState === "empty" &&
-    runStatusState === "resolved" &&
-    !p.runFlightRef.current?.shouldPreserveMessages(activeSessionId ?? "");
+    runStatusState === "resolved";
 
   // Leaving a saved chat that never received a message deletes it.
   const discardEmptySession = useCallback(async () => {
@@ -220,27 +217,19 @@ export function useSessionsAndNavigation(p: Args) {
       statusControllerRef.current?.abort();
       const controller = new AbortController();
       statusControllerRef.current = controller;
-      const previousId = p.activeSessionIdRef.current;
       p.activeSessionIdRef.current = id;
       setActiveSessionId(id);
       setSessionLoadState("loading");
       setSessionError(null);
       setRunStatusState("pending");
       preferences.setThinkingEffort(null);
-      const cf = p.runFlightRef.current;
-      const preserve = cf?.shouldPreserveMessages(id) ?? false;
-      const initialHistory = preserve
-        ? (cf?.getTurnSnapshot() ??
-          (previousId === id ? messagesRef.current : []))
-        : [];
-      const preserveHistory = preserve && initialHistory.length > 0;
+      const initialHistory: Message[] = [];
+      const preserveHistory = false;
       p.setMessages(initialHistory);
-      // A local stream owns its buffers and may already have newer content.
-      if (preserve) cf?.hydrateStreaming();
-      else p.resetStreamingUi();
+      p.resetStreamingUi();
       p.setEditingUserIndex(null);
       p.setTruncateConfirm(null);
-      const initialModelMessages = preserve ? p.modelMessagesRef.current : null;
+      const initialModelMessages = null;
       p.modelMessagesRef.current = initialModelMessages;
 
       const historyRequest = (async () => {
@@ -278,50 +267,11 @@ export function useSessionsAndNavigation(p: Args) {
         }
       })();
 
-      // Run discovery controls sending and stream reconciliation, never history display.
-      let statusError: string | null = null;
-      const discoverRun = async () => {
-        try {
-          const status = await getActiveRun(id, controller.signal);
-          if (
-            !status ||
-            typeof status.active !== "boolean" ||
-            (status.active && !status.requestId)
-          )
-            throw new Error("Invalid run status.");
-          if (gen !== loadGenRef.current) return;
-          if (
-            status.active &&
-            status.requestId &&
-            !p.runFlightRef.current?.shouldPreserveMessages(id)
-          ) {
-            p.runFlightRef.current?.reconnectToStream(id, status.requestId);
-          }
-          setRunStatusState("resolved");
-          setSessionError((current) =>
-            current === statusError ? null : current,
-          );
-        } catch (error) {
-          if (gen !== loadGenRef.current || controller.signal.aborted) return;
-          setRunStatusState("error");
-          statusError =
-            error instanceof Error
-              ? error.message
-              : "Could not check the active run.";
-          setSessionError(statusError);
-          window.setTimeout(() => {
-            if (gen === loadGenRef.current && !controller.signal.aborted) {
-              void discoverRun();
-            }
-          }, 1000);
-        }
-      };
-      void discoverRun();
+      setRunStatusState("resolved");
       await historyRequest;
     },
     [
       p.activeSessionIdRef,
-      p.runFlightRef,
       p.setMessages,
       p.resetStreamingUi,
       p.setEditingUserIndex,

@@ -1,4 +1,6 @@
+import { Fragment } from "react";
 import { memo } from "react";
+import { AgentRows } from "../Agents/AgentTaskCard";
 import { traceStepsForDisplay } from "../ExecutionTrace";
 import { MessageItem } from "../MessageItem";
 import type { MessageItemProps } from "../MessageItem/types";
@@ -43,13 +45,15 @@ export const MessageHistory = memo(function MessageHistory({
   ...props
 }: Props) {
   return messages.map((message, index) => (
-    <HistoryMessage
-      key={`${index}:${message.role}:${message.content.slice(0, 80)}`}
-      {...props}
-      messageIndex={index}
-      message={message}
-      animateEntry={index >= initialCount}
-      editingUserIndex={editingUserIndex === index ? index : null}
-    />
+    <Fragment key={`${index}:${message.role}:${message.content.slice(0, 80)}`}>
+      <HistoryMessage
+        {...props}
+        messageIndex={index}
+        message={message}
+        animateEntry={index >= initialCount}
+        editingUserIndex={editingUserIndex === index ? index : null}
+      />
+      <AgentRows position={index} />
+    </Fragment>
   ));
 });

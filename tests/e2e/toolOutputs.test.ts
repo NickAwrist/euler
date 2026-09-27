@@ -1,3 +1,4 @@
+import { waitForActivation } from "../helpers/activation";
 import "../setup";
 import { describe, expect, spyOn, test } from "bun:test";
 import type WebSocket from "ws";
@@ -36,13 +37,13 @@ describe("tool outputs", () => {
       { filename: "agents_00001_.png", subfolder: "", type: "output" },
     ]);
     const { url, close } = await startTestServer();
-    const run = (sessionId: string, message: string, history: unknown[]) =>
-      fetch(`${url}/api/runs`, {
+    const run = (sessionId: string, message: string) =>
+      fetch(`${url}/api/sessions/${sessionId}/messages`, {
         method: "POST",
         headers: userHeaders(undefined, {
           "Content-Type": "application/json",
         }),
-        body: JSON.stringify({ sessionId, message, history, model }),
+        body: JSON.stringify({ content: message, model }),
       });
     const storedHistory = async (sessionId: string) => {
       const stored = await fetch(`${url}/api/sessions/${sessionId}`, {
@@ -60,14 +61,9 @@ describe("tool outputs", () => {
       });
       const { id: sessionId } = (await created.json()) as { id: string };
 
-      const response = await run(sessionId, "Draw and research", []);
-      expect(response.status).toBe(200);
-      const done = (await response.text())
-        .split("\n")
-        .filter((line) => line.startsWith("data: "))
-        .map((line) => JSON.parse(line.slice(6)) as Record<string, unknown>)
-        .find((event) => event.type === "run_done");
-
+      const response = await run(sessionId, "Draw and research");
+      expect(response.status).toBe(202);
+      await waitForActivation(sessionId);
       // The scenario searches twice for the same query; its source is kept once.
       const expected: MessageAttachment[] = [
         {
@@ -80,7 +76,6 @@ describe("tool outputs", () => {
           url: "https://example.com/result1",
         },
       ];
-      expect(done?.attachments).toEqual(expected);
       const history = await storedHistory(sessionId);
       expect(history.at(-1)).toMatchObject({
         role: "assistant",
@@ -88,9 +83,9 @@ describe("tool outputs", () => {
         attachments: expected,
       });
 
-      const followUp = await run(sessionId, "Thanks", history);
-      expect(followUp.status).toBe(200);
-      expect(await followUp.text()).toContain('"type":"run_done"');
+      const followUp = await run(sessionId, "Thanks");
+      expect(followUp.status).toBe(202);
+      await waitForActivation(sessionId);
       const [, firstReply] = await storedHistory(sessionId);
       expect(firstReply?.attachments).toEqual(expected);
     } finally {

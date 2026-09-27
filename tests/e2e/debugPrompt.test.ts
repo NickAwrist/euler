@@ -1,3 +1,5 @@
+import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
+import { waitForActivation } from "../helpers/activation";
 import "../setup";
 import { expect, test } from "bun:test";
 import { createSkillRow, setOpenRouterApiKey } from "../../src/db";
@@ -5,11 +7,11 @@ import { workspaceService } from "../../src/workspaces/WorkspaceService";
 import { getOpenRouterRequests } from "../helpers/mockOpenRouter";
 import { TEST_USER_ID, startTestServer, userHeaders } from "../helpers/server";
 
-test("POST /api/runs/debug-prompt returns the server-rendered system prompt", async () => {
+test("POST /api/sessions/debug-prompt returns the server-rendered system prompt", async () => {
   const { url, close } = await startTestServer();
   try {
     // 1. Default request with no metadata includes current date and core directives
-    const res1 = await fetch(`${url}/api/runs/debug-prompt`, {
+    const res1 = await fetch(`${url}/api/sessions/debug-prompt`, {
       method: "POST",
       headers: userHeaders(undefined, {
         "Content-Type": "application/json",
@@ -24,7 +26,7 @@ test("POST /api/runs/debug-prompt returns the server-rendered system prompt", as
     expect(data1.systemPrompt).toContain("<agency>");
 
     // 2. Request with includeCurrentDate: false omits the date
-    const res2 = await fetch(`${url}/api/runs/debug-prompt`, {
+    const res2 = await fetch(`${url}/api/sessions/debug-prompt`, {
       method: "POST",
       headers: userHeaders(undefined, {
         "Content-Type": "application/json",
@@ -41,7 +43,7 @@ test("POST /api/runs/debug-prompt returns the server-rendered system prompt", as
     expect(data2.systemPrompt).toContain("<tool_format>");
 
     // 3. Request with custom metadata includes personalization fields
-    const res3 = await fetch(`${url}/api/runs/debug-prompt`, {
+    const res3 = await fetch(`${url}/api/sessions/debug-prompt`, {
       method: "POST",
       headers: userHeaders(undefined, {
         "Content-Type": "application/json",
@@ -91,7 +93,7 @@ for (const includeCurrentDate of [undefined, false]) {
           includeCurrentDate,
         },
       };
-      const preview = await fetch(`${url}/api/runs/debug-prompt`, {
+      const preview = await fetch(`${url}/api/sessions/debug-prompt`, {
         method: "POST",
         headers: userHeaders(undefined, { "Content-Type": "application/json" }),
         body: JSON.stringify(input),
@@ -106,17 +108,22 @@ for (const includeCurrentDate of [undefined, false]) {
       );
       expect(systemPrompt).toStartWith("Follow these instructions.");
       expect(systemPrompt).toContain("<tool_format>");
-      const run = await fetch(`${url}/api/runs`, {
-        method: "POST",
-        headers: userHeaders(undefined, { "Content-Type": "application/json" }),
-        body: JSON.stringify({
-          ...input,
-          history: [],
-          model: "openrouter:openai/gpt-5.4-mini",
-        }),
-      });
-      expect(run.status).toBe(200);
-      await run.text();
+      const run = await fetch(
+        `${url}/api/temporary-sessions/${lease.id}/messages`,
+        {
+          method: "POST",
+          headers: userHeaders(undefined, {
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify({
+            content: input.message,
+            metadata: input.metadata,
+            model: "openrouter:openai/gpt-5.4-mini",
+          }),
+        },
+      );
+      expect(run.status).toBe(202);
+      await waitForActivation(lease.id);
       expect(getOpenRouterRequests()).toHaveLength(1);
       const messages = getOpenRouterRequests()[0]!.body.messages as Array<{
         role: string;
@@ -124,6 +131,7 @@ for (const includeCurrentDate of [undefined, false]) {
       }>;
       expect(messages[0]).toEqual({ role: "system", content: systemPrompt });
     } finally {
+      await agentRuntime.deleteSession(TEST_USER_ID, lease.id);
       await workspaceService.deleteTemporary(TEST_USER_ID, lease.id);
       await close();
     }
@@ -138,7 +146,7 @@ test("debug preview rejects invalid sessions and expired workspaces", async () =
       [{ sessionId: "expired-lease", ephemeral: true }, 400],
       [{ metadata: { includeCurrentDate: "false" } }, 400],
     ] as const) {
-      const response = await fetch(`${url}/api/runs/debug-prompt`, {
+      const response = await fetch(`${url}/api/sessions/debug-prompt`, {
         method: "POST",
         headers: userHeaders(undefined, { "Content-Type": "application/json" }),
         body: JSON.stringify(body),

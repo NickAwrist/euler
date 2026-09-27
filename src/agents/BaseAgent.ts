@@ -31,6 +31,9 @@ export class BaseAgent {
   TOOL_MAP: Record<string, BaseTool>;
 
   plan?: Plan;
+  beforeModelCall?: () => Promise<void>;
+  checkpoint?: () => void;
+  hasPendingInput?: () => boolean;
 
   constructor(
     name: string,
@@ -153,6 +156,9 @@ export class BaseAgent {
     let turnIndex = 0;
 
     do {
+      if (signal?.aborted) break;
+
+      await this.beforeModelCall?.();
       if (signal?.aborted) break;
 
       const llmStep = ctx.beginStep({ kind: "llm_call", turnIndex });
@@ -292,6 +298,7 @@ export class BaseAgent {
         assistantMsg.reasoning = fullThinking;
       }
       this.history.push(assistantMsg);
+      this.checkpoint?.();
 
       if (toolCalls.length) {
         for (const toolCall of toolCalls) {
@@ -320,12 +327,50 @@ export class BaseAgent {
             content: result.text,
             ...(toolCall.id ? { tool_call_id: toolCall.id } : {}),
           });
+          this.checkpoint?.();
+          if (result.endActivation) {
+            // Providers require a result for every call in the assistant batch.
+            for (const skipped of toolCalls.slice(
+              toolCalls.indexOf(toolCall) + 1,
+            )) {
+              this.history.push({
+                role: "tool",
+                content: "Not executed: activation ended.",
+                ...(skipped.id ? { tool_call_id: skipped.id } : {}),
+              });
+            }
+            this.checkpoint?.();
+            return fullContent;
+          }
         }
         if (signal?.aborted) break;
         userMessage = "";
         turnIndex++;
       }
-    } while (toolCalls.length);
+    } while (toolCalls.length || this.hasPendingInput?.());
+
+    if (signal?.aborted) {
+      const pendingCalls =
+        this.history.findLast((message) => message.role === "assistant")
+          ?.tool_calls ?? [];
+      for (const call of pendingCalls) {
+        if (
+          call.id &&
+          !this.history.some(
+            (message) =>
+              message.role === "tool" && message.tool_call_id === call.id,
+          )
+        ) {
+          this.history.push({
+            role: "tool",
+            tool_call_id: call.id,
+            content:
+              "Cancelled. Check the current state before retrying any operation.",
+          });
+        }
+      }
+      this.checkpoint?.();
+    }
 
     // OpenRouter reasoning blocks are needed for immediate tool continuation,
     // but replaying them on later user turns adds large provider metadata to input.

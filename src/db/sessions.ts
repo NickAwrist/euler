@@ -103,9 +103,11 @@ export function getMessagesForSession(
   if (!getSessionById(ownerUuid, sessionId)) return [];
   const rows = getDb()
     .query(
-      "SELECT role, content, steps, attachments, versions FROM messages WHERE session_id = ? ORDER BY position ASC",
+      "SELECT id, activation_id, role, content, steps, attachments, versions FROM messages WHERE session_id = ? ORDER BY position ASC",
     )
     .all(sessionId) as Array<{
+    id: number;
+    activation_id: string | null;
     role: string;
     content: string;
     steps: string | null;
@@ -114,7 +116,12 @@ export function getMessagesForSession(
   }>;
 
   return rows.map((r) => {
-    const msg: WireMessage = { role: r.role, content: r.content };
+    const msg: WireMessage = {
+      id: r.id,
+      ...(r.activation_id ? { activationId: r.activation_id } : {}),
+      role: r.role,
+      content: r.content,
+    };
     if (r.steps != null && r.steps !== "") {
       try {
         msg.steps = JSON.parse(r.steps) as unknown;
@@ -259,67 +266,36 @@ export function patchSessionRow(
   return true;
 }
 
-/**
- * Persists run history without rewriting the full table each time: truncates when the
- * client sends a shorter history, appends new tail rows, or updates the last row when
- * the count is unchanged (e.g. assistant steps filled in).
- */
-export function persistSessionMessages(
+/** Runtime-owned transcript writes never replace another writer's history. */
+export function appendRuntimeMessage(
   ownerUuid: string,
   sessionId: string,
-  messages: WireMessage[],
-  modelMessages: Array<Record<string, unknown>> | null,
-  updatedAt: number,
-  runModel?: string | null,
-): boolean {
-  const row = getSessionById(ownerUuid, sessionId);
-  if (!row) return false;
+  message: WireMessage,
+): number {
+  if (!getSessionById(ownerUuid, sessionId))
+    throw new Error("Session not found");
   const db = getDb();
-  const nextModel =
-    typeof runModel === "string" && runModel.trim()
-      ? runModel.trim()
-      : row.model;
-  const tx = db.transaction(() => {
-    let n = countMessagesForSession(sessionId);
-    if (messages.length < n) {
-      db.run("DELETE FROM messages WHERE session_id = ? AND position >= ?", [
-        sessionId,
-        messages.length,
-      ]);
-      n = countMessagesForSession(sessionId);
-    }
-
-    const insert = db.prepare(
-      "INSERT INTO messages (session_id, role, content, steps, attachments, versions, position) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    );
-    for (let i = n; i < messages.length; i++) {
-      const m = messages[i]!;
-      const { steps, attachments, versions } = messageColumns(m);
-      insert.run(sessionId, m.role, m.content, steps, attachments, versions, i);
-    }
-
-    if (messages.length > 0 && n === messages.length) {
-      const last = messages[messages.length - 1]!;
-      const { steps, attachments, versions } = messageColumns(last);
+  return db.transaction(() => {
+    const { steps, attachments, versions } = messageColumns(message);
+    const id = Number(
       db.run(
-        "UPDATE messages SET content = ?, steps = ?, attachments = ?, versions = ? WHERE session_id = ? AND position = ?",
+        "INSERT INTO messages (session_id, role, content, steps, attachments, versions, position, activation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         [
-          last.content,
+          sessionId,
+          message.role,
+          message.content,
           steps,
           attachments,
           versions,
-          sessionId,
-          messages.length - 1,
+          countMessagesForSession(sessionId),
+          message.activationId ?? null,
         ],
-      );
-    }
-
-    const mmJson = modelMessages == null ? null : JSON.stringify(modelMessages);
-    db.run(
-      "UPDATE sessions SET model_messages = ?, updated_at = ?, model = ? WHERE owner_uuid = ? AND id = ?",
-      [mmJson, updatedAt, nextModel, ownerUuid, sessionId],
+      ).lastInsertRowid,
     );
-  });
-  tx();
-  return true;
+    db.run(
+      "UPDATE sessions SET updated_at = ?, last_activity_at = ? WHERE id = ?",
+      [Date.now(), Date.now(), sessionId],
+    );
+    return id;
+  })();
 }

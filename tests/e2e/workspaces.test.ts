@@ -1,3 +1,5 @@
+import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
+import { waitForActivation } from "../helpers/activation";
 import "../setup";
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import fs from "node:fs/promises";
@@ -79,9 +81,7 @@ describe("workspace API", () => {
             workspace: { kind: "local", path: await fs.realpath(path) },
           });
         }
-        const active = spyOn(workspaceService, "isTurnActive").mockReturnValue(
-          true,
-        );
+        const active = spyOn(agentRuntime, "busy").mockReturnValue(true);
         try {
           expect((await select({ path: directory })).status).toBe(409);
         } finally {
@@ -180,7 +180,7 @@ describe("workspace API", () => {
           workspaceKind: "local",
         }),
       });
-      expect(patch.status).toBe(200);
+      expect(patch.status).toBe(400);
 
       const stored = await fetch(`${url}/api/sessions/${sessionId}`, {
         headers: userHeaders(),
@@ -311,45 +311,32 @@ describe("workspace API", () => {
         `${url}/api/temporary-sessions/${id}/files`,
         { headers: userHeaders("22222222-2222-4222-8222-222222222222") },
       );
-      expect(otherFiles.status).toBe(400);
+      expect(otherFiles.status).toBe(404);
     } finally {
       await close();
     }
   });
 });
 
-test("an ephemeral run without an ID holds its generated lease lock until completion", async () => {
+test("temporary chats keep server-owned history for their lease", async () => {
   const { url, close } = await startTestServer();
-  const listFiles = workspaceService.listFiles.bind(workspaceService);
-  let leaseId = "";
-  const activeDuringScan: boolean[] = [];
-  const scan = spyOn(workspaceService, "listFiles").mockImplementation(
-    async (workspace) => {
-      leaseId = basename(workspace.hostPath);
-      activeDuringScan.push(
-        workspaceService.isTurnActive(TEST_USER_ID, leaseId),
-      );
-      return listFiles(workspace);
-    },
-  );
+  const lease = await workspaceService.createTemporary(TEST_USER_ID);
   try {
-    const response = await fetch(`${url}/api/runs`, {
-      method: "POST",
-      headers: userHeaders(undefined, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        ephemeral: true,
-        message: "Hello",
-        history: [],
-        model: "llama3:latest",
-      }),
-    });
-    expect(response.status).toBe(200);
-    expect(await response.text()).toContain('"type":"run_done"');
-    expect(activeDuringScan).toEqual([true, true]);
-    expect(workspaceService.isTurnActive(TEST_USER_ID, leaseId)).toBeFalse();
+    const response = await fetch(
+      `${url}/api/temporary-sessions/${lease.id}/messages`,
+      {
+        method: "POST",
+        headers: userHeaders(undefined, { "Content-Type": "application/json" }),
+        body: JSON.stringify({ content: "Hello", model: "llama3:latest" }),
+      },
+    );
+    expect(response.status).toBe(202);
+    const state = await waitForActivation(lease.id);
+    expect(state.history?.map((m) => m.role)).toEqual(["user", "assistant"]);
+    expect(agentRuntime.busy(TEST_USER_ID, lease.id)).toBeFalse();
   } finally {
-    scan.mockRestore();
-    if (leaseId) await workspaceService.deleteTemporary(TEST_USER_ID, leaseId);
+    await agentRuntime.deleteSession(TEST_USER_ID, lease.id);
+    await workspaceService.deleteTemporary(TEST_USER_ID, lease.id);
     await close();
   }
 });

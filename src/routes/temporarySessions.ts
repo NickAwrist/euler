@@ -1,6 +1,8 @@
 import { Router } from "express";
+import { agentRuntime } from "../agents/runtime/AgentRuntime";
 import { downloadWorkspaceFile } from "../http/downloadWorkspaceFile";
 import { errorMessage, sendApiError } from "../http/errors";
+import { agentActions } from "./agentActions";
 
 import { isLoopbackRequest } from "../http/isLoopbackRequest";
 import { revealFileNative } from "../nativeFolderPicker";
@@ -13,12 +15,14 @@ import {
 import { artifactRoutes } from "./artifacts";
 
 const router = Router();
+router.use(agentActions(true));
 router.use("/:id/artifacts", artifactRoutes(true));
 
 router.post("/", async (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
   const lease = await workspaceService.createTemporary(ownerUuid);
+  agentRuntime.main(ownerUuid, lease.id, true);
   res.status(201).json({ id: lease.id, expiresAt: lease.expiresAt });
 });
 
@@ -35,7 +39,7 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
     );
     return;
   }
-  if (workspaceService.isTurnActive(ownerUuid, req.params.id)) {
+  if (agentRuntime.busy(ownerUuid, req.params.id)) {
     sendApiError(
       res,
       409,
@@ -47,7 +51,7 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
   try {
     workspaceService.temporaryPresentation(ownerUuid, req.params.id);
     const path = await workspaceService.canonicalDirectory(parsed.data.path);
-    if (workspaceService.isTurnActive(ownerUuid, req.params.id)) {
+    if (agentRuntime.busy(ownerUuid, req.params.id)) {
       sendApiError(
         res,
         409,
@@ -75,7 +79,7 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
 router.post("/:id/workspace/use-sandbox", (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
-  if (workspaceService.isTurnActive(ownerUuid, req.params.id)) {
+  if (agentRuntime.busy(ownerUuid, req.params.id)) {
     sendApiError(
       res,
       409,
@@ -162,7 +166,7 @@ router.post("/:id/reveal", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
-  if (workspaceService.isTurnActive(ownerUuid, req.params.id)) {
+  if (agentRuntime.busy(ownerUuid, req.params.id)) {
     sendApiError(
       res,
       409,
@@ -187,6 +191,7 @@ router.get("/:id/file", async (req, res) => {
   if (!ownerUuid) return;
   const requestedPath =
     typeof req.query.path === "string" ? req.query.path : "";
+  await agentRuntime.deleteSession(ownerUuid, req.params.id);
   try {
     const workspace = await workspaceService.resolveTemporary(
       ownerUuid,

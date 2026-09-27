@@ -31,7 +31,6 @@ export type Step = {
   error?: string;
   startedAt: string;
   endedAt?: string;
-  childContext?: RunContext;
 };
 
 export type OnStepChange = (ctx: RunContext, step: Step) => void;
@@ -53,7 +52,7 @@ export class RunContext {
   readonly ownerUuid: string;
   readonly workspace?: Workspace;
   private _steps: Step[] = [];
-  /** Shared with child contexts so subagent tool outputs reach the reply. */
+  /** Tool outputs attached to this activation’s reply. */
   private _outputAttachments: ToolOutputAttachment[] = [];
   private _onChange?: OnStepChange;
   private _onStreamDelta?: OnStreamDelta;
@@ -145,30 +144,6 @@ export class RunContext {
     }
   }
 
-  /** Create a child RunContext for a nested agent, attached to `parentStep`. */
-  createChild(
-    agentInstance: BaseAgent,
-    prompt: string,
-    parentStep: Step,
-  ): RunContext {
-    const child = new RunContext(
-      agentInstance,
-      prompt,
-      this._onChange,
-      this._onStreamDelta,
-      this.signal,
-      this.sessionDir,
-      this.promptContext,
-      this.ownerUuid,
-      this.workspace,
-    );
-    child._outputAttachments = this._outputAttachments;
-    if (parentStep.status === "running") {
-      parentStep.childContext = child;
-    }
-    return child;
-  }
-
   /** Record tool outputs for the reply, skipping URLs already recorded. */
   addOutputAttachments(attachments: readonly ToolOutputAttachment[]): void {
     for (const attachment of attachments) {
@@ -196,7 +171,7 @@ export class RunContext {
     return this._steps;
   }
 
-  /** JSON-serializable snapshot of the entire run tree. */
+  /** JSON-serializable snapshot of this activation. */
   snapshot(): Record<string, unknown> {
     return {
       agentName: this.agentName,
@@ -223,23 +198,11 @@ export class RunContext {
   }
 
   private _stepSnapshot(step: Step): Record<string, unknown> {
-    const out = this._stepBase(step);
-    if (step.childContext) out.childRun = step.childContext.snapshot();
-    return out;
+    return this._stepBase(step);
   }
 
-  /** Plain JSON for SSE / UI; nested subagent runs under `childRun`. */
   wireStep(step: Step): Record<string, unknown> {
-    const out = this._stepBase(step);
-    out.agentName = this.agentName;
-    if (step.childContext) {
-      out.childRun = {
-        agentName: step.childContext.agentName,
-        prompt: step.childContext.prompt,
-        steps: step.childContext.wireSteps(),
-      };
-    }
-    return out;
+    return { ...this._stepBase(step), agentName: this.agentName };
   }
 
   wireSteps(): Record<string, unknown>[] {

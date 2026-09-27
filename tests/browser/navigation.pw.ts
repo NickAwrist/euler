@@ -54,8 +54,20 @@ async function mockApp(page: Page) {
               }
             : path.endsWith("/health")
               ? { connected: true }
-              : path.startsWith("/api/runs/active/")
-                ? { active: false }
+              : path.endsWith("/runtime")
+                ? {
+                    agents: [],
+                    activation: null,
+                    queued: [],
+                    held: false,
+                    sequence: 0,
+                    history: [
+                      {
+                        role: "user",
+                        content: `Stored ${path.split("/").at(-2)}`,
+                      },
+                    ],
+                  }
                 : path === "/api/skills"
                   ? { skills: [] }
                   : path === "/api/settings/openrouter"
@@ -238,6 +250,18 @@ test("view navigation desktop stays in Settings when a chat sent from Home is sa
   page,
 }) => {
   await mockApp(page);
+  await page.route("**/api/sessions/b/runtime", (route) =>
+    route.fulfill({
+      json: {
+        sequence: Date.now(),
+        agents: [],
+        activation: null,
+        queued: [],
+        held: false,
+        history: [{ role: "user", content: "Stored b" }],
+      },
+    }),
+  );
   const created = Promise.withResolvers<void>();
   await page.route("**/api/sessions", async (route) => {
     if (route.request().method() !== "POST") return route.fallback();
@@ -250,7 +274,7 @@ test("view navigation desktop stays in Settings when a chat sent from Home is sa
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByPlaceholder("Enter your name").fill("Keep this draft");
   const started = page.waitForRequest(
-    (request) => new URL(request.url()).pathname === "/api/runs",
+    (request) => new URL(request.url()).pathname === "/api/sessions/b/messages",
   );
   created.resolve();
   await started;
@@ -341,17 +365,31 @@ test("view navigation desktop restores the saved chat when loading Home", async 
 
 async function mockEphemeral(page: Page) {
   const deleted: string[] = [];
+  let history: { role: string; content: string }[] = [];
   await page.route("**/api/temporary-sessions**", (route) => {
-    if (route.request().method() === "DELETE")
+    const path = new URL(route.request().url()).pathname;
+    if (route.request().method() === "DELETE") {
       deleted.push(route.request().url());
+      history = [];
+    }
+    if (path.endsWith("/messages"))
+      history = [
+        { role: "user", content: route.request().postDataJSON().content },
+        { role: "assistant", content: "Ephemeral reply" },
+      ];
+    if (path.endsWith("/runtime"))
+      return route.fulfill({
+        json: {
+          sequence: Date.now(),
+          agents: [],
+          activation: null,
+          queued: [],
+          held: false,
+          history,
+        },
+      });
     return route.fulfill({ json: { id: "temporary" } });
   });
-  await page.route("**/api/runs", (route) =>
-    route.fulfill({
-      contentType: "text/event-stream",
-      body: 'data: {"type":"run_done","result":"Ephemeral reply"}\n\n',
-    }),
-  );
   return deleted;
 }
 

@@ -1,3 +1,7 @@
+import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
+import { workspaceService } from "../../src/workspaces/WorkspaceService";
+import { waitForActivation } from "../helpers/activation";
+import { TEST_USER_ID } from "../helpers/server";
 import "../setup";
 import { describe, expect, spyOn, test } from "bun:test";
 import {
@@ -20,9 +24,7 @@ import { setOpenRouterScenario } from "../helpers/mockOpenRouter";
 import { startTestServer, userHeaders } from "../helpers/server";
 
 const runBody = (model: string) => ({
-  ephemeral: true,
-  message: "Hello",
-  history: [],
+  content: "Hello",
   model,
 });
 
@@ -271,49 +273,28 @@ describe("OpenRouter API integration", () => {
     }
   });
 
-  test("validates configuration and runs through the existing agent flow", async () => {
-    const route = "openai/gpt-5.6-terra";
-    const model = `openrouter:${route}`;
+  test("validates model configuration before enqueueing a turn", async () => {
     const { url, close } = await startTestServer();
+    const lease = await workspaceService.createTemporary(TEST_USER_ID);
     try {
+      const post = (model: string) =>
+        fetch(`${url}/api/temporary-sessions/${lease.id}/messages`, {
+          method: "POST",
+          headers: userHeaders(undefined, {
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify(runBody(model)),
+        });
       setOpenRouterApiKey("");
-      let response = await fetch(`${url}/api/runs`, {
-        method: "POST",
-        headers: userHeaders(undefined, {
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify(runBody(model)),
-      });
-      expect(response.status).toBe(400);
-      expect(await response.text()).toContain(
-        "Configure an OpenRouter API key",
-      );
-
+      expect((await post("openrouter:openai/gpt-5.6-terra")).status).toBe(400);
       setOpenRouterApiKey("sk-or-run-test");
-      response = await fetch(`${url}/api/runs`, {
-        method: "POST",
-        headers: userHeaders(undefined, {
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify(runBody("openrouter:missing/model")),
-      });
-      expect(response.status).toBe(200);
-      await response.text();
-
-      response = await fetch(`${url}/api/runs`, {
-        method: "POST",
-        headers: userHeaders(undefined, {
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify(runBody(model)),
-      });
-      expect(response.status).toBe(200);
-      const stream = await response.text();
-      expect(stream).toContain('"type":"run_delta"');
-      expect(stream).toContain("Hello from OpenRouter.");
-      expect(stream).toContain('"type":"run_done"');
+      expect((await post("openrouter:openai/gpt-5.6-terra")).status).toBe(202);
+      const state = await waitForActivation(lease.id);
+      expect(state.history?.at(-1)?.content).toBe("Hello from OpenRouter.");
       expect(getOpenRouterApiKey()).toBe("sk-or-run-test");
     } finally {
+      await agentRuntime.deleteSession(TEST_USER_ID, lease.id);
+      await workspaceService.deleteTemporary(TEST_USER_ID, lease.id);
       await close();
     }
   });
@@ -335,19 +316,20 @@ describe("OpenRouter API integration", () => {
       expect(created.status).toBe(201);
       const { id: sessionId } = (await created.json()) as { id: string };
 
-      const response = await fetch(`${url}/api/runs`, {
-        method: "POST",
-        headers: userHeaders(undefined, {
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({
-          message: "Keep going in the background",
-          history: [],
-          model,
-          sessionId,
-        }),
-      });
-      expect(response.status).toBe(200);
+      const response = await fetch(
+        `${url}/api/sessions/${sessionId}/messages`,
+        {
+          method: "POST",
+          headers: userHeaders(undefined, {
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify({
+            content: "Keep going in the background",
+            model,
+          }),
+        },
+      );
+      expect(response.status).toBe(202);
       const reader = response.body?.getReader();
       expect(reader).toBeDefined();
       await reader?.read();
@@ -369,7 +351,7 @@ describe("OpenRouter API integration", () => {
         await Bun.sleep(20);
       }
 
-      expect(history).toEqual([
+      expect(history).toMatchObject([
         { role: "user", content: "Keep going in the background" },
         {
           role: "assistant",

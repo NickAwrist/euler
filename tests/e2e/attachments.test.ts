@@ -1,3 +1,4 @@
+import { waitForActivation } from "../helpers/activation";
 import "../setup";
 import { describe, expect, test } from "bun:test";
 import type {
@@ -57,21 +58,19 @@ describe("image attachments", () => {
         ).status,
       ).toBe(404);
 
-      const run = await fetch(`${url}/api/runs`, {
+      const run = await fetch(`${url}/api/sessions/${sessionId}/messages`, {
         method: "POST",
         headers: userHeaders(undefined, {
           "Content-Type": "application/json",
         }),
         body: JSON.stringify({
-          sessionId,
-          message: "What is in this image?",
-          history: [],
+          content: "What is in this image?",
           model: "llama3:latest",
           attachmentIds: [attachment.id],
         }),
       });
-      expect(run.status).toBe(200);
-      expect(await run.text()).toContain('"type":"run_done"');
+      expect(run.status).toBe(202);
+      await waitForActivation(sessionId);
 
       const stored = await fetch(`${url}/api/sessions/${sessionId}`, {
         headers: userHeaders(),

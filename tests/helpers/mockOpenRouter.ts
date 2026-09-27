@@ -1,4 +1,6 @@
 export type OpenRouterScenario =
+  | "async-agents"
+  | "agent-question"
   | "streaming"
   | "reasoning"
   | "thinking-tags"
@@ -14,6 +16,10 @@ type CapturedRequest = {
   body: Record<string, unknown>;
 };
 
+let asyncAgentDelay = 100;
+export function setAsyncAgentDelay(delay: number) {
+  asyncAgentDelay = delay;
+}
 let scenario: OpenRouterScenario = "streaming";
 let requests: CapturedRequest[] = [];
 
@@ -69,6 +75,67 @@ export async function handleOpenRouterRequest(
   const body = (await request.json()) as Record<string, unknown>;
   requests.push({ headers: request.headers, body });
 
+  if (scenario === "async-agents" || scenario === "agent-question") {
+    const messages = body.messages as Array<{
+      role: string;
+      content: string;
+      tool_calls?: Array<{ function: { name: string } }>;
+    }>;
+    const tools = body.tools as Array<{ function: { name: string } }>;
+    const main = tools.some((t) => t.function.name === "spawn_agent");
+    const called = (name: string) =>
+      messages.some((m) => m.tool_calls?.some((t) => t.function.name === name));
+    const call = (name: string, args: Record<string, unknown>) =>
+      sse([
+        chunk(
+          {
+            tool_calls: [
+              {
+                index: 0,
+                id: `call-${name}`,
+                type: "function",
+                function: { name, arguments: JSON.stringify(args) },
+              },
+            ],
+          },
+          "tool_calls",
+        ),
+        "[DONE]",
+      ]);
+    if (main) {
+      if (messages.some((m) => m.content === "Slow reply"))
+        await new Promise((resolve) => setTimeout(resolve, asyncAgentDelay));
+      if (!called("spawn_agent"))
+        return call("spawn_agent", {
+          kind: "general",
+          title: "Research",
+          task: "Find the answer",
+        });
+      if (messages.some((m) => m.content.includes('kind="result"')))
+        return sse([
+          chunk({ content: "The background result is 42." }, "stop"),
+          "[DONE]",
+        ]);
+      if (
+        messages.some((m) => m.content.includes('kind="question"')) &&
+        !called("send_message")
+      ) {
+        const question = messages.findLast((m) =>
+          m.content.includes('kind="question"'),
+        )!;
+        const id = /from="([^"]+)"/.exec(question.content)?.[1];
+        return call("send_message", { to: id, content: "Proceed" });
+      }
+      return sse([
+        chunk({ content: "Working in the background." }, "stop"),
+        "[DONE]",
+      ]);
+    }
+    if (scenario === "agent-question" && !called("ask_parent"))
+      return call("ask_parent", { question: "May I proceed?" });
+    await new Promise((resolve) => setTimeout(resolve, asyncAgentDelay));
+    return sse([chunk({ content: "42" }, "stop"), "[DONE]"]);
+  }
   if (scenario === "unauthorized") {
     return Response.json(
       { error: { code: 401, message: "Invalid API key" } },

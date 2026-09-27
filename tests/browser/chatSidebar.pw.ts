@@ -38,8 +38,17 @@ async function mockApp(page: Page) {
               }
             : path.endsWith("/health")
               ? { connected: true }
-              : path.startsWith("/api/runs/active/")
-                ? { active: false }
+              : path.endsWith("/runtime")
+                ? {
+                    agents: [],
+                    activation: null,
+                    queued: [],
+                    held: false,
+                    sequence: 0,
+                    history: [
+                      { role: "user", content: "Check the sidebar controls." },
+                    ],
+                  }
                 : path.endsWith("/artifacts/tree")
                   ? { entries: [] }
                   : {};
@@ -504,6 +513,21 @@ test("chat sidebar desktop jumps to the latest message after scrolling up", asyn
         id: "sidebar-test",
         model: "test",
         workspace: { kind: "sandbox" },
+        history: Array.from({ length: 40 }, (_, i) => ({
+          role: i % 2 ? "assistant" : "user",
+          content: `Message ${i}`,
+        })),
+      },
+    }),
+  );
+  await page.route("**/api/sessions/sidebar-test/runtime", (route) =>
+    route.fulfill({
+      json: {
+        agents: [],
+        activation: null,
+        queued: [],
+        held: false,
+        sequence: 0,
         history: Array.from({ length: 40 }, (_, i) => ({
           role: i % 2 ? "assistant" : "user",
           content: `Message ${i}`,

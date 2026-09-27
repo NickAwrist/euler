@@ -17,7 +17,6 @@ export {
   listSessionSummaries,
   parseModelMessages,
   patchSessionRow,
-  persistSessionMessages,
   countMessagesForSession,
   appendSessionEvent,
 } from "./sessions";

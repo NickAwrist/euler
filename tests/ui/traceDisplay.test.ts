@@ -12,9 +12,9 @@ const at = (seconds: number) => new Date(seconds * 1000).toISOString();
 describe("trace display", () => {
   test("labels step kinds for people", () => {
     expect(traceStepLabel({ kind: "llm_call" })).toBe("Model call");
-    expect(
-      traceStepLabel({ kind: "tool_call", toolName: "run_subagent" }),
-    ).toBe("Tool: run_subagent");
+    expect(traceStepLabel({ kind: "tool_call", toolName: "spawn_agent" })).toBe(
+      "Tool: spawn_agent",
+    );
   });
 
   test("measures finished steps and places them on the run timeline", () => {

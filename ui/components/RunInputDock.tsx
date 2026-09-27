@@ -1,4 +1,5 @@
 import { ArrowUp, Folder, ImagePlus, Square, Upload, X } from "lucide-react";
+import type { ReactNode } from "react";
 import {
   useCallback,
   useEffect,
@@ -24,6 +25,7 @@ import {
 import { completeSkillToken, findActiveSkillToken } from "./skillPicker";
 
 export function RunInputDock({
+  queuedInput,
   centered,
   ollamaModels,
   ollamaConnected,
@@ -51,6 +53,7 @@ export function RunInputDock({
   onRunCommand,
   onFooterHeightChange,
 }: {
+  queuedInput?: ReactNode;
   centered: boolean;
   ollamaModels: ModelOption[];
   ollamaConnected: boolean | null;
@@ -91,7 +94,7 @@ export function RunInputDock({
   const currentModelOption = ollamaModels.find(
     (model) => model.id === selectedModel,
   );
-  const canSend = modelSendReady && attachmentsSendReady && !isBusy;
+  const canSend = modelSendReady && attachmentsSendReady;
   const activeSkillToken = skillPickerDismissed
     ? null
     : findActiveSkillToken(input, caretIndex);
@@ -207,6 +210,11 @@ export function RunInputDock({
           </span>
         </div>
       )}
+      {queuedInput && (
+        <div className="pointer-events-auto w-full max-w-[var(--chat-width)]">
+          {queuedInput}
+        </div>
+      )}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -294,7 +302,7 @@ export function RunInputDock({
                 <button
                   type="button"
                   onClick={() => removePendingImage(image.id)}
-                  disabled={isBusy}
+                  disabled={false}
                   className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-background/85 text-foreground shadow-sm backdrop-blur hover:bg-background disabled:opacity-50"
                   aria-label={`Remove ${image.file.name}`}
                 >
@@ -324,7 +332,7 @@ export function RunInputDock({
           <IconButton
             variant="ghost"
             icon={ImagePlus}
-            disabled={isBusy || !canAttachImages}
+            disabled={!canAttachImages}
             onClick={() => fileInputRef.current?.click()}
             title={attachImageDisabledReason ?? "Add images"}
             label={attachImageDisabledReason ?? "Add images"}
@@ -375,7 +383,7 @@ export function RunInputDock({
             className="min-h-10 max-h-[30vh] w-full flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-[0.9375rem] leading-[1.5] text-foreground outline-none placeholder:text-muted-foreground"
             rows={1}
           />
-          {isBusy ? (
+          {isBusy && (
             <IconButton
               variant="danger"
               icon={Square}
@@ -388,7 +396,8 @@ export function RunInputDock({
               }}
               className="mb-0.5 hover:border-red-500/20 hover:bg-red-500/[0.06] hover:text-red-300"
             />
-          ) : (
+          )}
+          {(!isBusy || input.trim()) && (
             <IconButton
               type="submit"
               variant="primary"
@@ -409,7 +418,7 @@ export function RunInputDock({
             modelsLoadError={modelsLoadError}
             selectedModel={selectedModel}
             onModelChange={onModelChange}
-            disabled={isBusy}
+            disabled={false}
           />
           {currentModelOption?.reasoning &&
             hasConfigurableThinking(currentModelOption.reasoning) &&
@@ -423,7 +432,7 @@ export function RunInputDock({
                   reasoning={currentModelOption.reasoning}
                   value={thinkingEffort}
                   onChange={onThinkingEffortChange}
-                  disabled={isBusy}
+                  disabled={false}
                 />
               </>
             )}

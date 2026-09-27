@@ -4,6 +4,7 @@ import type { ToolOutputAttachment } from "../attachments/types";
 
 export type ToolResult = {
   text: string;
+  endActivation?: boolean;
   /** Shown with the assistant reply so display does not depend on the model repeating it. */
   attachments?: ToolOutputAttachment[];
 };
