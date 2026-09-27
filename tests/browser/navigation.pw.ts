@@ -293,12 +293,23 @@ test("view navigation desktop deletes an empty chat left with Back", async ({
 }) => {
   await mockApp(page);
   const deleted: string[] = [];
-  await page.route("**/api/sessions/b", (route) => {
+  await page.route(/\/api\/sessions\/b(?:\/runtime)?$/, (route) => {
     if (route.request().method() === "DELETE") {
       deleted.push(route.request().url());
       return route.fulfill({ json: { ok: true } });
     }
-    return route.fulfill({ json: { id: "b", model: "test", history: [] } });
+    return route.fulfill({
+      json: {
+        id: "b",
+        model: "test",
+        history: [],
+        agents: [],
+        activation: null,
+        queued: [],
+        held: false,
+        sequence: 0,
+      },
+    });
   });
   await page.goto("/run/a");
   await page.getByRole("button", { name: /Conversation b/ }).click();
@@ -314,10 +325,15 @@ test("view navigation desktop protects dirty settings after a markdown footnote 
   page,
 }) => {
   await mockApp(page);
-  await page.route("**/api/sessions/a", (route) =>
+  await page.route(/\/api\/sessions\/a(?:\/runtime)?$/, (route) =>
     route.fulfill({
       json: {
         id: "a",
+        agents: [],
+        activation: null,
+        queued: [],
+        held: false,
+        sequence: 0,
         model: "test",
         history: [
           {
