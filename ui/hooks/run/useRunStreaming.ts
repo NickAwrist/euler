@@ -3,6 +3,7 @@ import {
   type FormEvent,
   type MutableRefObject,
   type SetStateAction,
+  useRef,
   useState,
 } from "react";
 import type { ImageAttachment } from "../../../src/attachments/types";
@@ -49,6 +50,7 @@ type Args = {
 
 export function useRunStreaming(p: Args) {
   const [input, setInput] = useState("");
+  const sending = useRef(false);
   const events = useAgentEvents(
     p.activeSessionId,
     p.isEphemeral,
@@ -100,11 +102,13 @@ export function useRunStreaming(p: Args) {
           p.isEphemeral,
         );
       }
-      await events.refresh();
+      void events.refresh().catch(console.error);
+      return true;
     } catch (error) {
       images.setImageError(
         error instanceof Error ? error.message : "Could not send message",
       );
+      return false;
     }
   };
   const stopGeneration = () => {
@@ -117,7 +121,7 @@ export function useRunStreaming(p: Args) {
   const sendMessage = async (event?: FormEvent) => {
     event?.preventDefault();
     const message = input.trim();
-    if (!message || !p.modelSendReady) return;
+    if (!message || !p.modelSendReady || sending.current) return;
     if (images.pendingImages.length > 0 && !images.canAttachImages) {
       images.setImageError(
         !p.supportsImageInput
@@ -126,24 +130,27 @@ export function useRunStreaming(p: Args) {
       );
       return;
     }
-    let sessionId = p.activeSessionId;
-    if (!sessionId) {
-      try {
-        sessionId = await p.startSession();
-      } catch (error) {
-        console.error(error);
-        return;
+    sending.current = true;
+    try {
+      const sessionId = p.activeSessionId ?? (await p.startSession());
+      const attachments = await images.uploadPendingImages(sessionId);
+      if (!attachments) return;
+      if (
+        await runTurn(sessionId, p.messages, message, attachments, {
+          rebuildModelMessages: false,
+        })
+      ) {
+        // Preserve a new draft typed while the request was being accepted.
+        setInput((current) => (current === input ? "" : current));
+        images.clearPendingImages();
       }
+    } catch (error) {
+      images.setImageError(
+        error instanceof Error ? error.message : "Could not send message",
+      );
+    } finally {
+      sending.current = false;
     }
-
-    const attachments = await images.uploadPendingImages(sessionId);
-    if (!attachments) return;
-    // Keep anything typed while attachments were uploading.
-    setInput((current) => (current === input ? "" : current));
-    images.clearPendingImages();
-    await runTurn(sessionId, p.messages, message, attachments, {
-      rebuildModelMessages: false,
-    });
   };
 
   const rerunFrom = (

@@ -119,4 +119,17 @@ test("session loading: async agents continue across chat messages and browser re
   await page.screenshot({
     path: testInfo.outputPath("async-agents-narrow.png"),
   });
+  await page.keyboard.press("Escape");
+  await page.route("**/api/sessions/*/messages", (route) =>
+    route.fulfill({
+      status: 400,
+      json: { error: { code: "BAD_REQUEST", message: "Message rejected" } },
+    }),
+  );
+  await input.fill("Retain this draft");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(
+    page.getByText("Message rejected", { exact: true }),
+  ).toBeVisible();
+  await expect(input).toHaveValue("Retain this draft");
 });
