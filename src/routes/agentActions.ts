@@ -2,12 +2,11 @@ import { Router } from "express";
 import { agentRuntime } from "../agents/runtime/AgentRuntime";
 import { getOpenRouterApiKey } from "../db";
 import { getAttachment } from "../db/attachments";
-import { getDb } from "../db/connection";
-import { getSessionById } from "../db/sessions";
+import { getSessionById, markSessionViewed } from "../db/sessions";
 import { sendApiError } from "../http/errors";
 import { sendValidationError } from "../http/validation";
 import { resolveModelSelection } from "../llm";
-import { AgentSchema, EditQueuedMessageSchema } from "../schemas/agents";
+import { EditQueuedMessageSchema } from "../schemas/agents";
 import { RewindSchema, SendMessageSchema } from "../schemas/agents";
 import { requireUserId } from "../userIdentity";
 import { workspaceService } from "../workspaces/WorkspaceService";
@@ -33,11 +32,7 @@ export function agentActions(temporary = false) {
   router.post("/:id/viewed", (req, res) => {
     const owner = requireUserId(req, res);
     if (!owner) return;
-    if (!temporary)
-      getDb().run(
-        "UPDATE sessions SET last_viewed_at = ? WHERE id = ? AND owner_uuid = ?",
-        [Date.now(), req.params.id, owner],
-      );
+    if (!temporary) markSessionViewed(owner, req.params.id);
     res.json({ ok: true });
   });
   router.post("/:id/messages", (req, res) => {
@@ -77,20 +72,7 @@ export function agentActions(temporary = false) {
       );
       return;
     }
-    if (body.model) main.model = body.model;
-    main.config = {
-      metadata: body.metadata,
-      reasoningEffort: body.reasoningEffort,
-    };
-    agentRuntime.store.save(main);
-    const queued = main.status === "running";
-    const message = agentRuntime.enqueue(
-      main,
-      "user",
-      "user",
-      body.content,
-      body.attachmentIds,
-    );
+    const { message, queued } = agentRuntime.send(main, body);
     res.status(202).json({ messageId: message.id, queued });
   });
   router.post("/:id/stop", async (req, res) => {
@@ -150,26 +132,25 @@ export function agentActions(temporary = false) {
   router.get("/:id/agents/:agentId", (req, res) => {
     const owner = requireUserId(req, res);
     if (!owner) return;
-    const agent = agentRuntime.store
-      .list(owner, req.params.id)
-      .find((a) => a.id === req.params.agentId);
+    const agents = agentRuntime.store.view(owner, req.params.id);
+    const agent = agents.find((a) => a.id === req.params.agentId);
     if (!agent) {
       sendApiError(res, 404, "NOT_FOUND", "Agent not found");
       return;
     }
-    const messages = agentRuntime.store
-      .list(owner, req.params.id)
+    const messages = agents
       .flatMap((a) => agentRuntime.store.inbox(a.id))
       .filter((m) => m.agentId === agent.id || m.sender === agent.id)
       .sort((a, b) => a.createdAt - b.createdAt || a.id - b.id);
-    res.json({ agent: AgentSchema.parse(agent), messages });
+    res.json({ agent, messages });
   });
   router.post("/:id/agents/:agentId/cancel", async (req, res) => {
     const owner = requireUserId(req, res);
     if (!owner) return;
-    const agent = agentRuntime.store
-      .list(owner, req.params.id)
+    const visible = agentRuntime.store
+      .view(owner, req.params.id)
       .find((a) => a.id === req.params.agentId && a.kind !== "main");
+    const agent = visible ? agentRuntime.store.get(visible.id) : undefined;
     if (!agent) {
       sendApiError(res, 404, "NOT_FOUND", "Agent not found");
       return;

@@ -85,3 +85,26 @@ test("a slow client stays connected until its buffer overflows, then publishing 
   expect(client.writableEnded).toBe(true);
   expect(() => hub.publish("a", event)).not.toThrow();
 });
+
+test("a throwing client cannot interrupt delivery to healthy clients", () => {
+  const hub = new EventHub();
+  const broken = new Client();
+  const healthy = new Client();
+  hub.attach("owner", broken.response());
+  hub.attach("owner", healthy.response());
+  broken.write = () => {
+    throw new Error("socket closed");
+  };
+  Object.assign(broken, {
+    destroy: () => {
+      broken.destroyed = true;
+      broken.emit("close");
+    },
+  });
+  expect(() =>
+    hub.publish("owner", { type: "resync", sessionId: "chat", agentId: "" }),
+  ).not.toThrow();
+  expect(broken.destroyed).toBe(true);
+  expect(healthy.chunks).toHaveLength(2);
+  healthy.end();
+});

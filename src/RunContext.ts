@@ -52,6 +52,8 @@ export class RunContext {
   readonly ownerUuid: string;
   readonly workspace?: Workspace;
   private _steps: Step[] = [];
+  /** Files explicitly written by tools in this activation. */
+  readonly writtenFiles = new Set<string>();
   /** Tool outputs attached to this activation’s reply. */
   private _outputAttachments: ToolOutputAttachment[] = [];
   private _onChange?: OnStepChange;

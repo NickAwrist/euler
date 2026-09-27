@@ -1,44 +1,42 @@
+import { basename, relative } from "node:path";
 import type { WorkspaceFileAttachment } from "../../attachments/types";
 import {
   type Workspace,
   workspaceService,
 } from "../../workspaces/WorkspaceService";
-export async function snapshotWorkspace(
-  workspace: Workspace,
-): Promise<Map<string, string>> {
-  try {
-    return new Map(
-      (await workspaceService.listFiles(workspace)).map((file) => [
-        file.path,
-        `${file.size}:${file.modifiedAt}`,
-      ]),
-    );
-  } catch {
-    return new Map();
-  }
-}
+
+/** Resolve only tool-reported outputs. Concurrent edits are not inferred from timestamps. */
 export async function changedWorkspaceFiles(
   workspace: Workspace,
-  before: Map<string, string>,
+  paths: ReadonlySet<string>,
   sessionId: string,
   temporary: boolean,
 ): Promise<WorkspaceFileAttachment[]> {
-  try {
-    return (await workspaceService.listFiles(workspace))
-      .filter(
-        (file) => before.get(file.path) !== `${file.size}:${file.modifiedAt}`,
-      )
-      .map((file) => ({
+  const files = new Map<string, WorkspaceFileAttachment>();
+  for (const requested of paths) {
+    try {
+      const canonical = await workspaceService.resolveExistingPath(
+        workspace,
+        requested,
+      );
+      const path = relative(workspace.hostPath, canonical)
+        .split("\\")
+        .join("/");
+      const stat = await workspaceService.statPath(workspace, path);
+      if (!stat.isFile()) continue;
+      files.set(path, {
         id: crypto.randomUUID(),
         kind: "file",
-        name: file.name,
-        path: file.path,
-        size: file.size,
+        name: basename(path),
+        path,
+        size: stat.size,
         sessionId,
         workspaceKind: workspace.kind,
         temporary,
-      }));
-  } catch {
-    return [];
+      });
+    } catch {
+      // Deleted or inaccessible outputs cannot be attached.
+    }
   }
+  return [...files.values()];
 }

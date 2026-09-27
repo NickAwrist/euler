@@ -49,6 +49,7 @@ test("restart preserves an interrupted main reply without retrying and repairs c
     ],
   };
   first.store.save(child);
+  first.store.saveHistory(child, child.history);
   runMigrations(getDb());
   const recovered = new AgentRuntime();
   recovered.recover();

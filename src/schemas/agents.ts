@@ -60,6 +60,7 @@ export const SendMessageSchema = z
     metadata: RunMetadataSchema.optional(),
   })
   .strict();
+export type SendMessageRequest = z.infer<typeof SendMessageSchema>;
 export const EditQueuedMessageSchema = z
   .object({ content: z.string().trim().min(1) })
   .strict();
@@ -70,8 +71,19 @@ export const RewindSchema = z
     versions: z.array(MessageVersionSchema).optional(),
   })
   .strict();
-export const isFinalAgent = (agent: Pick<Agent, "status">) =>
-  ["completed", "failed", "cancelled"].includes(agent.status);
+export type AgentStatus = z.infer<typeof AgentStatusSchema>;
+export const FINAL_STATUSES: readonly AgentStatus[] = [
+  "completed",
+  "failed",
+  "cancelled",
+];
 /** Queued, running, or blocked on a reply. A ready subagent is `idle`. */
+export const WORKING_STATUSES: readonly AgentStatus[] = [
+  "queued",
+  "running",
+  "waiting",
+];
+export const isFinalAgent = (agent: Pick<Agent, "status">) =>
+  FINAL_STATUSES.includes(agent.status);
 export const isWorkingAgent = (agent: Pick<Agent, "status">) =>
-  ["queued", "running", "waiting"].includes(agent.status);
+  WORKING_STATUSES.includes(agent.status);

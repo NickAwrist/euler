@@ -28,6 +28,7 @@ export type SessionSummaryRow = {
   created_at: number;
   updated_at: number;
   title: string | null;
+  unread: boolean;
   preview: string;
 };
 

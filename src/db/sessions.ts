@@ -27,13 +27,14 @@ export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
   const db = getDb();
   const sessions = db
     .query(
-      "SELECT id, created_at, updated_at, title FROM sessions WHERE owner_uuid = ? ORDER BY updated_at DESC",
+      "SELECT id, created_at, updated_at, title, last_activity_at > last_viewed_at AS unread FROM sessions WHERE owner_uuid = ? ORDER BY updated_at DESC",
     )
     .all(ownerUuid) as Array<{
     id: string;
     created_at: number;
     updated_at: number;
     title: string | null;
+    unread: number;
   }>;
 
   const skillNames = new Set(listSkills(ownerUuid).map((skill) => skill.name));
@@ -48,6 +49,7 @@ export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
       created_at: s.created_at,
       updated_at: s.updated_at,
       title: s.title,
+      unread: s.unread === 1,
       preview: previewFromTitleAndFirstUser(
         s.title,
         fu?.content ?? null,
@@ -298,4 +300,19 @@ export function appendRuntimeMessage(
     );
     return id;
   })();
+}
+
+export function markSessionViewed(ownerUuid: string, sessionId: string) {
+  getDb().run(
+    "UPDATE sessions SET last_viewed_at = ? WHERE id = ? AND owner_uuid = ?",
+    [Date.now(), sessionId, ownerUuid],
+  );
+}
+
+/** Removes transcript messages from `position` on. */
+export function truncateSessionMessages(sessionId: string, position: number) {
+  getDb().run("DELETE FROM messages WHERE session_id = ? AND position >= ?", [
+    sessionId,
+    position,
+  ]);
 }

@@ -645,3 +645,25 @@ Open questions:
 - Should a user message sent mid-reply steer that reply, as designed here, or wait until the reply ends?
 - Is 10 agent-initiated main activations per user message the right budget, or should the budget be cost-based?
 - Should finished agents' histories expire, or live as long as the chat?
+
+### Runtime storage and output ownership
+
+Agent status and inbox delivery flags use indexed database columns. Display
+queries do not load model history into the runtime cache. The runtime keeps
+shared mutable records while a chat has active work and releases persistent
+records when it goes idle. Runtime operations re-read records after waits;
+routes use display snapshots and runtime methods instead of mutating records.
+Temporary chats remain in memory until their existing lifecycle cleanup runs.
+
+Activation execution lives in `src/agents/runtime/activation.ts`, separate from
+scheduling and conversation control. Agent tools live in `src/tools/` and
+validate their arguments with Zod. Database transactions defer events and
+scheduler notifications until commit and restore cached state on rollback.
+
+Reply file attachments come from paths reported by successful `create_file`
+and `apply_patch` calls. Shell commands can supply `outputFiles` to identify
+files to attach after a successful exit. The runtime resolves and stats only
+those paths; it no longer scans the workspace or attributes files by modification
+time. Missing files, directories, and paths outside the workspace are omitted.
+Attachments refer to current workspace files, not immutable snapshots of their
+contents.

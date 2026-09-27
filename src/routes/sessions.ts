@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import { Router } from "express";
 import { agentRuntime } from "../agents/runtime/AgentRuntime";
-import { getDb } from "../db/connection";
 import {
   appendSessionEvent,
   createSessionRow,
@@ -239,6 +238,10 @@ router.get("/", (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
   const rows = listSessionSummaries(ownerUuid);
+  const working = agentRuntime.store.sessionsWithStatus(ownerUuid, [
+    "queued",
+    "running",
+  ]);
   res.json({
     sessions: rows.map((r) => ({
       id: r.id,
@@ -246,18 +249,7 @@ router.get("/", (req, res) => {
       updatedAt: r.updated_at,
       customTitle: r.title,
       preview: r.preview,
-      badge: agentRuntime.store
-        .list(ownerUuid, r.id)
-        .some((a) => ["queued", "running"].includes(a.status))
-        ? "working"
-        : (() => {
-            const row = getDb()
-              .query(
-                "SELECT last_activity_at > last_viewed_at AS unread FROM sessions WHERE id = ?",
-              )
-              .get(r.id) as { unread: number };
-            return row.unread ? "unread" : null;
-          })(),
+      badge: working.has(r.id) ? "working" : r.unread ? "unread" : null,
     })),
   });
 });

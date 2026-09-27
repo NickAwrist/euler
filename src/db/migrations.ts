@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { POPULAR_PUBLISHERS } from "../openRouterPublishers";
+import { createAgentTables } from "./agentTables";
 import { migrateAttachmentMetadata } from "./attachmentMetadataMigration";
 import { migrateChildRuns } from "./childRunMigration";
 
@@ -190,11 +191,7 @@ export function runMigrations(db: Database) {
     if (!messageColumns.some((c) => c.name === "activation_id"))
       db.run("ALTER TABLE messages ADD COLUMN activation_id TEXT");
   }
-  db.run(`CREATE TABLE IF NOT EXISTS agents (
-    id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, data TEXT NOT NULL
-  ); CREATE TABLE IF NOT EXISTS agent_messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, agent_id TEXT NOT NULL REFERENCES agents(id) ON DELETE CASCADE, data TEXT NOT NULL
-  ); CREATE INDEX IF NOT EXISTS idx_agent_messages_recipient ON agent_messages(agent_id, id);`);
+  createAgentTables(db);
   if (tableExists(db, "messages")) migrateChildRuns(db);
   const columns = db.query("PRAGMA table_info(sessions)").all() as {
     name: string;

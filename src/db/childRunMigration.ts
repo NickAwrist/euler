@@ -32,13 +32,10 @@ export function migrateChildRuns(db: Database) {
     )
     .all() as Row[];
   const insertAgent = db.prepare(
-    "INSERT INTO agents (id, session_id, data) VALUES (?, ?, ?)",
+    "INSERT INTO agents (id, session_id, status, data) VALUES (?, ?, 'completed', ?)",
   );
-  const insertMessage = db.prepare(
-    "INSERT INTO agent_messages (agent_id, data) VALUES (?, '{}')",
-  );
-  const updateMessage = db.prepare(
-    "UPDATE agent_messages SET data = ? WHERE id = ?",
+  const insertTask = db.prepare(
+    "INSERT INTO agent_messages (agent_id, sender, kind, content, wakes, created_at, delivered_at) VALUES (?, 'runtime', 'task', ?, 1, ?, ?)",
   );
   const update = db.prepare(
     "UPDATE messages SET steps = ?, versions = ? WHERE id = ?",
@@ -80,14 +77,12 @@ export function migrateChildRuns(db: Database) {
                   .find((line) => line.trim())
                   ?.trim()
                   .slice(0, 80) || "Subagent",
-              status: "completed",
               model: row.model ?? DEFAULT_RUN_MODEL,
               spawnPosition,
               createdAt,
               endedAt: time(step.endedAt) ?? createdAt,
               activity: text(step.result),
               steps: extract(stepList(run.steps), -1, id),
-              history: [],
               held: false,
               wakes: 0,
               checkpoints: {},
@@ -95,24 +90,7 @@ export function migrateChildRuns(db: Database) {
               config: {},
             }),
           );
-          if (prompt) {
-            const messageId = Number(insertMessage.run(id).lastInsertRowid);
-            updateMessage.run(
-              JSON.stringify({
-                id: messageId,
-                agentId: id,
-                sender: "runtime",
-                kind: "task",
-                content: prompt,
-                wakes: true,
-                attachmentIds: [],
-                createdAt,
-                deliveredAt: createdAt,
-                held: false,
-              }),
-              messageId,
-            );
-          }
+          if (prompt) insertTask.run(id, prompt, createdAt, createdAt);
           return step;
         });
       update.run(

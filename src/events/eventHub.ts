@@ -1,11 +1,13 @@
 import type { Response } from "express";
 import type { AgentEvent } from "../schemas/events";
 
-type Unsequenced = AgentEvent extends infer E
+export type Unsequenced = AgentEvent extends infer E
   ? E extends AgentEvent
     ? Omit<E, "sequence">
     : never
   : never;
+/** Events kept per user so a reconnecting client can replay what it missed. */
+const MAX_REPLAY_EVENTS = 2000;
 /** Output a slow client may buffer before it is dropped. */
 const MAX_BUFFERED_BYTES = 1024 * 1024;
 export class EventHub {
@@ -28,7 +30,7 @@ export class EventHub {
     const state = this.user(owner);
     const sequenced = { ...event, sequence: ++state.sequence };
     state.events.push(sequenced);
-    if (state.events.length > 2000) state.events.shift();
+    if (state.events.length > MAX_REPLAY_EVENTS) state.events.shift();
     for (const client of state.clients) this.send(client, sequenced);
   }
   private send(client: Response, event: AgentEvent) {
@@ -40,9 +42,13 @@ export class EventHub {
   /** A disconnected client must never throw into the runtime publishing to it. */
   private write(client: Response, chunk: string) {
     if (client.writableEnded || client.destroyed) return;
-    client.write(chunk);
-    // A client far behind is dropped and reconnects with Last-Event-ID.
-    if (client.writableLength > MAX_BUFFERED_BYTES) client.end();
+    try {
+      client.write(chunk);
+      // A client far behind is dropped and reconnects with Last-Event-ID.
+      if (client.writableLength > MAX_BUFFERED_BYTES) client.end();
+    } catch {
+      client.destroy();
+    }
   }
   attach(owner: string, response: Response, lastId?: number) {
     const state = this.user(owner);
