@@ -70,6 +70,7 @@ export async function runActivation(
   partial: Activation,
 ) {
   agent.status = "running";
+  agent.interruption = undefined;
   host.status(agent);
   host.emit(agent.ownerUuid, {
     type: "activation_started",

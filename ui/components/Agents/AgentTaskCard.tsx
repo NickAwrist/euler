@@ -7,18 +7,9 @@ import {
 } from "../../../src/schemas/agents";
 import { cx } from "../../styles";
 import { IconButton } from "../IconButton";
+import { ModelLabel } from "../ModelLabel";
 import { useAgents } from "./AgentContext";
-const STATUS_LABELS: Record<Agent["status"], string> = {
-  queued: "Queued",
-  running: "Working",
-  waiting: "Waiting for Euler",
-  idle: "Ready",
-  completed: "Done",
-  failed: "Failed",
-  cancelled: "Stopped",
-};
-export const agentStatusLabel = (agent: Agent) =>
-  agent.held && !isFinalAgent(agent) ? "Paused" : STATUS_LABELS[agent.status];
+import { AgentStatus } from "./AgentStatus";
 /** Stops a working agent or dismisses a ready one. */
 export function AgentStopButton({ agent }: { agent: Agent }) {
   const { stop } = useAgents();
@@ -76,15 +67,17 @@ export function AgentTaskCard({
         <Bot size={16} className="shrink-0" />
         <span className="min-w-0 flex-1">
           <span className="block truncate">{agent.title}</span>
+          <ModelLabel
+            model={agent.model}
+            className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground [&>img]:size-3 [&>span:first-child]:size-3"
+          />
           {showActivity && agent.activity && (
             <span className="block truncate text-xs text-muted-foreground">
               {agent.activity}
             </span>
           )}
         </span>
-        <span className="text-muted-foreground" aria-live="polite">
-          {agentStatusLabel(agent)}
-        </span>
+        <AgentStatus agent={agent} />
         <ChevronRight size={14} className="shrink-0 text-muted-foreground" />
       </button>
       {!isFinalAgent(agent) && <AgentStopButton agent={agent} />}

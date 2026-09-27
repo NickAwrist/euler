@@ -60,3 +60,9 @@ export function groupModelProviders(models: ModelOption[]): ModelProvider[] {
   for (const group of groups.values()) group.models.sort(compareModels);
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
+
+export function modelProviderId(model: string) {
+  return model.startsWith("openrouter:")
+    ? model.slice(11).split("/")[0]!
+    : "ollama";
+}

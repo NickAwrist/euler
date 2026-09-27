@@ -25,6 +25,7 @@ export const AgentSchema = z.object({
   createdAt: z.number(),
   endedAt: z.number().nullable(),
   activity: z.string(),
+  interruption: z.string().optional(),
   steps: z.array(WireStepSchema),
 });
 export type Agent = z.infer<typeof AgentSchema>;

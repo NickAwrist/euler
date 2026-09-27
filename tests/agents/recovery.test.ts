@@ -63,6 +63,9 @@ test("restart preserves an interrupted main reply without retrying and repairs c
   expect(getMessagesForSession(owner, id)[0]?.content).toContain("interrupted");
   expect(recovered.store.get(main.id)?.status).toBe("idle");
   expect(recovered.store.get(child.id)?.status).toBe("idle");
+  expect(new AgentStore().get(child.id)?.interruption).toContain(
+    "server restart",
+  );
   await Bun.sleep(30);
   expect(getOpenRouterRequests()).toHaveLength(0);
   expect(
@@ -97,6 +100,7 @@ test("restart preserves an interrupted main reply without retrying and repairs c
           m.content.includes("Different work now"),
       ),
   ).toBe(true);
+  expect(recovered.store.get(child.id)?.interruption).toBeUndefined();
   await recovered.deleteSession(owner, id);
 });
 

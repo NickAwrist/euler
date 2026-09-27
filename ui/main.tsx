@@ -52,7 +52,10 @@ const Root =
                                   "../dev/experimental/async-agents/AsyncAgentsDemo"
                                 ),
                             )
-                          : App;
+                          : import.meta.env.DEV &&
+                              window.location.pathname === "/dev/agents"
+                            ? lazy(() => import("./dev/AgentsDemo"))
+                            : App;
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

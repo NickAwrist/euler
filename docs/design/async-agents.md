@@ -452,7 +452,7 @@ Opening a chat updates `last_viewed_at`. The sidebar's order continues to use `u
 | Endpoint | Purpose |
 | --- | --- |
 | `POST /api/sessions/:id/messages` | `{ content, attachmentIds, model, reasoningEffort, metadata }`. Stores the user message, enqueues it, and returns `{ messageId, queued }`. |
-| `POST /api/sessions/:id/rewind` | `{ position, content?, versions? }`. Edit and regenerate. Cancels agents spawned at or after `position`, truncates, then enqueues. |
+| `POST /api/sessions/:id/rewind` | `{ position, content?, versions? }`. Edit and regenerate. Cancels and deletes agents spawned at or after `position`, truncates, then enqueues. |
 | `POST /api/sessions/:id/stop` | Aborts the main activation. |
 | `GET /api/sessions/:id` | Existing session payload plus `agents` and the in-progress activation's partial state. |
 | `GET /api/sessions/:id/agents/:agentId` | Agents panel detail: inbox and steps. |
@@ -532,7 +532,7 @@ erDiagram
 
 - The main agent's model history stays in `sessions.model_messages`. The main agent also has an `agents` row, so the inbox and status apply to it uniformly.
 - `agents` and `agent_messages` cascade on session deletion, after the runtime has cancelled live agents.
-- `spawn_position` tells a rewind which agents to cancel.
+- `spawn_position` tells a rewind which agents to cancel and delete.
 - Persisting `messages` becomes append-and-update by message ID instead of rewriting by position, because agents and the user can now add rows concurrently.
 
 ## Lifecycle rules
@@ -543,11 +543,13 @@ erDiagram
 | User sends a message | Wakes the main agent, or is delivered at its next step boundary if it is replying. |
 | Stop in the composer | Aborts the main activation only. Messages queued at that moment are held. |
 | Stop agent | Cancels that subagent and its pending inbox. |
-| Edit or regenerate | Cancels agents with `spawn_position` at or after the rewind point, then rewinds. The confirmation dialog names them. |
+| Edit or regenerate | Cancels and deletes agents with `spawn_position` at or after the rewind point, including their inboxes and reports, then rewinds. The confirmation dialog names them. |
 | Delete chat | Cancels all agents, waits for activations to settle, then deletes. Browser data is untouched (phase 2). |
 | Change workspace | Rejected with 409 while any agent is live, as it is during a turn today. |
 | Change model | Applies to the main agent's next activation. Running subagents keep theirs. |
 | Server restart | See recovery below. |
+
+Subagent rows and traces show their fixed model and provider icon. A subtle warning marks failed agents and agents interrupted by a server restart. Restart interruptions retain their reason until the agent resumes or is dismissed.
 
 ### Restart recovery
 

@@ -6,8 +6,10 @@ import {
 } from "../../../src/schemas/agents";
 import { fetchAgent } from "../../persist/agents";
 import type { MessageStep } from "../../types";
+import { ModelLabel } from "../ModelLabel";
 import { StepsModal } from "../StepsModal";
-import { AgentStopButton, agentStatusLabel } from "./AgentTaskCard";
+import { AgentStatus } from "./AgentStatus";
+import { AgentStopButton } from "./AgentTaskCard";
 
 export function AgentTraceModal({
   sessionId,
@@ -56,10 +58,23 @@ export function AgentTraceModal({
     <StepsModal
       steps={steps}
       title={agent.title}
-      subtitle={<span aria-live="polite">{agentStatusLabel(agent)}</span>}
+      subtitle={
+        <span className="flex flex-wrap items-center gap-2">
+          <AgentStatus agent={agent} />
+          <ModelLabel
+            model={agent.model}
+            className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground [&>img]:size-3"
+          />
+        </span>
+      }
       actions={!isFinalAgent(agent) && <AgentStopButton agent={agent} />}
       onClose={onClose}
     >
+      {agent.interruption && (
+        <p className="mb-3 text-sm text-muted-foreground">
+          {agent.interruption}
+        </p>
+      )}
       {error && (
         <p role="alert" className="mb-3 text-sm text-red-400">
           {error}

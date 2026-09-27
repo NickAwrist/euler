@@ -494,6 +494,7 @@ export class AgentRuntime {
       endedAt: null,
       history: [],
       partial: undefined,
+      interruption: undefined,
       versions: undefined,
       checkpoints: {},
       steps: [],
@@ -571,6 +572,7 @@ export class AgentRuntime {
     await active?.promise;
     const current = this.store.get(agent.id);
     if (!current) return;
+    current.interruption = undefined;
     current.status =
       agent.kind === "main" ? "idle" : ready ? "completed" : "cancelled";
     if (current.kind === "main") current.held = false;
@@ -637,8 +639,6 @@ export class AgentRuntime {
         if (agent.kind !== "main" && agent.spawnPosition >= request.position) {
           await this.cancel(agent, "Conversation rewound");
           rewound.add(agent.id);
-          agent.spawnPosition = -1;
-          this.status(agent);
         }
       const kept = history.slice(0, request.position);
       const current = this.store.get(main.id)!;
@@ -670,6 +670,10 @@ export class AgentRuntime {
             .undelivered(main.id)
             .filter((m) => m.kind === "user" || rewound.has(m.sender)),
         );
+        for (const id of rewound) {
+          const agent = this.store.get(id);
+          if (agent) this.store.remove(agent);
+        }
         this.resync(owner, sessionId);
         this.enqueue(
           current,
@@ -734,6 +738,7 @@ export class AgentRuntime {
           this.store.deliver(pending);
           agent.activity =
             "Interrupted by server restart. Ready for new instructions.";
+          agent.interruption = agent.activity;
           history.push({ role: "user", content: agent.activity });
         }
         agent.partial = undefined;

@@ -104,7 +104,8 @@ export class AgentStore {
       for (const [id, agent] of this.temporary)
         if (agent.sessionId === sessionId) this.temporary.delete(id);
       for (const { agent, saved, temporary } of records) {
-        for (const key of ["partial", "versions"] as const) delete agent[key];
+        for (const key of ["partial", "versions", "interruption"] as const)
+          delete agent[key];
         Object.assign(agent, saved);
         (temporary ? this.temporary : this.records).set(agent.id, agent);
       }
@@ -248,8 +249,9 @@ export class AgentStore {
     this.records.delete(agent.id);
     this.temporary.delete(agent.id);
     this.temporaryInbox = this.temporaryInbox.filter(
-      (m) => m.agentId !== agent.id,
+      (m) => m.agentId !== agent.id && m.sender !== agent.id,
     );
+    getDb().run("DELETE FROM agent_messages WHERE sender = ?", [agent.id]);
     getDb().run("DELETE FROM agents WHERE id = ?", [agent.id]);
   }
 

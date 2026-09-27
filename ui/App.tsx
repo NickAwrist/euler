@@ -699,7 +699,7 @@ export default function App() {
                 ? "Messages after this reply will be permanently deleted. The current reply is kept as an earlier version."
                 : "All message history after this point will be permanently deleted. This cannot be undone.") +
               (app.rewindAgentNames.length
-                ? ` These agents will end: ${app.rewindAgentNames.join(", ")}.`
+                ? ` These agents will be deleted: ${app.rewindAgentNames.join(", ")}.`
                 : "")
             }
             onClose={() => app.setTruncateConfirm(null)}

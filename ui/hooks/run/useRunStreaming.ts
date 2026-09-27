@@ -7,7 +7,6 @@ import {
   useState,
 } from "react";
 import type { ImageAttachment } from "../../../src/attachments/types";
-import { isFinalAgent } from "../../../src/schemas/agents";
 import { agentAction } from "../../persist/agents";
 import { buildRunMetadata } from "../../persist/userSettings";
 import type { UserSettings } from "../../persist/userSettings";
@@ -195,9 +194,7 @@ export function useRunStreaming(p: Args) {
       assistantIndex < p.messages.length - 1 ||
       events.agents.some(
         (agent) =>
-          agent.kind !== "main" &&
-          agent.spawnPosition >= assistantIndex &&
-          !isFinalAgent(agent),
+          agent.kind !== "main" && agent.spawnPosition >= assistantIndex,
       )
     ) {
       p.setTruncateConfirm({ kind: "regenerate", assistantIndex });

@@ -1,5 +1,5 @@
 import { ProviderIcon } from "../ModelSelectBar";
-import { providerIcons } from "../modelProviders";
+import { modelProviderId as provider, providerIcons } from "../modelProviders";
 export const number = (n: number | null) =>
   n === null
     ? "Not reported"
@@ -25,32 +25,9 @@ const colors: Record<string, string> = {
   mistralai: "#FF8205",
   "meta-llama": "#0081FA",
 };
-export function provider(model: string) {
-  return model.startsWith("openrouter:")
-    ? model.slice(11).split("/")[0]!
-    : "ollama";
-}
+export { modelProviderId as provider } from "../modelProviders";
 export function color(model: string) {
   return providerColor(provider(model));
-}
-export function ModelLabel({ model }: { model: string }) {
-  const icon =
-    provider(model) === "ollama"
-      ? "/icons/ollama.svg"
-      : providerIcons[provider(model)];
-  return (
-    <span className="usage-model">
-      <ProviderIcon
-        provider={{
-          id: provider(model),
-          name: provider(model),
-          iconUrl: icon,
-          models: [],
-        }}
-      />
-      <span>{model.replace(/^openrouter:/, "")}</span>
-    </span>
-  );
 }
 
 export function providerColor(id: string) {
