@@ -8,7 +8,7 @@ import {
   RefreshCw,
   Waypoints,
 } from "lucide-react";
-import { type CSSProperties, useMemo } from "react";
+import { type CSSProperties, useMemo, useState } from "react";
 import type {
   WebSourceAttachment,
   WorkspaceFileAttachment,
@@ -158,11 +158,7 @@ export function AssistantMessageBubble({
                   title={source.url}
                   className={msgOutputChip}
                 >
-                  <Globe
-                    size={16}
-                    aria-hidden="true"
-                    className="shrink-0 text-muted-foreground"
-                  />
+                  <SourceFavicon url={source.url} />
                   <span className="min-w-0 max-w-64 truncate">
                     {source.title}
                   </span>
@@ -277,4 +273,28 @@ export function AssistantMessageBubble({
 
 function sourceDomain(url: string): string {
   return new URL(url).hostname.replace(/^www\./, "");
+}
+
+function SourceFavicon({ url }: { url: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <Globe
+        size={16}
+        aria-hidden="true"
+        className="shrink-0 text-muted-foreground"
+      />
+    );
+  }
+  return (
+    <img
+      src={`/api/favicons/${encodeURIComponent(new URL(url).hostname)}`}
+      alt=""
+      width={16}
+      height={16}
+      loading="lazy"
+      onError={() => setFailed(true)}
+      className="size-4 shrink-0 rounded-sm"
+    />
+  );
 }
