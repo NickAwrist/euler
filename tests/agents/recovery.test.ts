@@ -133,11 +133,12 @@ test("the automatic-turn budget holds updates and a user message resets it", asy
   await runtime.deleteSession(owner, id);
 });
 
-test("the scheduler queues the fifth activation and frees its slot when work ends", async () => {
+test("the scheduler queues work beyond the configured limit and frees slots as work ends", async () => {
   setOpenRouterApiKey("test");
   setOpenRouterScenario("delayed-stream");
-  const runtime = new AgentRuntime();
-  const ids = Array.from({ length: 5 }, () => crypto.randomUUID());
+  const limit = 2;
+  const runtime = new AgentRuntime(limit);
+  const ids = Array.from({ length: limit + 1 }, () => crypto.randomUUID());
   try {
     for (const id of ids) {
       createSessionRow(owner, id, Date.now(), model);
@@ -147,13 +148,14 @@ test("the scheduler queues the fifth activation and frees its slot when work end
       runtime.enqueue(runtime.main(owner, id), "user", "user", "Run");
     await until(
       () =>
-        ids.filter((id) => runtime.snapshot(owner, id).activation).length === 4,
+        ids.filter((id) => runtime.snapshot(owner, id).activation).length ===
+        limit,
     );
-    expect(runtime.main(owner, ids[4]!).status).toBe("queued");
+    expect(runtime.main(owner, ids[limit]!).status).toBe("queued");
     while (ids.some((id) => runtime.busy(owner, id))) {
       expect(
         ids.filter((id) => runtime.snapshot(owner, id).activation).length,
-      ).toBeLessThanOrEqual(4);
+      ).toBeLessThanOrEqual(limit);
       await Bun.sleep(10);
     }
     expect(

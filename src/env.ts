@@ -1,6 +1,7 @@
 const DEFAULT_BACKEND_PORT = 3000;
 const DEFAULT_FRONTEND_PORT = 5174;
 const DEFAULT_BACKEND_HOST = "127.0.0.1";
+const DEFAULT_MAX_RUNNING_AGENTS = 4;
 export const DEFAULT_COMFYUI_HOST = "http://127.0.0.1:8188";
 export const DEFAULT_SEARXNG_HOST = "http://127.0.0.1:8080";
 
@@ -28,6 +29,11 @@ function getPort(names: string[], fallback: number): number {
   return fallback;
 }
 
+function getPositiveInteger(names: string[], fallback: number): number {
+  const value = Number(getFirstEnv(names));
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
 function getBoolean(names: string[], fallback: boolean): boolean {
   const raw = getFirstEnv(names).toLowerCase();
   if (!raw) return fallback;
@@ -53,6 +59,11 @@ export const envConfig = {
   searxngHost: getFirstEnv(["EULER_SEARXNG_HOST", "SEARXNG_HOST"]),
   jinaApiKey: getFirstEnv(["JINA_API_KEY", "EULER_JINA_API_KEY"]),
   serveFrontend: getBoolean(["EULER_SERVE_FRONTEND"], true),
+  /** Agent activations one user may run at once, across all chats. */
+  maxRunningAgents: getPositiveInteger(
+    ["EULER_MAX_RUNNING_AGENTS"],
+    DEFAULT_MAX_RUNNING_AGENTS,
+  ),
   openrouterApiKey: getFirstEnv([
     "OPENROUTER_API_KEY",
     "EULER_OPENROUTER_API_KEY",

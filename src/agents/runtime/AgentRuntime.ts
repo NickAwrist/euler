@@ -10,6 +10,7 @@ import {
   patchSessionRow,
   truncateSessionMessages,
 } from "../../db/sessions";
+import { envConfig } from "../../env";
 import { type Unsequenced, eventHub } from "../../events/eventHub";
 import { ApiError } from "../../http/errors";
 import {
@@ -40,8 +41,6 @@ import { RuntimeTransaction } from "./RuntimeTransaction";
 import { runActivation } from "./activation";
 import { inboxModelContent } from "./agentContext";
 
-/** Activations one owner may run at once. */
-const MAX_RUNNING_PER_OWNER = 4;
 /** Running or waiting subagents admitted in one chat; queued work waits. */
 const MAX_ACTIVE_SUBAGENTS = 3;
 /**
@@ -55,6 +54,10 @@ const PAUSE_NOTE =
   "Automatic work paused at the automatic-turn limit. Continue from saved context when the user resumes.";
 
 export class AgentRuntime {
+  constructor(
+    /** Activations one owner may run at once, across all chats. */
+    private readonly maxRunningPerOwner = envConfig.maxRunningAgents,
+  ) {}
   readonly store = new AgentStore();
   private active = new Map<
     string,
@@ -355,7 +358,7 @@ export class AgentRuntime {
         ).length >= MAX_ACTIVE_SUBAGENTS;
       if (
         childSlotUnavailable ||
-        this.runningCount(agent.ownerUuid) >= MAX_RUNNING_PER_OWNER
+        this.runningCount(agent.ownerUuid) >= this.maxRunningPerOwner
       ) {
         // A waiting child already owns a child slot, even while awaiting an owner slot.
         if (agent.status !== "queued" && agent.status !== "waiting") {
@@ -579,7 +582,7 @@ export class AgentRuntime {
       };
     } finally {
       await this.until(() => {
-        if (this.runningCount(parent.ownerUuid) >= MAX_RUNNING_PER_OWNER)
+        if (this.runningCount(parent.ownerUuid) >= this.maxRunningPerOwner)
           return false;
         // Claim the slot before another waiter checks availability.
         this.waitingForChild.delete(parent.id);

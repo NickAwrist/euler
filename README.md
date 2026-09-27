@@ -70,6 +70,9 @@ In development, the backend API and Vite UI are separate processes:
 - `EULER_BACKEND_PORT` controls the API server. Default: `3000`.
 - `EULER_FRONTEND_PORT` controls the Vite dev server. Default: `5174`.
 
+`EULER_MAX_RUNNING_AGENTS` sets how many agent activations, replies and subagents,
+one user may run at once across all chats. Extra work waits as queued. Default: `4`.
+
 ## Worktree development
 
 From a new worktree, run:

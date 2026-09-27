@@ -189,7 +189,7 @@ The UI labels these states Queued (`queued`), Working (`running`), Waiting for E
 | Limit | Initial value | Behavior when reached |
 | --- | --- | --- |
 | Admitted subagents per chat | 3 | New agents and follow-ups queue while three children are running or waiting for an answer. |
-| Concurrent activations per user | 4 | Extra activations wait in `queued`. |
+| Concurrent activations per user | 4, set by `EULER_MAX_RUNNING_AGENTS` | Extra activations wait in `queued`. |
 | Browser agents per user | 1 | `spawn_agent` returns `browser_busy` naming the chat that holds the browser. |
 | Automatic turns per chat between user messages | 10 | A turn is a model call that delivers agent or runtime messages without user input, across Euler and its subagents, including messages delivered mid-activation. Tool continuations and calls consuming user input are not counted. Further automatic deliveries pause with saved context and pending input until Deliver or a new user message. |
 
