@@ -50,6 +50,9 @@ const MAX_ACTIVE_SUBAGENTS = 3;
  * agents waking each other, not how long one activation works.
  */
 const MAX_AUTOMATIC_TURNS = 10;
+/** Held for a paused agent, so Deliver is offered even with nothing else pending. */
+const PAUSE_NOTE =
+  "Automatic work paused at the automatic-turn limit. Continue from saved context when the user resumes.";
 
 export class AgentRuntime {
   readonly store = new AgentStore();
@@ -271,12 +274,7 @@ export class AgentRuntime {
     for (const target of new Set([agent, main])) {
       if (!this.active.has(target.id)) target.status = "idle";
       if (!this.store.undelivered(target.id).some((m) => m.wakes))
-        this.enqueue(
-          target,
-          "runtime",
-          "message",
-          "Automatic work paused at the automatic-turn limit. Continue from saved context when the user resumes.",
-        );
+        this.enqueue(target, "runtime", "message", PAUSE_NOTE);
       this.store.hold(target.id, true);
       this.status(target);
     }
@@ -651,10 +649,30 @@ export class AgentRuntime {
           .undelivered(current.parentId ?? "")
           .filter((m) => m.sender === current.id && m.kind === "question"),
       );
+      const parent = this.store.get(current.parentId ?? "");
+      if (parent) this.withdrawPauseNote(parent);
     }
     this.status(current);
     this.schedule();
     this.release(current.sessionId);
+  }
+  /** With no paused subagent left, the parent's pause note offers Deliver for nothing. */
+  private withdrawPauseNote(parent: AgentRecord) {
+    if (
+      this.store
+        .list(parent.ownerUuid, parent.sessionId)
+        .some(
+          (a) =>
+            a.kind !== "main" && !isFinalAgent(a) && this.store.isHeld(a.id),
+        )
+    )
+      return;
+    const notes = this.store
+      .undelivered(parent.id)
+      .filter((m) => m.sender === "runtime" && m.content === PAUSE_NOTE);
+    if (!notes.length) return;
+    this.store.deliver(notes);
+    this.status(parent);
   }
   deliver(record: AgentRecord) {
     const agent = this.store.get(record.id) ?? record;

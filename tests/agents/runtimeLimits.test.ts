@@ -105,6 +105,23 @@ test("the budget covers child calls and retains paused follow-ups until the user
   }
 });
 
+test("dismissing the last paused subagent withdraws the parent's pause notice", async () => {
+  const runtime = new AgentRuntime();
+  const main = await session(runtime);
+  const worker = child(runtime, main);
+  main.automaticTurns = 10;
+  runtime.store.save(main);
+  try {
+    runtime.enqueue(worker, main.id, "message", "New assignment");
+    await until(() => runtime.snapshot(owner, main.sessionId).held);
+    await runtime.cancel(runtime.store.get(worker.id)!);
+    expect(runtime.snapshot(owner, main.sessionId).held).toBe(false);
+    expect(getOpenRouterRequests()).toHaveLength(0);
+  } finally {
+    await runtime.deleteSession(owner, main.sessionId);
+  }
+});
+
 test("ready-agent follow-ups queue behind three admitted children", async () => {
   const runtime = new AgentRuntime();
   const main = await session(runtime);

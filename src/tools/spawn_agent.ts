@@ -26,7 +26,7 @@ export class SpawnAgentTool extends BaseTool {
   constructor(private spawn: (request: SpawnRequest) => Promise<SpawnResult>) {
     super(
       "spawn_agent",
-      "Create a reusable general subagent with an initial prompt. Include the context it needs. It keeps its identity and conversation history: use send_message for follow-ups or different work. After a server restart it remains available but does not resume automatically. Dismiss it with cancel_agent when no longer needed.",
+      "Create a reusable general subagent with an initial prompt. Include the context it needs. Without wait, its questions and result arrive as messages that wake you, so end your reply rather than polling or sleeping. It keeps its identity and conversation history: use send_message for follow-ups or different work. After a server restart it remains available but does not resume automatically. Dismiss it with cancel_agent when no longer needed.",
     );
   }
 
