@@ -21,6 +21,10 @@ Implementation notes:
   Queued user messages can be edited with `PATCH /api/sessions/:id/messages/:messageId`.
 - Runtime control records describe completed stop/deliver actions and do not
   themselves wake an agent. Resuming browser control remains phase 2.
+- Agent detail is an agent trace modal instead of a sidebar detail view.
+  Clicking a status row, or a row in the sidebar's Agents list, opens the
+  agent's task and steps in the same execution trace modal used for replies.
+  The panel screenshots and mock below predate this change.
 
 Updated: 2026-09-26.
 
@@ -37,7 +41,7 @@ This is phase 1 of two. Phase 2, [browser use](browser-use.md), is built on this
 - Every agent has an inbox. The main agent can message a subagent and a subagent can message the main agent.
 - Inbox messages are events. A subagent finishing, failing, or asking a question reaches the main agent as soon as it can act on it: at its next step if it is mid-reply, or by starting a new reply if it is idle. The user never has to prompt again to hear the outcome.
 - Messages that arrive while an agent is mid-step wait in a queue and are delivered at the next step boundary. Nothing is dropped or reordered.
-- The user can stop any subagent. The transcript shows only the user's messages, Euler's replies, and a one-line status row per subagent (name, status, controls) whose status updates in place. Agent events are never written to the transcript: questions, results, deliveries, queued updates, and stops. Those live in an Agents panel in the artifact sidebar.
+- The user can stop any subagent. The transcript shows only the user's messages, Euler's replies, and a one-line status row per subagent (name, status, controls) whose status updates in place. Agent events are never written to the transcript: questions, results, deliveries, queued updates, and stops. The artifact sidebar lists the chat's agents, and clicking a status row or list row opens that agent's trace.
 - One browser per user. Browser specifics are in the phase 2 document.
 - No push or system notifications. Replies are stored, and the chat shows a sidebar badge until it is viewed.
 
@@ -153,15 +157,14 @@ Only the main agent spawns subagents in this version, as `run_subagent` works to
 stateDiagram-v2
   [*] --> queued: spawn_agent
   queued --> running: activation starts
-  running --> idle: main agent's reply ends
+  running --> idle: reply or answer ends
   running --> waiting: ask_parent or request_human_control
   idle --> running: message arrives
   waiting --> running: reply or control returned
-  running --> completed: final answer
+  idle --> completed: subagent dismissed
   running --> failed: unrecoverable error
   queued --> cancelled
   running --> cancelled
-  idle --> cancelled
   waiting --> cancelled
   completed --> [*]
   failed --> [*]
@@ -171,16 +174,20 @@ stateDiagram-v2
 - `queued`: created but waiting for an activation slot.
 - `running`: an activation is in progress.
 - `waiting`: blocked on a specific reply. The card says who it waits for: "Waiting for Euler" for `ask_parent`, "Needs you" for the browser handoff.
-- `idle`: only the main agent uses this state. Subagents either finish or wait.
-- `completed`, `failed`, and `cancelled` are final. A final agent keeps its history for the Agents panel and rejects new messages.
+- `idle`: ready. The main agent is idle between replies. A subagent is idle after it answers, keeps its history, and wakes when `send_message` reaches it.
+- `completed`: a ready subagent was dismissed by the user or `cancel_agent`. Its summary keeps its last result.
+- `cancelled`: a working subagent was stopped.
+- `completed`, `failed`, and `cancelled` are final. A final agent keeps its history for its trace and rejects new messages.
 
-A subagent completes when its model loop ends with a text answer and no pending question. That answer becomes its `result` message to the parent. It doesn't need a separate `finish` tool.
+When a subagent's model loop ends with a text answer and no pending question, that answer becomes its `result` message to the parent and the subagent becomes ready. It doesn't need a separate `finish` tool. The limit of three subagents per chat counts working agents only (`queued`, `running`, `waiting`); ready agents hold no activation slot.
+
+The UI labels these states Working (`queued`, `running`), Waiting for Euler, Ready, Done (`completed`), Stopped (`cancelled`), and Failed. Ready agents show Dismiss instead of Stop. Ended agents are dimmed and open only their trace.
 
 ### Limits
 
 | Limit | Initial value | Behavior when reached |
 | --- | --- | --- |
-| Live subagents per chat | 3 | `spawn_agent` returns an error the model can explain to the user. |
+| Working subagents per chat | 3 | `spawn_agent` returns an error the model can explain to the user. |
 | Concurrent activations per user | 4 | Extra activations wait in `queued`. |
 | Browser agents per user | 1 | `spawn_agent` returns `browser_busy` naming the chat that holds the browser. |
 | Agent-initiated main activations between user messages | 10 | Further wakes are held. The chat shows "Agent updates waiting" with a Deliver action, and they are also delivered with the next user message. |
@@ -392,34 +399,39 @@ The system prompt for subagents tells them to use `progress` sparingly, at meani
 
 ### Visible transcript
 
-The transcript is the conversation between the user and Euler, plus one status row per subagent. Everything else about agents is in the Agents panel.
+The transcript is the conversation between the user and Euler, plus one status row per subagent. Everything else about agents is in the agent trace.
 
-The chat's `messages` table stays the user-visible transcript, with its existing `user`, `assistant`, and `event` roles. Agents add no transcript roles or rows. Their messages, questions, results, failures, and cancellations are stored in `agent_messages` and on the `agents` row, and read by the Agents panel.
+The chat's `messages` table stays the user-visible transcript, with its existing `user`, `assistant`, and `event` roles. Agents add no transcript roles or rows. Their messages, questions, results, failures, and cancellations are stored in `agent_messages` and on the `agents` row. The agent trace shows the task and the agent's steps.
 
-- The **status row** is rendered from the `spawn_agent` step of the reply that started the agent. It shows the agent's icon, title, and status, a Details button, and Stop while the agent is live. It has no activity line, elapsed time, or message text. Its live status comes from agent status events, not from the stored step.
+- The **status row** is rendered from the `spawn_agent` step of the reply that started the agent. It shows the agent's icon, title, and status, and Stop while the agent is live. Clicking it opens the agent trace. It has no activity line, elapsed time, or message text. Its live status comes from agent status events, not from the stored step.
 - Questions, results, and failures reach the user only through the main agent's reply, which restates what matters.
 - Queued agent messages are never shown in the transcript. Only the user's own queued message appears above the composer until it is delivered.
-- A reply the runtime starts because of an agent message appears directly after the previous message, with no user bubble or marker. The agent's status row and the panel explain it.
+- A reply the runtime starts because of an agent message appears directly after the previous message, with no user bubble or marker. The agent's status row and its trace explain it.
 
-### Agents panel
+### Agents list
 
-The panel is where subagent detail lives. It stays visible after the status row scrolls away, and every subagent can be stopped from it. The artifact sidebar therefore gets a second view:
+The artifact sidebar shows a SegmentedControl, **Files | Agents**, once the chat has a subagent. Having a subagent also makes the sidebar toggle available when the workspace has no files.
 
-- `ArtifactSidebar` stays the generic shell for layout, resizing, and dismissal. Its content gains a SegmentedControl, **Files | Agents**. Files is today's `WorkspaceArtifacts` content, unchanged.
-- **List:** every agent in the chat, live ones first, then ended ones newest first. Each row shows kind, title, status, elapsed time, and latest activity, plus Stop for live agents. The activity line says when a result or question is queued for the main agent. The Agents tab label counts live agents.
-- **Detail:** selecting a row, or Details on a status row, opens the agent's status, Stop, and a SegmentedControl for **Messages** and **Activity**. Messages is the inbox in both directions, with each message's sender and kind, whether it wakes, and whether it is still queued. Activity is the agent's tool steps. Back returns to the list and focuses the row that was open, following the file tree to file preview pattern.
-- **Opening it:** a header button reads "1 background agent" while agents are live and "Agents" otherwise. The sidebar toggle is available when the workspace has files *or* the chat has agents. Today it depends only on files.
-- On narrow screens the sidebar already covers the chat, and the Agents view uses the same full-width layout.
-- The browser agent (phase 2) appears in the same list. Its Stop is End task, and its live browser stays in the transcript.
+- The list groups every subagent in the chat under **Active** (working or waiting for Euler), **Ready** (Euler can message it), and **Ended**, each newest first, so an agent started early in a long chat stays easy to find. Each heading shows its count. Empty groups are hidden, and Ended starts collapsed.
+- Each row is the status row plus a one-line summary of the agent's latest activity: its task, latest message, or result.
+- The Agents tab label counts working agents.
+
+### Agent trace
+
+Clicking a status row or list row opens the agent in the execution trace modal used for replies:
+
+- The header shows the agent's title and status, Stop while the agent is live, and copy trace results.
+- The body shows the agent's task, token and cost metrics, and its numbered steps. Questions and messages the agent sends appear as its tool calls.
+- The trace refreshes every second while the agent is live and stops polling once it is final.
+- Escape or Close returns focus to the status row.
 
 ### Controls
 
 | Control | Location | Effect |
 | --- | --- | --- |
 | Stop (existing) | Composer while the main agent replies | Aborts the main activation, across all its segments. Subagents keep running. |
-| Stop agent | Status row, Agents list row, agent detail | Cancels that subagent. Its status row reads Cancelled; nothing is added to the transcript. |
-| Details | Status row | Opens the Agents panel at that agent's detail. |
-| Agents | Chat header | Opens the Agents panel list. |
+| Stop agent | Status row, Agents list row, agent trace header | Cancels that subagent. Its status row reads Cancelled; nothing is added to the transcript. |
+| Status row | Transcript, Agents list | Opens the agent trace. |
 | Send | Composer | Always enabled for persisted chats. Mid-reply, the message shows as queued until its step boundary. |
 | Deliver | "Agent updates waiting" notice | Delivers held messages after a Stop or when the wake limit was reached. |
 
@@ -575,8 +587,7 @@ On startup, the runtime scans agents that aren't final:
 | Terminal tool results, step-boundary hook, segment closing | `src/tools/BaseTool.ts` (`ToolResult.endActivation`), `src/agents/BaseAgent.ts` (a `beforeModelCall` hook the activation uses to drain the inbox, and a continue-if-pending check at the end of the loop) |
 | UI requests | `ui/persist/sessions.ts`, new `ui/persist/agents.ts`, `ui/persist/events.ts` |
 | UI state | `useAgentEvents` for snapshots and events; `useRunStreaming` for composer actions. Replaces `useRunResume`, `reconcilePersistentRun`, and `executeRunTurn` |
-| UI components | `ui/components/Agents/` (`AgentTaskCard` for the status row, `AgentsPanel` with its list and detail), the queued user-message row in `RunArea`, `SessionListItem` badge |
-| Sidebar content switch | `ui/components/Artifacts/`: the Files/Agents switch sits inside `ArtifactSidebar`'s content, and `App.tsx` shows the toggle when files or agents exist |
+| UI components | `ui/components/Agents/` (`AgentTaskCard` for the status row, `AgentsList` for the sidebar, `AgentTraceModal` wrapping `StepsModal`), the queued user-message row in `RunArea`, `SessionListItem` badge |
 
 ## Delivery
 
@@ -620,7 +631,7 @@ Steps 1–3 ship together in the first MVP commit. Follow-up commits contain fix
   - an agent-initiated reply appearing in an open chat
   - badges on a closed chat
   - reconnect replay across segments
-  - Agents panel list, detail, stop, back-focus, and Escape
+  - agent trace from the status row and Agents list, status, and Escape
   - mobile layout
 - Migration test from a database with existing chats.
 

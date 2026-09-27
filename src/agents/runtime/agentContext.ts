@@ -15,7 +15,7 @@ export function pendingSummary(agents: AgentRecord[]) {
     .filter((a) => a.kind !== "main")
     .map(
       (a) =>
-        `${a.id} · ${escapeEnvelope(a.title)} · ${a.status}\nlatest: ${escapeEnvelope(a.activity)}`,
+        `${a.id} · ${escapeEnvelope(a.title)} · ${a.status === "idle" ? "ready for follow-ups" : a.status}\nlatest: ${escapeEnvelope(a.activity)}`,
     )
     .join("\n")}\n</background_agents>`;
 }

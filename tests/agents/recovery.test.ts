@@ -57,7 +57,7 @@ test("restart preserves an interrupted main reply without retrying and repairs c
   );
   expect(getMessagesForSession(owner, id)[0]?.content).toContain("interrupted");
   expect(recovered.store.get(main.id)?.status).toBe("idle");
-  await until(() => recovered.store.get(child.id)?.status === "completed");
+  await until(() => recovered.store.get(child.id)?.status === "idle");
   expect(
     recovered.store
       .get(child.id)

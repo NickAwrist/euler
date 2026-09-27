@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import type { ImageAttachment } from "../../../src/attachments/types";
+import { isFinalAgent } from "../../../src/schemas/agents";
 import { agentAction } from "../../persist/agents";
 import { buildRunMetadata } from "../../persist/userSettings";
 import type { UserSettings } from "../../persist/userSettings";
@@ -196,7 +197,7 @@ export function useRunStreaming(p: Args) {
         (agent) =>
           agent.kind !== "main" &&
           agent.spawnPosition >= assistantIndex &&
-          ["queued", "running", "waiting"].includes(agent.status),
+          !isFinalAgent(agent),
       )
     ) {
       p.setTruncateConfirm({ kind: "regenerate", assistantIndex });

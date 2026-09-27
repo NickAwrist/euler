@@ -99,9 +99,7 @@ for (const scenario of ["async-agents", "agent-question"] as const) {
           ) && !agentRuntime.busy(TEST_USER_ID, id),
       );
       const agents = agentRuntime.store.list(TEST_USER_ID, id);
-      expect(agents.find((a) => a.kind === "general")?.status).toBe(
-        "completed",
-      );
+      expect(agents.find((a) => a.kind === "general")?.status).toBe("idle");
       expect(
         getMessagesForSession(TEST_USER_ID, id).filter(
           (m) => m.role === "user",
@@ -147,7 +145,7 @@ test("a result arriving after Stop wakes the parent and does not cancel the chil
     await until(() =>
       agentRuntime.store
         .list(TEST_USER_ID, id)
-        .some((a) => a.kind === "general" && a.status === "completed"),
+        .some((a) => a.kind === "general" && a.status === "idle"),
     );
     expect(agentRuntime.snapshot(TEST_USER_ID, id).held).toBe(false);
     await until(
@@ -207,6 +205,94 @@ test("user cancellation ends a child without a result or an automatic reply", as
         .some((m) => m.kind === "result"),
     ).toBe(false);
     expect(getMessagesForSession(TEST_USER_ID, id)).toHaveLength(2);
+  } finally {
+    await agentRuntime.deleteSession(TEST_USER_ID, id);
+    await close();
+  }
+});
+
+test("a ready child keeps its context for follow-ups until it is dismissed", async () => {
+  setOpenRouterApiKey("test");
+  setOpenRouterScenario("async-agents");
+  const { url, close } = await startTestServer();
+  const headers = userHeaders(undefined, {
+    "Content-Type": "application/json",
+  });
+  const post = (path: string, body = {}) =>
+    fetch(url + path, { method: "POST", headers, body: JSON.stringify(body) });
+  const created = await post("/api/sessions", { model });
+  const { id } = (await created.json()) as { id: string };
+  const results = (mainId: string) =>
+    agentRuntime.store
+      .inbox(mainId)
+      .filter((m) => m.kind === "result" && m.deliveredAt !== null).length;
+  try {
+    await post(`/api/sessions/${id}/messages`, { content: "Research", model });
+    const agents = () => agentRuntime.store.list(TEST_USER_ID, id);
+    await until(
+      () =>
+        agents().some((a) => a.kind === "general" && a.status === "idle") &&
+        !agentRuntime.busy(TEST_USER_ID, id),
+    );
+    const main = agents().find((a) => a.kind === "main")!;
+    const child = agents().find((a) => a.kind === "general")!;
+    expect(child.endedAt).toBeNull();
+    await until(() => results(main.id) === 1);
+
+    agentRuntime.enqueue(child, main.id, "message", "Double-check it");
+    await until(
+      () => results(main.id) === 2 && !agentRuntime.busy(TEST_USER_ID, id),
+    );
+    const followedUp = agentRuntime.store.get(child.id)!;
+    expect(followedUp.status).toBe("idle");
+    expect(
+      followedUp.history.filter((m) => m.role === "assistant"),
+    ).toHaveLength(2);
+
+    expect(
+      (await post(`/api/sessions/${id}/agents/${child.id}/cancel`)).status,
+    ).toBe(200);
+    const dismissed = agentRuntime.store.get(child.id)!;
+    expect(dismissed.status).toBe("completed");
+    expect(dismissed.endedAt).toBeNumber();
+    expect(dismissed.activity).toBe(followedUp.activity);
+    expect(() =>
+      agentRuntime.enqueue(dismissed, main.id, "message", "Again"),
+    ).toThrow("no longer accepting messages");
+  } finally {
+    await agentRuntime.deleteSession(TEST_USER_ID, id);
+    await close();
+  }
+});
+
+test("a blocking spawn returns the child's result to the same reply", async () => {
+  setOpenRouterApiKey("test");
+  setOpenRouterScenario("blocking-agent");
+  const { url, close } = await startTestServer();
+  const headers = userHeaders(undefined, {
+    "Content-Type": "application/json",
+  });
+  const post = (path: string, body = {}) =>
+    fetch(url + path, { method: "POST", headers, body: JSON.stringify(body) });
+  const created = await post("/api/sessions", { model });
+  const { id } = (await created.json()) as { id: string };
+  try {
+    await post(`/api/sessions/${id}/messages`, { content: "Research", model });
+    await until(
+      () =>
+        getMessagesForSession(TEST_USER_ID, id).length === 2 &&
+        !agentRuntime.busy(TEST_USER_ID, id),
+    );
+    const main = agentRuntime.store
+      .list(TEST_USER_ID, id)
+      .find((a) => a.kind === "main")!;
+    const spawned = main.history.find(
+      (m) => m.role === "tool" && m.content.includes("agentId"),
+    );
+    expect(JSON.parse(spawned!.content)).toMatchObject({
+      status: "idle",
+      result: "42",
+    });
   } finally {
     await agentRuntime.deleteSession(TEST_USER_ID, id);
     await close();

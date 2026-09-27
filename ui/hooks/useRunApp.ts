@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { InputCapability } from "../../src/modelCapabilities";
+import { isFinalAgent } from "../../src/schemas/agents";
 import { traceStepsForModal } from "../components/ExecutionTrace";
 import { resolveEffectiveThinkingEffort } from "../lib/thinkingLevel";
 import type {
@@ -172,7 +173,7 @@ export function useRunApp() {
                 (truncateConfirm.kind === "edit"
                   ? truncateConfirm.userIndex
                   : truncateConfirm.assistantIndex) &&
-              ["running", "queued", "waiting"].includes(agent.status),
+              !isFinalAgent(agent),
           )
           .map((agent) => agent.title)
       : [],

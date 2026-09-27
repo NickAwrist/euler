@@ -1,6 +1,7 @@
 export type OpenRouterScenario =
   | "async-agents"
   | "agent-question"
+  | "blocking-agent"
   | "streaming"
   | "reasoning"
   | "thinking-tags"
@@ -75,7 +76,11 @@ export async function handleOpenRouterRequest(
   const body = (await request.json()) as Record<string, unknown>;
   requests.push({ headers: request.headers, body });
 
-  if (scenario === "async-agents" || scenario === "agent-question") {
+  if (
+    scenario === "async-agents" ||
+    scenario === "agent-question" ||
+    scenario === "blocking-agent"
+  ) {
     const messages = body.messages as Array<{
       role: string;
       content: string;
@@ -110,6 +115,7 @@ export async function handleOpenRouterRequest(
           kind: "general",
           title: "Research",
           task: "Find the answer",
+          wait: scenario === "blocking-agent",
         });
       if (messages.some((m) => m.content.includes('kind="result"')))
         return sse([

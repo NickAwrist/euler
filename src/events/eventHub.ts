@@ -30,10 +30,16 @@ export class EventHub {
     for (const client of state.clients) this.send(client, sequenced);
   }
   private send(client: Response, event: AgentEvent) {
-    if (
-      !client.write(`id: ${event.sequence}\ndata: ${JSON.stringify(event)}\n\n`)
-    )
-      client.end();
+    this.write(
+      client,
+      `id: ${event.sequence}\ndata: ${JSON.stringify(event)}\n\n`,
+    );
+  }
+  /** A disconnected client must never throw into the runtime publishing to it. */
+  private write(client: Response, chunk: string) {
+    if (client.writableEnded || client.destroyed) return;
+    // A client that falls behind is dropped and reconnects with Last-Event-ID.
+    if (!client.write(chunk)) client.end();
   }
   attach(owner: string, response: Response, lastId?: number) {
     const state = this.user(owner);
@@ -55,7 +61,7 @@ export class EventHub {
         sequence: state.sequence,
       });
     state.clients.add(response);
-    const ping = setInterval(() => response.write(": ping\n\n"), 15000);
+    const ping = setInterval(() => this.write(response, ": ping\n\n"), 15000);
     response.on("close", () => {
       clearInterval(ping);
       state.clients.delete(response);

@@ -16,7 +16,11 @@ import { eventHub } from "../../events/eventHub";
 import { ApiError } from "../../http/errors";
 import type { LlmMessage } from "../../llm";
 import { AgentSchema } from "../../schemas/agents";
-import { type InboxMessage, isFinalAgent } from "../../schemas/agents";
+import {
+  type InboxMessage,
+  isFinalAgent,
+  isWorkingAgent,
+} from "../../schemas/agents";
 import type { Activation } from "../../schemas/events";
 import { ModelMessageSchema } from "../../schemas/modelMessages";
 import type { WireMessageInput } from "../../schemas/run";
@@ -80,6 +84,32 @@ export class AgentRuntime {
   }
   private scheduled = false;
   private waitingForChild = new Set<string>();
+  private waiters = new Set<() => void>();
+  /** Activations holding one of the owner's slots; a blocking spawn releases its slot. */
+  private runningCount(owner: string) {
+    return [...this.active.keys()].filter(
+      (id) =>
+        !this.waitingForChild.has(id) &&
+        this.store.get(id)?.ownerUuid === owner,
+    ).length;
+  }
+  /** Resolves once `ready` holds or `signal` aborts, re-checked on agent changes. */
+  private until(ready: () => boolean, signal: AbortSignal) {
+    return new Promise<void>((resolve) => {
+      const check = () => {
+        if (!signal.aborted && !ready()) return;
+        this.waiters.delete(check);
+        signal.removeEventListener("abort", check);
+        resolve();
+      };
+      this.waiters.add(check);
+      signal.addEventListener("abort", check);
+      check();
+    });
+  }
+  private notify() {
+    for (const check of [...this.waiters]) check();
+  }
 
   main(owner: string, sessionId: string, temporary = false): AgentRecord {
     const existing = this.store
@@ -141,12 +171,11 @@ export class AgentRuntime {
     };
   }
   busy(owner: string, sessionId: string) {
-    return this.store
-      .list(owner, sessionId)
-      .some((a) => ["queued", "running", "waiting"].includes(a.status));
+    return this.store.list(owner, sessionId).some(isWorkingAgent);
   }
   private status(agent: AgentRecord) {
     this.store.save(agent);
+    this.notify();
     eventHub.publish(agent.ownerUuid, {
       type: "agent_status",
       sessionId: agent.sessionId,
@@ -222,12 +251,7 @@ export class AgentRuntime {
         this.status(agent);
         continue;
       }
-      const count = [...this.active.keys()].filter(
-        (id) =>
-          !this.waitingForChild.has(id) &&
-          this.store.get(id)?.ownerUuid === agent.ownerUuid,
-      ).length;
-      if (count >= 4) {
+      if (this.runningCount(agent.ownerUuid) >= 4) {
         agent.status = "queued";
         this.status(agent);
         continue;
@@ -246,6 +270,7 @@ export class AgentRuntime {
         .then(() => this.activate(agent, controller.signal, partial))
         .finally(() => {
           this.active.delete(agent.id);
+          this.notify();
           this.schedule();
         });
       this.active.set(agent.id, { controller, promise, partial });
@@ -529,17 +554,14 @@ export class AgentRuntime {
       if (signal.aborted) {
         outcome = "aborted";
         agent.status = agent.kind === "main" ? "idle" : "cancelled";
-      } else
-        agent.status = waiting
-          ? "waiting"
-          : agent.kind === "main"
-            ? "idle"
-            : "completed";
+      }
+      // A subagent stays ready for follow-ups until it is dismissed.
+      else agent.status = waiting ? "waiting" : "idle";
       agent.activity = result;
       if (isFinalAgent(agent)) agent.endedAt = Date.now();
       getDb().transaction(() => {
         this.store.save(agent);
-        if (agent.status === "completed" && agent.parentId) {
+        if (agent.status === "idle" && agent.parentId) {
           const parent = this.store.get(agent.parentId);
           if (parent && !this.deleting.has(agent.sessionId))
             this.enqueue(parent, agent.id, "result", result);
@@ -644,7 +666,7 @@ export class AgentRuntime {
       message,
       new RuntimeTool(
         "spawn_agent",
-        "Start a durable general subagent. Include context and success criteria. It reports back when done.",
+        "Start a durable general subagent. Include context and success criteria. It reports back when done, then stays ready: send_message wakes it with a follow-up and it keeps its context. Dismiss it with cancel_agent when it is no longer needed.",
         parameters(
           {
             kind: { type: "string" },
@@ -661,9 +683,9 @@ export class AgentRuntime {
           if (
             this.store
               .list(agent.ownerUuid, agent.sessionId)
-              .filter((a) => a.kind !== "main" && !isFinalAgent(a)).length >= 3
+              .filter((a) => a.kind !== "main" && isWorkingAgent(a)).length >= 3
           )
-            throw new Error("Three subagents are already live in this chat");
+            throw new Error("Three subagents are already working in this chat");
           const child: AgentRecord = {
             ...agent,
             id: crypto.randomUUID(),
@@ -696,32 +718,25 @@ export class AgentRuntime {
             this.waitingForChild.add(agent.id);
             this.schedule();
             try {
-              while (!signal.aborted) {
+              await this.until(() => {
                 const current = this.store.get(child.id);
-                if (
-                  !current ||
-                  isFinalAgent(current) ||
-                  current.status === "waiting"
-                )
-                  return {
-                    text: JSON.stringify({
-                      agentId: child.id,
-                      status: current?.status,
-                      result: current?.activity,
-                    }),
-                  };
-                await new Promise((resolve) => setTimeout(resolve, 50));
+                return !current || !isWorkingAgent(current);
+              }, signal);
+              if (!signal.aborted) {
+                const current = this.store.get(child.id);
+                return {
+                  text: JSON.stringify({
+                    agentId: child.id,
+                    status: current?.status,
+                    result: current?.activity,
+                  }),
+                };
               }
             } finally {
-              while (
-                !signal.aborted &&
-                [...this.active.keys()].filter(
-                  (id) =>
-                    !this.waitingForChild.has(id) &&
-                    this.store.get(id)?.ownerUuid === agent.ownerUuid,
-                ).length >= 4
-              )
-                await new Promise((resolve) => setTimeout(resolve, 50));
+              await this.until(
+                () => this.runningCount(agent.ownerUuid) < 4,
+                signal,
+              );
               this.waitingForChild.delete(agent.id);
             }
           }
@@ -730,7 +745,7 @@ export class AgentRuntime {
       ),
       new RuntimeTool(
         "cancel_agent",
-        "Cancel one of your subagents.",
+        "Stop a working subagent, or dismiss a ready one you no longer need.",
         parameters(
           { agentId: { type: "string" }, reason: { type: "string" } },
           ["agentId", "reason"],
@@ -758,6 +773,8 @@ export class AgentRuntime {
   }
   async cancel(agent: AgentRecord, reason = "Stopped by user") {
     if (isFinalAgent(agent)) return;
+    // Dismissing a ready subagent ends it as done rather than stopped.
+    const ready = agent.status === "idle" && !this.active.has(agent.id);
     this.recordControl(agent, reason);
     if (agent.kind === "main")
       this.store.hold(this.store.inbox(agent.id), true);
@@ -768,9 +785,11 @@ export class AgentRuntime {
     await active?.promise;
     const current = this.store.get(agent.id);
     if (!current) return;
-    current.status = agent.kind === "main" ? "idle" : "cancelled";
+    current.status =
+      agent.kind === "main" ? "idle" : ready ? "completed" : "cancelled";
     if (current.kind === "main") current.held = false;
-    current.activity = reason;
+    // A dismissed agent keeps its last result as its summary.
+    if (!ready) current.activity = reason;
     if (current.kind !== "main") {
       current.endedAt = Date.now();
       this.store.deliver(

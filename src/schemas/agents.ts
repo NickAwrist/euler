@@ -72,3 +72,6 @@ export const RewindSchema = z
   .strict();
 export const isFinalAgent = (agent: Pick<Agent, "status">) =>
   ["completed", "failed", "cancelled"].includes(agent.status);
+/** Queued, running, or blocked on a reply. A ready subagent is `idle`. */
+export const isWorkingAgent = (agent: Pick<Agent, "status">) =>
+  ["queued", "running", "waiting"].includes(agent.status);

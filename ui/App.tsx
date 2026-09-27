@@ -1,7 +1,9 @@
 import { Bug, EyeOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isWorkingAgent } from "../src/schemas/agents";
 import { AgentContext } from "./components/Agents/AgentContext";
-import { AgentsPanel } from "./components/Agents/AgentsPanel";
+import { AgentTraceModal } from "./components/Agents/AgentTraceModal";
+import { AgentsList } from "./components/Agents/AgentsList";
 import { QueuedMessages } from "./components/Agents/QueuedMessages";
 import { ArtifactContext } from "./components/Artifacts/ArtifactContext";
 import { initialArtifactWidth } from "./components/Artifacts/ArtifactSidebar";
@@ -93,13 +95,8 @@ function ChatView({
 }: ChatViewProps) {
   const workspaceKey = `${app.activeSessionId}:${app.workspace.kind === "local" ? app.workspace.path : "sandbox"}`;
   const [artifactView, setArtifactView] = useState<"files" | "agents">("files");
-  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const openAgent = (id: string | null) => {
-    setSelectedAgent(id);
-    setArtifactView("agents");
-    setArtifactsOpen(true);
-    setOpenedSessionId(app.activeSessionId);
-  };
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const selectedAgent = app.agents.find((a) => a.id === selectedAgentId);
   const stopAgent = async (id: string) => {
     if (app.activeSessionId) {
       await agentAction(
@@ -183,10 +180,12 @@ function ChatView({
   // The remembered open state applies only to workspaces with files; an
   // explicit open in this chat shows the panel even when it is empty.
   const [openedSessionId, setOpenedSessionId] = useState<string | null>(null);
+  const subagents = app.agents.filter((a) => a.kind !== "main");
+  const workingAgentCount = subagents.filter(isWorkingAgent).length;
   const filesOpen =
     artifactsOpen &&
     (hasFiles === true ||
-      app.agents.some((a) => a.kind !== "main") ||
+      subagents.length > 0 ||
       openedSessionId === app.activeSessionId);
   // Settings unmounts this view, so the saved appearance is current on mount.
   const [appearance] = useState(loadAppearance);
@@ -289,7 +288,7 @@ function ChatView({
 
   return (
     <AgentContext.Provider
-      value={{ agents: app.agents, open: openAgent, stop: stopAgent }}
+      value={{ agents: app.agents, open: setSelectedAgentId, stop: stopAgent }}
     >
       <ArtifactContext.Provider
         value={app.activeSessionId ? artifactContext : null}
@@ -463,26 +462,6 @@ function ChatView({
               )}
             </section>
 
-            <div className="absolute top-2 left-1/2 z-10 -translate-x-1/2">
-              {app.activeSessionId && (
-                <button
-                  type="button"
-                  className="rounded-lg bg-background px-3 py-2 text-xs text-muted-foreground"
-                  onClick={() => openAgent(null)}
-                >
-                  {(() => {
-                    const count = app.agents.filter(
-                      (a) =>
-                        a.kind !== "main" &&
-                        ["running", "queued", "waiting"].includes(a.status),
-                    ).length;
-                    return count
-                      ? `${count} background agent${count === 1 ? "" : "s"}`
-                      : "Agents";
-                  })()}
-                </button>
-              )}
-            </div>
             <RunInputDock
               queuedInput={
                 app.activeSessionId ? (
@@ -527,29 +506,28 @@ function ChatView({
             <WorkspaceArtifacts
               key={workspaceKey}
               header={
-                <div className="p-3">
-                  <SegmentedControl
-                    label="Sidebar view"
-                    value={artifactView}
-                    onChange={setArtifactView}
-                    options={[
-                      { value: "files", label: "Files" },
-                      {
-                        value: "agents",
-                        label: `Agents (${app.agents.filter((a) => a.kind !== "main" && ["running", "queued", "waiting"].includes(a.status)).length})`,
-                      },
-                    ]}
-                  />
-                </div>
+                subagents.length > 0 && (
+                  <div className="p-3">
+                    <SegmentedControl
+                      label="Sidebar view"
+                      value={artifactView}
+                      onChange={setArtifactView}
+                      options={[
+                        { value: "files", label: "Files" },
+                        {
+                          value: "agents",
+                          label: workingAgentCount
+                            ? `Agents (${workingAgentCount})`
+                            : "Agents",
+                        },
+                      ]}
+                    />
+                  </div>
+                )
               }
               alternate={
-                artifactView === "agents" ? (
-                  <AgentsPanel
-                    sessionId={app.activeSessionId}
-                    temporary={app.isEphemeral}
-                    selected={selectedAgent}
-                    onBack={() => setSelectedAgent(null)}
-                  />
+                subagents.length > 0 && artifactView === "agents" ? (
+                  <AgentsList />
                 ) : undefined
               }
               open={filesOpen}
@@ -568,6 +546,14 @@ function ChatView({
             />
           )}
         </div>
+        {selectedAgent && app.activeSessionId && (
+          <AgentTraceModal
+            sessionId={app.activeSessionId}
+            temporary={app.isEphemeral}
+            agent={selectedAgent}
+            onClose={() => setSelectedAgentId(null)}
+          />
+        )}
       </ArtifactContext.Provider>
     </AgentContext.Provider>
   );
@@ -713,7 +699,7 @@ export default function App() {
                 ? "Messages after this reply will be permanently deleted. The current reply is kept as an earlier version."
                 : "All message history after this point will be permanently deleted. This cannot be undone.") +
               (app.rewindAgentNames.length
-                ? ` These agents will stop: ${app.rewindAgentNames.join(", ")}.`
+                ? ` These agents will end: ${app.rewindAgentNames.join(", ")}.`
                 : "")
             }
             onClose={() => app.setTruncateConfirm(null)}

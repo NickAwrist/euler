@@ -1,42 +1,92 @@
-import { Bot } from "lucide-react";
+import { Bot, ChevronRight, Square, X } from "lucide-react";
 import { useState } from "react";
-import { type Agent, isFinalAgent } from "../../../src/schemas/agents";
-import { Button } from "../Button";
+import {
+  type Agent,
+  isFinalAgent,
+  isWorkingAgent,
+} from "../../../src/schemas/agents";
+import { cx } from "../../styles";
+import { IconButton } from "../IconButton";
 import { useAgents } from "./AgentContext";
-export const agentStatusLabel = (agent: Agent) =>
-  agent.status === "waiting"
-    ? "Waiting for Euler"
-    : agent.status[0]!.toUpperCase() + agent.status.slice(1);
-export function AgentTaskCard({ agent }: { agent: Agent }) {
-  const { open, stop } = useAgents();
+const STATUS_LABELS: Record<Agent["status"], string> = {
+  queued: "Working",
+  running: "Working",
+  waiting: "Waiting for Euler",
+  idle: "Ready",
+  completed: "Done",
+  failed: "Failed",
+  cancelled: "Stopped",
+};
+export const agentStatusLabel = (agent: Agent) => STATUS_LABELS[agent.status];
+/** Stops a working agent or dismisses a ready one. */
+export function AgentStopButton({ agent }: { agent: Agent }) {
+  const { stop } = useAgents();
   const [error, setError] = useState("");
   const [stopping, setStopping] = useState(false);
+  const working = isWorkingAgent(agent);
   return (
-    <div className="my-2 flex flex-wrap items-center gap-2 rounded-lg border border-border-subtle px-3 py-2 text-sm">
-      <Bot size={16} />
-      <span className="min-w-0 flex-1 truncate">{agent.title}</span>
-      <span className="text-muted-foreground" aria-live="polite">
-        {agentStatusLabel(agent)}
-      </span>
-      <Button variant="ghost" size="sm" onClick={() => open(agent.id)}>
-        Details
-      </Button>
-      {!isFinalAgent(agent) && (
-        <Button
-          variant="ghost"
-          size="sm"
-          loading={stopping}
-          onClick={() => {
-            setStopping(true);
-            void stop(agent.id)
-              .catch((e) => setError(String(e)))
-              .finally(() => setStopping(false));
-          }}
-        >
-          Stop
-        </Button>
+    <>
+      <IconButton
+        icon={working ? Square : X}
+        label={`${working ? "Stop" : "Dismiss"} ${agent.title}`}
+        title={working ? "Stop agent" : "Dismiss agent"}
+        variant={working ? "danger" : "ghost"}
+        size="sm"
+        iconSize={working ? 12 : 14}
+        iconProps={{ strokeWidth: 2.25 }}
+        loading={stopping}
+        onClick={() => {
+          setStopping(true);
+          setError("");
+          void stop(agent.id)
+            .catch((e) => setError(String(e)))
+            .finally(() => setStopping(false));
+        }}
+      />
+      {error && (
+        <p role="alert" className="text-sm text-red-400">
+          {error}
+        </p>
       )}
-      {error && <p role="alert">{error}</p>}
+    </>
+  );
+}
+export function AgentTaskCard({
+  agent,
+  showActivity = false,
+}: {
+  agent: Agent;
+  /** Show the agent's latest activity under its title. */
+  showActivity?: boolean;
+}) {
+  const { open } = useAgents();
+  return (
+    <div
+      className={cx(
+        "my-2 flex items-center gap-1 rounded-lg border border-border-subtle pr-1.5 text-sm",
+        isFinalAgent(agent) && "text-muted-foreground",
+      )}
+    >
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-muted/50"
+        onClick={() => open(agent.id)}
+      >
+        <Bot size={16} className="shrink-0" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate">{agent.title}</span>
+          {showActivity && agent.activity && (
+            <span className="block truncate text-xs text-muted-foreground">
+              {agent.activity}
+            </span>
+          )}
+        </span>
+        <span className="text-muted-foreground" aria-live="polite">
+          {agentStatusLabel(agent)}
+        </span>
+        <ChevronRight size={14} className="shrink-0 text-muted-foreground" />
+      </button>
+      {!isFinalAgent(agent) && <AgentStopButton agent={agent} />}
     </div>
   );
 }
