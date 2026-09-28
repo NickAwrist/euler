@@ -83,7 +83,12 @@ test("markdown rendering shows tool output images once and opens sources in a ne
     reply.getByRole("link", { name: /^Open generated image \d in new tab$/ }),
   ).toHaveCount(2);
 
+  const toggle = reply.getByRole("button", { name: "1 source" });
   const source = reply.getByRole("link", { name: /Lighthouse history/ });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await expect(source).toBeHidden();
+  await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
   await expect(source).toHaveText("Lighthouse historyexample.com");
   await expect(source).toHaveAttribute("target", "_blank");
   await expect(source).toHaveAttribute("rel", "noopener noreferrer");
