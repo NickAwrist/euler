@@ -26,11 +26,8 @@ type Args = {
   messages: Message[];
   setMessages: Dispatch<SetStateAction<Message[]>>;
   activeSessionId: string | null;
-  activeSessionIdRef: MutableRefObject<string | null>;
   isEphemeralRef: MutableRefObject<boolean>;
   userSettingsRef: MutableRefObject<UserSettings>;
-  modelMessagesRef: MutableRefObject<Array<Record<string, unknown>> | null>;
-  debugOpenRef: MutableRefObject<boolean>;
   debugOpen: boolean;
   setDebugOpen: Dispatch<SetStateAction<boolean>>;
   setDebugData: Dispatch<SetStateAction<DebugData | null>>;
@@ -39,7 +36,6 @@ type Args = {
   modelSendReady: boolean;
   refreshSessions: () => Promise<void>;
   fetchOllamaHealth: () => Promise<void>;
-  bindStreamingReset: (fn: () => void) => void;
   setEditingUserIndex: Dispatch<SetStateAction<number | null>>;
   truncateConfirm: TruncateConfirmState;
   setTruncateConfirm: Dispatch<SetStateAction<TruncateConfirmState>>;
@@ -74,7 +70,7 @@ export function useRunStreaming(p: Args) {
     priorMessages: Message[],
     message: string,
     attachments: ImageAttachment[],
-    options: { rebuildModelMessages: boolean; versions?: MessageVersion[] },
+    options: { rewind: boolean; versions?: MessageVersion[] },
   ) => {
     const settings = {
       model: p.selectedModel,
@@ -82,7 +78,7 @@ export function useRunStreaming(p: Args) {
       metadata: buildRunMetadata(p.userSettingsRef.current),
     };
     try {
-      if (options.rebuildModelMessages) {
+      if (options.rewind) {
         await agentAction(
           sessionId,
           "rewind",
@@ -141,7 +137,7 @@ export function useRunStreaming(p: Args) {
       if (!attachments) return;
       if (
         await runTurn(sessionId, p.messages, message, attachments, {
-          rebuildModelMessages: false,
+          rewind: false,
         })
       ) {
         // Preserve a new draft typed while the request was being accepted.
@@ -174,7 +170,7 @@ export function useRunStreaming(p: Args) {
         (attachment): attachment is ImageAttachment =>
           attachment.kind === "image",
       ) ?? [],
-      { rebuildModelMessages: true, versions },
+      { rewind: true, versions },
     );
   };
 

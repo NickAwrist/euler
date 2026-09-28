@@ -50,7 +50,6 @@ export const AgentEventSchema = z
         type: z.literal("inbox_queued"),
         messages: z.array(InboxMessageSchema),
       }),
-      z.object({ type: z.literal("session_activity") }),
       z.object({ type: z.literal("resync") }),
     ]),
   );

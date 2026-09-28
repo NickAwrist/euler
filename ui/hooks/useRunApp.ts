@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { InputCapability } from "../../src/modelCapabilities";
 import { traceStepsForModal } from "../components/ExecutionTrace";
 import { resolveEffectiveThinkingEffort } from "../lib/thinkingLevel";
@@ -24,16 +24,6 @@ export function useRunApp() {
 
   const activeSessionIdRef = useRef<string | null>(null);
   const isEphemeralRef = useRef(false);
-  const modelMessagesRef = useRef<Array<Record<string, unknown>> | null>(null);
-  const debugOpenRef = useRef(false);
-  const resetStreamingUiRef = useRef<() => void>(() => {});
-
-  const bindStreamingReset = useCallback((fn: () => void) => {
-    resetStreamingUiRef.current = fn;
-  }, []);
-
-  const resetStreamingUi = useCallback(() => resetStreamingUiRef.current(), []);
-
   const settings = useSettings(
     ollama.setOllamaHost,
     ollama.fetchOllamaHealth,
@@ -53,8 +43,6 @@ export function useRunApp() {
   const [truncateConfirm, setTruncateConfirm] =
     useState<TruncateConfirmState>(null);
 
-  debugOpenRef.current = debugOpen;
-
   const sessions = useSessionsAndNavigation({
     ollamaModels: ollama.ollamaModels,
     userSettingsRef: settings.userSettingsRef,
@@ -66,8 +54,6 @@ export function useRunApp() {
     setStepsModalData,
     setDebugOpen,
     setDebugData,
-    resetStreamingUi,
-    modelMessagesRef,
     activeSessionIdRef,
     isEphemeralRef,
     onNavigate: () => sidebar.setSidebarOpen(false),
@@ -102,11 +88,8 @@ export function useRunApp() {
     messages,
     setMessages,
     activeSessionId: sessions.activeSessionId,
-    activeSessionIdRef,
     isEphemeralRef,
     userSettingsRef: settings.userSettingsRef,
-    modelMessagesRef,
-    debugOpenRef,
     debugOpen,
     setDebugOpen,
     setDebugData,
@@ -115,7 +98,6 @@ export function useRunApp() {
     modelSendReady: modelSendReady && sessions.sessionSendReady,
     refreshSessions: sessions.refreshSessions,
     fetchOllamaHealth: ollama.fetchOllamaHealth,
-    bindStreamingReset,
     setEditingUserIndex,
     truncateConfirm,
     setTruncateConfirm,

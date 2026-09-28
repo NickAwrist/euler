@@ -165,7 +165,6 @@ export async function runActivation(
     );
     ctx = new RunContext(
       model,
-      "",
       (context, step) => {
         const position = context.steps.indexOf(step) - segmentStart;
         if (position < 0) return;

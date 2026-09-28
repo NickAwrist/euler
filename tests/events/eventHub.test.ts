@@ -1,7 +1,13 @@
 import { expect, test } from "bun:test";
 import { EventEmitter } from "node:events";
 import type { Response } from "express";
-import { EventHub } from "../../src/events/eventHub";
+import { EventHub, type Unsequenced } from "../../src/events/eventHub";
+const queued = (sessionId: string, agentId: string): Unsequenced => ({
+  type: "inbox_queued",
+  sessionId,
+  agentId,
+  messages: [],
+});
 class Client extends EventEmitter {
   chunks: string[] = [];
   writableEnded = false;
@@ -25,21 +31,9 @@ class Client extends EventEmitter {
 test("event replay is ordered, owner scoped, and requests resync for an expired cursor", () => {
   const hub = new EventHub();
   const cursor = hub.sequence("a");
-  hub.publish("a", {
-    type: "session_activity",
-    sessionId: "chat-a",
-    agentId: "main-a",
-  });
-  hub.publish("b", {
-    type: "session_activity",
-    sessionId: "chat-b",
-    agentId: "main-b",
-  });
-  hub.publish("a", {
-    type: "session_activity",
-    sessionId: "chat-a",
-    agentId: "child-a",
-  });
+  hub.publish("a", queued("chat-a", "main-a"));
+  hub.publish("b", queued("chat-b", "main-b"));
+  hub.publish("a", queued("chat-a", "child-a"));
   const client = new Client();
   hub.attach("a", client.response(), cursor);
   expect(client.chunks).toHaveLength(2);
@@ -47,12 +41,7 @@ test("event replay is ordered, owner scoped, and requests resync for an expired 
   expect(client.chunks[0]).toContain(`id: ${cursor + 1}`);
   expect(client.chunks[1]).toContain(`id: ${cursor + 2}`);
   client.end();
-  for (let i = 0; i < 2001; i++)
-    hub.publish("a", {
-      type: "session_activity",
-      sessionId: "chat-a",
-      agentId: "main-a",
-    });
+  for (let i = 0; i < 2001; i++) hub.publish("a", queued("chat-a", "main-a"));
   const stale = new Client();
   hub.attach("a", stale.response(), cursor);
   expect(stale.chunks).toHaveLength(1);
@@ -73,11 +62,7 @@ test("a slow client stays connected until its buffer overflows, then publishing 
   client.end = () => {
     client.writableEnded = true;
   };
-  const event = {
-    type: "session_activity",
-    sessionId: "chat-a",
-    agentId: "main-a",
-  } as const;
+  const event = queued("chat-a", "main-a");
   hub.publish("a", event);
   expect(client.writableEnded).toBe(false);
   client.writableLength = 1024 * 1024;
@@ -112,11 +97,7 @@ test("a throwing client cannot interrupt delivery to healthy clients", () => {
 test("replay is bounded by size so large step events cannot grow it without limit", () => {
   const hub = new EventHub();
   const cursor = hub.sequence("a");
-  const large = {
-    type: "session_activity",
-    sessionId: "chat-a",
-    agentId: "x".repeat(1024 * 1024),
-  } as const;
+  const large = queued("chat-a", "x".repeat(1024 * 1024));
   for (let i = 0; i < 5; i++) hub.publish("a", large);
   const stale = new Client();
   hub.attach("a", stale.response(), cursor);

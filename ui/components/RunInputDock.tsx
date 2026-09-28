@@ -302,8 +302,7 @@ export function RunInputDock({
                 <button
                   type="button"
                   onClick={() => removePendingImage(image.id)}
-                  disabled={false}
-                  className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-background/85 text-foreground shadow-sm backdrop-blur hover:bg-background disabled:opacity-50"
+                  className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-background/85 text-foreground shadow-sm backdrop-blur hover:bg-background"
                   aria-label={`Remove ${image.file.name}`}
                 >
                   <X size={12} />

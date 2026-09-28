@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { isWorkingAgent } from "../../../src/schemas/agents";
 import type { AgentEvent } from "../../../src/schemas/events";
-import { agentAction } from "../../persist/agents";
-import { type RuntimeSnapshot, fetchRuntime } from "../../persist/agents";
+import {
+  type RuntimeSnapshot,
+  agentAction,
+  fetchRuntime,
+} from "../../persist/agents";
 import { subscribeEvents } from "../../persist/events";
 import type { Message, MessageStep } from "../../types";
 

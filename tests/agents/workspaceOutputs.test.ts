@@ -17,7 +17,6 @@ test("attaches only tool-reported paths without scanning or leaking outside the 
   };
   const ctx = new RunContext(
     new BaseAgent("test", "test"),
-    "",
     undefined,
     undefined,
     undefined,

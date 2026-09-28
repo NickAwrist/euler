@@ -12,7 +12,7 @@ const STATUS_LABELS: Record<Agent["status"], string> = {
 
 export function AgentStatus({ agent }: { agent: Agent }) {
   const problem = agent.interruption;
-  const label = agent.interruption
+  const label = problem
     ? "Interrupted"
     : agent.held && !isFinalAgent(agent)
       ? "Paused"

@@ -42,7 +42,6 @@ export const InboxMessageSchema = z.object({
     "progress",
     "result",
     "failure",
-    "status",
     "control",
   ]),
   content: z.string(),

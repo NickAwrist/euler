@@ -35,27 +35,9 @@ const Root =
                         window.location.pathname === "/dev/long-thread"
                       ? lazy(() => import("./dev/LongThreadDemo"))
                       : import.meta.env.DEV &&
-                          window.location.pathname ===
-                            "/dev/experimental/browser-use"
-                        ? lazy(
-                            () =>
-                              import(
-                                "../dev/experimental/browser-use/BrowserUseDemo"
-                              ),
-                          )
-                        : import.meta.env.DEV &&
-                            window.location.pathname ===
-                              "/dev/experimental/async-agents"
-                          ? lazy(
-                              () =>
-                                import(
-                                  "../dev/experimental/async-agents/AsyncAgentsDemo"
-                                ),
-                            )
-                          : import.meta.env.DEV &&
-                              window.location.pathname === "/dev/agents"
-                            ? lazy(() => import("./dev/AgentsDemo"))
-                            : App;
+                          window.location.pathname === "/dev/agents"
+                        ? lazy(() => import("./dev/AgentsDemo"))
+                        : App;
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

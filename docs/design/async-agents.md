@@ -62,7 +62,7 @@ This is phase 1 of two. Phase 2, [browser use](browser-use.md), is built on this
 
 ## How it looks
 
-These screenshots come from the checked-in React mock at `/dev/experimental/async-agents`. They show fictional data and no server behavior.
+These screenshots come from an early React mock of the design. They show fictional data and no server behavior.
 
 ### A background agent
 
@@ -652,8 +652,6 @@ Steps 1–3 ship together in the first MVP commit. Follow-up commits contain fix
 - Migration test from a database with existing chats.
 
 ## Continue this work
-
-The mock lives in [`dev/experimental/async-agents/`](../../dev/experimental/async-agents/README.md). Open `/dev/experimental/async-agents` with the Vite dev server. `?scene=started|chatting|question|inflight|finished` opens a scene directly. `&panel=list` or `&panel=detail` opens the Agents panel.
 
 Open questions:
 

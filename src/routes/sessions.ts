@@ -265,7 +265,6 @@ router.get("/:id", (req, res) => {
   }
   const history = getMessagesForSession(ownerUuid, id);
   res.json({
-    ...agentRuntime.snapshot(ownerUuid, id),
     id: row.id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

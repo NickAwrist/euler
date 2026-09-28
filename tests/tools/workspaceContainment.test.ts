@@ -38,7 +38,6 @@ async function fixture() {
   await fs.writeFile(join(outside, "file.txt"), "outside secret");
   const ctx = new RunContext(
     new BaseAgent("test", "test"),
-    "",
     undefined,
     undefined,
     undefined,

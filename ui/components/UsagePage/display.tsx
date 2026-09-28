@@ -25,7 +25,6 @@ const colors: Record<string, string> = {
   mistralai: "#FF8205",
   "meta-llama": "#0081FA",
 };
-export { modelProviderId as provider } from "../modelProviders";
 export function color(model: string) {
   return providerColor(provider(model));
 }

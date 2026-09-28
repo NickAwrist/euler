@@ -43,7 +43,6 @@ export type OnStreamDelta = (
 export class RunContext {
   agentInstance: BaseAgent;
   readonly agentName: string;
-  readonly prompt: string;
   readonly signal?: AbortSignal;
   /** Resolved host path for the active workspace. */
   readonly sessionDir?: string;
@@ -61,7 +60,6 @@ export class RunContext {
 
   constructor(
     agentInstance: BaseAgent,
-    prompt: string,
     onChange?: OnStepChange,
     onStreamDelta?: OnStreamDelta,
     signal?: AbortSignal,
@@ -72,7 +70,6 @@ export class RunContext {
   ) {
     this.agentInstance = agentInstance;
     this.agentName = agentInstance.name;
-    this.prompt = prompt;
     this._onChange = onChange;
     this._onStreamDelta = onStreamDelta;
     this.signal = signal;
@@ -173,16 +170,7 @@ export class RunContext {
     return this._steps;
   }
 
-  /** JSON-serializable snapshot of this activation. */
-  snapshot(): Record<string, unknown> {
-    return {
-      agentName: this.agentName,
-      prompt: this.prompt,
-      steps: this._steps.map((s) => this._stepSnapshot(s)),
-    };
-  }
-
-  private _stepBase(step: Step): Record<string, unknown> {
+  wireStep(step: Step): Record<string, unknown> {
     const out: Record<string, unknown> = {
       kind: step.kind,
       status: step.status,
@@ -196,18 +184,7 @@ export class RunContext {
     if (step.thinking !== undefined) out.thinking = step.thinking;
     if (step.metrics !== undefined) out.metrics = step.metrics;
     if (step.error !== undefined) out.error = step.error;
+    out.agentName = this.agentName;
     return out;
-  }
-
-  private _stepSnapshot(step: Step): Record<string, unknown> {
-    return this._stepBase(step);
-  }
-
-  wireStep(step: Step): Record<string, unknown> {
-    return { ...this._stepBase(step), agentName: this.agentName };
-  }
-
-  wireSteps(): Record<string, unknown>[] {
-    return this._steps.map((s) => this.wireStep(s));
   }
 }

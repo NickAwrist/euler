@@ -6,7 +6,8 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { color, money, number, provider } from "./display";
+import { modelProviderId as provider } from "../modelProviders";
+import { color, money, number } from "./display";
 
 type Series = { model: string; values: number[] };
 type Shape = "circle" | "square" | "triangle" | "diamond";

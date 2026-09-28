@@ -36,10 +36,9 @@ import {
   type SpawnRequest,
   type SpawnResult,
 } from "../../tools/spawn_agent";
-import { missingToolResults } from "../toolResults";
 import { RuntimeTransaction } from "./RuntimeTransaction";
 import { runActivation } from "./activation";
-import { inboxModelContent } from "./agentContext";
+import { recoverInterrupted } from "./recovery";
 
 /** Running or waiting subagents admitted in one chat; queued work waits. */
 const MAX_ACTIVE_SUBAGENTS = 3;
@@ -69,15 +68,19 @@ export class AgentRuntime {
   /** Agents being cancelled, which must not start again before it settles. */
   private stopping = new Set<string>();
   private transactions = new RuntimeTransaction();
+  private scheduled = false;
+  private waitingForChild = new Set<string>();
+  private waiters = new Set<() => void>();
   resync(owner: string, sessionId: string) {
     this.emit(owner, { type: "resync", sessionId, agentId: "" });
+  }
+  /** The current record: one may be released and reloaded across awaits. */
+  private live(record: AgentRecord) {
+    return this.store.get(record.id) ?? record;
   }
   isChanging(sessionId: string) {
     return this.deleting.has(sessionId) || this.rewinding.has(sessionId);
   }
-  private scheduled = false;
-  private waitingForChild = new Set<string>();
-  private waiters = new Set<() => void>();
   /** Activations holding one of the owner's slots; a blocking spawn releases its slot. */
   private runningCount(owner: string) {
     return [...this.active.keys()].filter(
@@ -191,7 +194,7 @@ export class AgentRuntime {
   }
   /** Queues the user's message for the main agent with the settings sent with it. */
   send(record: AgentRecord, request: SendMessageRequest) {
-    const main = this.store.get(record.id) ?? record;
+    const main = this.live(record);
     return this.atomically(main.sessionId, () => {
       this.configure(main, request);
       const queued = main.status === "running";
@@ -234,7 +237,7 @@ export class AgentRuntime {
       content,
       attachmentIds,
       attachments,
-      wakes: !["progress", "status"].includes(kind),
+      wakes: kind !== "progress",
     });
     if (kind === "user") this.resetBudget(agent);
     this.emit(agent.ownerUuid, {
@@ -295,7 +298,7 @@ export class AgentRuntime {
     return true;
   }
   removeQueued(record: AgentRecord, messageId: number): boolean {
-    const agent = this.store.get(record.id) ?? record;
+    const agent = this.live(record);
     let removed = false;
     this.atomically(agent.sessionId, () => {
       removed = this.store.removeQueued(agent.id, messageId);
@@ -505,12 +508,8 @@ export class AgentRuntime {
     const target = this.store.get(
       agent.kind === "main" ? (to ?? "") : (agent.parentId ?? ""),
     );
-    if (
-      !target ||
-      target.ownerUuid !== agent.ownerUuid ||
-      target.sessionId !== agent.sessionId ||
-      (agent.kind === "main" && target.parentId !== agent.id)
-    )
+    // A subagent's parent, or a child the main agent spawned, shares its chat.
+    if (!target || (agent.kind === "main" && target.parentId !== agent.id))
       throw new Error("Unknown recipient");
     this.enqueue(target, agent.id, kind ?? "message", content);
     if (kind === "progress") {
@@ -593,7 +592,7 @@ export class AgentRuntime {
   }
   /** A blocking spawn returns the child's report, so it is not delivered again. */
   private receiveReport(record: AgentRecord, childId: string) {
-    const parent = this.store.get(record.id) ?? record;
+    const parent = this.live(record);
     return this.atomically(parent.sessionId, () => {
       const reports = this.store
         .undelivered(parent.id)
@@ -621,7 +620,7 @@ export class AgentRuntime {
     this.store.deliver([message]);
   }
   async cancel(record: AgentRecord, requestedReason?: string) {
-    const agent = this.store.get(record.id) ?? record;
+    const agent = this.live(record);
     if (isFinalAgent(agent)) return;
     // Dismissing a ready subagent ends it as done rather than stopped.
     const ready = agent.status === "idle" && !this.active.has(agent.id);
@@ -680,7 +679,7 @@ export class AgentRuntime {
     this.status(parent);
   }
   deliver(record: AgentRecord) {
-    const agent = this.store.get(record.id) ?? record;
+    const agent = this.live(record);
     this.recordControl(agent, "Deliver held messages");
     this.resetBudget(agent);
     this.schedule();
@@ -793,55 +792,13 @@ export class AgentRuntime {
     }
   }
   recover() {
-    for (const agent of this.store.interrupted()) {
-      this.store.failRunningSteps(agent.id, "Interrupted by server restart");
-      const pending = this.store.undelivered(agent.id);
-      const reply =
-        agent.kind === "main" ? this.store.reply(agent.id) : undefined;
-      const steps = agent.kind === "main" ? this.store.steps(agent.id) : [];
-      const replying = reply !== undefined || steps.length > 0;
-      this.atomically(agent.sessionId, () => {
-        const history = [
-          ...agent.history,
-          ...missingToolResults(
-            agent.history,
-            "Interrupted by a server restart. Check the current state before retrying.",
-          ),
-        ];
-        if (agent.kind === "main") {
-          if (replying) {
-            this.append(agent, {
-              role: "assistant",
-              content: `${reply ?? ""}\n\n*Response interrupted by server restart.*`,
-              steps,
-              attachments: agent.pendingOutputs,
-            });
-            agent.pendingOutputs = [];
-          }
-          this.store.clearSegment(agent);
-          // Nothing starts solely because the server restarted.
-          this.store.hold(agent.id, true);
-        } else {
-          const peers = this.store.list(agent.ownerUuid, agent.sessionId);
-          for (const message of pending) {
-            agent.pendingOutputs.push(...message.attachments);
-            history.push({
-              role: "user",
-              content: inboxModelContent(message, peers),
-            });
-          }
-          this.store.deliver(pending);
-          agent.activity =
-            "Interrupted by server restart. Ready for new instructions.";
-          agent.interruption = agent.activity;
-          history.push({ role: "user", content: agent.activity });
-        }
-        agent.status = "idle";
-        this.store.saveHistory(agent, history);
-        this.status(agent);
-      });
-      this.release(agent.sessionId);
-    }
+    recoverInterrupted({
+      store: this.store,
+      status: (agent) => this.status(agent),
+      append: (agent, message) => this.append(agent, message),
+      atomically: (sessionId, write) => this.atomically(sessionId, write),
+      release: (sessionId) => this.release(sessionId),
+    });
   }
 }
 export const agentRuntime = new AgentRuntime();
