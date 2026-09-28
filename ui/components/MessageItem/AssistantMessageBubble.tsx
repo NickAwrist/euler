@@ -4,11 +4,10 @@ import {
   ChevronRight,
   Copy,
   Download,
-  Globe,
   RefreshCw,
   Waypoints,
 } from "lucide-react";
-import { type CSSProperties, useMemo, useState } from "react";
+import { type CSSProperties, useMemo } from "react";
 import type {
   WebSourceAttachment,
   WorkspaceFileAttachment,
@@ -26,6 +25,7 @@ import {
 } from "../MarkdownMessage";
 import { ThinkingBlock } from "../ThinkingBlock";
 import { MessageActions } from "./MessageActions";
+import { SourceList } from "./SourceList";
 import {
   msgIconBtn,
   msgIconSize,
@@ -147,28 +147,7 @@ export function AssistantMessageBubble({
               )}
             </div>
           )}
-          {sources.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {sources.map((source) => (
-                <a
-                  key={source.url}
-                  href={source.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={source.url}
-                  className={msgOutputChip}
-                >
-                  <SourceFavicon url={source.url} />
-                  <span className="min-w-0 max-w-64 truncate">
-                    {source.title}
-                  </span>
-                  <span className="shrink-0 text-muted-foreground">
-                    {sourceDomain(source.url)}
-                  </span>
-                </a>
-              ))}
-            </div>
-          )}
+          {sources.length > 0 && <SourceList sources={sources} />}
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-1">
@@ -268,33 +247,5 @@ export function AssistantMessageBubble({
         </div>
       </div>
     </div>
-  );
-}
-
-function sourceDomain(url: string): string {
-  return new URL(url).hostname.replace(/^www\./, "");
-}
-
-function SourceFavicon({ url }: { url: string }) {
-  const [failed, setFailed] = useState(false);
-  if (failed) {
-    return (
-      <Globe
-        size={16}
-        aria-hidden="true"
-        className="shrink-0 text-muted-foreground"
-      />
-    );
-  }
-  return (
-    <img
-      src={`/api/favicons/${encodeURIComponent(new URL(url).hostname)}`}
-      alt=""
-      width={16}
-      height={16}
-      loading="lazy"
-      onError={() => setFailed(true)}
-      className="size-4 shrink-0 rounded-sm"
-    />
   );
 }

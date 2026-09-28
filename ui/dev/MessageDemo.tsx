@@ -62,6 +62,25 @@ const markdownMessages: Message[] = [
       },
     ],
   },
+  {
+    role: "assistant",
+    content:
+      "Lighthouses were automated through the 20th century, and most now run without resident keepers.",
+    attachments: [
+      "Lighthouse automation timeline",
+      "Keepers of the coast: an oral history",
+      "Fresnel lens design and optics",
+      "Decommissioned lighthouses and preservation efforts",
+      "Modern aids to navigation",
+      "How LED beacons replaced rotating lamps",
+      "Coast guard maintenance schedules",
+      "Lighthouse tourism statistics",
+    ].map((title, index) => ({
+      kind: "web_source" as const,
+      title,
+      url: `https://source-${index + 1}.example.org/articles/${index + 1}`,
+    })),
+  },
 ];
 
 export default function MessageDemo() {
