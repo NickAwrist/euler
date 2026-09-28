@@ -112,6 +112,8 @@ Sidebar badges use three states: a spinner for a working agent, a dot for an unr
 
 ## Architecture
 
+[`async-agents-runtime.html`](async-agents-runtime.html) is a visual walkthrough of the shipped runtime compared with the old per-request flow: ownership by layer, a message's journey, agent statuses, parent and subagent messages, limits, and storage. Open it in a browser.
+
 ```mermaid
 flowchart LR
   UI[Euler UI] -- "POST message / stop / edit" --> API[Session and agent routes]
