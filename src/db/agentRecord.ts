@@ -1,5 +1,8 @@
 import type { AgentRecord } from "./agents";
 
+/** What subagents see as the main agent's name, independent of the app name. */
+export const MAIN_AGENT_TITLE = "Parent";
+
 /** A new agent. Every field is listed so a new one needs a deliberate default. */
 export function createAgentRecord(
   init: Pick<

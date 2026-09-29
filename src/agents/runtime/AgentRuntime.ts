@@ -1,6 +1,6 @@
 import type { OutputAttachment } from "../../attachments/types";
 import { DEFAULT_RUN_MODEL } from "../../constants";
-import { createAgentRecord } from "../../db/agentRecord";
+import { MAIN_AGENT_TITLE, createAgentRecord } from "../../db/agentRecord";
 import { type AgentRecord, AgentStore } from "../../db/agents";
 import {
   appendRuntimeMessage,
@@ -150,7 +150,7 @@ export class AgentRuntime {
       sessionId,
       parentId: null,
       kind: "main",
-      title: "Euler",
+      title: MAIN_AGENT_TITLE,
       status: "idle",
       model: session?.model ?? DEFAULT_RUN_MODEL,
       spawnPosition: 0,
@@ -545,7 +545,7 @@ export class AgentRuntime {
     this.waitingForChild.add(parent.id);
     this.schedule();
     try {
-      // Return for incoming input or a child waiting on Euler, including
+      // Return for incoming input or a child waiting on the parent, including
       // other children that occupy the slots this new child needs.
       await this.until(() => {
         const current = this.store.get(child.id);

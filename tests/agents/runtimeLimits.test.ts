@@ -245,7 +245,7 @@ for (const target of ["main", "child"] as const)
         });
       else runtime.enqueue(worker, main.id, "message", "Work until finished");
       await until(() => getOpenRouterRequests().length > 15);
-      // Only the child's delivery from Euler is automatic; user input is exempt.
+      // Only the child's delivery from the parent is automatic; user input is exempt.
       expect(runtime.store.get(main.id)?.automaticTurns).toBe(
         target === "main" ? 0 : 1,
       );

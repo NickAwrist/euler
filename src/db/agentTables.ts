@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { DEFAULT_RUN_MODEL } from "../constants";
-import { createAgentRecord } from "./agentRecord";
+import { MAIN_AGENT_TITLE, createAgentRecord } from "./agentRecord";
 
 const AGENTS = `CREATE TABLE IF NOT EXISTS agents (
   id TEXT PRIMARY KEY,
@@ -86,7 +86,7 @@ function moveHistory(db: Database) {
         sessionId: chat.id,
         parentId: null,
         kind: "main",
-        title: "Euler",
+        title: MAIN_AGENT_TITLE,
         status: "idle",
         model: chat.model ?? DEFAULT_RUN_MODEL,
         spawnPosition: 0,

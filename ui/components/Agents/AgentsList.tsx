@@ -69,7 +69,7 @@ function AgentSection({
   );
 }
 
-/** The chat's subagents grouped by whether Euler can still reach them. */
+/** The chat's subagents grouped by whether the parent can still reach them. */
 export function AgentsList() {
   const { agents } = useAgents();
   const list = agents

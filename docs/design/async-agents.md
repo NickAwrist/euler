@@ -42,7 +42,7 @@ This is phase 1 of two. Phase 2, [browser use](browser-use.md), is built on this
 - Every agent has an inbox. The main agent can message a subagent and a subagent can message the main agent.
 - Inbox messages are events. A subagent finishing, failing, or asking a question reaches the main agent as soon as it can act on it: at its next step if it is mid-reply, or by starting a new reply if it is idle. The user never has to prompt again to hear the outcome.
 - Messages that arrive while an agent is mid-step wait in a queue and are delivered at the next step boundary. Nothing is dropped or reordered.
-- The user can stop any subagent. The transcript shows only the user's messages, Euler's replies, and a one-line status row per subagent (name, status, controls) whose status updates in place. Agent events are never written to the transcript: questions, results, deliveries, queued updates, and stops. The artifact sidebar lists the chat's agents, and clicking a status row or list row opens that agent's trace.
+- The user can stop any subagent. The transcript shows only the user's messages, the main agent's replies, and a one-line status row per subagent (name, status, controls) whose status updates in place. Agent events are never written to the transcript: questions, results, deliveries, queued updates, and stops. The artifact sidebar lists the chat's agents, and clicking a status row or list row opens that agent's trace.
 - One browser per user. Browser specifics are in the phase 2 document.
 - No push or system notifications. Replies are stored, and the chat shows a sidebar badge until it is viewed.
 
@@ -78,13 +78,13 @@ The user asks an unrelated question and then a progress question. Both are ordin
 
 ### A subagent asks the main agent
 
-The research agent asks a question and waits. The question wakes the main agent, which cannot decide on the user's behalf and asks the user. The transcript shows only the status row changing to "Waiting for Euler" and the main agent's reply. The question itself is in the Agents panel. The user's answer goes to the main agent, which forwards it with `send_message`.
+The research agent asks a question and waits. The question wakes the main agent, which cannot decide on the user's behalf and asks the user. The transcript shows only the status row changing to "Waiting for parent" and the main agent's reply. The question itself is in the Agents panel. The user's answer goes to the main agent, which forwards it with `send_message`.
 
 ![A subagent question wakes the main agent](async-agents/agent-question.png)
 
 ### A subagent finishes while the main agent is mid-reply
 
-The user asked for two things. The main agent started a research agent for one and kept working on the other. The research agent finishes while the main agent is reading a file, so the result waits in the queue. The chat shows nothing extra. The Agents panel marks the result "queued for Euler's next step".
+The user asked for two things. The main agent started a research agent for one and kept working on the other. The research agent finishes while the main agent is reading a file, so the result waits in the queue. The chat shows nothing extra. The Agents panel marks the result "queued for the parent's next step".
 
 ![A finished agent's result queued in the Agents panel during the main agent's step](async-agents/queued-mid-reply.png)
 
@@ -175,7 +175,7 @@ stateDiagram-v2
 
 - `queued`: created but waiting for an activation slot.
 - `running`: an activation is in progress.
-- `waiting`: blocked on a specific reply. The card says who it waits for: "Waiting for Euler" for `ask_parent`, "Needs you" for the browser handoff.
+- `waiting`: blocked on a specific reply. The card says who it waits for: "Waiting for parent" for `ask_parent`, "Needs you" for the browser handoff.
 - `idle`: ready. The main agent is idle between replies. A subagent is idle after it answers, keeps its history, and wakes when `send_message` reaches it.
 - `completed`: a ready subagent was dismissed by the user or `cancel_agent`. Its summary keeps its last result.
 - `cancelled`: a working subagent was stopped.
@@ -184,7 +184,7 @@ stateDiagram-v2
 
 When a subagent's model loop ends with a text answer and no pending question, that answer becomes its `result` message to the parent and the subagent becomes ready. It doesn't need a separate `finish` tool. Three subagents per chat may be running or waiting for an answer. New prompts and follow-ups beyond that limit queue until a slot opens; queued and ready agents hold no child slot. A subagent is a reusable conversation, not a single task. Its initial prompt starts that conversation, and later messages can assign different work.
 
-The UI labels these states Queued (`queued`), Working (`running`), Waiting for Euler, Ready, Done (`completed`), and Stopped (`cancelled`). An agent whose last activation was interrupted by an error or restart shows Interrupted. Ready agents show Dismiss instead of Stop. Ended agents are dimmed and open only their trace.
+The UI labels these states Queued (`queued`), Working (`running`), Waiting for parent, Ready, Done (`completed`), and Stopped (`cancelled`). An agent whose last activation was interrupted by an error or restart shows Interrupted. Ready agents show Dismiss instead of Stop. Ended agents are dimmed and open only their trace.
 
 ### Limits
 
@@ -193,7 +193,7 @@ The UI labels these states Queued (`queued`), Working (`running`), Waiting for E
 | Admitted subagents per chat | 3 | New agents and follow-ups queue while three children are running or waiting for an answer. |
 | Concurrent activations per user | 4, set by `EULER_MAX_RUNNING_AGENTS` | Extra activations wait in `queued`. |
 | Browser agents per user | 1 | `spawn_agent` returns `browser_busy` naming the chat that holds the browser. |
-| Automatic turns per chat between user messages | 10 | A turn is a model call that delivers agent or runtime messages without user input, across Euler and its subagents, including messages delivered mid-activation. Tool continuations and calls consuming user input are not counted. Further automatic deliveries pause with saved context and pending input until Deliver or a new user message. |
+| Automatic turns per chat between user messages | 10 | A turn is a model call that delivers agent or runtime messages without user input, across the main agent and its subagents, including messages delivered mid-activation. Tool continuations and calls consuming user input are not counted. Further automatic deliveries pause with saved context and pending input until Deliver or a new user message. |
 
 The automatic-turn budget bounds agents waking each other without the user, including messages delivered while an activation is already running. It does not bound how long one activation works: tool loops continue as in a normal reply, and the user can stop any agent. User messages and Deliver reset it. Paused agents keep their history and a continuation in their inbox; a pause does not send a false completion report.
 
@@ -385,7 +385,7 @@ sequenceDiagram
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
-| `spawn_agent` | `kind`, `title`, `prompt`, optional `wait` (default `false`) | With `wait: false`, the agent ID immediately. With `wait: true`, waits for an answer unless incoming parent input or waiting children require Euler to continue first. A result or failure returned this way is not delivered again as a message. A call that returns before the agent finishes carries its status and a note instead of a result. If the agent calls `ask_parent` first, the call returns with status `waiting` and the question arrives in the caller's inbox. `browser` agents always start with `wait: false`. |
+| `spawn_agent` | `kind`, `title`, `prompt`, optional `wait` (default `false`) | With `wait: false`, the agent ID immediately. With `wait: true`, waits for an answer unless incoming parent input or waiting children require the parent to continue first. A result or failure returned this way is not delivered again as a message. A call that returns before the agent finishes carries its status and a note instead of a result. If the agent calls `ask_parent` first, the call returns with status `waiting` and the question arrives in the caller's inbox. `browser` agents always start with `wait: false`. |
 | `send_message` | `to` (agent ID), `content` | Confirmation, or an error if the agent is final. |
 | `cancel_agent` | `agentId`, `reason` | Confirmation. The reason appears on the card. |
 
@@ -405,7 +405,7 @@ The system prompt for subagents tells them to use `progress` sparingly, at meani
 
 ### Visible transcript
 
-The transcript is the conversation between the user and Euler, plus one status row per subagent. Everything else about agents is in the agent trace.
+The transcript is the conversation between the user and the main agent, plus one status row per subagent. Everything else about agents is in the agent trace.
 
 The chat's `messages` table stays the user-visible transcript, with its existing `user`, `assistant`, and `event` roles. Agents add no transcript roles or rows. Their messages, questions, results, failures, and cancellations are stored in `agent_messages` and on the `agents` row. The agent trace shows the initial prompt and the agent's steps.
 
@@ -418,7 +418,7 @@ The chat's `messages` table stays the user-visible transcript, with its existing
 
 The artifact sidebar shows a SegmentedControl, **Files | Agents**, once the chat has a subagent. Having a subagent also makes the sidebar toggle available when the workspace has no files.
 
-- The list groups every subagent in the chat under **Active** (working or waiting for Euler), **Ready** (Euler can message it), and **Ended**, each newest first, so an agent started early in a long chat stays easy to find. Each heading shows its count. Empty groups are hidden, and Ended starts collapsed.
+- The list groups every subagent in the chat under **Active** (working or waiting for the parent), **Ready** (the parent can message it), and **Ended**, each newest first, so an agent started early in a long chat stays easy to find. Each heading shows its count. Empty groups are hidden, and Ended starts collapsed.
 - Each row is the status row plus a one-line summary of the agent's latest activity: its initial prompt, latest message, or result.
 - The Agents tab label counts working agents.
 

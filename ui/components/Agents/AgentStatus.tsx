@@ -4,7 +4,7 @@ import { type Agent, isFinalAgent } from "../../../src/schemas/agents";
 const STATUS_LABELS: Record<Agent["status"], string> = {
   queued: "Queued",
   running: "Working",
-  waiting: "Waiting for Euler",
+  waiting: "Waiting for parent",
   idle: "Ready",
   completed: "Done",
   cancelled: "Stopped",
