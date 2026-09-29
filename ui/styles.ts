@@ -5,6 +5,10 @@ export function cx(...values: Array<string | false | null | undefined>) {
 export const eyebrowText =
   "text-[0.6875rem] font-medium uppercase tracking-[0.08em] text-muted-foreground";
 
+/** Bordered surface shared by inline chips in the transcript (files, sources, agents). */
+export const chipSurface =
+  "rounded-lg border border-border-subtle bg-muted/40 text-sm hover:bg-muted";
+
 export const modalShell =
   "fixed inset-0 z-50 m-0 [&:not([open])]:hidden flex h-screen max-h-none w-screen max-w-none items-center justify-center border-0 bg-black/55 p-4 text-foreground backdrop-blur-[8px] sm:p-[10px] ui-animate-modal-shell";
 

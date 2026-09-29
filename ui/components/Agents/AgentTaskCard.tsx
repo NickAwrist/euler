@@ -5,7 +5,7 @@ import {
   isFinalAgent,
   isWorkingAgent,
 } from "../../../src/schemas/agents";
-import { cx } from "../../styles";
+import { chipSurface, cx } from "../../styles";
 import { IconButton } from "../IconButton";
 import { ModelLabel } from "../ModelLabel";
 import { AgentAvatar } from "./AgentAvatar";
@@ -46,23 +46,30 @@ export function AgentStopButton({ agent }: { agent: Agent }) {
 }
 export function AgentTaskCard({
   agent,
-  showActivity = false,
+  variant,
 }: {
   agent: Agent;
-  /** Show the agent's latest activity under its title. */
-  showActivity?: boolean;
+  /** Inline chips fit their content; list cards fill the row and show the agent's latest activity. */
+  variant: "inline" | "list";
 }) {
   const { open } = useAgents();
+  const inline = variant === "inline";
   return (
     <div
       className={cx(
-        "my-2 flex items-center gap-1 rounded-lg border border-border-subtle pr-1.5 text-sm",
+        "my-2 flex items-center gap-1 pr-1.5",
+        inline
+          ? cx(chipSurface, "w-fit max-w-full")
+          : "rounded-lg border border-border-subtle text-sm",
         isFinalAgent(agent) && "text-muted-foreground",
       )}
     >
       <button
         type="button"
-        className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-muted/50"
+        className={cx(
+          "flex min-w-0 items-center gap-2 rounded-lg px-3 py-2 text-left",
+          !inline && "flex-1 hover:bg-muted/50",
+        )}
         onClick={() => open(agent.id)}
       >
         <AgentAvatar agent={agent} />
@@ -70,9 +77,10 @@ export function AgentTaskCard({
           <span className="block truncate">{agent.title}</span>
           <ModelLabel
             model={agent.model}
+            hideProvider
             className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground [&>img]:size-3 [&>span:first-child]:size-3"
           />
-          {showActivity && agent.activity && (
+          {!inline && agent.activity && (
             <span className="block truncate text-xs text-muted-foreground">
               {agent.activity}
             </span>
@@ -89,5 +97,7 @@ export function AgentRows({ position }: { position: number }) {
   const { agents } = useAgents();
   return agents
     .filter((a) => a.kind !== "main" && a.spawnPosition === position)
-    .map((agent) => <AgentTaskCard key={agent.id} agent={agent} />);
+    .map((agent) => (
+      <AgentTaskCard key={agent.id} agent={agent} variant="inline" />
+    ));
 }

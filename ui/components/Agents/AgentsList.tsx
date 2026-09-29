@@ -62,7 +62,7 @@ function AgentSection({
       )}
       <div id={bodyId} hidden={!expanded}>
         {agents.map((agent) => (
-          <AgentTaskCard key={agent.id} agent={agent} showActivity />
+          <AgentTaskCard key={agent.id} agent={agent} variant="list" />
         ))}
       </div>
     </section>

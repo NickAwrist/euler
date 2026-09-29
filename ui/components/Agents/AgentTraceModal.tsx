@@ -65,6 +65,7 @@ export function AgentTraceModal({
           <AgentStatus agent={agent} />
           <ModelLabel
             model={agent.model}
+            hideProvider
             className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground [&>img]:size-3"
           />
         </span>
