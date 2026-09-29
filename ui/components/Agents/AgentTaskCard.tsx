@@ -1,4 +1,4 @@
-import { Bot, ChevronRight, Square, X } from "lucide-react";
+import { ChevronRight, Square, X } from "lucide-react";
 import { useState } from "react";
 import {
   type Agent,
@@ -8,6 +8,7 @@ import {
 import { cx } from "../../styles";
 import { IconButton } from "../IconButton";
 import { ModelLabel } from "../ModelLabel";
+import { AgentAvatar } from "./AgentAvatar";
 import { useAgents } from "./AgentContext";
 import { AgentStatus } from "./AgentStatus";
 /** Stops a working agent or dismisses a ready one. */
@@ -64,7 +65,7 @@ export function AgentTaskCard({
         className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left hover:bg-muted/50"
         onClick={() => open(agent.id)}
       >
-        <Bot size={16} className="shrink-0" />
+        <AgentAvatar agent={agent} />
         <span className="min-w-0 flex-1">
           <span className="block truncate">{agent.title}</span>
           <ModelLabel

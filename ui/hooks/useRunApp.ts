@@ -117,6 +117,7 @@ export function useRunApp() {
     activeSessionId: sessions.activeSessionId,
     messages,
     agents: stream.agents,
+    agentPhases: stream.phases,
     queuedMessages: stream.queued,
     heldUpdates: stream.held,
     refreshRuntime: stream.refresh,

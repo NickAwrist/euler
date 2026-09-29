@@ -8,6 +8,7 @@ import { fetchAgent } from "../../persist/agents";
 import type { MessageStep } from "../../types";
 import { ModelLabel } from "../ModelLabel";
 import { StepsModal } from "../StepsModal";
+import { AgentAvatar } from "./AgentAvatar";
 import { AgentStatus } from "./AgentStatus";
 import { AgentStopButton } from "./AgentTaskCard";
 
@@ -60,6 +61,7 @@ export function AgentTraceModal({
       title={agent.title}
       subtitle={
         <span className="flex flex-wrap items-center gap-2">
+          <AgentAvatar agent={agent} size={14} />
           <AgentStatus agent={agent} />
           <ModelLabel
             model={agent.model}

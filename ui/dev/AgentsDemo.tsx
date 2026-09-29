@@ -1,8 +1,10 @@
 import { useState } from "react";
 import type { Agent } from "../../src/schemas/agents";
+import { AgentAvatar } from "../components/Agents/AgentAvatar";
 import { AgentContext } from "../components/Agents/AgentContext";
 import { AgentTraceModal } from "../components/Agents/AgentTraceModal";
 import { AgentsList } from "../components/Agents/AgentsList";
+import type { AgentPhase } from "../types";
 
 const base: Agent = {
   id: "interrupted",
@@ -20,6 +22,52 @@ const base: Agent = {
   held: false,
   interruption: "Interrupted by server restart. Ready for new instructions.",
 };
+const gallery = Array.from({ length: 8 }, (_, i) => ({
+  ...base,
+  id: `gallery-${i}`,
+  createdAt: i,
+  interruption: undefined,
+}));
+const galleryStates: Array<[string, AgentPhase | null]> = [
+  ["Ready", null],
+  ["Thinking", "thinking"],
+  ["Using a tool", "tool"],
+  ["Responding", "responding"],
+];
+function AvatarGallery() {
+  return (
+    <section
+      aria-label="Avatar states"
+      className="mt-8 grid grid-cols-[auto_repeat(8,1fr)] items-center gap-3 text-xs text-muted-foreground"
+    >
+      {galleryStates.map(([label, phase]) => (
+        <AgentContext.Provider
+          key={label}
+          value={{
+            agents: gallery.map((a) => ({
+              ...a,
+              status: phase ? "running" : "idle",
+            })),
+            phases: phase
+              ? Object.fromEntries(gallery.map((a) => [a.id, phase]))
+              : {},
+            open: () => {},
+            stop: async () => {},
+          }}
+        >
+          <span>{label}</span>
+          {gallery.map((a) => (
+            <AgentAvatar
+              key={a.id}
+              agent={{ ...a, status: phase ? "running" : "idle" }}
+              size={28}
+            />
+          ))}
+        </AgentContext.Provider>
+      ))}
+    </section>
+  );
+}
 export default function AgentsDemo() {
   const [agents, setAgents] = useState<Agent[]>([
     base,
@@ -45,6 +93,7 @@ export default function AgentsDemo() {
     <AgentContext.Provider
       value={{
         agents,
+        phases: {},
         open: setSelected,
         stop: async (id) =>
           setAgents((current) =>
@@ -58,6 +107,7 @@ export default function AgentsDemo() {
     >
       <main className="mx-auto max-w-md py-6">
         <AgentsList />
+        <AvatarGallery />
         {agent && (
           <AgentTraceModal
             sessionId="fixture"

@@ -8,6 +8,7 @@ import {
 } from "../../persist/agents";
 import { subscribeEvents } from "../../persist/events";
 import type { Message, MessageStep } from "../../types";
+import { type AgentPhases, nextAgentPhases } from "./agentPhases";
 
 const empty = (): RuntimeSnapshot => ({
   agents: [],
@@ -81,6 +82,7 @@ export function useAgentEvents(
   refreshSessions: () => Promise<void>,
 ) {
   const [state, setState] = useState<RuntimeSnapshot>(empty);
+  const [phases, setPhases] = useState<AgentPhases>({});
   const current = useRef({
     sessionId,
     temporary,
@@ -145,11 +147,13 @@ export function useAgentEvents(
       if (event.type === "resync") {
         views.current.clear();
         recent.current = [];
+        setPhases({});
         void refreshRef.current().catch(console.error);
         void current.current.refreshSessions();
         return;
       }
       recent.current.push(event);
+      setPhases((current) => nextAgentPhases(current, event));
       if (recent.current.length > 2000) recent.current.shift();
       const view = views.current.get(event.sessionId);
       if (view) publishRef.current(event.sessionId, applyEvent(view, event));
@@ -180,6 +184,7 @@ export function useAgentEvents(
   );
   return {
     agents: state.agents,
+    phases,
     queued: state.queued,
     held: state.held,
     refresh,

@@ -284,7 +284,12 @@ function ChatView({
 
   return (
     <AgentContext.Provider
-      value={{ agents: app.agents, open: setSelectedAgentId, stop: stopAgent }}
+      value={{
+        agents: app.agents,
+        phases: app.agentPhases,
+        open: setSelectedAgentId,
+        stop: stopAgent,
+      }}
     >
       <ArtifactContext.Provider
         value={app.activeSessionId ? artifactContext : null}
