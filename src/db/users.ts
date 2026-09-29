@@ -1,5 +1,6 @@
 import { getDb } from "./connection";
 import { LEGACY_USER_DATA_CLAIMED_BY_KEY } from "./constants";
+import { seedDefaultSkills } from "./skills/queries";
 
 export function ensureUserData(ownerUuid: string): void {
   const db = getDb();
@@ -21,6 +22,7 @@ export function ensureUserData(ownerUuid: string): void {
         ownerUuid,
       ]);
     }
+    seedDefaultSkills(ownerUuid);
   });
   tx();
 }

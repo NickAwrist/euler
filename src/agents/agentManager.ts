@@ -9,7 +9,7 @@ import {
   DEFAULT_SYSTEM_PROMPT,
   SUBAGENT_DIRECTIVES,
 } from "../prompts/systemPrompt";
-import { BUILTIN_SKILLS } from "../skills/builtin";
+import { MANAGE_SUBAGENTS_SKILL_NAME } from "../skills/defaults";
 import { modelInvocableSkills, renderSkillsPrompt } from "../skills/runtime";
 import type { BaseTool } from "../tools/BaseTool";
 import { ApplyPatchTool } from "../tools/apply_patch";
@@ -121,13 +121,15 @@ function buildAgent(
     opts.toolSessionDir,
   );
   const isSubagent = name === SUBAGENT_NAME;
-  const userSkills = listSkills(opts.ownerUuid);
+  const allSkills = listSkills(opts.ownerUuid);
   // A subagent's task is written by the model, so its $skill-name references
-  // are model invocations too. Built-in skills cover managing subagents, which
-  // only the main agent does.
+  // are model invocations too. Subagents can't spawn, so they skip the skill
+  // for managing subagents.
   const skills = isSubagent
-    ? modelInvocableSkills(userSkills)
-    : [...BUILTIN_SKILLS, ...userSkills];
+    ? modelInvocableSkills(allSkills).filter(
+        (skill) => skill.name !== MANAGE_SUBAGENTS_SKILL_NAME,
+      )
+    : allSkills;
   const loadableSkills = modelInvocableSkills(skills);
   const finalPrompt = [
     renderSystemPrompt(

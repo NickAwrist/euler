@@ -1,14 +1,14 @@
 import type { Tool } from "ollama";
-import type { SkillWriteBody } from "../schemas/skills";
+import type { SkillRow } from "../db/index";
 import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
 
 export class LoadSkillTool extends BaseTool {
-  private readonly skillsByName: ReadonlyMap<string, SkillWriteBody>;
+  private readonly skillsByName: ReadonlyMap<string, SkillRow>;
 
-  constructor(skills: readonly SkillWriteBody[]) {
+  constructor(skills: readonly SkillRow[]) {
     super(
       "load_skill",
-      "Load the full instructions for an available skill before applying it.",
+      "Load the full instructions for an available user skill before applying it.",
     );
     this.skillsByName = new Map(skills.map((skill) => [skill.name, skill]));
   }

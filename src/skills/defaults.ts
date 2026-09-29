@@ -105,10 +105,12 @@ files to edit at the same time, and do not edit files a working subagent
 owns. Give each agent its own files or directories, or run the edits one
 after another.`;
 
-/** Skills that ship with the app. Only the main agent loads them; users can't invoke them. */
-export const BUILTIN_SKILLS: readonly SkillWriteBody[] = [
+export const MANAGE_SUBAGENTS_SKILL_NAME = "manage-subagents";
+
+/** Skills every account starts with. Users may edit or delete them. */
+export const DEFAULT_SKILLS: readonly SkillWriteBody[] = [
   {
-    name: "manage-subagents",
+    name: MANAGE_SUBAGENTS_SKILL_NAME,
     description:
       "How to delegate work to subagents with spawn_agent, send_message, and cancel_agent. Load before starting a subagent, when a subagent's question, result, or failure arrives, or when deciding whether to reuse, retry, or dismiss one.",
     instructions: MANAGE_SUBAGENTS,

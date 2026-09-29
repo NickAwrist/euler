@@ -6,11 +6,17 @@ import {
   buildServerRunPromptContext,
 } from "../../src/agents/agentManager";
 import { SUBAGENT_NAME } from "../../src/agents/agentNames";
-import { createSkillRow, ensureUserData } from "../../src/db";
+import {
+  createSkillRow,
+  deleteSkillRow,
+  ensureUserData,
+  getSkillByName,
+} from "../../src/db";
 import {
   DEFAULT_SYSTEM_PROMPT,
   SUBAGENT_DIRECTIVES,
 } from "../../src/prompts/systemPrompt";
+import { MANAGE_SUBAGENTS_SKILL_NAME } from "../../src/skills/defaults";
 import { BUILTIN_TOOLS } from "../../src/tools/builtinTools";
 
 const RUNTIME_USER_ID = "33333333-3333-4333-8333-333333333333";
@@ -51,22 +57,26 @@ describe("agent runtime", () => {
     ).toBe(`Error: skill '${otherUserSkill.name}' not found`);
   });
 
-  test("offers built-in skills to the main agent only, by model invocation", async () => {
-    const agent = agentManager.createAgent({
-      ownerUuid: RUNTIME_USER_ID,
-      userPrompt: "Use $manage-subagents.",
+  test("seeds the subagent skill once for the main agent only", () => {
+    const owner = "55555555-5555-4555-8555-555555555555";
+    ensureUserData(owner);
+    const seeded = getSkillByName(owner, MANAGE_SUBAGENTS_SKILL_NAME);
+    expect(seeded).toMatchObject({
+      user_invocable: false,
+      disable_model_invocation: false,
     });
-    expect(agent.systemPrompt).toContain('"name":"manage-subagents"');
-    expect(agent.systemPrompt).not.toContain("# Managing subagents");
-    expect(
-      (await agent.TOOL_MAP.load_skill!.execute({ name: "manage-subagents" }))
-        .text,
-    ).toContain("# Managing subagents");
 
-    const subagent = agentManager.createGeneralAgent({
-      ownerUuid: RUNTIME_USER_ID,
-    });
-    expect(subagent.systemPrompt).not.toContain("manage-subagents");
+    const listed = `"name":"${MANAGE_SUBAGENTS_SKILL_NAME}"`;
+    expect(
+      agentManager.createAgent({ ownerUuid: owner }).systemPrompt,
+    ).toContain(listed);
+    expect(
+      agentManager.createGeneralAgent({ ownerUuid: owner }).systemPrompt,
+    ).not.toContain(listed);
+
+    deleteSkillRow(owner, seeded!.id);
+    ensureUserData(owner);
+    expect(getSkillByName(owner, MANAGE_SUBAGENTS_SKILL_NAME)).toBeNull();
   });
 
   test("uses the default prompt unless the user provides one", () => {

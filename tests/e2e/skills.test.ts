@@ -1,5 +1,6 @@
 import "../setup";
 import { expect, test } from "bun:test";
+import { MANAGE_SUBAGENTS_SKILL_NAME } from "../../src/skills/defaults";
 import { startTestServer, userHeaders } from "../helpers/server";
 
 test("skills CRUD is validated and scoped to the current user", async () => {
@@ -45,13 +46,18 @@ test("skills CRUD is validated and scoped to the current user", async () => {
       headers: userHeaders(),
     });
     expect(await ownList.json()).toMatchObject({
-      skills: [{ id: skill.id, name: "release-notes" }],
+      skills: [
+        { name: MANAGE_SUBAGENTS_SKILL_NAME },
+        { id: skill.id, name: "release-notes" },
+      ],
     });
 
     const otherList = await fetch(`${url}/api/skills`, {
       headers: userHeaders(otherUser),
     });
-    expect(await otherList.json()).toEqual({ skills: [] });
+    expect(await otherList.json()).toMatchObject({
+      skills: [{ name: MANAGE_SUBAGENTS_SKILL_NAME }],
+    });
 
     const update = await fetch(`${url}/api/skills/${skill.id}`, {
       method: "PUT",
