@@ -22,7 +22,6 @@ async function fixture(content: string) {
   await fs.writeFile(path, content, { mode: 0o755 });
   const ctx = new RunContext(
     new BaseAgent("test", "test"),
-    "",
     undefined,
     undefined,
     undefined,

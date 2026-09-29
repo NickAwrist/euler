@@ -43,7 +43,8 @@ export function ExecutionTraceList({
     <>
       {displaySteps.map((step, index) => (
         <TraceStepBody
-          key={traceStepKey(step)}
+          // Steps only append, and identical steps repeat, so the index disambiguates.
+          key={`${index}:${traceStepKey(step)}`}
           step={step}
           showIndex
           stepNumber={index + 1}

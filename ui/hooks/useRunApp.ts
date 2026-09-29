@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { InputCapability } from "../../src/modelCapabilities";
 import { traceStepsForModal } from "../components/ExecutionTrace";
 import { resolveEffectiveThinkingEffort } from "../lib/thinkingLevel";
@@ -8,7 +8,6 @@ import type {
   TraceModalSelection,
   TruncateConfirmState,
 } from "../types";
-import type { RunFlightApi } from "./run/runTypes";
 import { useComfyUIConnection } from "./run/useComfyUIConnection";
 import { useOllamaConnection } from "./run/useOllamaConnection";
 import { useRunStreaming } from "./run/useRunStreaming";
@@ -25,17 +24,6 @@ export function useRunApp() {
 
   const activeSessionIdRef = useRef<string | null>(null);
   const isEphemeralRef = useRef(false);
-  const modelMessagesRef = useRef<Array<Record<string, unknown>> | null>(null);
-  const debugOpenRef = useRef(false);
-  const resetStreamingUiRef = useRef<() => void>(() => {});
-  const runFlightRef = useRef<RunFlightApi | null>(null);
-
-  const bindStreamingReset = useCallback((fn: () => void) => {
-    resetStreamingUiRef.current = fn;
-  }, []);
-
-  const resetStreamingUi = useCallback(() => resetStreamingUiRef.current(), []);
-
   const settings = useSettings(
     ollama.setOllamaHost,
     ollama.fetchOllamaHealth,
@@ -55,8 +43,6 @@ export function useRunApp() {
   const [truncateConfirm, setTruncateConfirm] =
     useState<TruncateConfirmState>(null);
 
-  debugOpenRef.current = debugOpen;
-
   const sessions = useSessionsAndNavigation({
     ollamaModels: ollama.ollamaModels,
     userSettingsRef: settings.userSettingsRef,
@@ -68,11 +54,8 @@ export function useRunApp() {
     setStepsModalData,
     setDebugOpen,
     setDebugData,
-    resetStreamingUi,
-    modelMessagesRef,
     activeSessionIdRef,
     isEphemeralRef,
-    runFlightRef,
     onNavigate: () => sidebar.setSidebarOpen(false),
   });
 
@@ -105,11 +88,8 @@ export function useRunApp() {
     messages,
     setMessages,
     activeSessionId: sessions.activeSessionId,
-    activeSessionIdRef,
     isEphemeralRef,
     userSettingsRef: settings.userSettingsRef,
-    modelMessagesRef,
-    debugOpenRef,
     debugOpen,
     setDebugOpen,
     setDebugData,
@@ -118,11 +98,9 @@ export function useRunApp() {
     modelSendReady: modelSendReady && sessions.sessionSendReady,
     refreshSessions: sessions.refreshSessions,
     fetchOllamaHealth: ollama.fetchOllamaHealth,
-    bindStreamingReset,
     setEditingUserIndex,
     truncateConfirm,
     setTruncateConfirm,
-    runFlightRef,
     supportsImageInput,
     isEphemeral: sessions.isEphemeral,
     startSession: sessions.startSession,
@@ -138,6 +116,11 @@ export function useRunApp() {
     sessions: sessions.sessions,
     activeSessionId: sessions.activeSessionId,
     messages,
+    agents: stream.agents,
+    agentPhases: stream.phases,
+    queuedMessages: stream.queued,
+    heldUpdates: stream.held,
+    refreshRuntime: stream.refresh,
     input: stream.input,
     setInput: stream.setInput,
     streamingStep: stream.streamingStep,
@@ -163,6 +146,18 @@ export function useRunApp() {
     setEditingUserIndex,
     truncateConfirm,
     setTruncateConfirm,
+    rewindAgentNames: truncateConfirm
+      ? stream.agents
+          .filter(
+            (agent) =>
+              agent.kind !== "main" &&
+              agent.spawnPosition >=
+                (truncateConfirm.kind === "edit"
+                  ? truncateConfirm.userIndex
+                  : truncateConfirm.assistantIndex),
+          )
+          .map((agent) => agent.title)
+      : [],
     pendingDeleteSessionId: sessions.pendingDeleteSessionId,
     setPendingDeleteSessionId: sessions.setPendingDeleteSessionId,
     ephemeralExitPromptOpen: sessions.ephemeralExitPromptOpen,

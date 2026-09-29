@@ -1,11 +1,10 @@
 import { Check, Coins, Copy, Gauge, Waypoints } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { copyTextToClipboard } from "../lib/copyTextToClipboard";
 import type { MessageStep } from "../types";
 import {
   ExecutionTraceList,
   formatTraceResultsForCopy,
-  traceStepsForDisplay,
 } from "./ExecutionTrace";
 import {
   formatCost,
@@ -18,10 +17,20 @@ import { Modal } from "./Modal";
 export function StepsModal({
   steps,
   streamingThinking,
+  title = "Execution Trace",
+  subtitle,
+  actions,
+  children,
   onClose,
 }: {
   steps: MessageStep[];
   streamingThinking?: string;
+  title?: string;
+  subtitle?: ReactNode;
+  /** Extra header controls shown before the copy button. */
+  actions?: ReactNode;
+  /** Content shown above the trace. */
+  children?: ReactNode;
   onClose: () => void;
 }) {
   const [resultsCopied, setResultsCopied] = useState(false);
@@ -38,27 +47,30 @@ export function StepsModal({
     }
   };
 
-  if (traceStepsForDisplay(steps ?? []).length === 0) return null;
-
   return (
     <Modal
-      title="Execution Trace"
+      title={title}
+      subtitle={subtitle}
       icon={Waypoints}
-      ariaLabel="Execution Trace"
+      ariaLabel={title}
       closeLabel="Close steps viewer"
       onClose={onClose}
       maxWidthClass="max-w-[42rem]"
       headerActions={
-        <IconButton
-          icon={resultsCopied ? Check : Copy}
-          label={resultsCopied ? "Copied" : "Copy trace results"}
-          disabled={!canCopyResults}
-          onClick={() => void copyResults()}
-          title={resultsCopied ? "Copied" : "Copy trace results"}
-        />
+        <>
+          {actions}
+          <IconButton
+            icon={resultsCopied ? Check : Copy}
+            label={resultsCopied ? "Copied" : "Copy trace results"}
+            disabled={!canCopyResults}
+            onClick={() => void copyResults()}
+            title={resultsCopied ? "Copied" : "Copy trace results"}
+          />
+        </>
       }
     >
       <div className="flex min-h-0 flex-col overflow-y-auto px-[18px] pb-5 pt-4 sm:px-3.5 sm:pb-3.5 sm:pt-3.5">
+        {children}
         {metrics &&
           (metrics.inputTokens !== undefined ||
             metrics.outputTokens !== undefined ||

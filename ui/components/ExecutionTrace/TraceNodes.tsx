@@ -1,10 +1,9 @@
-import { Bot, ChevronRight, Wrench } from "lucide-react";
+import { ChevronRight, Wrench } from "lucide-react";
 import { useState } from "react";
 import { MAIN_AGENT_NAME } from "../../../src/agents/agentNames";
 import { formatDuration } from "../../lib/formatDuration";
 import { cx, debugBlock, eyebrowText } from "../../styles";
-import type { MessageStep, SubagentRun } from "../../types";
-import { traceStepsForDisplay } from "./normalizeTrace";
+import type { MessageStep } from "../../types";
 import {
   type TimelineSpan,
   traceStepDurationMs,
@@ -13,82 +12,6 @@ import {
 
 const LONG_SECTION_LINES = 12;
 const LONG_SECTION_CHARS = 800;
-
-function traceStepKey(step: MessageStep): string {
-  return [
-    step.kind,
-    step.status,
-    step.toolName,
-    step.agentName,
-    step.result,
-    step.error,
-  ]
-    .filter((part) => typeof part === "string" && part.length > 0)
-    .join(":");
-}
-
-function TraceStepsInner({ steps }: { steps: MessageStep[] }) {
-  return (
-    <div className="border-l border-border-subtle/80 pl-3">
-      {steps.map((step, index) => (
-        <div
-          key={traceStepKey(step)}
-          className={
-            index > 0 ? "mt-3 border-t border-border-subtle/60 pt-3" : ""
-          }
-        >
-          <TraceStepBody step={step} showIndex={false} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TraceSubagentPanel({ run }: { run: SubagentRun }) {
-  const steps = traceStepsForDisplay(run.steps ?? []);
-  if (steps.length === 0) return null;
-
-  return (
-    <details
-      className="group mt-3 rounded-lg border border-border-subtle bg-muted/25 open:bg-muted/35"
-      open={false}
-    >
-      <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-2.5 text-[0.8125rem] font-medium text-foreground marker:content-none [&::-webkit-details-marker]:hidden">
-        <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground group-open:bg-accent-soft group-open:text-accent">
-          <Bot size={15} />
-        </span>
-        <span className="min-w-0 flex-1">
-          Subagent trace
-          {run.agentName ? (
-            <span className="font-normal text-muted-foreground">
-              {" "}
-              - {run.agentName}
-            </span>
-          ) : null}
-        </span>
-        <span className="shrink-0 text-[0.6875rem] font-normal text-muted-foreground">
-          {steps.length} steps
-        </span>
-      </summary>
-      <div className="border-t border-border-subtle px-2 pb-3 pt-1">
-        {run.prompt ? (
-          <div className="mb-3 px-2 pt-2">
-            <div className={eyebrowText}>Prompt</div>
-            <pre
-              className={cx(
-                debugBlock,
-                "mt-1.5 max-h-40 overflow-auto text-[0.8125rem] leading-[1.5] text-muted-foreground",
-              )}
-            >
-              {run.prompt}
-            </pre>
-          </div>
-        ) : null}
-        <TraceStepsInner steps={steps} />
-      </div>
-    </details>
-  );
-}
 
 /** Labeled trace text that starts collapsed when it is long. */
 function TraceSection({ label, text }: { label: string; text: string }) {
@@ -215,8 +138,6 @@ export function TraceStepBody({
           </div>
         </div>
       ) : null}
-
-      {step.childRun ? <TraceSubagentPanel run={step.childRun} /> : null}
     </div>
   );
 }

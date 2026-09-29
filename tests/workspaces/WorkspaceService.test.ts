@@ -91,10 +91,14 @@ describe("workspace service", () => {
     roots.push(local);
     await workspaces.selectTemporaryDirectory("owner-a", lease.id, local);
     lease.expiresAt = Date.now() - 1;
-    const endTurn = workspaces.beginTurn("owner-a", lease.id)!;
+    let busy = true;
+    workspaces.setAgentLifecycle({
+      isBusy: () => busy,
+      onExpire: (_owner, _session, remove) => remove(),
+    });
     await workspaces.cleanupExpired();
     await fs.access(lease.hostPath);
-    endTurn();
+    busy = false;
     await workspaces.cleanupExpired();
     await expect(fs.access(lease.hostPath)).rejects.toThrow();
     expect(await workspaces.deleteTemporary("owner-a", lease.id)).toBeFalse();

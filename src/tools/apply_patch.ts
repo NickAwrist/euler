@@ -133,6 +133,7 @@ export class ApplyPatchTool extends BaseTool {
           offset += bytesWritten;
         }
         await file.truncate(bytes.length);
+        ctx?.writtenFiles.add(path);
         return textToolResult(`Patched ${path} (${hunks.length} hunks)`);
       } finally {
         await file.close();

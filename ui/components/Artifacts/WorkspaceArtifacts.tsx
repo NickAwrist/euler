@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { ArtifactSidebar } from "./ArtifactSidebar";
 import { FilePreview } from "./FilePreview";
@@ -6,6 +7,8 @@ import type { ArtifactSource } from "./api";
 import { ArtifactPreviewCache } from "./previewCache";
 
 export function WorkspaceArtifacts({
+  header,
+  alternate,
   source,
   open,
   path,
@@ -16,6 +19,8 @@ export function WorkspaceArtifacts({
   onClose,
   onWidthChange,
 }: {
+  header?: ReactNode;
+  alternate?: ReactNode;
   source: ArtifactSource;
   open: boolean;
   path: string | null;
@@ -41,26 +46,28 @@ export function WorkspaceArtifacts({
       onClose={onClose}
       onWidthChange={onWidthChange}
     >
-      {(open || activated) && (
-        <>
-          <div hidden={path !== null} className="min-h-0 flex-1">
-            <FileTree
-              source={cache}
-              active={open && path === null}
-              onOpen={onOpen}
-              rootLabel={rootLabel}
-            />
-          </div>
-          {path !== null && (
-            <FilePreview
-              key={path}
-              source={cache}
-              path={path}
-              onBack={onBack}
-            />
-          )}
-        </>
-      )}
+      {header}
+      {alternate ??
+        ((open || activated) && (
+          <>
+            <div hidden={path !== null} className="min-h-0 flex-1">
+              <FileTree
+                source={cache}
+                active={open && path === null}
+                onOpen={onOpen}
+                rootLabel={rootLabel}
+              />
+            </div>
+            {path !== null && (
+              <FilePreview
+                key={path}
+                source={cache}
+                path={path}
+                onBack={onBack}
+              />
+            )}
+          </>
+        ))}
     </ArtifactSidebar>
   );
 }

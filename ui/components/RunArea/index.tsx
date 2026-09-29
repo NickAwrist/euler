@@ -2,6 +2,7 @@ import { ArrowDown } from "lucide-react";
 import { memo, useLayoutEffect, useRef } from "react";
 import { useStickToBottom } from "use-stick-to-bottom";
 import { MAIN_AGENT_NAME } from "../../../src/agents/agentNames";
+import { AgentRows } from "../Agents/AgentTaskCard";
 import { IconButton } from "../IconButton";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { LiveThinking } from "./LiveThinking";
@@ -112,6 +113,8 @@ export const RunArea = memo(function RunArea({
             onRegenerate={onRegenerate}
             regenerateLabel={regenerateLabel}
           />
+
+          <AgentRows position={messages.length} />
 
           {(streamingStep || streamingSteps.length > 0) && (
             <StreamingStatusRow

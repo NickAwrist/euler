@@ -2,6 +2,8 @@ import type { MessageAttachment } from "../attachments/types";
 import type { MessageVersion } from "../schemas/run";
 
 export type WireMessage = {
+  id?: number;
+  activationId?: string;
   role: string;
   content: string;
   steps?: unknown;
@@ -16,7 +18,6 @@ export type SessionRow = {
   updated_at: number;
   title: string | null;
   model: string | null;
-  model_messages: string | null;
   session_directory: string | null;
   workspace_kind: "sandbox" | "local";
 };
@@ -26,6 +27,7 @@ export type SessionSummaryRow = {
   created_at: number;
   updated_at: number;
   title: string | null;
+  unread: boolean;
   preview: string;
 };
 

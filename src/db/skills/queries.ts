@@ -1,5 +1,7 @@
 import crypto from "node:crypto";
+import { DEFAULT_SKILLS } from "../../skills/defaults";
 import { getDb } from "../connection";
+import { DEFAULT_SKILLS_SEEDED_KEY_PREFIX } from "../constants";
 import type { SkillRow } from "./types";
 
 export type SkillWriteData = {
@@ -119,4 +121,20 @@ export function deleteSkillRow(ownerUuid: string, id: string): boolean {
       id,
     ]).changes > 0
   );
+}
+
+/**
+ * Gives an account the default skills once. Later deletions or renames stick
+ * because the account is marked as seeded.
+ */
+export function seedDefaultSkills(ownerUuid: string): void {
+  const db = getDb();
+  const seededKey = `${DEFAULT_SKILLS_SEEDED_KEY_PREFIX}${ownerUuid}`;
+  if (db.query("SELECT 1 FROM app_settings WHERE key = ?").get(seededKey))
+    return;
+  for (const skill of DEFAULT_SKILLS) createSkillRow(ownerUuid, skill);
+  db.run("INSERT INTO app_settings (key, value) VALUES (?, ?)", [
+    seededKey,
+    "1",
+  ]);
 }

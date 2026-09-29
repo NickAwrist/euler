@@ -1,11 +1,17 @@
 import type { Tool } from "ollama";
+import { z } from "zod";
 import type { RunContext } from "../RunContext";
 import { sandboxRunner } from "../sandbox/SandboxRunner";
 import { errorMessage } from "../utils/errors";
 import { filterOutputLines } from "../utils/gitignoreFilter";
 import { loadWorkspaceIgnore } from "../workspaces/WorkspaceIgnore";
 import { workspaceService } from "../workspaces/WorkspaceService";
-import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
+import {
+  BaseTool,
+  type ToolResult,
+  parseToolArgs,
+  textToolResult,
+} from "./BaseTool";
 import { requireWorkspace } from "./workspace";
 
 const DEFAULT_MAX_BUFFER = 2 * 1024 * 1024;
@@ -24,6 +30,12 @@ export class BashTool extends BaseTool {
         parameters: {
           type: "object",
           properties: {
+            outputFiles: {
+              type: "array",
+              items: { type: "string" },
+              description:
+                "Paths of files this command creates or modifies to attach to the reply. Only list outputs of this command.",
+            },
             command: {
               type: "string",
               description: "The shell command to execute.",
@@ -44,6 +56,10 @@ export class BashTool extends BaseTool {
     if (ctx?.signal?.aborted) return textToolResult("[command aborted]");
 
     try {
+      const { outputFiles } = parseToolArgs(
+        z.object({ outputFiles: z.array(z.string().min(1)).default([]) }),
+        args,
+      );
       const workspace = requireWorkspace(ctx);
       const result = await sandboxRunner.run({
         command,
@@ -51,6 +67,8 @@ export class BashTool extends BaseTool {
         signal: ctx?.signal,
         maxOutputBytes: DEFAULT_MAX_BUFFER,
       });
+      if (result.exitCode === 0)
+        for (const path of outputFiles) ctx?.writtenFiles.add(path);
       let output = "";
       if (result.stdout) {
         const ig = await loadWorkspaceIgnore(workspaceService, workspace, ".");

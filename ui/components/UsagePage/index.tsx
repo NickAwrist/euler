@@ -3,18 +3,12 @@ import { useEffect, useState } from "react";
 import type { UsageDashboard } from "../../../src/usage";
 import { userScopedFetch } from "../../persist/userIdentity";
 import { BackToChatButton } from "../BackToChatButton";
+import { ModelLabel } from "../ModelLabel";
 import { RefreshButton } from "../RefreshButton";
 import { SegmentedControl } from "../SegmentedControl";
 import { ModelList } from "./ModelList";
 import { UsageChart } from "./UsageChart";
-import {
-  ModelLabel,
-  ProviderLabel,
-  color,
-  money,
-  number,
-  providerColor,
-} from "./display";
+import { ProviderLabel, color, money, number, providerColor } from "./display";
 import { type SortRule, changeSorting } from "./sorting";
 import "./usage.css";
 
@@ -352,7 +346,7 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
                         <tr key={key}>
                           <td>
                             {data.grouping === "model" ? (
-                              <ModelLabel model={key} />
+                              <ModelLabel model={key} className="usage-model" />
                             ) : (
                               new Date(item.timestamp).toLocaleString(
                                 undefined,

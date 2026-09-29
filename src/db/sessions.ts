@@ -27,13 +27,14 @@ export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
   const db = getDb();
   const sessions = db
     .query(
-      "SELECT id, created_at, updated_at, title FROM sessions WHERE owner_uuid = ? ORDER BY updated_at DESC",
+      "SELECT id, created_at, updated_at, title, last_activity_at > last_viewed_at AS unread FROM sessions WHERE owner_uuid = ? ORDER BY updated_at DESC",
     )
     .all(ownerUuid) as Array<{
     id: string;
     created_at: number;
     updated_at: number;
     title: string | null;
+    unread: number;
   }>;
 
   const skillNames = new Set(listSkills(ownerUuid).map((skill) => skill.name));
@@ -48,6 +49,7 @@ export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
       created_at: s.created_at,
       updated_at: s.updated_at,
       title: s.title,
+      unread: s.unread === 1,
       preview: previewFromTitleAndFirstUser(
         s.title,
         fu?.content ?? null,
@@ -63,7 +65,7 @@ export function getSessionById(
 ): SessionRow | null {
   const row = getDb()
     .query(
-      "SELECT id, owner_uuid, created_at, updated_at, title, model, model_messages, session_directory, workspace_kind FROM sessions WHERE owner_uuid = ? AND id = ?",
+      "SELECT id, owner_uuid, created_at, updated_at, title, model, session_directory, workspace_kind FROM sessions WHERE owner_uuid = ? AND id = ?",
     )
     .get(ownerUuid, id) as SessionRow | null;
   return row ?? null;
@@ -103,9 +105,11 @@ export function getMessagesForSession(
   if (!getSessionById(ownerUuid, sessionId)) return [];
   const rows = getDb()
     .query(
-      "SELECT role, content, steps, attachments, versions FROM messages WHERE session_id = ? ORDER BY position ASC",
+      "SELECT id, activation_id, role, content, steps, attachments, versions FROM messages WHERE session_id = ? ORDER BY position ASC",
     )
     .all(sessionId) as Array<{
+    id: number;
+    activation_id: string | null;
     role: string;
     content: string;
     steps: string | null;
@@ -114,7 +118,12 @@ export function getMessagesForSession(
   }>;
 
   return rows.map((r) => {
-    const msg: WireMessage = { role: r.role, content: r.content };
+    const msg: WireMessage = {
+      id: r.id,
+      ...(r.activation_id ? { activationId: r.activation_id } : {}),
+      role: r.role,
+      content: r.content,
+    };
     if (r.steps != null && r.steps !== "") {
       try {
         msg.steps = JSON.parse(r.steps) as unknown;
@@ -167,18 +176,6 @@ function messageColumns(m: WireMessage) {
   };
 }
 
-export function parseModelMessages(
-  json: string | null,
-): Array<Record<string, unknown>> | null {
-  if (json == null || json === "") return null;
-  try {
-    const v = JSON.parse(json) as unknown;
-    return Array.isArray(v) ? (v as Array<Record<string, unknown>>) : null;
-  } catch {
-    return null;
-  }
-}
-
 export function createSessionRow(
   ownerUuid: string,
   id: string,
@@ -187,7 +184,7 @@ export function createSessionRow(
 ): SessionRow {
   const db = getDb();
   db.run(
-    "INSERT INTO sessions (id, owner_uuid, created_at, updated_at, title, model, model_messages) VALUES (?, ?, ?, ?, NULL, ?, NULL)",
+    "INSERT INTO sessions (id, owner_uuid, created_at, updated_at, title, model) VALUES (?, ?, ?, ?, NULL, ?)",
     [id, ownerUuid, now, now, model],
   );
   return {
@@ -197,7 +194,6 @@ export function createSessionRow(
     updated_at: now,
     title: null,
     model,
-    model_messages: null,
     session_directory: null,
     workspace_kind: "sandbox",
   };
@@ -218,7 +214,6 @@ export function patchSessionRow(
   patch: {
     title?: string | null;
     model?: string | null;
-    model_messages?: Array<Record<string, unknown>> | null;
     session_directory?: string | null;
     workspace_kind?: "sandbox" | "local";
     updated_at?: number;
@@ -234,92 +229,60 @@ export function patchSessionRow(
       ? patch.session_directory
       : existing.session_directory;
   const workspaceKind = patch.workspace_kind ?? existing.workspace_kind;
-  let modelMessagesJson: string | null = existing.model_messages;
-  if (patch.model_messages !== undefined) {
-    modelMessagesJson =
-      patch.model_messages == null
-        ? null
-        : JSON.stringify(patch.model_messages);
-  }
   const updatedAt = patch.updated_at ?? Date.now();
 
   getDb().run(
-    "UPDATE sessions SET title = ?, model = ?, model_messages = ?, session_directory = ?, workspace_kind = ?, updated_at = ? WHERE owner_uuid = ? AND id = ?",
-    [
-      title,
-      model,
-      modelMessagesJson,
-      sessionDirectory,
-      workspaceKind,
-      updatedAt,
-      ownerUuid,
-      id,
-    ],
+    "UPDATE sessions SET title = ?, model = ?, session_directory = ?, workspace_kind = ?, updated_at = ? WHERE owner_uuid = ? AND id = ?",
+    [title, model, sessionDirectory, workspaceKind, updatedAt, ownerUuid, id],
   );
   return true;
 }
 
-/**
- * Persists run history without rewriting the full table each time: truncates when the
- * client sends a shorter history, appends new tail rows, or updates the last row when
- * the count is unchanged (e.g. assistant steps filled in).
- */
-export function persistSessionMessages(
+/** Runtime-owned transcript writes never replace another writer's history. */
+export function appendRuntimeMessage(
   ownerUuid: string,
   sessionId: string,
-  messages: WireMessage[],
-  modelMessages: Array<Record<string, unknown>> | null,
-  updatedAt: number,
-  runModel?: string | null,
-): boolean {
-  const row = getSessionById(ownerUuid, sessionId);
-  if (!row) return false;
+  message: WireMessage,
+): number {
+  if (!getSessionById(ownerUuid, sessionId))
+    throw new Error("Session not found");
   const db = getDb();
-  const nextModel =
-    typeof runModel === "string" && runModel.trim()
-      ? runModel.trim()
-      : row.model;
-  const tx = db.transaction(() => {
-    let n = countMessagesForSession(sessionId);
-    if (messages.length < n) {
-      db.run("DELETE FROM messages WHERE session_id = ? AND position >= ?", [
-        sessionId,
-        messages.length,
-      ]);
-      n = countMessagesForSession(sessionId);
-    }
-
-    const insert = db.prepare(
-      "INSERT INTO messages (session_id, role, content, steps, attachments, versions, position) VALUES (?, ?, ?, ?, ?, ?, ?)",
-    );
-    for (let i = n; i < messages.length; i++) {
-      const m = messages[i]!;
-      const { steps, attachments, versions } = messageColumns(m);
-      insert.run(sessionId, m.role, m.content, steps, attachments, versions, i);
-    }
-
-    if (messages.length > 0 && n === messages.length) {
-      const last = messages[messages.length - 1]!;
-      const { steps, attachments, versions } = messageColumns(last);
+  return db.transaction(() => {
+    const { steps, attachments, versions } = messageColumns(message);
+    const id = Number(
       db.run(
-        "UPDATE messages SET content = ?, steps = ?, attachments = ?, versions = ? WHERE session_id = ? AND position = ?",
+        "INSERT INTO messages (session_id, role, content, steps, attachments, versions, position, activation_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         [
-          last.content,
+          sessionId,
+          message.role,
+          message.content,
           steps,
           attachments,
           versions,
-          sessionId,
-          messages.length - 1,
+          countMessagesForSession(sessionId),
+          message.activationId ?? null,
         ],
-      );
-    }
-
-    const mmJson = modelMessages == null ? null : JSON.stringify(modelMessages);
-    db.run(
-      "UPDATE sessions SET model_messages = ?, updated_at = ?, model = ? WHERE owner_uuid = ? AND id = ?",
-      [mmJson, updatedAt, nextModel, ownerUuid, sessionId],
+      ).lastInsertRowid,
     );
-  });
-  tx();
-  return true;
+    db.run(
+      "UPDATE sessions SET updated_at = ?, last_activity_at = ? WHERE id = ?",
+      [Date.now(), Date.now(), sessionId],
+    );
+    return id;
+  })();
+}
+
+export function markSessionViewed(ownerUuid: string, sessionId: string) {
+  getDb().run(
+    "UPDATE sessions SET last_viewed_at = ? WHERE id = ? AND owner_uuid = ?",
+    [Date.now(), sessionId, ownerUuid],
+  );
+}
+
+/** Removes transcript messages from `position` on. */
+export function truncateSessionMessages(sessionId: string, position: number) {
+  getDb().run("DELETE FROM messages WHERE session_id = ? AND position >= ?", [
+    sessionId,
+    position,
+  ]);
 }

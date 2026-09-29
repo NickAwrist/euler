@@ -28,7 +28,6 @@ export function getDb(): Database {
       updated_at INTEGER NOT NULL,
       title TEXT,
       model TEXT,
-      model_messages TEXT,
       session_directory TEXT,
       workspace_kind TEXT NOT NULL DEFAULT 'sandbox'
     );
@@ -96,4 +95,9 @@ export function resetDbConnection(): void {
     dbSingleton.close();
     dbSingleton = null;
   }
+}
+
+/** Runs `write` in one transaction; a nested call becomes a savepoint. */
+export function transaction<T>(write: () => T): T {
+  return getDb().transaction(write)();
 }

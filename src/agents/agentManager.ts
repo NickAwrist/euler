@@ -1,6 +1,4 @@
 import os from "node:os";
-import type { RunContext } from "../RunContext";
-import { DEFAULT_RUN_MODEL } from "../constants";
 import { listSkills } from "../db/index";
 import {
   type PersonalizationFields,
@@ -11,6 +9,7 @@ import {
   DEFAULT_SYSTEM_PROMPT,
   SUBAGENT_DIRECTIVES,
 } from "../prompts/systemPrompt";
+import { MANAGE_SUBAGENTS_SKILL_NAME } from "../skills/defaults";
 import { modelInvocableSkills, renderSkillsPrompt } from "../skills/runtime";
 import type { BaseTool } from "../tools/BaseTool";
 import { ApplyPatchTool } from "../tools/apply_patch";
@@ -25,7 +24,6 @@ import { ListFilesTool } from "../tools/list_files";
 import { LoadSkillTool } from "../tools/load_skill";
 import { ModifyPlan } from "../tools/modify_plan";
 import { ReadFileTool } from "../tools/read_file";
-import { RunSubagentTool } from "../tools/run_subagent";
 import { WebSearchTool } from "../tools/web_search";
 import { BaseAgent } from "./BaseAgent";
 import { MAIN_AGENT_NAME, SUBAGENT_NAME } from "./agentNames";
@@ -125,8 +123,13 @@ function buildAgent(
   const isSubagent = name === SUBAGENT_NAME;
   const allSkills = listSkills(opts.ownerUuid);
   // A subagent's task is written by the model, so its $skill-name references
-  // are model invocations too.
-  const skills = isSubagent ? modelInvocableSkills(allSkills) : allSkills;
+  // are model invocations too. Subagents can't spawn, so they skip the skill
+  // for managing subagents.
+  const skills = isSubagent
+    ? modelInvocableSkills(allSkills).filter(
+        (skill) => skill.name !== MANAGE_SUBAGENTS_SKILL_NAME,
+      )
+    : allSkills;
   const loadableSkills = modelInvocableSkills(skills);
   const finalPrompt = [
     renderSystemPrompt(
@@ -147,9 +150,6 @@ function buildAgent(
     finalPrompt,
   );
   agent.addTools(BUILTIN_TOOLS.map((tool) => createBuiltinTool(tool)));
-  if (!isSubagent) {
-    agent.addTool(new RunSubagentTool());
-  }
   if (loadableSkills.length > 0) {
     agent.addTool(new LoadSkillTool(loadableSkills));
   }
@@ -160,22 +160,11 @@ function buildAgent(
 }
 
 export const agentManager = {
+  createGeneralAgent(opts: CreateAgentOptions): BaseAgent {
+    return buildAgent(SUBAGENT_NAME, opts);
+  },
   createAgent(opts: CreateAgentOptions): BaseAgent {
     return buildAgent(MAIN_AGENT_NAME, opts);
-  },
-
-  /** Build a subagent that inherits its parent's run context and model. */
-  createSubagentForContext(ctx: RunContext, task: string): BaseAgent {
-    const parent = ctx.agentInstance;
-    const agent = buildAgent(SUBAGENT_NAME, {
-      ownerUuid: ctx.ownerUuid,
-      toolSessionDir: ctx.sessionDir,
-      promptContext: ctx.promptContext,
-      userPrompt: task,
-    });
-    agent.model = parent.model || DEFAULT_RUN_MODEL;
-    agent.reasoningEffort = parent.reasoningEffort;
-    return agent;
   },
 
   getToolInstance(toolName: string): BaseTool {

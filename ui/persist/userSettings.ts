@@ -1,4 +1,5 @@
-import type { RunBody } from "../../src/schemas/run";
+import type { z } from "zod";
+import type { RunMetadataSchema } from "../../src/schemas/run";
 
 const STORAGE_KEY = "euler:userSettings";
 
@@ -68,7 +69,7 @@ export function updateUserSettings(
 
 export function buildRunMetadata(
   settings: UserSettings,
-): NonNullable<RunBody["metadata"]> {
+): z.infer<typeof RunMetadataSchema> {
   return {
     systemPrompt: settings.systemPrompt?.trim() || undefined,
     name: settings.name.trim() || undefined,

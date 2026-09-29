@@ -23,7 +23,7 @@ export function useRunDebug({
         const metadata = buildRunMetadata(settings);
 
         const [promptRes, stored] = await Promise.all([
-          userScopedFetch("/api/runs/debug-prompt", {
+          userScopedFetch("/api/sessions/debug-prompt", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

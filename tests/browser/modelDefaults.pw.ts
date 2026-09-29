@@ -54,8 +54,15 @@ async function mockApp(
           ? { id: "new", model: sessionModel, history: [] }
           : path === "/api/temporary-sessions"
             ? { id: "temporary" }
-            : path.startsWith("/api/runs/active/")
-              ? { active: false }
+            : path.endsWith("/runtime")
+              ? {
+                  agents: [],
+                  activation: null,
+                  queued: [],
+                  held: false,
+                  sequence: 0,
+                  history: [],
+                }
               : path.endsWith("/health")
                 ? { connected: true }
                 : path === "/api/settings/environment"

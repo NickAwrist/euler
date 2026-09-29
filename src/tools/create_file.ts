@@ -63,6 +63,7 @@ export class CreateFileTool extends BaseTool {
     try {
       const workspace = requireWorkspace(ctx);
       await workspaceService.writeFile(workspace, rawPath, content);
+      ctx?.writtenFiles.add(rawPath);
       return textToolResult(`File created at ${rawPath}`);
     } catch (error) {
       return textToolResult(workspaceError(error));

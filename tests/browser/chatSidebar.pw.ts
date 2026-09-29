@@ -38,8 +38,17 @@ async function mockApp(page: Page) {
               }
             : path.endsWith("/health")
               ? { connected: true }
-              : path.startsWith("/api/runs/active/")
-                ? { active: false }
+              : path.endsWith("/runtime")
+                ? {
+                    agents: [],
+                    activation: null,
+                    queued: [],
+                    held: false,
+                    sequence: 0,
+                    history: [
+                      { role: "user", content: "Check the sidebar controls." },
+                    ],
+                  }
                 : path.endsWith("/artifacts/tree")
                   ? { entries: [] }
                   : {};
@@ -156,10 +165,15 @@ test("chat sidebar desktop workspace changes refresh open artifacts without remo
   await mockApp(page);
   let local = false;
   let previews = 0;
-  await page.route("**/api/sessions/sidebar-test", (route) =>
+  await page.route(/\/api\/sessions\/sidebar-test(?:\/runtime)?$/, (route) =>
     route.fulfill({
       json: {
         id: "sidebar-test",
+        agents: [],
+        activation: null,
+        queued: [],
+        held: false,
+        sequence: 0,
         model: "test",
         workspace: { kind: "sandbox" },
         history: [
@@ -498,10 +512,15 @@ test("chat sidebar desktop jumps to the latest message after scrolling up", asyn
 }) => {
   await page.setViewportSize({ width: 1440, height: 700 });
   await mockApp(page);
-  await page.route("**/api/sessions/sidebar-test", (route) =>
+  await page.route(/\/api\/sessions\/sidebar-test(?:\/runtime)?$/, (route) =>
     route.fulfill({
       json: {
         id: "sidebar-test",
+        agents: [],
+        activation: null,
+        queued: [],
+        held: false,
+        sequence: 0,
         model: "test",
         workspace: { kind: "sandbox" },
         history: Array.from({ length: 40 }, (_, i) => ({

@@ -1,6 +1,8 @@
 import type { Database } from "bun:sqlite";
 import { POPULAR_PUBLISHERS } from "../openRouterPublishers";
+import { createAgentTables } from "./agentTables";
 import { migrateAttachmentMetadata } from "./attachmentMetadataMigration";
+import { migrateChildRuns } from "./childRunMigration";
 
 function tableExists(db: Database, name: string): boolean {
   return (
@@ -148,7 +150,15 @@ export function migrateRemoveAgents(db: Database) {
     db.run("DROP TABLE IF EXISTS agent_delegations");
     db.run("DROP TABLE IF EXISTS agent_skills");
     db.run("DROP TABLE IF EXISTS agent_tools");
-    db.run("DROP TABLE IF EXISTS agents");
+    const agentColumns = db.query("PRAGMA table_info(agents)").all() as {
+      name: string;
+    }[];
+    if (
+      agentColumns.length &&
+      !agentColumns.some((c) => c.name === "session_id")
+    ) {
+      db.run("DROP TABLE agents");
+    }
     const sessionColumns = db.query("PRAGMA table_info(sessions)").all() as {
       name: string;
     }[];
@@ -173,5 +183,23 @@ export function runMigrations(db: Database) {
   migrateMessagesAttachmentsColumn(db);
   migrateSkillInvocationColumns(db);
   migrateMessagesVersionsColumn(db);
-  if (tableExists(db, "messages")) migrateAttachmentMetadata(db);
+  if (tableExists(db, "messages")) {
+    migrateAttachmentMetadata(db);
+    const messageColumns = db.query("PRAGMA table_info(messages)").all() as {
+      name: string;
+    }[];
+    if (!messageColumns.some((c) => c.name === "activation_id"))
+      db.run("ALTER TABLE messages ADD COLUMN activation_id TEXT");
+  }
+  createAgentTables(db);
+  if (tableExists(db, "messages")) migrateChildRuns(db);
+  const columns = db.query("PRAGMA table_info(sessions)").all() as {
+    name: string;
+  }[];
+  for (const column of ["last_activity_at", "last_viewed_at"]) {
+    if (!columns.some((c) => c.name === column))
+      db.run(
+        `ALTER TABLE sessions ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`,
+      );
+  }
 }

@@ -16,6 +16,7 @@ import {
   textToolResult,
 } from "../tools/BaseTool";
 import { toolErrorToString } from "../tools/errors";
+import { missingToolResults } from "./toolResults";
 
 const log = logger.child({ component: "BaseAgent" });
 
@@ -31,6 +32,9 @@ export class BaseAgent {
   TOOL_MAP: Record<string, BaseTool>;
 
   plan?: Plan;
+  beforeModelCall?: () => Promise<boolean>;
+  checkpoint?: () => void;
+  hasPendingInput?: () => boolean;
 
   constructor(
     name: string,
@@ -153,6 +157,9 @@ export class BaseAgent {
     let turnIndex = 0;
 
     do {
+      if (signal?.aborted) break;
+
+      if ((await this.beforeModelCall?.()) === false) return fullContent;
       if (signal?.aborted) break;
 
       const llmStep = ctx.beginStep({ kind: "llm_call", turnIndex });
@@ -292,6 +299,7 @@ export class BaseAgent {
         assistantMsg.reasoning = fullThinking;
       }
       this.history.push(assistantMsg);
+      this.checkpoint?.();
 
       if (toolCalls.length) {
         for (const toolCall of toolCalls) {
@@ -320,19 +328,54 @@ export class BaseAgent {
             content: result.text,
             ...(toolCall.id ? { tool_call_id: toolCall.id } : {}),
           });
+          this.checkpoint?.();
+          if (result.endActivation) {
+            // Providers require a result for every call in the assistant batch.
+            for (const skipped of toolCalls.slice(
+              toolCalls.indexOf(toolCall) + 1,
+            )) {
+              this.history.push({
+                role: "tool",
+                content: "Not executed: activation ended.",
+                ...(skipped.id ? { tool_call_id: skipped.id } : {}),
+              });
+            }
+            this.checkpoint?.();
+            return fullContent;
+          }
         }
         if (signal?.aborted) break;
         userMessage = "";
         turnIndex++;
       }
-    } while (toolCalls.length);
+    } while (toolCalls.length || this.hasPendingInput?.());
+
+    if (signal?.aborted) {
+      this.history.push(
+        ...missingToolResults(
+          this.history,
+          "Cancelled. Check the current state before retrying any operation.",
+        ),
+      );
+      this.checkpoint?.();
+    }
 
     // OpenRouter reasoning blocks are needed for immediate tool continuation,
     // but replaying them on later user turns adds large provider metadata to input.
-    this.history = this.history.map(
-      ({ reasoning: _reasoning, reasoning_details: _details, ...message }) =>
-        message,
-    );
+    // Messages without reasoning stay the same objects, so they are not saved again.
+    this.history = this.history.map((message) => {
+      if (
+        message.reasoning === undefined &&
+        message.reasoning_details === undefined
+      )
+        return message;
+      const {
+        reasoning: _reasoning,
+        reasoning_details: _details,
+        ...stripped
+      } = message;
+      return stripped;
+    });
 
     if (!signal?.aborted) {
       const completeStep = ctx.beginStep({ kind: "complete", turnIndex });

@@ -57,7 +57,18 @@ export class WorkspaceService {
   readonly ephemeralRoot: string;
   readonly trashRoot: string;
   private readonly temporaryLeases = new Map<string, TemporaryWorkspaceLease>();
-  private readonly activeTurns = new Set<string>();
+  private agentLifecycle = {
+    isBusy: (_owner: string, _session: string) => false,
+    /** Settles the chat's agents and runs `remove` before anything restarts. */
+    onExpire: (
+      _owner: string,
+      _session: string,
+      remove: () => Promise<unknown>,
+    ): Promise<unknown> => remove(),
+  };
+  setAgentLifecycle(lifecycle: typeof this.agentLifecycle) {
+    this.agentLifecycle = lifecycle;
+  }
 
   constructor(readonly dataRoot = DATA_ROOT) {
     this.retainedRoot = join(dataRoot, "workspaces");
@@ -89,9 +100,11 @@ export class WorkspaceService {
     for (const lease of this.temporaryLeases.values()) {
       if (
         lease.expiresAt <= Date.now() &&
-        !this.isTurnActive(lease.ownerUuid, lease.id)
+        !this.agentLifecycle.isBusy(lease.ownerUuid, lease.id)
       ) {
-        await this.deleteTemporary(lease.ownerUuid, lease.id);
+        await this.agentLifecycle.onExpire(lease.ownerUuid, lease.id, () =>
+          this.deleteTemporary(lease.ownerUuid, lease.id),
+        );
       }
     }
     await Promise.all([
@@ -101,17 +114,6 @@ export class WorkspaceService {
       ),
       this.purgeExpiredDirectories(this.trashRoot, TRASH_RETENTION_MS),
     ]);
-  }
-
-  beginTurn(ownerUuid: string, sessionId: string): (() => void) | null {
-    const key = `${ownerUuid}:${sessionId}`;
-    if (this.activeTurns.has(key)) return null;
-    this.activeTurns.add(key);
-    return () => this.activeTurns.delete(key);
-  }
-
-  isTurnActive(ownerUuid: string, sessionId: string): boolean {
-    return this.activeTurns.has(`${ownerUuid}:${sessionId}`);
   }
 
   private safeSegment(value: string, field: string): string {
@@ -482,7 +484,8 @@ export class WorkspaceService {
     if (
       !lease ||
       lease.ownerUuid !== ownerUuid ||
-      lease.expiresAt <= Date.now()
+      (lease.expiresAt <= Date.now() &&
+        !this.agentLifecycle.isBusy(ownerUuid, id))
     ) {
       throw new WorkspaceError("Temporary chat expired or was not found");
     }

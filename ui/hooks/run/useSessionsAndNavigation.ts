@@ -18,7 +18,6 @@ import {
   sessionPath,
 } from "../../lib/navigation";
 import { safeStorage } from "../../lib/safeStorage";
-import { getActiveRun } from "../../persist/runs";
 import {
   createSessionApi,
   createTemporarySessionApi,
@@ -37,7 +36,7 @@ import type {
   TruncateConfirmState,
 } from "../../types";
 import type { ModelOption } from "../../types";
-import type { RunFlightApi, SessionLoadState } from "./runTypes";
+import type { SessionLoadState } from "./runTypes";
 import { useSessionPreferences } from "./useSessionPreferences";
 
 const ACTIVE_SESSION_STORAGE_KEY = "activeSessionId";
@@ -78,11 +77,8 @@ type Args = {
   setStepsModalData: Dispatch<SetStateAction<TraceModalSelection>>;
   setDebugOpen: Dispatch<SetStateAction<boolean>>;
   setDebugData: Dispatch<SetStateAction<DebugData | null>>;
-  resetStreamingUi: () => void;
-  modelMessagesRef: MutableRefObject<Array<Record<string, unknown>> | null>;
   activeSessionIdRef: MutableRefObject<string | null>;
   isEphemeralRef: MutableRefObject<boolean>;
-  runFlightRef: MutableRefObject<RunFlightApi | null>;
   onNavigate?: () => void;
 };
 
@@ -96,10 +92,6 @@ export function useSessionsAndNavigation(p: Args) {
   const [sessionLoadState, setSessionLoadState] =
     useState<SessionLoadState>("loading");
   const [sessionError, setSessionError] = useState<string | null>(null);
-  const [runStatusState, setRunStatusState] = useState<
-    "pending" | "resolved" | "error"
-  >("pending");
-  const statusControllerRef = useRef<AbortController | null>(null);
 
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null);
   const [pendingDeleteSessionId, setPendingDeleteSessionId] = useState<
@@ -140,7 +132,6 @@ export function useSessionsAndNavigation(p: Args) {
 
   const resetSessionTransientState = useCallback(() => {
     p.setMessages([]);
-    p.resetStreamingUi();
     p.setEditingUserIndex(null);
     p.setTruncateConfirm(null);
     p.setStepsModalData(null);
@@ -150,7 +141,6 @@ export function useSessionsAndNavigation(p: Args) {
     preferences.setSessionModel(null);
   }, [
     p.setMessages,
-    p.resetStreamingUi,
     p.setEditingUserIndex,
     p.setTruncateConfirm,
     p.setStepsModalData,
@@ -192,10 +182,7 @@ export function useSessionsAndNavigation(p: Args) {
   }, [hasEphemeralContent, confirmEphemeralExit]);
 
   const canDiscardEmptySession =
-    p.messages.length === 0 &&
-    sessionLoadState === "empty" &&
-    runStatusState === "resolved" &&
-    !p.runFlightRef.current?.shouldPreserveMessages(activeSessionId ?? "");
+    p.messages.length === 0 && sessionLoadState === "empty";
 
   // Leaving a saved chat that never received a message deletes it.
   const discardEmptySession = useCallback(async () => {
@@ -217,116 +204,45 @@ export function useSessionsAndNavigation(p: Args) {
   const loadSession = useCallback(
     async (id: string) => {
       const gen = ++loadGenRef.current;
-      statusControllerRef.current?.abort();
-      const controller = new AbortController();
-      statusControllerRef.current = controller;
-      const previousId = p.activeSessionIdRef.current;
       p.activeSessionIdRef.current = id;
       setActiveSessionId(id);
       setSessionLoadState("loading");
       setSessionError(null);
-      setRunStatusState("pending");
       preferences.setThinkingEffort(null);
-      const cf = p.runFlightRef.current;
-      const preserve = cf?.shouldPreserveMessages(id) ?? false;
-      const initialHistory = preserve
-        ? (cf?.getTurnSnapshot() ??
-          (previousId === id ? messagesRef.current : []))
-        : [];
-      const preserveHistory = preserve && initialHistory.length > 0;
-      p.setMessages(initialHistory);
-      // A local stream owns its buffers and may already have newer content.
-      if (preserve) cf?.hydrateStreaming();
-      else p.resetStreamingUi();
+      const cleared: Message[] = [];
+      p.setMessages(cleared);
       p.setEditingUserIndex(null);
       p.setTruncateConfirm(null);
-      const initialModelMessages = preserve ? p.modelMessagesRef.current : null;
-      p.modelMessagesRef.current = initialModelMessages;
 
-      const historyRequest = (async () => {
-        try {
-          const stored = await fetchSession(id);
-          if (gen !== loadGenRef.current) return;
-          if (!stored) throw new Error("Conversation not found.");
-          preferences.setSessionModel(stored.model ?? null);
-          preferences.setWorkspace(stored.workspace ?? { kind: "sandbox" });
-          if (!preserveHistory) {
-            // Streaming completion or another writer may have updated history
-            // while this snapshot was in flight. Never replace that newer state.
-            p.setMessages((current) =>
-              gen === loadGenRef.current && current === initialHistory
-                ? stored.history
-                : current,
-            );
-            if (p.modelMessagesRef.current === initialModelMessages) {
-              p.modelMessagesRef.current = stored.modelMessages ?? null;
-            }
-          }
-          setSessionLoadState(
-            stored.history.length > 0 || initialHistory.length > 0
-              ? "loaded"
-              : "empty",
-          );
-        } catch (error) {
-          if (gen !== loadGenRef.current) return;
-          setSessionError(
-            error instanceof Error
-              ? error.message
-              : "Could not load conversation.",
-          );
-          setSessionLoadState("error");
-        }
-      })();
-
-      // Run discovery controls sending and stream reconciliation, never history display.
-      let statusError: string | null = null;
-      const discoverRun = async () => {
-        try {
-          const status = await getActiveRun(id, controller.signal);
-          if (
-            !status ||
-            typeof status.active !== "boolean" ||
-            (status.active && !status.requestId)
-          )
-            throw new Error("Invalid run status.");
-          if (gen !== loadGenRef.current) return;
-          if (
-            status.active &&
-            status.requestId &&
-            !p.runFlightRef.current?.shouldPreserveMessages(id)
-          ) {
-            p.runFlightRef.current?.reconnectToStream(id, status.requestId);
-          }
-          setRunStatusState("resolved");
-          setSessionError((current) =>
-            current === statusError ? null : current,
-          );
-        } catch (error) {
-          if (gen !== loadGenRef.current || controller.signal.aborted) return;
-          setRunStatusState("error");
-          statusError =
-            error instanceof Error
-              ? error.message
-              : "Could not check the active run.";
-          setSessionError(statusError);
-          window.setTimeout(() => {
-            if (gen === loadGenRef.current && !controller.signal.aborted) {
-              void discoverRun();
-            }
-          }, 1000);
-        }
-      };
-      void discoverRun();
-      await historyRequest;
+      try {
+        const stored = await fetchSession(id);
+        if (gen !== loadGenRef.current) return;
+        if (!stored) throw new Error("Conversation not found.");
+        preferences.setSessionModel(stored.model ?? null);
+        preferences.setWorkspace(stored.workspace ?? { kind: "sandbox" });
+        // The runtime snapshot may have set newer history while this
+        // request was in flight. Never replace that newer state.
+        p.setMessages((current) =>
+          gen === loadGenRef.current && current === cleared
+            ? stored.history
+            : current,
+        );
+        setSessionLoadState(stored.history.length > 0 ? "loaded" : "empty");
+      } catch (error) {
+        if (gen !== loadGenRef.current) return;
+        setSessionError(
+          error instanceof Error
+            ? error.message
+            : "Could not load conversation.",
+        );
+        setSessionLoadState("error");
+      }
     },
     [
       p.activeSessionIdRef,
-      p.runFlightRef,
       p.setMessages,
-      p.resetStreamingUi,
       p.setEditingUserIndex,
       p.setTruncateConfirm,
-      p.modelMessagesRef,
       preferences.setThinkingEffort,
       preferences.setSessionModel,
       preferences.setWorkspace,
@@ -340,7 +256,6 @@ export function useSessionsAndNavigation(p: Args) {
     restoreDoneRef.current = true;
     return () => {
       loadGenRef.current++;
-      statusControllerRef.current?.abort();
     };
   }, [refreshSessions, loadSession]);
 
@@ -402,14 +317,11 @@ export function useSessionsAndNavigation(p: Args) {
         model: preferences.selectedModel || null,
       });
       loadGenRef.current++;
-      statusControllerRef.current?.abort();
       p.activeSessionIdRef.current = id;
       setActiveSessionId(id);
       setSessionLoadState("empty");
-      setRunStatusState("resolved");
       setSessionError(null);
       preferences.setSessionModel(preferences.selectedModel || null);
-      p.modelMessagesRef.current = null;
       pushSessionUrl(id);
       void refreshSessions();
       return id;
@@ -418,7 +330,6 @@ export function useSessionsAndNavigation(p: Args) {
     }
   }, [
     p.activeSessionIdRef,
-    p.modelMessagesRef,
     preferences.selectedModel,
     preferences.setSessionModel,
     refreshSessions,
@@ -433,15 +344,12 @@ export function useSessionsAndNavigation(p: Args) {
     }
     const { id } = await createTemporarySessionApi();
     loadGenRef.current++;
-    statusControllerRef.current?.abort();
     setSessionLoadState("empty");
-    setRunStatusState("resolved");
     setSessionError(null);
     setActiveSessionId(id);
     resetSessionTransientState();
     setIsEphemeral(true);
     preferences.setSessionModel(null);
-    p.modelMessagesRef.current = null;
     p.onNavigate?.();
     preferences.setWorkspace({ kind: "sandbox" });
     pushSessionUrl(null);
@@ -451,7 +359,6 @@ export function useSessionsAndNavigation(p: Args) {
     p.isEphemeralRef,
     p.onNavigate,
     discardEmptySession,
-    p.modelMessagesRef,
     resetSessionTransientState,
     preferences.setSessionModel,
     preferences.setWorkspace,
@@ -485,7 +392,6 @@ export function useSessionsAndNavigation(p: Args) {
         void loadSession(urlId);
       } else {
         loadGenRef.current++;
-        statusControllerRef.current?.abort();
         p.activeSessionIdRef.current = null;
         setActiveSessionId(null);
         setIsEphemeral(false);
@@ -507,7 +413,6 @@ export function useSessionsAndNavigation(p: Args) {
   const goToHome = useCallback(async () => {
     if (!(await confirmEphemeralExit())) return;
     loadGenRef.current++;
-    statusControllerRef.current?.abort();
     const curId = p.activeSessionIdRef.current;
     if (curId && p.isEphemeralRef.current) {
       await deleteTemporarySessionApi(curId).catch(() => {});
@@ -538,7 +443,6 @@ export function useSessionsAndNavigation(p: Args) {
       }
       if (activeSessionId === id) {
         loadGenRef.current++;
-        statusControllerRef.current?.abort();
         p.activeSessionIdRef.current = null;
         setActiveSessionId(null);
         preferences.setWorkspace({ kind: "sandbox" });
@@ -626,8 +530,7 @@ export function useSessionsAndNavigation(p: Args) {
     sessionError,
     retrySessionLoad,
     sessionSendReady: activeSessionId
-      ? (sessionLoadState === "loaded" || sessionLoadState === "empty") &&
-        runStatusState === "resolved"
+      ? sessionLoadState === "loaded" || sessionLoadState === "empty"
       : !startingSession,
     renameSessionId,
     setRenameSessionId,

@@ -1,10 +1,3 @@
-/** Nested subagent run attached to a tool_call step (from RunContext.wireSteps). */
-export interface SubagentRun {
-  agentName?: string;
-  prompt?: string;
-  steps?: MessageStep[];
-}
-
 export interface MessageStep {
   kind: string;
   status?: string;
@@ -26,13 +19,14 @@ export interface MessageStep {
   };
   result?: string;
   error?: string;
-  childRun?: SubagentRun;
   /** ISO timestamps set by the server when the step begins and ends. */
   startedAt?: string;
   endedAt?: string;
 }
 
 export interface Message {
+  id?: number;
+  activationId?: string;
   role: "user" | "assistant" | "event";
   content: string;
   steps?: MessageStep[];

@@ -1,5 +1,11 @@
 import { Bug, EyeOff } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isWorkingAgent } from "../src/schemas/agents";
+import { AgentContext } from "./components/Agents/AgentContext";
+import { AgentTraceModal } from "./components/Agents/AgentTraceModal";
+import { AgentsList } from "./components/Agents/AgentsList";
+import { QueuedMessages } from "./components/Agents/QueuedMessages";
+import { SubagentModelNotice } from "./components/Agents/SubagentModelNotice";
 import { ArtifactContext } from "./components/Artifacts/ArtifactContext";
 import { initialArtifactWidth } from "./components/Artifacts/ArtifactSidebar";
 import { WorkspaceArtifacts } from "./components/Artifacts/WorkspaceArtifacts";
@@ -13,6 +19,7 @@ import { ProviderSetupBanner } from "./components/OllamaDisconnectedBanner";
 import { RenameSessionModal } from "./components/RenameSessionModal";
 import { RunArea } from "./components/RunArea";
 import { RunInputDock } from "./components/RunInputDock";
+import { SegmentedControl } from "./components/SegmentedControl";
 import { SettingsPage } from "./components/SettingsPage";
 import { Sidebar } from "./components/Sidebar";
 import { SidebarBackdrop } from "./components/SidebarBackdrop";
@@ -39,6 +46,7 @@ import {
   parseRoute,
   sessionPath,
 } from "./lib/navigation";
+import { cancelAgent } from "./persist/agents";
 import { CHAT_MAX_WIDTHS, loadAppearance } from "./persist/appearance";
 import { fetchSession } from "./persist/sessions";
 import { cx } from "./styles";
@@ -87,6 +95,15 @@ function ChatView({
   onUsage,
 }: ChatViewProps) {
   const workspaceKey = `${app.activeSessionId}:${app.workspace.kind === "local" ? app.workspace.path : "sandbox"}`;
+  const [artifactView, setArtifactView] = useState<"files" | "agents">("files");
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const selectedAgent = app.agents.find((a) => a.id === selectedAgentId);
+  const stopAgent = async (id: string) => {
+    if (app.activeSessionId) {
+      await cancelAgent(app.activeSessionId, id, app.isEphemeral);
+      await app.refreshRuntime();
+    }
+  };
   const [savedArtifacts] = useState(loadArtifactState);
   const [artifactsOpen, setArtifactsOpen] = useState(savedArtifacts.open);
   const workspaceReady =
@@ -159,9 +176,13 @@ function ChatView({
   // The remembered open state applies only to workspaces with files; an
   // explicit open in this chat shows the panel even when it is empty.
   const [openedSessionId, setOpenedSessionId] = useState<string | null>(null);
+  const subagents = app.agents.filter((a) => a.kind !== "main");
+  const workingAgentCount = subagents.filter(isWorkingAgent).length;
   const filesOpen =
     artifactsOpen &&
-    (hasFiles === true || openedSessionId === app.activeSessionId);
+    (hasFiles === true ||
+      subagents.length > 0 ||
+      openedSessionId === app.activeSessionId);
   // Settings unmounts this view, so the saved appearance is current on mount.
   const [appearance] = useState(loadAppearance);
   const [artifactsWidth, setArtifactsWidth] = useState(initialArtifactWidth);
@@ -262,219 +283,286 @@ function ChatView({
   });
 
   return (
-    <ArtifactContext.Provider
-      value={app.activeSessionId ? artifactContext : null}
+    <AgentContext.Provider
+      value={{
+        agents: app.agents,
+        phases: app.agentPhases,
+        open: setSelectedAgentId,
+        stop: stopAgent,
+      }}
     >
-      <div className="relative flex h-full w-full overflow-hidden">
-        <SidebarToggle
-          side="left"
-          open={chatsOpen}
-          onToggle={toggleChats}
-          className={filesOpen ? "max-[900px]:hidden" : undefined}
-        />
-        {app.activeSessionId && (
-          <SidebarToggle side="right" open={filesOpen} onToggle={toggleFiles} />
-        )}
-        <aside
-          id="app-sidebar"
-          aria-label="Chats"
-          aria-hidden={!chatsOpen}
-          inert={!chatsOpen}
-          className={cx(
-            "h-full w-[260px] min-w-[260px] shrink-0 overflow-hidden bg-background motion-reduce:transition-none",
-            // Mobile <= 900px: overlay drawer
-            "max-[900px]:fixed max-[900px]:top-0 max-[900px]:bottom-0 max-[900px]:left-0 max-[900px]:z-30 max-[900px]:w-[min(85vw,300px)] max-[900px]:shadow-[4px_0_24px_rgba(0,0,0,0.35)] max-[900px]:transform-gpu max-[900px]:transition-transform max-[900px]:duration-[var(--sidebar-duration)] max-[900px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
-            app.sidebarOpen
-              ? "max-[900px]:translate-x-0"
-              : "max-[900px]:-translate-x-full",
-            // Desktop: slides over the chat; chatInsets moves the chat when needed
-            "min-[901px]:absolute min-[901px]:inset-y-0 min-[901px]:left-0 min-[901px]:z-20 min-[901px]:transition-transform min-[901px]:duration-[var(--sidebar-duration)] min-[901px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
-            app.sidebarCollapsed
-              ? "min-[901px]:pointer-events-none min-[901px]:-translate-x-full min-[901px]:border-r-0"
-              : "min-[901px]:pointer-events-auto min-[901px]:translate-x-0 min-[901px]:border-r min-[901px]:border-border-subtle",
-          )}
-        >
-          <Sidebar
-            sessions={app.sessions}
-            activeSessionId={app.activeSessionId}
-            onSelectSession={(id) => {
-              app.setSidebarOpen(false);
-              app.switchToSession(id);
-            }}
-            onNewSession={app.goToHome}
-            onNewEphemeralSession={app.createEphemeralSession}
-            onRenameSession={(id) => app.setRenameSessionId(id)}
-            onExportSession={async (id) => {
-              const useCurrent =
-                id === app.activeSessionId &&
-                (app.sessionLoadState === "loaded" ||
-                  app.sessionLoadState === "empty");
-              const stored = await fetchSession(id, { fresh: true });
-              if (!stored) throw new Error("Conversation not found.");
-              const title =
-                app.sessions.find((s) => s.id === id)?.preview ?? "Chat";
-              const transcript = formatRunTranscript(
-                useCurrent ? app.messages : stored.history,
-                {
-                  title,
-                  exportedAt: new Date(),
-                  model: stored.model,
-                  streamingAssistant: useCurrent
-                    ? app.streamingContent
-                    : undefined,
-                },
-              );
-              downloadBlob(
-                new Blob([transcript], { type: "text/markdown;charset=utf-8" }),
-                transcriptFileName(title),
-              );
-            }}
-            onDeleteSession={app.requestDeleteSession}
-            onCustomization={onCustomization}
-            onSettings={onSettings}
-            onUsage={onUsage}
+      <ArtifactContext.Provider
+        value={app.activeSessionId ? artifactContext : null}
+      >
+        <div className="relative flex h-full w-full overflow-hidden">
+          <SidebarToggle
+            side="left"
+            open={chatsOpen}
+            onToggle={toggleChats}
+            className={filesOpen ? "max-[900px]:hidden" : undefined}
           />
-        </aside>
-
-        <SidebarBackdrop
-          open={app.sidebarOpen}
-          onClose={() => app.setSidebarOpen(false)}
-        />
-
-        <main
-          style={{ marginLeft: insets.left, marginRight: insets.right }}
-          className="relative h-full min-h-0 min-w-0 flex-1 bg-background transition-[margin] duration-[var(--sidebar-duration)] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
-        >
-          {app.activeSessionId && app.userSettings.showDebugButton && (
-            <button
-              type="button"
-              onClick={app.toggleDebug}
-              title="Debug inspector"
-              aria-label="Debug inspector"
-              // Keep clear of the artifacts panel, which may overlay the chat.
-              style={{
-                right: filesOpen
-                  ? Math.max(8, artifactsWidth + 8 - insets.right)
-                  : 56,
-              }}
-              className="absolute top-[calc((var(--workspace-header-height)-2.25rem-1px)/2)] z-10 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <Bug size={16} />
-            </button>
+          {app.activeSessionId && (
+            <SidebarToggle
+              side="right"
+              open={filesOpen}
+              onToggle={toggleFiles}
+            />
           )}
-          {app.isEphemeral && (
-            <span
-              title="Not saved. Messages and files are deleted when you leave."
-              // Keep clear of the chat list, which may overlay the chat.
-              style={{
-                left:
-                  chatsOpen && !mobileLayout
-                    ? Math.max(56, CHAT_LIST_WIDTH + 16 - insets.left)
-                    : 56,
-              }}
-              className="absolute top-4 z-10 inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-background px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-amber-400"
-            >
-              <EyeOff size={12} />
-              Ephemeral
-            </span>
-          )}
-
-          <section
+          <aside
+            id="app-sidebar"
+            aria-label="Chats"
+            aria-hidden={!chatsOpen}
+            inert={!chatsOpen}
             className={cx(
-              "flex h-full min-h-0 overflow-x-hidden",
-              !app.activeSessionId && "pt-0",
+              "h-full w-[260px] min-w-[260px] shrink-0 overflow-hidden bg-background motion-reduce:transition-none",
+              // Mobile <= 900px: overlay drawer
+              "max-[900px]:fixed max-[900px]:top-0 max-[900px]:bottom-0 max-[900px]:left-0 max-[900px]:z-30 max-[900px]:w-[min(85vw,300px)] max-[900px]:shadow-[4px_0_24px_rgba(0,0,0,0.35)] max-[900px]:transform-gpu max-[900px]:transition-transform max-[900px]:duration-[var(--sidebar-duration)] max-[900px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
+              app.sidebarOpen
+                ? "max-[900px]:translate-x-0"
+                : "max-[900px]:-translate-x-full",
+              // Desktop: slides over the chat; chatInsets moves the chat when needed
+              "min-[901px]:absolute min-[901px]:inset-y-0 min-[901px]:left-0 min-[901px]:z-20 min-[901px]:transition-transform min-[901px]:duration-[var(--sidebar-duration)] min-[901px]:ease-[cubic-bezier(0.22,1,0.36,1)]",
+              app.sidebarCollapsed
+                ? "min-[901px]:pointer-events-none min-[901px]:-translate-x-full min-[901px]:border-r-0"
+                : "min-[901px]:pointer-events-auto min-[901px]:translate-x-0 min-[901px]:border-r min-[901px]:border-border-subtle",
             )}
           >
-            {app.activeSessionId && !composerCentered ? (
-              <div
-                key={app.activeSessionId}
-                className="ui-animate-fade-in flex h-full min-h-0 min-w-0 flex-1 flex-col"
-              >
-                <RunArea
-                  messages={app.messages}
-                  sessionLoadState={app.sessionLoadState}
-                  sessionError={app.sessionError}
-                  sessionSendReady={app.sessionSendReady}
-                  onRetryLoad={app.retrySessionLoad}
-                  streamingSteps={app.streamingSteps}
-                  streamingStep={app.streamingStep}
-                  streamingContent={app.streamingContent}
-                  streamingThinking={app.streamingThinking}
-                  runPending={app.runPending}
-                  footerInset={runFooterInset}
-                  onViewSteps={app.setStepsModalData}
-                  editingUserIndex={app.editingUserIndex}
-                  onStartEditUser={app.setEditingUserIndex}
-                  onCancelEditUser={cancelEditUser}
-                  onRequestEditConfirm={requestEditConfirm}
-                  onRegenerate={requestRegenerate}
-                  regenerateLabel={regenerateLabel}
-                />
-              </div>
-            ) : (
-              <WelcomeHome
-                key={
-                  app.activeSessionId ??
-                  (app.isEphemeral ? "ephemeral" : "home")
-                }
-                name={app.userSettings.name}
-                sessions={app.sessions}
-                home={!app.activeSessionId}
-                ephemeral={app.isEphemeral}
-                composerHeight={runFooterInset}
-                onNewEphemeralRun={app.createEphemeralSession}
-                onOpenSession={app.switchToSession}
-              />
-            )}
-          </section>
+            <Sidebar
+              sessions={app.sessions}
+              activeSessionId={app.activeSessionId}
+              onSelectSession={(id) => {
+                app.setSidebarOpen(false);
+                app.switchToSession(id);
+              }}
+              onNewSession={app.goToHome}
+              onNewEphemeralSession={app.createEphemeralSession}
+              onRenameSession={(id) => app.setRenameSessionId(id)}
+              onExportSession={async (id) => {
+                const useCurrent =
+                  id === app.activeSessionId &&
+                  (app.sessionLoadState === "loaded" ||
+                    app.sessionLoadState === "empty");
+                const stored = await fetchSession(id, { fresh: true });
+                if (!stored) throw new Error("Conversation not found.");
+                const title =
+                  app.sessions.find((s) => s.id === id)?.preview ?? "Chat";
+                const transcript = formatRunTranscript(
+                  useCurrent ? app.messages : stored.history,
+                  {
+                    title,
+                    exportedAt: new Date(),
+                    model: stored.model,
+                    streamingAssistant: useCurrent
+                      ? app.streamingContent
+                      : undefined,
+                  },
+                );
+                downloadBlob(
+                  new Blob([transcript], {
+                    type: "text/markdown;charset=utf-8",
+                  }),
+                  transcriptFileName(title),
+                );
+              }}
+              onDeleteSession={app.requestDeleteSession}
+              onCustomization={onCustomization}
+              onSettings={onSettings}
+              onUsage={onUsage}
+            />
+          </aside>
 
-          <RunInputDock
-            centered={composerCentered}
-            ollamaModels={app.ollamaModels}
-            ollamaConnected={app.ollamaConnected}
-            modelsLoadError={app.modelsLoadError}
-            selectedModel={app.selectedModel}
-            onModelChange={app.handleModelChange}
-            thinkingEffort={app.thinkingEffort}
-            onThinkingEffortChange={app.handleThinkingEffortChange}
-            input={app.input}
-            setInput={app.setInput}
-            onSendMessage={app.sendMessage}
-            onStopGeneration={app.stopGeneration}
-            runPending={app.runPending}
-            streamingStep={app.streamingStep}
-            streamingSteps={app.streamingSteps}
-            modelSendReady={app.modelSendReady}
-            pendingImages={app.pendingImages}
-            imageError={app.imageError}
-            addPendingImages={app.addPendingImages}
-            removePendingImage={app.removePendingImage}
-            canAttachImages={app.canAttachImages}
-            attachImageDisabledReason={app.attachImageDisabledReason}
-            attachmentsSendReady={app.attachmentsSendReady}
-            workspace={app.workspace}
-            onRunCommand={runCommand}
-            onFooterHeightChange={setRunFooterInset}
+          <SidebarBackdrop
+            open={app.sidebarOpen}
+            onClose={() => app.setSidebarOpen(false)}
           />
-        </main>
-        {app.activeSessionId && workspaceReady && (
-          <WorkspaceArtifacts
-            key={workspaceKey}
-            open={filesOpen}
-            source={source}
-            path={selectedFile}
-            revision={revision}
-            rootLabel={
-              app.workspace.kind === "local" ? app.workspace.path : "/workspace"
-            }
-            onOpen={openFile}
-            onBack={() => setSelectedFile(null)}
-            onClose={() => setArtifactsOpen(false)}
-            onWidthChange={setArtifactsWidth}
+
+          <main
+            style={{ marginLeft: insets.left, marginRight: insets.right }}
+            className="relative h-full min-h-0 min-w-0 flex-1 bg-background transition-[margin] duration-[var(--sidebar-duration)] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+          >
+            {app.activeSessionId && app.userSettings.showDebugButton && (
+              <button
+                type="button"
+                onClick={app.toggleDebug}
+                title="Debug inspector"
+                aria-label="Debug inspector"
+                // Keep clear of the artifacts panel, which may overlay the chat.
+                style={{
+                  right: filesOpen
+                    ? Math.max(8, artifactsWidth + 8 - insets.right)
+                    : 56,
+                }}
+                className="absolute top-[calc((var(--workspace-header-height)-2.25rem-1px)/2)] z-10 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground/60 transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Bug size={16} />
+              </button>
+            )}
+            {app.isEphemeral && (
+              <span
+                title="Not saved. Messages and files are deleted when you leave."
+                // Keep clear of the chat list, which may overlay the chat.
+                style={{
+                  left:
+                    chatsOpen && !mobileLayout
+                      ? Math.max(56, CHAT_LIST_WIDTH + 16 - insets.left)
+                      : 56,
+                }}
+                className="absolute top-4 z-10 inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-background px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-amber-400"
+              >
+                <EyeOff size={12} />
+                Ephemeral
+              </span>
+            )}
+
+            <section
+              className={cx(
+                "flex h-full min-h-0 overflow-x-hidden",
+                !app.activeSessionId && "pt-0",
+              )}
+            >
+              {app.activeSessionId && !composerCentered ? (
+                <div
+                  key={app.activeSessionId}
+                  className="ui-animate-fade-in flex h-full min-h-0 min-w-0 flex-1 flex-col"
+                >
+                  <RunArea
+                    messages={app.messages}
+                    sessionLoadState={app.sessionLoadState}
+                    sessionError={app.sessionError}
+                    sessionSendReady={app.sessionSendReady}
+                    onRetryLoad={app.retrySessionLoad}
+                    streamingSteps={app.streamingSteps}
+                    streamingStep={app.streamingStep}
+                    streamingContent={app.streamingContent}
+                    streamingThinking={app.streamingThinking}
+                    runPending={app.runPending}
+                    footerInset={runFooterInset}
+                    onViewSteps={app.setStepsModalData}
+                    editingUserIndex={app.editingUserIndex}
+                    onStartEditUser={app.setEditingUserIndex}
+                    onCancelEditUser={cancelEditUser}
+                    onRequestEditConfirm={requestEditConfirm}
+                    onRegenerate={requestRegenerate}
+                    regenerateLabel={regenerateLabel}
+                  />
+                </div>
+              ) : (
+                <WelcomeHome
+                  key={
+                    app.activeSessionId ??
+                    (app.isEphemeral ? "ephemeral" : "home")
+                  }
+                  name={app.userSettings.name}
+                  sessions={app.sessions}
+                  home={!app.activeSessionId}
+                  ephemeral={app.isEphemeral}
+                  composerHeight={runFooterInset}
+                  onNewEphemeralRun={app.createEphemeralSession}
+                  onOpenSession={app.switchToSession}
+                />
+              )}
+            </section>
+
+            <RunInputDock
+              notices={
+                app.activeSessionId ? (
+                  <>
+                    <SubagentModelNotice
+                      agents={app.agents}
+                      model={app.selectedModel}
+                    />
+                    <QueuedMessages
+                      sessionId={app.activeSessionId}
+                      temporary={app.isEphemeral}
+                      messages={app.queuedMessages}
+                      held={app.heldUpdates}
+                      refresh={app.refreshRuntime}
+                    />
+                  </>
+                ) : undefined
+              }
+              centered={composerCentered}
+              ollamaModels={app.ollamaModels}
+              ollamaConnected={app.ollamaConnected}
+              modelsLoadError={app.modelsLoadError}
+              selectedModel={app.selectedModel}
+              onModelChange={app.handleModelChange}
+              thinkingEffort={app.thinkingEffort}
+              onThinkingEffortChange={app.handleThinkingEffortChange}
+              input={app.input}
+              setInput={app.setInput}
+              onSendMessage={app.sendMessage}
+              onStopGeneration={app.stopGeneration}
+              runPending={app.runPending}
+              streamingStep={app.streamingStep}
+              streamingSteps={app.streamingSteps}
+              modelSendReady={app.modelSendReady}
+              pendingImages={app.pendingImages}
+              imageError={app.imageError}
+              addPendingImages={app.addPendingImages}
+              removePendingImage={app.removePendingImage}
+              canAttachImages={app.canAttachImages}
+              attachImageDisabledReason={app.attachImageDisabledReason}
+              attachmentsSendReady={app.attachmentsSendReady}
+              workspace={app.workspace}
+              onRunCommand={runCommand}
+              onFooterHeightChange={setRunFooterInset}
+            />
+          </main>
+          {app.activeSessionId && workspaceReady && (
+            <WorkspaceArtifacts
+              key={workspaceKey}
+              header={
+                subagents.length > 0 && (
+                  <div className="p-3">
+                    <SegmentedControl
+                      label="Sidebar view"
+                      value={artifactView}
+                      onChange={setArtifactView}
+                      options={[
+                        { value: "files", label: "Files" },
+                        {
+                          value: "agents",
+                          label: workingAgentCount
+                            ? `Agents (${workingAgentCount})`
+                            : "Agents",
+                        },
+                      ]}
+                    />
+                  </div>
+                )
+              }
+              alternate={
+                subagents.length > 0 && artifactView === "agents" ? (
+                  <AgentsList />
+                ) : undefined
+              }
+              open={filesOpen}
+              source={source}
+              path={selectedFile}
+              revision={revision}
+              rootLabel={
+                app.workspace.kind === "local"
+                  ? app.workspace.path
+                  : "/workspace"
+              }
+              onOpen={openFile}
+              onBack={() => setSelectedFile(null)}
+              onClose={() => setArtifactsOpen(false)}
+              onWidthChange={setArtifactsWidth}
+            />
+          )}
+        </div>
+        {selectedAgent && app.activeSessionId && (
+          <AgentTraceModal
+            sessionId={app.activeSessionId}
+            temporary={app.isEphemeral}
+            agent={selectedAgent}
+            onClose={() => setSelectedAgentId(null)}
           />
         )}
-      </div>
-    </ArtifactContext.Provider>
+      </ArtifactContext.Provider>
+    </AgentContext.Provider>
   );
 }
 
@@ -614,9 +702,12 @@ export default function App() {
           <TruncateConfirmModal
             title="Delete later messages?"
             description={
-              app.truncateConfirm.kind === "regenerate"
+              (app.truncateConfirm.kind === "regenerate"
                 ? "Messages after this reply will be permanently deleted. The current reply is kept as an earlier version."
-                : "All message history after this point will be permanently deleted. This cannot be undone."
+                : "All message history after this point will be permanently deleted. This cannot be undone.") +
+              (app.rewindAgentNames.length
+                ? ` These agents will be deleted: ${app.rewindAgentNames.join(", ")}.`
+                : "")
             }
             onClose={() => app.setTruncateConfirm(null)}
             onConfirm={app.confirmTruncate}

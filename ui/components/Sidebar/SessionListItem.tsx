@@ -1,4 +1,4 @@
-import { Download, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Download, Loader2, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { cx } from "../../styles";
 import type { SessionSummary } from "../../types";
@@ -47,6 +47,20 @@ export function SessionListItem({
       >
         <div className="min-w-0">
           <div className="overflow-hidden text-[0.8125rem] leading-[1.35] text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+            {session.badge === "working" && (
+              <Loader2
+                size={12}
+                className="mr-1 inline animate-spin"
+                aria-label="Agent working"
+              />
+            )}
+            {session.badge === "unread" && (
+              <span
+                className="mr-1 inline-block size-2 rounded-full bg-accent"
+                role="img"
+                aria-label="New reply"
+              />
+            )}
             {session.preview || "New chat"}
           </div>
           <time

@@ -15,6 +15,7 @@ export const SessionWorkspaceSchema = z.discriminatedUnion("kind", [
 export type SessionWorkspace = z.infer<typeof SessionWorkspaceSchema>;
 
 export const SessionSummarySchema = z.object({
+  badge: z.enum(["working", "unread"]).nullable().optional(),
   id: z.string(),
   createdAt: z.number(),
   updatedAt: z.number(),
@@ -50,14 +51,9 @@ export const CreateSessionBodySchema = z.object({
 
 export type CreateSessionBody = z.infer<typeof CreateSessionBodySchema>;
 
-export const PatchSessionBodySchema = z.object({
+export const PatchSessionBodySchema = z.strictObject({
   customTitle: z.string().trim().nullable().optional(),
   model: z.string().trim().nullable().optional(),
-  modelMessages: z
-    .array(z.record(z.string(), z.unknown()))
-    .nullable()
-    .optional(),
-  history: z.array(WireMessageSchema).optional(),
 });
 
 export type PatchSessionBody = z.infer<typeof PatchSessionBodySchema>;

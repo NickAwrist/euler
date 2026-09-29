@@ -134,7 +134,7 @@ describe("OpenRouter provider", () => {
         `openrouter:${model}`,
         "Be concise.",
       );
-      const context = new RunContext(agent, "Hello");
+      const context = new RunContext(agent);
       await agent.run("Hello", context);
       return context.steps.find((step) => step.kind === "llm_call")?.metrics
         ?.thinkingDurationMs;
@@ -156,7 +156,7 @@ describe("OpenRouter provider", () => {
       `openrouter:${model}`,
       "Be concise.",
     );
-    const context = new RunContext(agent, "Use a tool");
+    const context = new RunContext(agent);
 
     expect(await agent.run("Use a tool", context)).toBe("Finished after tool.");
     const requests = getOpenRouterRequests();

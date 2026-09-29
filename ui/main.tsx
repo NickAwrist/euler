@@ -34,7 +34,10 @@ const Root =
                     : import.meta.env.DEV &&
                         window.location.pathname === "/dev/long-thread"
                       ? lazy(() => import("./dev/LongThreadDemo"))
-                      : App;
+                      : import.meta.env.DEV &&
+                          window.location.pathname === "/dev/agents"
+                        ? lazy(() => import("./dev/AgentsDemo"))
+                        : App;
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

@@ -16,6 +16,7 @@ export const DATA_ROOT =
       : dirname(DB_PATH));
 
 export const LEGACY_USER_DATA_CLAIMED_BY_KEY = "legacy_user_data_claimed_by";
+export const DEFAULT_SKILLS_SEEDED_KEY_PREFIX = "default_skills_seeded:";
 export const OLLAMA_HOST_KEY = "ollama_host";
 export const COMFYUI_HOST_KEY = "comfyui_host";
 export const COMFYUI_DEFAULT_MODEL_KEY = "comfyui_default_model";

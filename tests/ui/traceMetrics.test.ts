@@ -5,7 +5,7 @@ import {
 } from "../../ui/components/ExecutionTrace/traceMetrics";
 
 describe("trace metrics", () => {
-  test("aggregates nested LLM token, speed, and cost metrics", () => {
+  test("aggregates LLM token, speed, and cost metrics", () => {
     const summary = summarizeTraceMetrics([
       {
         kind: "llm_call",
@@ -16,20 +16,14 @@ describe("trace metrics", () => {
           outputDurationMs: 500,
         },
       },
+      { kind: "tool_call" },
       {
-        kind: "tool_call",
-        childRun: {
-          steps: [
-            {
-              kind: "llm_call",
-              metrics: {
-                cost: 0.00084,
-                promptTokens: 20,
-                outputTokens: 15,
-                outputDurationMs: 500,
-              },
-            },
-          ],
+        kind: "llm_call",
+        metrics: {
+          cost: 0.00084,
+          promptTokens: 20,
+          outputTokens: 15,
+          outputDurationMs: 500,
         },
       },
     ]);

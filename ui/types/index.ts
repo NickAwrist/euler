@@ -8,7 +8,6 @@ export type {
   MessageStep,
   MessageVersion,
   SessionSummary,
-  SubagentRun,
   TruncateConfirmState,
 } from "./run";
 export type { ModelOption, ModelReasoning } from "./models";
@@ -16,3 +15,4 @@ export type { ComfyUIConfigPayload, SearXNGConfigPayload } from "./settingsApi";
 export type { TraceModalOpenPayload, TraceModalSelection } from "./traceModal";
 
 export type { SettingsTab } from "./navigation";
+export type { AgentPhase } from "./agents";

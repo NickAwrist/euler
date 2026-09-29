@@ -18,22 +18,6 @@ describe("live step metadata", () => {
     );
   });
 
-  test("identifies delegation from nested run data instead of tool naming", () => {
-    const result = getLiveStepMeta(
-      {
-        kind: "tool_call",
-        status: "running",
-        toolName: "run_subagent",
-        childRun: { agentName: SUBAGENT_NAME, steps: [] },
-      },
-      2,
-      "",
-      "",
-    );
-
-    expect(result.label).toBe("Agent");
-  });
-
   test("labels subagent model calls but not the main agent's", () => {
     expect(
       getLiveStepMeta({ ...llmStep, agentName: SUBAGENT_NAME }, 3, "", ""),
