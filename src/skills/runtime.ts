@@ -1,4 +1,4 @@
-import type { SkillRow } from "../db/index";
+import type { SkillWriteBody } from "../schemas/skills";
 
 const SKILL_REFERENCE_PATTERN = /\$([a-z0-9]+(?:-[a-z0-9]+)*)\b/g;
 
@@ -23,12 +23,14 @@ export function stripSkillReferences(
 }
 
 /** Skills the agent may discover and load without an explicit $skill-name. */
-export function modelInvocableSkills(skills: SkillRow[]): SkillRow[] {
+export function modelInvocableSkills(
+  skills: readonly SkillWriteBody[],
+): SkillWriteBody[] {
   return skills.filter((skill) => !skill.disable_model_invocation);
 }
 
 export function renderSkillsPrompt(
-  skills: SkillRow[],
+  skills: readonly SkillWriteBody[],
   userMessage: string,
 ): string {
   const explicitNames = findExplicitSkillNames(userMessage);
@@ -46,7 +48,7 @@ export function renderSkillsPrompt(
 
   const lines = [
     "<skills>",
-    "Skills are user-authored instructions for specialized tasks.",
+    "Skills are instructions for specialized tasks.",
     "Only skill metadata is listed in <available_skills>. When a task clearly matches a skill, call load_skill with its exact name before doing the task.",
     "A user can invoke a skill with $skill-name. Invoked skills appear in <active_skills>; follow those instructions without calling load_skill again.",
     "<available_skills>",

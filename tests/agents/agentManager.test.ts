@@ -51,6 +51,24 @@ describe("agent runtime", () => {
     ).toBe(`Error: skill '${otherUserSkill.name}' not found`);
   });
 
+  test("offers built-in skills to the main agent only, by model invocation", async () => {
+    const agent = agentManager.createAgent({
+      ownerUuid: RUNTIME_USER_ID,
+      userPrompt: "Use $manage-subagents.",
+    });
+    expect(agent.systemPrompt).toContain('"name":"manage-subagents"');
+    expect(agent.systemPrompt).not.toContain("# Managing subagents");
+    expect(
+      (await agent.TOOL_MAP.load_skill!.execute({ name: "manage-subagents" }))
+        .text,
+    ).toContain("# Managing subagents");
+
+    const subagent = agentManager.createGeneralAgent({
+      ownerUuid: RUNTIME_USER_ID,
+    });
+    expect(subagent.systemPrompt).not.toContain("manage-subagents");
+  });
+
   test("uses the default prompt unless the user provides one", () => {
     const standard = agentManager.createAgent({
       ownerUuid: RUNTIME_USER_ID,
