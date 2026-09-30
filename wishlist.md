@@ -2,6 +2,10 @@ Really want
 
 - MCPs
 - Artifacts: interactive charts.
+- Background tools and shared networking per session/workspace:
+  - Opt-in background execution with job inspection, cancellation, and terminal inbox notifications.
+  - Shared session networking so later commands can reach development servers, plus explicit browser service exposure.
+  - Design: [Background tools and shared session networking](docs/design/background-tools-and-session-networking.md).
 
 Low priority / Nice to have
 
