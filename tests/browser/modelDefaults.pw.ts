@@ -226,3 +226,41 @@ test("model defaults desktop: empty catalogs show no default and cannot send", a
   ).toBeDisabled();
   expect(created).toEqual([]);
 });
+
+test("model defaults desktop: reset icon clears and saves the explicit preference", async ({
+  page,
+}) => {
+  await mockApp(page, "openrouter:test/remote", async () => models);
+  await page.goto("/settings/general");
+  await expect(
+    page.getByText("New chats will use this model.", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: "Use first available model",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  const reset = page.getByRole("button", {
+    name: "Reset default model",
+    exact: true,
+  });
+  await expect(reset).toBeEnabled();
+  await reset.click();
+  await expect(reset).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Model: Local", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Save settings", exact: true }),
+  ).toBeHidden();
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("euler:userSettings")!).defaultModel,
+    ),
+  ).toBe("");
+});

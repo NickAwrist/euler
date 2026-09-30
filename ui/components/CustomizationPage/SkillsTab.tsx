@@ -5,7 +5,7 @@ import { SkillEditor } from "./SkillEditor";
 import { SkillList } from "./SkillList";
 import { useSkillsPage } from "./useSkillsPage";
 
-export function SkillsPanel() {
+export function SkillsTab() {
   const p = useSkillsPage();
   const [importOpen, setImportOpen] = useState(false);
 

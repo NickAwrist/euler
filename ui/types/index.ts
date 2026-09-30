@@ -16,3 +16,4 @@ export type { TraceModalOpenPayload, TraceModalSelection } from "./traceModal";
 
 export type { SettingsTab } from "./navigation";
 export type { AgentPhase } from "./agents";
+export type { Personalization } from "./personalization";

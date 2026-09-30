@@ -4,7 +4,11 @@ import {
   loadUserSettings,
   updateUserSettings,
 } from "../../persist/userSettings";
-import type { ComfyUIConfigPayload, SearXNGConfigPayload } from "../../types";
+import type {
+  ComfyUIConfigPayload,
+  Personalization,
+  SearXNGConfigPayload,
+} from "../../types";
 
 type ComfyConfigResponse = {
   host?: string;
@@ -32,6 +36,10 @@ export function useSettings(
   );
   const userSettingsRef = useRef(userSettings);
   userSettingsRef.current = userSettings;
+
+  const savePersonalization = useCallback(async (updates: Personalization) => {
+    setUserSettings(updateUserSettings(updates));
+  }, []);
 
   const saveUserSettings = useCallback(
     async (
@@ -92,5 +100,6 @@ export function useSettings(
     userSettings,
     userSettingsRef,
     saveUserSettings,
+    savePersonalization,
   };
 }

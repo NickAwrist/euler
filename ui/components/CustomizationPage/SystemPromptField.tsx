@@ -3,8 +3,8 @@ import { useRef } from "react";
 import { PROMPT_PLACEHOLDER_LIST } from "../../../src/prompts/render";
 import { DEFAULT_SYSTEM_PROMPT } from "../../../src/prompts/systemPrompt";
 import { cx, textareaClass } from "../../styles";
+import { hintClass, labelClass } from "../../styles";
 import { Button } from "../Button";
-import { hintClass, labelClass } from "./constants";
 
 function insertAtCaret(
   textarea: HTMLTextAreaElement | null,
@@ -88,16 +88,19 @@ export function SystemPromptField({ value, onChange }: Props) {
             </button>
           ))}
         </div>
-        <div className="flex flex-col gap-0.5 text-[0.68rem] leading-snug text-muted-foreground">
-          {PROMPT_PLACEHOLDER_LIST.map((p) => (
-            <span key={p.key}>
-              <code className="font-mono text-[0.7rem] text-foreground/80">
-                {p.token}
-              </code>{" "}
-              - {p.description}
-            </span>
-          ))}
-        </div>
+        <details className="text-[0.75rem] text-muted-foreground">
+          <summary className="cursor-pointer">Placeholder reference</summary>
+          <div className="mt-2 flex flex-col gap-1 leading-snug">
+            {PROMPT_PLACEHOLDER_LIST.map((p) => (
+              <span key={p.key}>
+                <code className="font-mono text-[0.7rem] text-foreground/80">
+                  {p.token}
+                </code>{" "}
+                - {p.description}
+              </span>
+            ))}
+          </div>
+        </details>
       </div>
       <p className={hintClass}>
         Instructions for the agent and its subagents. An empty prompt uses the

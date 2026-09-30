@@ -634,7 +634,11 @@ export default function App() {
           <UsagePage onBack={backToChat} />
         ) : route.view === "customization" ? (
           <main className="relative h-full min-h-0 min-w-0 flex-1 bg-background">
-            <CustomizationPage onBack={backToChat} />
+            <CustomizationPage
+              onBack={backToChat}
+              currentSettings={app.userSettings}
+              onSave={app.savePersonalization}
+            />
           </main>
         ) : route.view === "settings" ? (
           <main className="relative h-full min-h-0 min-w-0 flex-1 bg-background">

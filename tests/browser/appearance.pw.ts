@@ -65,7 +65,8 @@ for (const device of ["desktop", "mobile"] as const) {
         "Unsaved changes in Appearance",
       );
       await page.getByRole("button", { name: "General", exact: true }).click();
-      await page.getByPlaceholder("Enter your name").fill("Ada");
+      await page.getByText("Developer tools", { exact: true }).click();
+      await page.getByRole("switch", { name: "Display debug button" }).click();
       await expect(page.locator("footer")).toContainText(
         "Unsaved changes in General, Appearance",
       );

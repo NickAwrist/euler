@@ -33,7 +33,8 @@ for (const device of ["desktop", "mobile"] as const) {
         }
       }
 
-      await page.getByPlaceholder("Enter your name").fill("Ada");
+      await page.getByText("Developer tools", { exact: true }).click();
+      await page.getByRole("switch", { name: "Display debug button" }).click();
       await expect(save).toBeInViewport();
       await expect(footer).toContainText("Unsaved changes in General");
 
@@ -52,7 +53,7 @@ for (const device of ["desktop", "mobile"] as const) {
       const dialog = page.getByRole("dialog", { name: "Discard changes?" });
       const changes = dialog.getByRole("list", { name: "Changed settings" });
       await expect(changes.getByRole("listitem")).toHaveText([
-        "NameGeneral",
+        "Display debug buttonGeneral",
         "Negative promptImage Generation",
       ]);
       await expect(
@@ -77,15 +78,18 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect(save).toBeHidden();
       await expect(page.getByLabel("Negative Prompt")).toHaveValue("");
       await page.getByRole("button", { name: "General", exact: true }).click();
-      await expect(page.getByPlaceholder("Enter your name")).toHaveValue("");
+      await page.getByText("Developer tools", { exact: true }).click();
+      await expect(
+        page.getByRole("switch", { name: "Display debug button" }),
+      ).not.toBeChecked();
 
       // The visible label toggles the switch.
-      await page.getByText("Include current date", { exact: true }).click();
+      await page.locator("label[for=showDebugButton]").click();
       await save.click();
       await expect(save).toBeHidden();
       await expect(
-        page.getByRole("switch", { name: "Include current date" }),
-      ).not.toBeChecked();
+        page.getByRole("switch", { name: "Display debug button" }),
+      ).toBeChecked();
     } finally {
       await page.close();
     }

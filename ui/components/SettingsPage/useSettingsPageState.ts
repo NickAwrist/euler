@@ -235,23 +235,6 @@ export function useSettingsPageState({
 
   const changes = useMemo((): SettingChange[] => {
     const settingChanges: [SettingsTab, string, boolean][] = [
-      ["general", "Name", settings.name !== currentSettings.name],
-      ["general", "Location", settings.location !== currentSettings.location],
-      [
-        "general",
-        "Preferred response formats",
-        settings.preferredFormats !== currentSettings.preferredFormats,
-      ],
-      [
-        "general",
-        "Include current date",
-        settings.includeCurrentDate !== currentSettings.includeCurrentDate,
-      ],
-      [
-        "general",
-        "System prompt",
-        settings.systemPrompt !== currentSettings.systemPrompt,
-      ],
       [
         "general",
         "Default model",

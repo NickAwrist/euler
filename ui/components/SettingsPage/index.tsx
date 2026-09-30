@@ -1,15 +1,14 @@
 import { Save } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { addNavigationGuard } from "../../lib/navigation";
+import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
 import { cx } from "../../styles";
 import { BackToChatButton } from "../BackToChatButton";
 import { Button } from "../Button";
+import { UnsavedChangesModal } from "../UnsavedChangesModal";
 import { AppearanceSettingsTab } from "./AppearanceSettingsTab";
 import { GeneralSettingsTab } from "./GeneralSettingsTab";
 import { ImageGenerationTab } from "./ImageGenerationTab";
 import { OllamaSettingsTab } from "./OllamaSettingsTab";
 import { OpenRouterSettingsTab } from "./OpenRouterSettingsTab";
-import { UnsavedChangesModal } from "./UnsavedChangesModal";
 import { WebSearchTab } from "./WebSearchTab";
 import { SETTINGS_TABS } from "./constants";
 import type { SettingsPageProps } from "./types";
@@ -19,35 +18,11 @@ import { useSettingsPageState } from "./useSettingsPageState";
 export function SettingsPage(props: SettingsPageProps) {
   const p = useSettingsPageState(props);
   const environment = useEnvironmentSettings();
-  const [prompt, setPrompt] = useState<"leave" | "discard" | null>(null);
-
   const { tab, onTabChange: setTab } = props;
-  const allowLeave = useRef(false);
-  const pendingLeave = useRef<((approved: boolean) => void) | null>(null);
-  const requestLeave = () =>
-    new Promise<boolean>((resolve) => {
-      pendingLeave.current = resolve;
-      setPrompt("leave");
-    });
-  useEffect(() => {
-    if (!p.isDirty) return;
-    return addNavigationGuard(async (path) => {
-      if (path.startsWith("/settings/")) return true;
-      const approved = allowLeave.current || (await requestLeave());
-      // Approval applies to this attempt; another guard may still cancel it.
-      allowLeave.current = false;
-      return approved;
-    });
-  }, [p.isDirty]);
-  const resolveLeave = (approved: boolean) => {
-    allowLeave.current = approved;
-    pendingLeave.current?.(approved);
-    pendingLeave.current = null;
-    setPrompt(null);
-  };
-  const handleBack = async () => {
-    if (!p.isDirty || (await requestLeave())) props.onBack();
-  };
+  const { prompt, setPrompt, resolveLeave } = useUnsavedChanges(
+    p.isDirty,
+    "/settings/",
+  );
   const handleSaveAndLeave = async () => {
     if (await p.handleSubmit()) resolveLeave(true);
   };
@@ -63,7 +38,7 @@ export function SettingsPage(props: SettingsPageProps) {
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
       <header className="flex shrink-0 items-center gap-3 border-b border-border-subtle bg-background px-5 py-3">
-        <BackToChatButton onClick={handleBack} />
+        <BackToChatButton onClick={props.onBack} />
         <div className="h-4 w-px bg-border-subtle" />
         <h1 className="text-[0.9375rem] font-semibold text-foreground">
           Settings
@@ -188,7 +163,10 @@ export function SettingsPage(props: SettingsPageProps) {
       {prompt === "leave" && (
         <UnsavedChangesModal
           title="Leave settings?"
-          changes={p.changes}
+          changes={p.changes.map((change) => ({
+            label: change.label,
+            group: SETTINGS_TABS.find((tab) => tab.id === change.tab)?.label,
+          }))}
           saving={p.isSaving}
           onStay={() => resolveLeave(false)}
           onDiscard={() => resolveLeave(true)}
@@ -198,7 +176,10 @@ export function SettingsPage(props: SettingsPageProps) {
       {prompt === "discard" && (
         <UnsavedChangesModal
           title="Discard changes?"
-          changes={p.changes}
+          changes={p.changes.map((change) => ({
+            label: change.label,
+            group: SETTINGS_TABS.find((tab) => tab.id === change.tab)?.label,
+          }))}
           saving={p.isSaving}
           onStay={() => setPrompt(null)}
           onDiscard={confirmDiscard}

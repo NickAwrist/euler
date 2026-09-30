@@ -1,7 +1,5 @@
-import { Button } from "../Button";
-import { Modal } from "../Modal";
-import { SETTINGS_TABS } from "./constants";
-import type { SettingChange } from "./types";
+import { Button } from "./Button";
+import { Modal } from "./Modal";
 
 export function UnsavedChangesModal({
   title,
@@ -12,7 +10,7 @@ export function UnsavedChangesModal({
   onSaveAndLeave,
 }: {
   title: string;
-  changes: SettingChange[];
+  changes: { label: string; group?: string }[];
   saving: boolean;
   onStay: () => void;
   onDiscard: () => void;
@@ -45,12 +43,12 @@ export function UnsavedChangesModal({
         >
           {changes.map((change) => (
             <li
-              key={`${change.tab}:${change.label}`}
+              key={`${change.group}:${change.label}`}
               className="flex justify-between gap-3"
             >
               <span className="text-foreground">{change.label}</span>
               <span className="shrink-0 text-muted-foreground">
-                {SETTINGS_TABS.find((tab) => tab.id === change.tab)?.label}
+                {change.group}
               </span>
             </li>
           ))}

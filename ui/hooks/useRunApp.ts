@@ -188,6 +188,7 @@ export function useRunApp() {
     searxngHost: searxng.searxngHost,
     searxngConnected: searxng.searxngConnected,
     saveUserSettings: settings.saveUserSettings,
+    savePersonalization: settings.savePersonalization,
     refreshModels: ollama.refreshOllamaModels,
     switchToSession: sessions.switchToSession,
     startSession: sessions.startSession,

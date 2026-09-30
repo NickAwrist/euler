@@ -55,7 +55,11 @@ function saveUserSettings(settings: UserSettings): void {
     includeCurrentDate: settings.includeCurrentDate ?? true,
     showDebugButton: settings.showDebugButton === true,
   };
-  safeStorage.setJSON(STORAGE_KEY, toSave);
+  if (!safeStorage.setJSON(STORAGE_KEY, toSave)) {
+    throw new Error(
+      "Could not save settings in this browser. Your changes have not been applied.",
+    );
+  }
 }
 
 export function updateUserSettings(

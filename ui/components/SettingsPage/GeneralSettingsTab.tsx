@@ -1,3 +1,4 @@
+import { RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { effectiveDefaultRunModel } from "../../lib/defaultModel";
 import {
@@ -9,9 +10,9 @@ import type { UserSettings } from "../../persist/userSettings";
 import { cx, eyebrowText } from "../../styles";
 import type { ModelOption } from "../../types";
 import { Button } from "../Button";
+import { IconButton } from "../IconButton";
 import { EnableSwitch } from "../ModelPreferenceControls";
 import { ModelSelectBar } from "../ModelSelectBar";
-import { SystemPromptField } from "./SystemPromptField";
 import { hintClass, inputClass, labelClass } from "./constants";
 
 type Props = {
@@ -87,127 +88,47 @@ export function GeneralSettingsTab({
 
       <hr className="border-border-subtle" />
 
-      <div>
-        <h2 className={cx(eyebrowText, "mb-4")}>Personal Information</h2>
-        <div className="space-y-2">
-          <label htmlFor="name" className={labelClass}>
-            Name <span className="text-muted-foreground">(optional)</span>
-          </label>
-          <input
-            type="text"
-            id="name"
-            value={settings.name}
-            onChange={(e) => onFieldChange("name", e.target.value)}
-            placeholder="Enter your name"
-            className={inputClass}
-          />
-          <p className={hintClass}>
-            Your name will be used in conversations and messages.
-          </p>
-        </div>
-        <div className="mt-4 space-y-2">
-          <label htmlFor="location" className={labelClass}>
-            Location <span className="text-muted-foreground">(optional)</span>
-          </label>
-          <input
-            type="text"
-            id="location"
-            value={settings.location}
-            onChange={(e) => onFieldChange("location", e.target.value)}
-            placeholder="e.g., New York, USA"
-            className={inputClass}
-          />
-          <p className={hintClass}>
-            Your location can help provide more relevant responses.
-          </p>
-        </div>
-      </div>
-
-      <hr className="border-border-subtle" />
-
-      <div className="space-y-4">
-        <h2 className={cx(eyebrowText, "mb-4")}>Preferences</h2>
-        <div className="space-y-2">
-          <label htmlFor="preferredFormats" className={labelClass}>
-            Preferred Response Formats{" "}
-            <span className="text-muted-foreground">(optional)</span>
-          </label>
-          <textarea
-            id="preferredFormats"
-            value={settings.preferredFormats}
-            onChange={(e) => onFieldChange("preferredFormats", e.target.value)}
-            placeholder="e.g., JSON, Markdown tables, bullet points, code snippets"
-            rows={3}
-            className="min-h-[100px] w-full rounded-lg border border-border-subtle bg-surface px-3 py-2 text-[0.875rem] text-foreground placeholder:text-muted-foreground transition-colors focus:border-border focus:outline-none"
-          />
-          <p className={hintClass}>
-            Specify how you prefer responses to be formatted.
-          </p>
-        </div>
-
-        <div className="flex items-start gap-3 pt-1">
-          <EnableSwitch
-            id="includeCurrentDate"
-            label="Include current date"
-            checked={settings.includeCurrentDate}
-            onChange={(checked) => onFieldChange("includeCurrentDate", checked)}
-          />
-          <div className="space-y-0.5">
-            <label htmlFor="includeCurrentDate" className={labelClass}>
-              Include current date
-            </label>
-            <p className={hintClass}>
-              Include today&apos;s date in the system prompt so models know what
-              day it is.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <hr className="border-border-subtle" />
-
-      <div>
-        <h2 className={cx(eyebrowText, "mb-4")}>Agent</h2>
-        <SystemPromptField
-          value={settings.systemPrompt}
-          onChange={(value) => onFieldChange("systemPrompt", value)}
-        />
-      </div>
-
-      <hr className="border-border-subtle" />
-
       <div className="space-y-2">
         <h2 className={cx(eyebrowText, "mb-2")}>Chat Defaults</h2>
         <div className="space-y-2">
           <label htmlFor="run-model" className={labelClass}>
             Default Model
           </label>
-          <ModelSelectBar
-            ollamaModels={availableModels}
-            ollamaConnected={catalogLoaded ? true : null}
-            modelsLoadError={null}
-            selectedModel={effectiveModel}
-            onModelChange={(model) => onFieldChange("defaultModel", model)}
-            disabled={!catalogLoaded || !effectiveModel}
-          />
-          {settings.defaultModel && (
-            <Button
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <ModelSelectBar
+                ollamaModels={availableModels}
+                ollamaConnected={catalogLoaded ? true : null}
+                modelsLoadError={null}
+                selectedModel={effectiveModel}
+                onModelChange={(model) => onFieldChange("defaultModel", model)}
+                disabled={!catalogLoaded || !effectiveModel}
+              />
+            </div>
+            <IconButton
+              icon={RotateCcw}
+              label="Reset default model"
+              title="Reset to first available model"
               variant="ghost"
+              disabled={!settings.defaultModel}
               onClick={() => onFieldChange("defaultModel", "")}
-            >
-              Use first available model
-            </Button>
-          )}
-          <p className={hintClass}>
-            {!catalogLoaded
-              ? "Loading models..."
-              : !effectiveModel
-                ? "No models available. Connect a provider and enable a model to start chatting."
-                : settings.defaultModel &&
-                    settings.defaultModel !== effectiveModel
-                  ? `Saved model ${settings.defaultModel} is unavailable. New chats will use the model shown above.`
-                  : "New chats will use this model."}
-          </p>
+              className="shrink-0"
+            />
+          </div>
+          {!catalogLoaded ? (
+            <p className={hintClass}>Loading models...</p>
+          ) : !effectiveModel ? (
+            <p className={hintClass}>
+              No models available. Connect a provider and enable a model to
+              start chatting.
+            </p>
+          ) : settings.defaultModel &&
+            settings.defaultModel !== effectiveModel ? (
+            <p className={hintClass}>
+              Saved model {settings.defaultModel} is unavailable. New chats will
+              use the model shown above.
+            </p>
+          ) : null}
         </div>
       </div>
       <details className="border-t border-border-subtle pt-4">
