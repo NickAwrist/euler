@@ -6,7 +6,7 @@ test("system prompt settings desktop: customize, save, and reset to default", as
 }) => {
   await page.route("**/api/**", (route) =>
     route.fulfill({
-      json: { ollamaHost: false, comfyuiHost: false, searxngHost: false },
+      json: { ollamaHost: false, comfyuiHost: false },
     }),
   );
   await page.goto("/customization");

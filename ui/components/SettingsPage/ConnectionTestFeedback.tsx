@@ -1,9 +1,5 @@
 import { cx } from "../../styles";
-import type {
-  ComfyUITestState,
-  OllamaTestState,
-  SearXNGTestState,
-} from "./types";
+import type { ComfyUITestState, OllamaTestState } from "./types";
 
 const lineClass = "text-[0.75rem]";
 
@@ -58,28 +54,6 @@ export function comfyConnectionFeedback(
       return { variant: "ok", okLabel: "Connected" };
     case "idle":
       if (comfyuiConnected === true) {
-        return { variant: "ok", okLabel: "Connected" };
-      }
-      return { variant: "idle" };
-  }
-}
-
-export function searxngConnectionFeedback(
-  state: SearXNGTestState,
-  searxngConnected: boolean | null,
-): ConnectionTestFeedbackModel {
-  switch (state.status) {
-    case "err":
-      return { variant: "err", message: state.message };
-    case "loading":
-      return {
-        variant: "loading",
-        verifyingLabel: state.holdConnected ? "Connected" : undefined,
-      };
-    case "ok":
-      return { variant: "ok", okLabel: "Connected" };
-    case "idle":
-      if (searxngConnected === true) {
         return { variant: "ok", okLabel: "Connected" };
       }
       return { variant: "idle" };

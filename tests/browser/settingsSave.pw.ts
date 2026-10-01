@@ -13,7 +13,7 @@ for (const device of ["desktop", "mobile"] as const) {
     });
     await page.route("**/api/**", (route) =>
       route.fulfill({
-        json: { ollamaHost: false, comfyuiHost: false, searxngHost: false },
+        json: { ollamaHost: false, comfyuiHost: false },
       }),
     );
     try {

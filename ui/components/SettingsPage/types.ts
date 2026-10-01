@@ -2,7 +2,6 @@ import type { UserSettings } from "../../persist/userSettings";
 import type {
   ComfyUIConfigPayload,
   ModelOption,
-  SearXNGConfigPayload,
   SettingsTab,
 } from "../../types";
 
@@ -24,12 +23,6 @@ export type OllamaTestState =
   | { status: "ok"; version: string }
   | { status: "err"; message: string };
 
-export type SearXNGTestState =
-  | { status: "idle" }
-  | { status: "loading"; holdConnected?: boolean }
-  | { status: "ok" }
-  | { status: "err"; message: string };
-
 export type SettingsPageProps = {
   tab: SettingsTab;
   onTabChange: (tab: SettingsTab) => void;
@@ -44,13 +37,10 @@ export type SettingsPageProps = {
   comfyuiDefaultWidth: number;
   comfyuiDefaultHeight: number;
   comfyuiNegativePrompt: string;
-  searxngHost: string;
-  searxngConnected: boolean | null;
   onSave: (
     settings: UserSettings,
     ollamaHost: string,
     comfyui?: ComfyUIConfigPayload,
-    searxng?: SearXNGConfigPayload,
   ) => Promise<void>;
   onModelsChanged: () => Promise<void>;
   onBack: () => void;

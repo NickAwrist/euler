@@ -11,7 +11,6 @@ import type {
 import { useComfyUIConnection } from "./run/useComfyUIConnection";
 import { useOllamaConnection } from "./run/useOllamaConnection";
 import { useRunStreaming } from "./run/useRunStreaming";
-import { useSearXNGConnection } from "./run/useSearXNGConnection";
 import { useSessionsAndNavigation } from "./run/useSessionsAndNavigation";
 import { useSettings } from "./run/useSettings";
 import { useSidebarState } from "./useSidebarState";
@@ -20,7 +19,6 @@ export function useRunApp() {
   const sidebar = useSidebarState();
   const ollama = useOllamaConnection();
   const comfy = useComfyUIConnection();
-  const searxng = useSearXNGConnection();
 
   const activeSessionIdRef = useRef<string | null>(null);
   const isEphemeralRef = useRef(false);
@@ -30,8 +28,6 @@ export function useRunApp() {
     ollama.refreshOllamaModels,
     comfy.fetchComfyUIHealth,
     comfy.applyComfyConfigResponse,
-    searxng.fetchSearXNGHealth,
-    searxng.applySearXNGConfigResponse,
   );
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -185,8 +181,6 @@ export function useRunApp() {
     comfyuiDefaultWidth: comfy.comfyuiDefaultWidth,
     comfyuiDefaultHeight: comfy.comfyuiDefaultHeight,
     comfyuiNegativePrompt: comfy.comfyuiNegativePrompt,
-    searxngHost: searxng.searxngHost,
-    searxngConnected: searxng.searxngConnected,
     saveUserSettings: settings.saveUserSettings,
     savePersonalization: settings.savePersonalization,
     refreshModels: ollama.refreshOllamaModels,
