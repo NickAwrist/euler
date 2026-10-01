@@ -192,6 +192,12 @@ export function runMigrations(db: Database) {
       db.run("ALTER TABLE messages ADD COLUMN activation_id TEXT");
   }
   createAgentTables(db);
+  db.run(
+    "CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, owner_uuid TEXT NOT NULL, payload TEXT NOT NULL)",
+  );
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_jobs_session ON jobs(session_id, owner_uuid)",
+  );
   if (tableExists(db, "messages")) migrateChildRuns(db);
   const columns = db.query("PRAGMA table_info(sessions)").all() as {
     name: string;

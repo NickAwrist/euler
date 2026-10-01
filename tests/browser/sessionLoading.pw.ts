@@ -74,7 +74,7 @@ test("session loading: async agents continue across chat messages and browser re
   ).toBeVisible();
   await expect(page.getByText("Ready", { exact: true })).toBeVisible();
   const agentRow = page.getByRole("button", {
-    name: "Research openai/gpt-5.6-terra Ready",
+    name: "Research gpt-5.6-terra Ready",
     exact: true,
   });
   await agentRow.click();
