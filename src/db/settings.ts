@@ -1,6 +1,7 @@
-import { DEFAULT_SEARXNG_HOST, envConfig } from "../env";
+import { envConfig } from "../env";
 import { getDb } from "./connection";
 import {
+  BRAVE_SEARCH_API_KEY_KEY,
   COMFYUI_DEFAULT_HEIGHT_KEY,
   COMFYUI_DEFAULT_MODEL_KEY,
   COMFYUI_DEFAULT_WIDTH_KEY,
@@ -9,7 +10,6 @@ import {
   DEFAULT_COMFYUI_NEGATIVE_PROMPT,
   OLLAMA_HOST_KEY,
   OPENROUTER_API_KEY_KEY,
-  SEARXNG_HOST_KEY,
 } from "./constants";
 
 /** Explicit environment configuration takes precedence over saved UI settings. */
@@ -64,22 +64,18 @@ export function getComfyUINegativePrompt(): string {
   return row.value.trim();
 }
 
-export function getSearXNGHost(): string {
-  return envConfig.searxngHost || getAppSetting(SEARXNG_HOST_KEY);
-}
-
-export function setSearXNGHost(host: string): void {
-  const trimmed = host.trim();
-  setAppSetting(
-    SEARXNG_HOST_KEY,
-    trimmed === DEFAULT_SEARXNG_HOST ? "" : trimmed,
-  );
-}
-
 export function getOpenRouterApiKey(): string {
   return envConfig.openrouterApiKey || getAppSetting(OPENROUTER_API_KEY_KEY);
 }
 
 export function setOpenRouterApiKey(key: string): void {
   setAppSetting(OPENROUTER_API_KEY_KEY, key);
+}
+
+export function getBraveSearchApiKey(): string {
+  return envConfig.braveSearchApiKey || getAppSetting(BRAVE_SEARCH_API_KEY_KEY);
+}
+
+export function setBraveSearchApiKey(key: string): void {
+  setAppSetting(BRAVE_SEARCH_API_KEY_KEY, key);
 }

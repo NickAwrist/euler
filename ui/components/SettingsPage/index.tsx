@@ -123,16 +123,7 @@ export function SettingsPage(props: SettingsPageProps) {
             <OpenRouterSettingsTab onModelsChanged={props.onModelsChanged} />
           )}
 
-          {tab === "web-search" && (
-            <WebSearchTab
-              environmentManaged={environment.settings?.searxngHost}
-              searxngConnected={props.searxngConnected}
-              searxngUri={p.searxngUri}
-              onSearxngUriInput={p.onSearxngUriInput}
-              searxngTestState={p.searxngTestState}
-              onTestSearXNG={p.handleTestSearXNG}
-            />
-          )}
+          {tab === "web-search" && <WebSearchTab />}
         </div>
       </main>
 

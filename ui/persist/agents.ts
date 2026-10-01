@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { AgentSchema, InboxMessageSchema } from "../../src/schemas/agents";
 import { ActivationSchema } from "../../src/schemas/events";
+import { JobSchema } from "../../src/schemas/jobs";
 import { WireMessageSchema, WireStepSchema } from "../../src/schemas/run";
 import { apiJson, apiVoid } from "../lib/api";
 export const runtimePath = (id: string, temporary = false) =>
@@ -8,6 +9,7 @@ export const runtimePath = (id: string, temporary = false) =>
 export const RuntimeSnapshotSchema = z.object({
   sequence: z.number(),
   agents: z.array(AgentSchema),
+  jobs: z.array(JobSchema).default([]),
   activation: ActivationSchema.nullable(),
   queued: z.array(InboxMessageSchema),
   held: z.boolean(),

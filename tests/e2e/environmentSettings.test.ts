@@ -1,9 +1,9 @@
 import { afterEach, expect, test } from "bun:test";
 import {
+  getBraveSearchApiKey,
   getComfyUIHost,
   getOllamaHost,
   getOpenRouterApiKey,
-  getSearXNGHost,
 } from "../../src/db";
 import { getDb } from "../../src/db/connection";
 import { envConfig } from "../../src/env";
@@ -28,18 +28,18 @@ const settings = [
     get: getComfyUIHost,
   },
   {
-    env: "searxngHost",
-    key: "searxng_host",
-    path: "/api/searxng/config",
-    field: "host",
-    get: getSearXNGHost,
-  },
-  {
     env: "openrouterApiKey",
     key: "openrouter_api_key",
     path: "/api/settings/openrouter",
     field: "apiKey",
     get: getOpenRouterApiKey,
+  },
+  {
+    env: "braveSearchApiKey",
+    key: "brave_search_api_key",
+    path: "/api/settings/brave",
+    field: "apiKey",
+    get: getBraveSearchApiKey,
   },
 ] as const;
 
@@ -98,14 +98,12 @@ for (const setting of settings) {
 test("environment ownership contains only flags and does not lock unrelated ComfyUI fields", async () => {
   envConfig.ollamaHost = "http://ollama.test";
   envConfig.comfyuiHost = "http://comfyui.test";
-  envConfig.searxngHost = "http://searxng.test";
   const { url, close } = await startTestServer();
   try {
     const ownership = await fetch(`${url}/api/settings/environment`);
     expect(await ownership.json()).toEqual({
       ollamaHost: true,
       comfyuiHost: true,
-      searxngHost: true,
     });
     const save = await fetch(`${url}/api/comfyui/config`, {
       method: "PUT",

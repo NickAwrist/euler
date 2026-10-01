@@ -6,15 +6,7 @@ import {
   loadUserSettings,
   updateUserSettings,
 } from "../../persist/userSettings";
-import type {
-  ComfyUIConfigPayload,
-  Personalization,
-  SearXNGConfigPayload,
-} from "../../types";
-
-type SearXNGConfigResponse = {
-  host?: string;
-};
+import type { ComfyUIConfigPayload, Personalization } from "../../types";
 
 export function useSettings(
   setOllamaHost: (host: string) => void,
@@ -22,8 +14,6 @@ export function useSettings(
   refreshOllamaModels: () => Promise<void>,
   fetchComfyUIHealth: () => Promise<void>,
   applyComfyConfigResponse: (data: ComfyUIConfigResponse) => void,
-  fetchSearXNGHealth: () => Promise<void>,
-  applySearXNGConfigResponse: (data: SearXNGConfigResponse) => void,
 ) {
   const [userSettings, setUserSettings] = useState<UserSettings>(() =>
     loadUserSettings(),
@@ -43,7 +33,6 @@ export function useSettings(
       settings: Partial<UserSettings>,
       ollamaHostToSave: string | undefined,
       comfyui?: ComfyUIConfigPayload,
-      searxng?: SearXNGConfigPayload,
     ) => {
       const updated = await updateUserSettings(settings);
       setUserSettings(updated);
@@ -65,18 +54,6 @@ export function useSettings(
         applyComfyConfigResponse(cData);
         void fetchComfyUIHealth();
       }
-
-      if (searxng) {
-        const sRes = await fetch("/api/searxng/config", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(searxng),
-        });
-        if (!sRes.ok) throw new Error("Failed to save SearXNG settings");
-        const sData = (await sRes.json()) as SearXNGConfigResponse;
-        applySearXNGConfigResponse(sData);
-        void fetchSearXNGHealth();
-      }
     },
     [
       setOllamaHost,
@@ -84,8 +61,6 @@ export function useSettings(
       refreshOllamaModels,
       fetchComfyUIHealth,
       applyComfyConfigResponse,
-      fetchSearXNGHealth,
-      applySearXNGConfigResponse,
     ],
   );
 

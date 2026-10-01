@@ -2,7 +2,7 @@ import "../setup";
 import { expect, spyOn, test } from "bun:test";
 import { AgentRuntime } from "../../src/agents/runtime/AgentRuntime";
 import type { OutputAttachment } from "../../src/attachments/types";
-import { setOpenRouterApiKey, setSearXNGHost } from "../../src/db";
+import { setBraveSearchApiKey, setOpenRouterApiKey } from "../../src/db";
 import { AgentStore } from "../../src/db/agents";
 import { createSessionRow, getSessionById } from "../../src/db/sessions";
 import { eventHub } from "../../src/events/eventHub";
@@ -162,7 +162,7 @@ for (const temporary of [false, true]) {
       kind: "general" as const,
     };
     runtime.store.save(child, temporary);
-    setSearXNGHost("http://searxng.test");
+    setBraveSearchApiKey("brave-child-outputs-test");
     setOpenRouterScenario("child-outputs");
     const image = {
       kind: "generated_image",

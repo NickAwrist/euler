@@ -1,0 +1,284 @@
+import { z } from "zod";
+import type { RunContext, Step } from "../RunContext";
+import { changedWorkspaceFiles } from "../agents/runtime/workspaceOutputs";
+import { getDb, transaction } from "../db/connection";
+import { type Job, JobSchema, activeJob } from "../schemas/jobs";
+import {
+  ToolContentSchema,
+  type ToolContentUpdate,
+  ToolContentUpdateSchema,
+  ToolInputSchema,
+} from "../schemas/toolContent";
+import type { ToolResult } from "../tools/BaseTool";
+import type {
+  BackgroundCapable,
+  BackgroundResult,
+  JobExecutor,
+  RunningExecution,
+} from "../tools/background";
+import { updateContent } from "./content";
+
+export class JobManager {
+  private records = new Map<string, Job>();
+  private live = new Map<
+    string,
+    {
+      controller: AbortController;
+      execution?: RunningExecution;
+      done: Promise<void>;
+    }
+  >();
+  constructor(
+    private host: {
+      temporary(sessionId: string): boolean;
+      blocked(sessionId: string): boolean;
+      notify(job: Job, wakes: boolean): void;
+      changed(job: Job): void;
+      position(sessionId: string): number;
+    },
+    private sessionLimit = z.coerce
+      .number()
+      .int()
+      .positive()
+      .parse(process.env.EULER_MAX_SESSION_JOBS ?? 4),
+    private ownerLimit = z.coerce
+      .number()
+      .int()
+      .positive()
+      .parse(process.env.EULER_MAX_OWNER_JOBS ?? 16),
+  ) {}
+  private save(job: Job) {
+    if (!this.host.temporary(job.sessionId))
+      getDb().run(
+        "INSERT INTO jobs VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",
+        [job.id, job.sessionId, job.ownerUuid, JSON.stringify(job)],
+      );
+    this.records.set(job.id, job);
+  }
+  list(owner: string, sessionId: string) {
+    if (!this.host.temporary(sessionId))
+      for (const row of getDb()
+        .query<{ id: string; payload: string }, [string, string]>(
+          "SELECT id, payload FROM jobs WHERE owner_uuid=? AND session_id=?",
+        )
+        .all(owner, sessionId)) {
+        if (!this.records.has(row.id))
+          this.records.set(row.id, JobSchema.parse(JSON.parse(row.payload)));
+      }
+    return [...this.records.values()].filter(
+      (j) => j.ownerUuid === owner && j.sessionId === sessionId,
+    );
+  }
+  busy(owner: string, sessionId: string) {
+    return this.list(owner, sessionId).some(activeJob);
+  }
+  read(owner: string, sessionId: string, id: string) {
+    const job = this.list(owner, sessionId).find((j) => j.id === id);
+    if (!job) throw new Error("Unknown job");
+    return job;
+  }
+  executor(
+    agentId: string,
+    sessionId: string,
+    activationId: string,
+  ): JobExecutor {
+    return {
+      start: (tool, args, ctx, step) =>
+        this.start(tool, args, ctx, agentId, sessionId, activationId, step),
+    };
+  }
+  private async start(
+    tool: BackgroundCapable,
+    args: Record<string, unknown>,
+    ctx: RunContext,
+    agentId: string,
+    sessionId: string,
+    activationId: string,
+    step?: Step,
+  ): Promise<ToolResult> {
+    const workspace = ctx.workspace;
+    if (!workspace) throw new Error("Workspace required");
+    const input = ToolInputSchema.parse(tool.describeInput(args));
+    if (this.host.blocked(sessionId) || ctx.signal?.aborted)
+      throw new Error("Job starts are blocked");
+    const active = [...this.records.values()].filter(activeJob);
+    if (
+      active.filter((j) => j.sessionId === sessionId).length >=
+        this.sessionLimit ||
+      active.filter((j) => j.ownerUuid === ctx.ownerUuid).length >=
+        this.ownerLimit
+    )
+      throw new Error("Active job limit reached");
+    const job: Job = {
+      id: `job_${crypto.randomUUID()}`,
+      ownerUuid: ctx.ownerUuid,
+      sessionId,
+      agentId,
+      activationId,
+      input: input.content,
+      spawnPosition: this.host.position(sessionId),
+      tool: tool.name,
+      description: input.summary,
+      status: "starting",
+      createdAt: Date.now(),
+      endedAt: null,
+      progress: null,
+      output: null,
+      metadata: null,
+      outputTruncated: false,
+      notified: false,
+    };
+    this.save(job);
+    if (step) step.jobId = job.id;
+    const controller = new AbortController();
+    let finish!: () => void;
+    const done = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const handle = {
+      controller,
+      done,
+      execution: undefined as RunningExecution | undefined,
+    };
+    this.live.set(job.id, handle);
+    this.host.changed(job);
+    let presentationError: Error | undefined;
+    const settle = async (
+      result?: BackgroundResult,
+      executionError?: unknown,
+    ) => {
+      let error = executionError ?? presentationError;
+      for (const target of ["output", "metadata"] as const) {
+        const content = result?.[target];
+        if (!content) continue;
+        const parsed = ToolContentSchema.safeParse(content);
+        if (parsed.success) job[target] = parsed.data;
+        else error = new Error(z.prettifyError(parsed.error));
+      }
+      try {
+        if (result) {
+          job.result = {
+            text: result.text,
+            failed: result.failed,
+            attachments: result.attachments,
+          };
+          if (!controller.signal.aborted && !error && !result.failed) {
+            const files = await changedWorkspaceFiles(
+              workspace,
+              new Set(result.outputFiles ?? []),
+              sessionId,
+              this.host.temporary(sessionId),
+            );
+            job.result.attachments = [...(result.attachments ?? []), ...files];
+          }
+        }
+        if (error)
+          job.error = error instanceof Error ? error.message : String(error);
+        job.status = presentationError
+          ? "failed"
+          : controller.signal.aborted
+            ? "cancelled"
+            : error || result?.failed
+              ? "failed"
+              : "succeeded";
+        job.endedAt = Date.now();
+        transaction(() => {
+          this.save(job);
+          if (job.status !== "cancelled" && !this.host.blocked(sessionId)) {
+            this.host.notify(job, true);
+            job.notified = true;
+            this.save(job);
+          }
+        });
+        this.host.changed(job);
+      } finally {
+        this.live.delete(job.id);
+        finish();
+      }
+    };
+    const publish = (
+      target: "progress" | "output",
+      update: ToolContentUpdate,
+    ) => {
+      if (controller.signal.aborted || !this.live.has(job.id)) return;
+      const parsed = ToolContentUpdateSchema.safeParse(update);
+      if (!parsed.success) {
+        presentationError = new Error(z.prettifyError(parsed.error));
+        controller.abort();
+        return;
+      }
+      const updated = updateContent(job[target], parsed.data);
+      job[target] = updated.content;
+      if (target === "output")
+        job.outputTruncated =
+          (parsed.data.mode === "append" && job.outputTruncated) ||
+          updated.truncated;
+    };
+    try {
+      handle.execution = await tool.start(args, {
+        workspace,
+        signal: controller.signal,
+        background: true,
+        emitProgress: (update) => publish("progress", update),
+        emitOutput: (update) => publish("output", update),
+      });
+      job.status = "running";
+      this.save(job);
+      this.host.changed(job);
+      void handle.execution.completion
+        .then(
+          (result) => settle(result),
+          (error) => settle(undefined, error),
+        )
+        .catch((error) => console.error("Job settlement failed", error));
+    } catch (error) {
+      await settle(undefined, error);
+    }
+    return { text: JSON.stringify({ jobId: job.id, status: job.status }) };
+  }
+  async cancel(owner: string, sessionId: string, id: string) {
+    const job = this.read(owner, sessionId, id);
+    const handle = this.live.get(job.id);
+    if (handle) {
+      handle.controller.abort();
+      await handle.execution?.cancel();
+      await handle.done;
+    }
+    return this.read(owner, sessionId, id);
+  }
+  async cancelAgent(owner: string, sessionId: string, agentId?: string) {
+    await Promise.all(
+      this.list(owner, sessionId)
+        .filter((j) => activeJob(j) && (!agentId || j.agentId === agentId))
+        .map((j) => this.cancel(owner, sessionId, j.id)),
+    );
+  }
+  remove(owner: string, sessionId: string) {
+    for (const job of this.list(owner, sessionId)) this.records.delete(job.id);
+    if (!this.host.temporary(sessionId))
+      getDb().run("DELETE FROM jobs WHERE session_id=? AND owner_uuid=?", [
+        sessionId,
+        owner,
+      ]);
+  }
+  recover() {
+    for (const row of getDb()
+      .query<{ payload: string }, []>("SELECT payload FROM jobs")
+      .all()) {
+      const job = JobSchema.parse(JSON.parse(row.payload));
+      if (activeJob(job)) {
+        job.status = "interrupted";
+        job.endedAt = Date.now();
+        job.error = "Interrupted by backend restart";
+        transaction(() => {
+          this.save(job);
+          if (!job.notified) {
+            this.host.notify(job, false);
+            job.notified = true;
+            this.save(job);
+          }
+        });
+      }
+    }
+  }
+}

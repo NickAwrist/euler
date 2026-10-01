@@ -23,6 +23,6 @@ export const COMFYUI_DEFAULT_MODEL_KEY = "comfyui_default_model";
 export const COMFYUI_DEFAULT_WIDTH_KEY = "comfyui_default_width";
 export const COMFYUI_DEFAULT_HEIGHT_KEY = "comfyui_default_height";
 export const COMFYUI_NEGATIVE_PROMPT_KEY = "comfyui_negative_prompt";
-export const SEARXNG_HOST_KEY = "searxng_host";
 export const OPENROUTER_API_KEY_KEY = "openrouter_api_key";
 export { DEFAULT_COMFYUI_NEGATIVE_PROMPT } from "../schemas/userPreferences";
+export const BRAVE_SEARCH_API_KEY_KEY = "brave_search_api_key";

@@ -335,12 +335,15 @@ test("create_file creates missing parents but rejects a symlink substituted afte
 
 test("bash filters dependency and Git paths using the sandbox working directory", async () => {
   const { ctx } = await fixture();
-  const run = spyOn(sandboxRunner, "run").mockResolvedValue({
-    stdout:
-      "/workspace/README.md\n/workspace/node_modules/pkg/README.md\n./.git/objects/README.md\n.cache/README.md\n/workspace/.github/README.md",
-    stderr: "",
-    exitCode: 0,
-    truncated: false,
+  const run = spyOn(sandboxRunner, "spawn").mockResolvedValue({
+    cancel: async () => {},
+    completion: Promise.resolve({
+      stdout:
+        "/workspace/README.md\n/workspace/node_modules/pkg/README.md\n./.git/objects/README.md\n.cache/README.md\n/workspace/.github/README.md",
+      stderr: "",
+      exitCode: 0,
+      truncated: false,
+    }),
   });
   try {
     const result = await new BashTool().execute(

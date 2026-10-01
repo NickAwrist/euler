@@ -31,8 +31,6 @@ export default function SettingsDemo() {
         comfyuiDefaultWidth={1440}
         comfyuiDefaultHeight={1440}
         comfyuiNegativePrompt=""
-        searxngHost="http://searxng.test"
-        searxngConnected={false}
         onSave={async (next) =>
           setSettings((current) => ({ ...current, ...next }))
         }

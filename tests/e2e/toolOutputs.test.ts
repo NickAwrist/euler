@@ -5,9 +5,9 @@ import type WebSocket from "ws";
 import type { MessageAttachment } from "../../src/attachments/types";
 import { ComfyUIClient } from "../../src/comfyui/client";
 import {
+  setBraveSearchApiKey,
   setComfyUIHost,
   setOpenRouterApiKey,
-  setSearXNGHost,
 } from "../../src/db";
 import { setOpenRouterScenario } from "../helpers/mockOpenRouter";
 import { startTestServer, userHeaders } from "../helpers/server";
@@ -25,7 +25,7 @@ describe("tool outputs", () => {
     setOpenRouterApiKey("sk-or-tool-outputs-test");
     setOpenRouterScenario("tool-outputs");
     setComfyUIHost("http://comfyui.test");
-    setSearXNGHost("http://searxng.test");
+    setBraveSearchApiKey("brave-tool-outputs-test");
     const connect = spyOn(
       ComfyUIClient.prototype,
       "connectWebSocket",

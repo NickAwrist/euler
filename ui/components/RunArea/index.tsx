@@ -4,6 +4,7 @@ import { useStickToBottom } from "use-stick-to-bottom";
 import { MAIN_AGENT_NAME } from "../../../src/agents/agentNames";
 import { AgentRows } from "../Agents/AgentTaskCard";
 import { IconButton } from "../IconButton";
+import { JobRows } from "../Jobs/JobTaskCard";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { LiveThinking } from "./LiveThinking";
 import { MessageHistory } from "./MessageHistory";
@@ -115,6 +116,7 @@ export const RunArea = memo(function RunArea({
           />
 
           <AgentRows position={messages.length} />
+          <JobRows position={messages.length} />
 
           {(streamingStep || streamingSteps.length > 0) && (
             <StreamingStatusRow

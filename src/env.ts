@@ -3,7 +3,6 @@ const DEFAULT_FRONTEND_PORT = 5174;
 const DEFAULT_BACKEND_HOST = "127.0.0.1";
 const DEFAULT_MAX_RUNNING_AGENTS = 4;
 export const DEFAULT_COMFYUI_HOST = "http://127.0.0.1:8188";
-export const DEFAULT_SEARXNG_HOST = "http://127.0.0.1:8080";
 
 function getEnv(name: string): string {
   return process.env[name]?.trim() ?? "";
@@ -56,7 +55,6 @@ export const envConfig = {
   ),
   ollamaHost: getFirstEnv(["EULER_OLLAMA_HOST", "OLLAMA_HOST"]),
   comfyuiHost: getFirstEnv(["EULER_COMFYUI_HOST", "COMFYUI_HOST"]),
-  searxngHost: getFirstEnv(["EULER_SEARXNG_HOST", "SEARXNG_HOST"]),
   jinaApiKey: getFirstEnv(["JINA_API_KEY", "EULER_JINA_API_KEY"]),
   serveFrontend: getBoolean(["EULER_SERVE_FRONTEND"], true),
   /** Agent activations one user may run at once, across all chats. */
@@ -68,6 +66,10 @@ export const envConfig = {
     "OPENROUTER_API_KEY",
     "EULER_OPENROUTER_API_KEY",
   ]),
+  braveSearchApiKey: getFirstEnv([
+    "BRAVE_SEARCH_API_KEY",
+    "EULER_BRAVE_SEARCH_API_KEY",
+  ]),
 };
 
 /** Only expose ownership flags to the browser, never environment secrets. */
@@ -75,7 +77,6 @@ export function getEnvironmentSettings() {
   return {
     ollamaHost: Boolean(envConfig.ollamaHost),
     comfyuiHost: Boolean(envConfig.comfyuiHost),
-    searxngHost: Boolean(envConfig.searxngHost),
   };
 }
 

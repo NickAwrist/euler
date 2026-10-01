@@ -165,18 +165,19 @@ const originalFetch = globalThis.fetch;
       );
     }
 
-    // 3. SearXNG mock
-    if (pathname.endsWith("/search")) {
+    // 3. Brave Search mock
+    if (urlString.startsWith("https://api.search.brave.com/")) {
       return new Response(
         JSON.stringify({
-          results: [
-            {
-              title: "Mocked Search Result 1",
-              url: "https://example.com/result1",
-              content: "This is a mocked search result from SearXNG.",
-              engine: "google",
-            },
-          ],
+          web: {
+            results: [
+              {
+                title: "Mocked Search Result 1",
+                url: "https://example.com/result1",
+                description: "This is a mocked search result from Brave.",
+              },
+            ],
+          },
         }),
         {
           status: 200,
