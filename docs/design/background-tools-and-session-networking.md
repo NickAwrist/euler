@@ -1,244 +1,66 @@
 # Background tools and shared session networking
 
-Status: proposed design, implementation has not started.
-
-Updated: 2026-09-29.
-
-## Purpose
-
-Let agents start long-running tools, continue working, and receive their results
-later. Let shell commands in the same session reach services started by earlier
-commands, including development servers. Both features are required for the
-workflow: start a server, test it from another command, inspect it in a browser,
-and stop it when finished.
-
-This extends the [existing agent runtime](async-agents.md). Jobs are tool
-executions, not agents: they have no model history or scheduling budget of their
-own. Their completion messages use the existing inbox and activation scheduler.
-
-## Proposed product decisions
-
-- Tools opt into background execution through a typed capability interface.
-  Bash is the first implementation. Web search remains foreground-only.
-- Capable tools expose `background: boolean`, defaulting to false. The shared
-  tool layer owns this argument and rejects it for unsupported tools.
-- Foreground and background execution share the same tool operation.
-- Jobs belong to the agent that started them, within its owner and session.
-  Ending a reply leaves them running; explicit cancellation or dismissal stops
-  them. Session deletion stops all jobs before workspace removal.
-- Jobs emit terminal inbox notifications, not a message for every log chunk.
-- Network scope is one session and one active workspace generation. Sharing a
-  local directory between chats does not share their ports or services.
-- Commands keep separate filesystem and PID isolation while sharing session
-  networking. Host networking and outbound internet access are not enabled by
-  this change.
-- Backend restarts interrupt jobs and discard network environments. Neither
-  commands nor servers are automatically restarted.
-- Browser access uses explicit service exposure. A URL containing `localhost`
-  inside the sandbox is not directly usable by a host or remote browser.
-
-These are implementation defaults for this proposal, not shipped behavior.
-
-## Current constraints
-
-[`BaseAgent`](../../src/agents/BaseAgent.ts) awaits every tool and then records
-one result in model history. Keep that provider-required call/result pairing:
-a background call receives a job handle immediately, and completion is a new
-runtime message rather than a second result for the original call.
-
-[`RunContext`](../../src/RunContext.ts) is activation-scoped. Its signal, steps,
-written-file set, and attachment collection must not own background execution.
-
-[`SandboxRunner`](../../src/sandbox/SandboxRunner.ts) currently creates a fresh
-network namespace for each call with `--unshare-all`. It also applies a
-120-second wall timeout, a 60-second CPU limit, and kills commands when their
-2 MiB output budget fills. Returning early from Bash does not fix those limits
-or make one call's server reachable from another.
-
-[`WorkspaceService`](../../src/workspaces/WorkspaceService.ts) supports both
-retained and temporary chats, and local directories. Expiry and workspace
-switching currently depend on agent activity. Running jobs need an execution
-lease even when every agent is idle.
+Background tool execution is implemented. Shared session networking and browser
+service exposure below remain proposals.
 
 ## Feature 1: background tool execution
 
-### Agent interaction
+Tools opt in through [BackgroundCapable](../../src/tools/background.ts).
+The dispatcher adds `background: boolean` to their model-facing definition,
+validates it, and returns a job handle immediately when requested. Unsupported
+tools reject the argument. Bash uses the same process runner in both modes.
 
 ```text
-bash({ command: "bun run dev", background: true })
+bash({ command: "echo READY; sleep 10; echo DONE", background: true })
   -> { jobId: "job_123", status: "running" }
 
-get_job({ jobId: "job_123", cursor: 0 })
-  -> {
-       status: "running",
-       output: [{ cursor: 1, channel: "stdout", text: "Listening on :5173" }],
-       nextCursor: 1,
-       outputTruncated: false
-     }
+get_job({ jobId: "job_123" })
+  -> { status: "running", output: { blocks: [{ kind: "code", text: "READY\n" }] }, ... }
 
 cancel_job({ jobId: "job_123" })
-  -> { jobId: "job_123", status: "cancelled" }
+  -> { status: "cancelled", ... }
 ```
 
-`get_job` returns status even when there is no new output. On completion it also
-returns the result or error. Reads have a bounded output size. Terminal results
-remain available after inbox delivery, subject to session retention.
+`get_job` returns the current status and retained output snapshot. The starting
+agent and its same-session ancestors can inspect or cancel the job. Completion
+also sends one durable runtime inbox message to its owner, using the existing
+[agent scheduler](async-agents.md). A normal reply ending leaves the job running.
+Stop, dismissal, rewind, and session deletion cancel affected jobs and await
+process cleanup. Backend restart marks unfinished jobs interrupted, with a
+non-waking notification; it never restarts work automatically.
 
-Start does not imply readiness. The agent can read logs and run an HTTP health
-check. Output-based readiness patterns and a bounded wait tool are deferred.
+Tools own their Input, optional Progress, Output, and optional Metadata through
+[ToolContent](../../src/schemas/toolContent.ts), which supports text, code, and
+fields. Progress and Output accept append or replace updates and retain bounded
+64 KiB snapshots. The shared renderer does not branch on tool names. Bash
+streams stdout/stderr into one Output block, retained at completion, and returns
+the real process exit code as Metadata. Nothing infers status from printed text.
 
-### Capability and dispatch
+The [job manager](../../src/jobs/JobManager.ts) owns IDs, agent/session ownership,
+status, timestamps, cancellation, limits, persistence, and notifications. Retained
+jobs use SQLite; temporary jobs stay in memory. Live handles and intermediate
+output are memory-only, so a crash can lose recent logs. Runtime boundaries and
+stored records use shared Zod schemas. Defaults allow four active jobs per
+session and sixteen per user, including starting jobs.
 
-Illustrative contracts, with shared schemas to be added under `src/schemas/`:
+The Jobs sidebar and inline job cards open the same modal. It polls running jobs
+once per second, shows one output block and collapsed Metadata, and keeps timing
+separate from tool content. Elapsed time updates while active and freezes when
+finished. Requests live in `ui/persist/jobs.ts`; reload restores runtime state.
 
-```ts
-interface BackgroundCapable {
-  start(
-    args: Record<string, unknown>,
-    ctx: JobContext,
-  ): Promise<RunningExecution>;
-}
+Background Bash drains output even after old logs are discarded, keeps filesystem
+and PID isolation, and cancels descendants. It removes the foreground wall/CPU
+timeouts so a service can keep running. Foreground limits are unchanged. Commands
+still use separate isolated networks; a service started in one command is not
+reachable from another command or a host browser through this feature.
 
-interface RunningExecution {
-  completion: Promise<ToolResult>;
-  cancel(): Promise<void>;
-}
-
-interface JobContext {
-  ownerUuid: string;
-  sessionId: string;
-  agentId: string;
-  workspace: Workspace;
-  signal: AbortSignal;
-  emitOutput(chunk: { channel: "stdout" | "stderr" | "progress"; text: string }): void;
-}
-```
-
-Use a typed capability guard. Do not infer support from a tool name, advertise
-background mode for every `BaseTool`, or maintain a second allowlist of capable
-tools. One shared schema builder adds the reserved `background` argument only
-when the interface is implemented. Runtime validation requires an actual
-boolean and strips that argument before validating the tool's own arguments.
-
-The dispatcher uses an injected execution service, exposed through the run
-context, rather than importing `AgentRuntime`. Ordinary tools retain their
-existing `execute()` path. Capable tools use `start()` for both modes; Bash's
-existing execution body moves into that path, with no second spawn implementation.
-
-Output publishing is installed before work starts. A subscribe-after-start
-interface can lose the first output chunks. Attach completion handlers
-immediately so early failures cannot become unhandled promise rejections.
-
-`start()` acknowledges creation of an execution handle, not successful completion
-or readiness. Validation errors return directly. Spawn failures either fail
-start or settle the created job, depending on when they occur.
-
-### Job manager and storage
-
-Add a server-owned job manager beside the agent runtime. It owns:
-
-- Job IDs, owner/session/agent relationships, originating activation and step,
-  workspace generation, timestamps, and a bounded human-readable description.
-- Admission limits, execution handles, independent abort controllers, and
-  workspace/network leases. Reserve capacity before starting work.
-- A bounded output tail, initially 64 KiB per job, with monotonically increasing
-  chunk cursors. Report gaps when a cursor predates retained output. Continue
-  draining process pipes when old logs are discarded.
-- Terminal results, cancellation reasons, and completion notifications.
-
-Use tool-independent states:
-
-```ts
-type JobStatus =
-  | "starting"
-  | "running"
-  | "succeeded"
-  | "failed"
-  | "cancelled"
-  | "interrupted";
-```
-
-Keep Bash exit code and signal in result metadata. Do not parse result text such
-as `Error:` to discover failure. Capable implementations must reject or return
-an explicit typed failure when the operation fails. A future ComfyUI adapter
-can use the same interface without fabricating process exit codes.
-
-Persist retained-session metadata, terminal results, and a bounded terminal
-output tail using the existing SQLite patterns. Live handles and intermediate
-logs are memory-only initially; acknowledge that a crash can lose recent logs.
-Temporary chats use memory-backed records, matching the agent store. Validate
-stored and API data with Zod rather than trusting type annotations.
-
-Introduce configurable per-session and per-owner active-job limits. Suggested
-initial defaults are 4 and 16. Limits count starting jobs too, and admission is
-atomic. These are separate from model concurrency and automatic-turn limits.
-
-### Completion, inboxes, and output files
-
-Persist terminal state and enqueue one typed `job` notification atomically in
-the same store transaction. Include `jobId`, originating tool, status, a short
-output tail, and result attachments. Record notification identity so recovery
-cannot enqueue it twice. Sender is the runtime; job output remains untrusted
-tool data and carries no user authority.
-
-Delivery follows existing step boundaries. An eligible idle agent wakes; held
-input and the automatic-turn budget still apply. Terminal notifications must
-not bypass a user stop or cause an activation solely because the backend
-restarted. Startup interruption notices are non-waking and available on the
-next permitted activation. Suppress waking messages during deletion, rewind,
-and explicit cancellation. Keep terminal state inspectable regardless.
-
-The owner and its same-session ancestors can inspect and cancel jobs; unrelated
-agents cannot. The authenticated session UI can inspect all that user's session
-jobs. When an owner has become final, retain the result without reviving it.
-
-Add a compact `<background_jobs>` block beside the pending-agent summary,
-containing IDs, tool names, descriptions, and active states. Do not include
-continuous logs or repeat terminal results after delivery. This provides
-discovery without requiring a separate list tool initially.
-
-Record attachments through the owning agent's pending-output path, never a
-finished activation's `RunContext`. Preserve explicit Bash `outputFiles` in
-job metadata and resolve them against its captured workspace on successful
-completion. Reuse workspace attachment logic rather than scanning the entire
-workspace per log update or attributing background writes to a later reply.
-
-### Lifecycle rules
-
-| Event | Job behavior | Network behavior |
-| --- | --- | --- |
-| Reply ends, agent becomes idle | Keep running | Keep while leased |
-| Agent explicitly stopped or dismissed | Cancel its jobs and await cleanup | Release their leases |
-| Session stop | Apply existing agent-stop scope and cancel jobs of stopped agents | Release affected leases |
-| Conversation rewound | Cancel all session jobs before truncating history | Close exposed services and retire the environment |
-| Workspace changed | Reject while agents or jobs are active | Retire the old generation before accepting new commands |
-| Session deleted or temporary workspace expires | Block starts, cancel jobs, await cleanup before removal | Close bridges and keeper before removal |
-| Backend restarts or keeper dies | Mark affected unfinished jobs interrupted | Invalidate leases and service URLs |
-
-Rewind cancels all session jobs initially, even jobs started before the target
-message. Their filesystem effects cannot be rolled back; cancellation prevents
-future writes but does not restore old files. Document that existing limitation.
-
-Cancellation is idempotent. Resolve cancellation-versus-completion races through
-one terminal transition; never publish both success and cancellation. A cancel
-acknowledgment means cleanup has finished. If cleanup fails, retain an error and
-block unsafe workspace removal rather than claiming the process stopped.
-
-### Bash process management
-
-Add `SandboxRunner.spawn()` returning a live handle, output publisher, completion,
-and cancellation. Implement `run()` by collecting output and awaiting that
-handle. Preserve foreground timeout and output-limit behavior initially.
-
-Background policy removes the foreground wall timeout and CPU lifetime limit;
-keep file-descriptor and memory containment and bounded job admission. This
-is a deliberate resource-policy change, not a claim that concurrency limits
-bound CPU usage. Optional deadlines can be added explicitly later.
-
-Cancellation must terminate descendants, not just the shell PID. Prefer the
-per-command PID namespace teardown already associated with containment, verify
-it experimentally, and use bounded graceful termination followed by forced
-termination. Only release leases after processes and streams have settled.
+Verification lives in `tests/e2e/backgroundJobs.test.ts`, `tests/jobs/`,
+`tests/sandbox/background.test.ts`, and `tests/browser/jobs.pw.ts`. It covers real
+Bash completion, live inspection, attachments, failure, admission limits, output
+bounds, descendant cleanup, temporary sessions, rewind, deletion, restart, and UI
+reload/cancellation. The browser fixture uses deterministic model replies with
+the actual HTTP server, SQLite, and Bash runner. Screenshots and recordings are
+under `.cache/jobs-evidence` and `.cache/browser-results`.
 
 ## Feature 2: shared networking per session/workspace
 
@@ -349,58 +171,29 @@ Until this stage ships, state that command-to-command networking works while
 host/remote browser access is unavailable. Do not call the entire dev-server
 workflow complete without browser reachability and HMR verification.
 
-## API and UI integration
+## Proposed networking integration and acceptance checks
 
-Add validated job contracts and user-scoped session job read/cancel routes.
-Expose active jobs and services in runtime snapshots, and emit job state changes
-through the existing per-user event hub. Avoid sending every raw log chunk over
-the event stream initially; bounded reads provide details when opened.
+Service state should extend the existing runtime snapshots and use the same
+user-scoped APIs, shared schemas, and `ui/persist/` request helpers as jobs.
+Service URLs need authenticated access and revocation when their leases end.
 
-Link the completed launch tool step to its job ID. The launch step is done when
-the handle is returned; the job has a separate running status. Reuse the trace
-modal for output/status and shared buttons for inspect and cancel. Register
-generic job tools centrally without changing a tool's capability declaration.
-An additional Jobs sidebar is deferred.
-
-UI requests belong in `ui/persist/` through `ui/lib/api.ts`, with schemas shared
-from `src/schemas/`. Reload uses the runtime snapshot to restore job state rather
-than assuming the original activation remains active.
-
-## Implementation sequence and acceptance checks
-
-1. **Prove session namespace joining.** Start a loopback server in one isolated
-   command and request it from another. Prove separate sessions can use the same
-   port, cross-session and host networking stay inaccessible, local-owner file
-   ownership is preserved, and descendants stop on cancellation. Record the
-   supported kernel/Bubblewrap/helper requirements and diagnostics.
-2. **Build shared spawn and job execution.** Add capability dispatch, lifecycle
-   storage, bounded output, Bash background mode, and generic job tools. Verify
-   foreground compatibility, immediate failure, early output, output overflow,
-   nonzero exit, admission races, cancellation races, and final results.
-3. **Integrate runtime delivery and session leases.** Verify one terminal inbox
-   notification, delivery at step boundaries, normal reply completion leaving
-   jobs alive, held/budget behavior, attachments, restart interruption, deletion,
-   rewind, workspace switching, and temporary-workspace expiry. Use retained and
-   temporary session tests and deterministic model responses.
-4. **Ship shared session networking.** Route all session Bash calls through the
-   leased environment. Run real Linux integration tests for server/curl across
-   calls, parallel agents, port isolation, keeper death, and resource teardown.
-   Unsupported hosts may skip these tests locally, but require a supported Linux
-   CI run before claiming verification.
-5. **Add service exposure and the minimal job UI.** Verify authenticated browser
-   access on the actual deployment origin, assets and HMR WebSockets, reload,
-   inspection, cancellation, URL revocation, and denial of another user's
+1. Prove namespace joining with a loopback server started in one isolated command
+   and requested from another. Verify session/host isolation, separate sessions
+   using the same port, local-owner file permissions, and descendant cleanup.
+2. Route session Bash calls through the leased environment. Test server/curl
+   across calls, parallel agents, keeper death, and resource teardown. Require a
+   supported Linux CI run before claiming verification.
+3. Add browser service exposure on the deployment origin. Verify assets and HMR
+   WebSockets, reload, cancellation, URL revocation, and denial of another user's
    service. This completes the dev-server workflow.
 
-For implementation changes, run affected Bun tests, `bunx tsc --noEmit`, and
-`bun run lint`. Add `bun run build` for UI changes and `bun run test:browser` for
-interaction changes. Keep pure lifecycle tests separate from real namespace
-tests so a missing Linux capability cannot hide job-state failures.
+Keep job lifecycle checks separate from real namespace tests so missing Linux
+capabilities cannot hide job-state failures.
 
 ## Deferred work
 
 - Readiness patterns, automatic polling, and a bounded wait tool.
-- A job sidebar, durable full logs, and process reattachment after restart.
+- Durable full logs and process reattachment after restart.
 - Background image generation. It is a useful second capability implementation,
   but must support meaningful failure and cancellation of its remote work.
 - Networking shared across distinct chats using the same local workspace.

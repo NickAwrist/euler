@@ -9,6 +9,8 @@ export type SandboxRunOptions = {
   signal?: AbortSignal;
   maxOutputBytes?: number;
   timeoutMs?: number;
+  background?: boolean;
+  emitOutput?: (chunk: { channel: "stdout" | "stderr"; text: string }) => void;
 };
 
 export type SandboxRunResult = {
@@ -21,6 +23,12 @@ export type SandboxRunResult = {
 export interface SandboxRunner {
   capability(): Promise<{ available: boolean; diagnostic?: string }>;
   run(options: SandboxRunOptions): Promise<SandboxRunResult>;
+  spawn(options: SandboxRunOptions): Promise<SandboxExecution>;
+}
+
+export interface SandboxExecution {
+  completion: Promise<SandboxRunResult>;
+  cancel(): Promise<void>;
 }
 
 const DEFAULT_MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
@@ -38,6 +46,10 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
   }
 
   async run(options: SandboxRunOptions): Promise<SandboxRunResult> {
+    return (await this.spawn(options)).completion;
+  }
+
+  async spawn(options: SandboxRunOptions): Promise<SandboxExecution> {
     const capability = await this.capability();
     if (!capability.available) {
       throw new Error(
@@ -45,10 +57,23 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
           "Shell containment is unavailable on this host",
       );
     }
-    return this.spawnSandbox(
-      this.argumentsFor(options.workspace, options.command),
-      options,
-    );
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (options.signal?.aborted) abort();
+    else options.signal?.addEventListener("abort", abort, { once: true });
+    const completion = this.spawnSandbox(
+      this.argumentsFor(options.workspace, options.command, options.background),
+      { ...options, signal: controller.signal },
+    ).finally(() => options.signal?.removeEventListener("abort", abort));
+    // The caller receives the handle asynchronously. Observe immediate failures.
+    void completion.catch(() => {});
+    return {
+      completion,
+      cancel: async () => {
+        controller.abort();
+        await completion.catch(() => {});
+      },
+    };
   }
 
   private spawnSandbox(
@@ -124,24 +149,37 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
         outputBytes += chunk.byteLength;
         return current + chunk.toString();
       };
+      let stoppedError: Error | undefined;
       const abort = () => {
+        stoppedError = new Error("Command aborted");
         stop();
-        finish(() => reject(new Error("Command aborted")));
       };
-      const timeout = setTimeout(() => {
-        stop();
-        finish(() => reject(new Error("Command timed out")));
-      }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+      const timeout = options.background
+        ? undefined
+        : setTimeout(() => {
+            stop();
+            stoppedError = new Error("Command timed out");
+          }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
       child.stdout.on("data", (chunk: Buffer) => {
-        stdout = append(stdout, chunk);
+        options.emitOutput?.({ channel: "stdout", text: chunk.toString() });
+        stdout = options.background
+          ? (stdout + chunk.toString()).slice(-65536)
+          : append(stdout, chunk);
       });
       child.stderr.on("data", (chunk: Buffer) => {
-        stderr = append(stderr, chunk);
+        options.emitOutput?.({ channel: "stderr", text: chunk.toString() });
+        stderr = options.background
+          ? (stderr + chunk.toString()).slice(-65536)
+          : append(stderr, chunk);
       });
       child.on("error", (error) => finish(() => reject(error)));
       child.on("close", (exitCode) =>
-        finish(() => resolve({ stdout, stderr, exitCode, truncated })),
+        finish(() =>
+          stoppedError
+            ? reject(stoppedError)
+            : resolve({ stdout, stderr, exitCode, truncated }),
+        ),
       );
 
       if (options.signal?.aborted) abort();
@@ -193,7 +231,11 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
     }
   }
 
-  private argumentsFor(workspace: Workspace, command: string): string[] {
+  private argumentsFor(
+    workspace: Workspace,
+    command: string,
+    background = false,
+  ): string[] {
     const args = [
       "--die-with-parent",
       "--new-session",
@@ -233,7 +275,7 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
       "--",
       "/bin/sh",
       "-c",
-      'ulimit -t 60; ulimit -n 256; ulimit -v 2097152 2>/dev/null || true; exec /bin/sh -c "$1"',
+      `${background ? "" : "ulimit -t 60; "}ulimit -n 256; ulimit -v 2097152 2>/dev/null || true; exec /bin/sh -c "$1"`,
       "euler-shell",
       command,
     );

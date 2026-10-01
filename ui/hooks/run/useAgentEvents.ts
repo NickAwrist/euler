@@ -12,6 +12,7 @@ import { type AgentPhases, nextAgentPhases } from "./agentPhases";
 
 const empty = (): RuntimeSnapshot => ({
   agents: [],
+  jobs: [],
   activation: null,
   queued: [],
   held: false,
@@ -184,6 +185,7 @@ export function useAgentEvents(
   );
   return {
     agents: state.agents,
+    jobs: state.jobs,
     phases,
     queued: state.queued,
     held: state.held,

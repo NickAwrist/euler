@@ -43,6 +43,7 @@ export const InboxMessageSchema = z.object({
     "result",
     "failure",
     "control",
+    "job",
   ]),
   content: z.string(),
   wakes: z.boolean(),

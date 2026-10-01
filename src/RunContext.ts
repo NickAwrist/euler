@@ -24,6 +24,7 @@ export type Step = {
   status: StepStatus;
   turnIndex: number;
   toolName?: string;
+  jobId?: string;
   args?: Record<string, unknown>;
   result?: string;
   thinking?: string;
@@ -41,6 +42,7 @@ export type OnStreamDelta = (
 ) => void;
 
 export class RunContext {
+  jobs?: import("./tools/background").JobExecutor;
   agentInstance: BaseAgent;
   readonly agentName: string;
   readonly signal?: AbortSignal;
@@ -179,6 +181,7 @@ export class RunContext {
     };
     if (step.endedAt) out.endedAt = step.endedAt;
     if (step.toolName) out.toolName = step.toolName;
+    if (step.jobId) out.jobId = step.jobId;
     if (step.args) out.args = step.args;
     if (step.result !== undefined) out.result = step.result;
     if (step.thinking !== undefined) out.thinking = step.thinking;

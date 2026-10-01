@@ -12,9 +12,15 @@ import {
   parseToolArgs,
   textToolResult,
 } from "./BaseTool";
+import type { JobContext, RunningExecution } from "./background";
 import { requireWorkspace } from "./workspace";
 
 const DEFAULT_MAX_BUFFER = 2 * 1024 * 1024;
+
+const BashArgs = z.object({
+  command: z.string().min(1),
+  outputFiles: z.array(z.string().min(1)).default([]),
+});
 
 export class BashTool extends BaseTool {
   constructor() {
@@ -56,19 +62,66 @@ export class BashTool extends BaseTool {
     if (ctx?.signal?.aborted) return textToolResult("[command aborted]");
 
     try {
-      const { outputFiles } = parseToolArgs(
-        z.object({ outputFiles: z.array(z.string().min(1)).default([]) }),
-        args,
-      );
+      const { outputFiles } = parseToolArgs(BashArgs, args);
       const workspace = requireWorkspace(ctx);
-      const result = await sandboxRunner.run({
-        command,
+      const execution = await this.start(args, {
         workspace,
-        signal: ctx?.signal,
-        maxOutputBytes: DEFAULT_MAX_BUFFER,
+        signal: ctx?.signal ?? new AbortController().signal,
+        background: false,
+        emitProgress: () => {},
+        emitOutput: () => {},
       });
-      if (result.exitCode === 0)
+      const result = await execution.completion;
+      if (!result.failed)
         for (const path of outputFiles) ctx?.writtenFiles.add(path);
+      return result;
+    } catch (error) {
+      if (ctx?.signal?.aborted) return textToolResult("[command aborted]");
+      return textToolResult(`Error executing command: ${errorMessage(error)}`);
+    }
+  }
+
+  describeInput(args: Record<string, unknown>) {
+    const { command } = parseToolArgs(BashArgs, args);
+    return {
+      summary: command.slice(0, 300),
+      content: {
+        blocks: [{ kind: "code" as const, language: "bash", text: command }],
+      },
+    };
+  }
+
+  async start(
+    args: Record<string, unknown>,
+    ctx: JobContext,
+  ): Promise<RunningExecution> {
+    const { command, outputFiles } = parseToolArgs(BashArgs, args);
+    const workspace = ctx.workspace;
+    ctx.emitOutput({
+      mode: "replace",
+      content: { blocks: [{ kind: "code", text: "" }] },
+    });
+    const execution = await sandboxRunner.spawn({
+      command,
+      workspace,
+      signal: ctx.signal,
+      background: ctx.background,
+      emitOutput: (chunk) =>
+        ctx.emitOutput({
+          mode: "append",
+          content: {
+            blocks: [
+              {
+                kind: "code",
+                text: chunk.text,
+              },
+            ],
+          },
+        }),
+      maxOutputBytes: DEFAULT_MAX_BUFFER,
+    });
+    const completion = (async () => {
+      const result = await execution.completion;
       let output = "";
       if (result.stdout) {
         const ig = await loadWorkspaceIgnore(workspaceService, workspace, ".");
@@ -85,12 +138,29 @@ export class BashTool extends BaseTool {
       if (result.exitCode !== 0) {
         output += `\n[command exited with status ${result.exitCode}]`;
       }
-      return textToolResult(
-        output || "Command executed successfully with no output.",
-      );
-    } catch (error) {
-      if (ctx?.signal?.aborted) return textToolResult("[command aborted]");
-      return textToolResult(`Error executing command: ${errorMessage(error)}`);
-    }
+      return {
+        text: output || "Command executed successfully with no output.",
+        failed: result.exitCode !== 0,
+        outputFiles: result.exitCode === 0 ? outputFiles : [],
+        metadata: {
+          blocks: [
+            {
+              kind: "fields" as const,
+              fields: [
+                {
+                  label: "Exit code",
+                  value:
+                    result.exitCode === null
+                      ? "terminated"
+                      : String(result.exitCode),
+                },
+              ],
+            },
+          ],
+        },
+      };
+    })();
+    void completion.catch(() => {});
+    return { completion, cancel: () => execution.cancel() };
   }
 }

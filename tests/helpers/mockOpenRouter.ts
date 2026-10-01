@@ -1,4 +1,5 @@
 export type OpenRouterScenario =
+  | "background-jobs"
   | "async-agents"
   | "agent-question"
   | "blocking-agent"
@@ -79,6 +80,66 @@ export async function handleOpenRouterRequest(
   const body = (await request.json()) as Record<string, unknown>;
   requests.push({ headers: request.headers, body });
 
+  if (scenario === "background-jobs") {
+    const messages = body.messages as Array<{ role: string; content: string }>;
+    const lastUser = messages.findLast(
+      (m) => m.role === "user" && !m.content.startsWith("<"),
+    );
+    const last = messages.at(-1);
+    if (last?.content.includes('kind="job"'))
+      return sse([
+        chunk(
+          {
+            content:
+              "The background script finished. JOB_DONE was received automatically.",
+          },
+          "stop",
+        ),
+        "[DONE]",
+      ]);
+    if (last?.role === "tool" || last?.content.startsWith("<background_jobs>"))
+      return sse([
+        chunk(
+          {
+            content:
+              "The script is running in the background. You can keep chatting.",
+          },
+          "stop",
+        ),
+        "[DONE]",
+      ]);
+    if (lastUser?.content === "How is it going?")
+      return sse([
+        chunk({ content: "The background script is still running." }, "stop"),
+        "[DONE]",
+      ]);
+    const command = lastUser?.content.startsWith("command:")
+      ? lastUser.content.slice(8)
+      : "echo JOB_STARTED; sleep 3; echo JOB_PROGRESS; sleep 7; echo JOB_DONE; echo artifact > result.txt";
+    return sse([
+      chunk(
+        {
+          tool_calls: [
+            {
+              index: 0,
+              id: "launch",
+              type: "function",
+              function: {
+                name: "bash",
+                arguments: JSON.stringify({
+                  command,
+                  background: true,
+                  outputFiles: ["result.txt"],
+                }),
+              },
+            },
+          ],
+        },
+        "tool_calls",
+      ),
+      "[DONE]",
+    ]);
+  }
   if (scenario === "endless-tools") {
     // Yield like real network I/O so an unbounded loop cannot starve timers.
     await Bun.sleep(1);

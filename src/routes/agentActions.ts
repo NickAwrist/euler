@@ -132,6 +132,30 @@ export function agentActions(temporary = false) {
     }
     res.json({ ok: true });
   });
+  router.get("/:id/jobs", (req, res) => {
+    const owner = requireUserId(req, res);
+    if (owner) res.json(agentRuntime.jobs.list(owner, req.params.id));
+  });
+  router.get("/:id/jobs/:jobId", (req, res) => {
+    const owner = requireUserId(req, res);
+    if (!owner) return;
+    try {
+      res.json(agentRuntime.jobs.read(owner, req.params.id, req.params.jobId));
+    } catch {
+      sendApiError(res, 404, "NOT_FOUND", "Job not found");
+    }
+  });
+  router.post("/:id/jobs/:jobId/cancel", async (req, res) => {
+    const owner = requireUserId(req, res);
+    if (!owner) return;
+    try {
+      res.json(
+        await agentRuntime.jobs.cancel(owner, req.params.id, req.params.jobId),
+      );
+    } catch {
+      sendApiError(res, 404, "NOT_FOUND", "Job not found");
+    }
+  });
   router.get("/:id/runtime", (req, res) => {
     const owner = requireUserId(req, res);
     if (!owner) return;

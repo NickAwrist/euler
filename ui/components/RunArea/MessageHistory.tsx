@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import { memo } from "react";
 import { AgentRows } from "../Agents/AgentTaskCard";
 import { traceStepsForDisplay } from "../ExecutionTrace";
+import { JobRows } from "../Jobs/JobTaskCard";
 import { MessageItem } from "../MessageItem";
 import type { MessageItemProps } from "../MessageItem/types";
 import type { RunAreaProps } from "./types";
@@ -54,6 +55,7 @@ export const MessageHistory = memo(function MessageHistory({
         editingUserIndex={editingUserIndex === index ? index : null}
       />
       <AgentRows position={index} />
+      <JobRows position={index} />
     </Fragment>
   ));
 });

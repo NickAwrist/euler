@@ -13,6 +13,7 @@ import {
 import { envConfig } from "../../env";
 import { type Unsequenced, eventHub } from "../../events/eventHub";
 import { ApiError } from "../../http/errors";
+import { JobManager } from "../../jobs/JobManager";
 import {
   type InboxMessage,
   type RewindRequest,
@@ -27,6 +28,7 @@ import type { WireMessageInput } from "../../schemas/run";
 import type { BaseTool } from "../../tools/BaseTool";
 import { AskParentTool } from "../../tools/ask_parent";
 import { CancelAgentTool } from "../../tools/cancel_agent";
+import { JobTool } from "../../tools/jobs";
 import {
   type AgentMessageRequest,
   SendMessageTool,
@@ -58,6 +60,50 @@ export class AgentRuntime {
     private readonly maxRunningPerOwner = envConfig.maxRunningAgents,
   ) {}
   readonly store = new AgentStore();
+  readonly jobs = new JobManager({
+    position: (id) => this.transcriptLength(id),
+    temporary: (id) => this.temporaryHistory.has(id),
+    blocked: (id) => this.isChanging(id),
+    changed: (job) => this.resync(job.ownerUuid, job.sessionId),
+    notify: (job, wakes) => {
+      const agent = this.store.get(job.agentId);
+      if (!agent || isFinalAgent(agent)) return;
+      this.atomically(job.sessionId, () => {
+        if (!wakes) {
+          this.store.enqueue({
+            agentId: agent.id,
+            sender: "runtime",
+            kind: "job",
+            content: JSON.stringify({
+              jobId: job.id,
+              status: job.status,
+              error: job.error,
+            }),
+            wakes: false,
+            attachmentIds: [],
+            attachments: [],
+          });
+          return;
+        }
+        this.enqueue(
+          agent,
+          "runtime",
+          "job",
+          JSON.stringify({
+            jobId: job.id,
+            tool: job.tool,
+            status: job.status,
+            result: job.result,
+            error: job.error,
+          }),
+          [],
+          job.result?.attachments,
+        );
+        if (this.stopping.has(agent.id) || this.store.isHeld(agent.id))
+          this.store.hold(agent.id, true);
+      });
+    },
+  });
   private active = new Map<
     string,
     { controller: AbortController; promise: Promise<void>; partial: Activation }
@@ -167,6 +213,7 @@ export class AgentRuntime {
     return {
       sequence: eventHub.sequence(owner),
       agents,
+      jobs: this.jobs.list(owner, sessionId),
       activation: main ? (this.active.get(main.id)?.partial ?? null) : null,
       queued: main
         ? this.store.undelivered(main.id).filter((m) => m.kind === "user")
@@ -178,9 +225,10 @@ export class AgentRuntime {
     };
   }
   busy(owner: string, sessionId: string) {
-    return this.store
-      .sessionsWithStatus(owner, WORKING_STATUSES)
-      .has(sessionId);
+    return (
+      this.jobs.busy(owner, sessionId) ||
+      this.store.sessionsWithStatus(owner, WORKING_STATUSES).has(sessionId)
+    );
   }
   private status(agent: AgentRecord) {
     this.store.save(agent);
@@ -450,6 +498,7 @@ export class AgentRuntime {
     return runActivation(
       {
         store: this.store,
+        jobs: this.jobs,
         temporaryHistory: this.temporaryHistory,
         status: (record) => this.status(record),
         emit: (owner, event) => this.emit(owner, event),
@@ -474,12 +523,30 @@ export class AgentRuntime {
     wait: () => void,
     currentModel: () => string,
   ): BaseTool[] {
+    const authorizeJob = (jobId: string) => {
+      const job = this.jobs.read(agent.ownerUuid, agent.sessionId, jobId);
+      let owner = this.store.get(job.agentId);
+      while (owner && owner.id !== agent.id)
+        owner = owner.parentId ? this.store.get(owner.parentId) : undefined;
+      if (!owner) throw new Error("Unknown job");
+    };
+    const jobTools = [
+      new JobTool("get_job", (id) => {
+        authorizeJob(id);
+        return this.jobs.read(agent.ownerUuid, agent.sessionId, id);
+      }),
+      new JobTool("cancel_job", async (id) => {
+        authorizeJob(id);
+        return this.jobs.cancel(agent.ownerUuid, agent.sessionId, id);
+      }),
+    ];
     const message = new SendMessageTool(
       (request) => this.sendMessage(agent, request),
       agent.kind !== "main",
     );
     if (agent.kind !== "main")
       return [
+        ...jobTools,
         message,
         new AskParentTool((question) => {
           const parent = this.store.get(agent.parentId ?? "");
@@ -489,6 +556,7 @@ export class AgentRuntime {
         }),
       ];
     return [
+      ...jobTools,
       message,
       new SpawnAgentTool((request) =>
         this.spawn(agent, request, currentModel(), signal),
@@ -634,6 +702,7 @@ export class AgentRuntime {
       const active = this.active.get(agent.id);
       active?.controller.abort();
       await active?.promise;
+      await this.jobs.cancelAgent(agent.ownerUuid, agent.sessionId, agent.id);
     } finally {
       this.stopping.delete(agent.id);
     }
@@ -699,6 +768,7 @@ export class AgentRuntime {
         await this.cancel(agent, "Chat deleted");
         this.store.remove(agent);
       }
+      this.jobs.remove(owner, sessionId);
       this.temporaryHistory.delete(sessionId);
       return await remove?.();
     } finally {
@@ -730,6 +800,7 @@ export class AgentRuntime {
       );
     this.rewinding.add(sessionId);
     try {
+      await this.jobs.cancelAgent(owner, sessionId);
       await this.cancel(main);
       const rewound = new Set<string>();
       for (const agent of this.store.list(owner, sessionId))
@@ -792,6 +863,7 @@ export class AgentRuntime {
     }
   }
   recover() {
+    this.jobs.recover();
     recoverInterrupted({
       store: this.store,
       status: (agent) => this.status(agent),
