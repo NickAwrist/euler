@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=",
@@ -13,6 +14,7 @@ test("attachment image loading defers until after initial scroll and reuses cach
     requests.push(route.request().url());
     await route.fulfill({ contentType: "image/png", body: png });
   });
+  await mockUserPreferences(page);
   await page.goto("/dev/images");
   await expect(page.getByAltText("Image 19", { exact: true })).toBeVisible();
   expect(requests.length).toBeLessThan(6);
@@ -44,6 +46,7 @@ test("attachment image loading retries failures without resizing the preview", a
         : { contentType: "image/png", body: png },
     );
   });
+  await mockUserPreferences(page);
   await page.goto("/dev/images");
   const error = page.getByText("Failed to load Image 19", { exact: true });
   await expect(error).toBeVisible();
@@ -86,6 +89,7 @@ test("attachment image loading aborts transfers when previews unmount", async ({
       });
     };
   });
+  await mockUserPreferences(page);
   await page.goto("/dev/images");
   await expect(page.locator("html")).toHaveAttribute("data-downloads", "2");
   await page.getByRole("button", { name: "Toggle images" }).click();

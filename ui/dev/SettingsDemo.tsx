@@ -31,7 +31,9 @@ export default function SettingsDemo() {
         comfyuiDefaultWidth={1440}
         comfyuiDefaultHeight={1440}
         comfyuiNegativePrompt=""
-        onSave={async (next) => setSettings(next)}
+        onSave={async (next) =>
+          setSettings((current) => ({ ...current, ...next }))
+        }
         onModelsChanged={async () => {}}
         onBack={() => {}}
       />

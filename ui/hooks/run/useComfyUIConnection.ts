@@ -1,12 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-
-type ComfyConfigJson = {
-  host?: string;
-  defaultModel?: string;
-  defaultWidth?: number;
-  defaultHeight?: number;
-  negativePrompt?: string;
-};
+import type { ComfyUIConfigResponse } from "../../../src/schemas/comfyui";
+import { fetchComfyUIConfig } from "../../persist/comfyui";
 
 export function useComfyUIConnection() {
   const [comfyuiHost, setComfyuiHost] = useState("");
@@ -30,24 +24,26 @@ export function useComfyUIConnection() {
     }
   }, []);
 
-  const applyComfyConfigResponse = useCallback((data: ComfyConfigJson) => {
-    if (typeof data.host === "string") setComfyuiHost(data.host);
-    if (typeof data.defaultModel === "string")
-      setComfyuiDefaultModel(data.defaultModel);
-    if (typeof data.defaultWidth === "number")
-      setComfyuiDefaultWidth(data.defaultWidth);
-    if (typeof data.defaultHeight === "number")
-      setComfyuiDefaultHeight(data.defaultHeight);
-    if (typeof data.negativePrompt === "string")
-      setComfyuiNegativePrompt(data.negativePrompt);
-  }, []);
+  const applyComfyConfigResponse = useCallback(
+    (data: ComfyUIConfigResponse) => {
+      if (typeof data.host === "string") setComfyuiHost(data.host);
+      if (typeof data.defaultModel === "string")
+        setComfyuiDefaultModel(data.defaultModel);
+      if (typeof data.defaultWidth === "number")
+        setComfyuiDefaultWidth(data.defaultWidth);
+      if (typeof data.defaultHeight === "number")
+        setComfyuiDefaultHeight(data.defaultHeight);
+      if (typeof data.negativePrompt === "string")
+        setComfyuiNegativePrompt(data.negativePrompt);
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/comfyui/config");
-        const data = (await res.json().catch(() => ({}))) as ComfyConfigJson;
+        const data = await fetchComfyUIConfig();
         if (cancelled) return;
         applyComfyConfigResponse(data);
       } catch {

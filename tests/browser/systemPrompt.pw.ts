@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { DEFAULT_SYSTEM_PROMPT } from "../../src/prompts/systemPrompt";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 test("system prompt settings desktop: customize, save, and reset to default", async ({
   page,
@@ -9,6 +10,7 @@ test("system prompt settings desktop: customize, save, and reset to default", as
       json: { ollamaHost: false, comfyuiHost: false },
     }),
   );
+  await mockUserPreferences(page);
   await page.goto("/customization");
 
   const prompt = page.getByLabel("System Prompt");
@@ -34,7 +36,7 @@ test("system prompt settings desktop: customize, save, and reset to default", as
 });
 
 for (const device of ["desktop", "mobile"] as const) {
-  test(`settings save ${device}: customization layout, tab drafts, and storage failures`, async ({
+  test(`settings save ${device}: customization layout, tab drafts, and server failures`, async ({
     page,
   }, testInfo) => {
     await page.setViewportSize(
@@ -54,6 +56,7 @@ for (const device of ["desktop", "mobile"] as const) {
         writes.push(route.request().url());
       return route.fulfill({ json: { skills: [] } });
     });
+    await mockUserPreferences(page);
     await page.goto("/customization");
     const prompt = page.getByLabel("System Prompt");
     const name = page.getByPlaceholder("Enter your name");
@@ -88,8 +91,8 @@ for (const device of ["desktop", "mobile"] as const) {
     await save.click();
     await expect(save).toBeHidden();
     expect(
-      await page.evaluate(() =>
-        JSON.parse(localStorage.getItem("euler:userSettings")!),
+      await page.evaluate(
+        async () => (await (await fetch("/api/settings/user")).json()).settings,
       ),
     ).toMatchObject({
       name: "Ada",
@@ -99,11 +102,14 @@ for (const device of ["desktop", "mobile"] as const) {
     expect(writes).toEqual([]);
 
     await name.fill("Unsaved");
-    await page.evaluate(() => {
-      Storage.prototype.setItem = () => {
-        throw new Error("Storage unavailable");
-      };
-    });
+    await page.route("**/api/settings/user", (route) =>
+      route.request().method() === "PATCH"
+        ? route.fulfill({
+            status: 503,
+            json: { error: { message: "Could not save settings" } },
+          })
+        : route.fallback(),
+    );
     await page.getByRole("button", { name: "Back to chat" }).click();
     const dialog = page.getByRole("dialog", { name: "Leave customization?" });
     await dialog.getByRole("button", { name: "Save & leave" }).click();

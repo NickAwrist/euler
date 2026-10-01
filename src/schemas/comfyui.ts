@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  imagePreferencesSchema,
+  userPreferencesPatchSchema,
+} from "./userPreferences";
 
 /** Express query values are often `string | string[] | undefined`. */
 const queryString = z.preprocess(
@@ -6,13 +10,9 @@ const queryString = z.preprocess(
   z.string().optional(),
 );
 
-export const ComfyUIConfigPutSchema = z.object({
-  host: z.string().optional(),
-  defaultModel: z.string().optional(),
-  defaultWidth: z.number().finite().optional(),
-  defaultHeight: z.number().finite().optional(),
-  negativePrompt: z.string().optional(),
-});
+export const ComfyUIConfigPutSchema = userPreferencesPatchSchema.shape.image
+  .unwrap()
+  .extend({ host: z.string().optional() });
 
 export type ComfyUIConfigPut = z.infer<typeof ComfyUIConfigPutSchema>;
 
@@ -31,3 +31,9 @@ export const ComfyUIViewQuerySchema = z.object({
 });
 
 export type ComfyUIViewQuery = z.infer<typeof ComfyUIViewQuerySchema>;
+
+export const ComfyUIConfigResponseSchema = imagePreferencesSchema.extend({
+  host: z.string().default(""),
+  effectiveHost: z.string().default(""),
+});
+export type ComfyUIConfigResponse = z.infer<typeof ComfyUIConfigResponseSchema>;

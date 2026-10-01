@@ -1,4 +1,6 @@
 import { useCallback, useRef, useState } from "react";
+import type { ComfyUIConfigResponse } from "../../../src/schemas/comfyui";
+import { saveComfyUIConfig } from "../../persist/comfyui";
 import {
   type UserSettings,
   loadUserSettings,
@@ -6,20 +8,12 @@ import {
 } from "../../persist/userSettings";
 import type { ComfyUIConfigPayload, Personalization } from "../../types";
 
-type ComfyConfigResponse = {
-  host?: string;
-  defaultModel?: string;
-  defaultWidth?: number;
-  defaultHeight?: number;
-  negativePrompt?: string;
-};
-
 export function useSettings(
   setOllamaHost: (host: string) => void,
   fetchOllamaHealth: () => Promise<void>,
   refreshOllamaModels: () => Promise<void>,
   fetchComfyUIHealth: () => Promise<void>,
-  applyComfyConfigResponse: (data: ComfyConfigResponse) => void,
+  applyComfyConfigResponse: (data: ComfyUIConfigResponse) => void,
 ) {
   const [userSettings, setUserSettings] = useState<UserSettings>(() =>
     loadUserSettings(),
@@ -27,37 +21,36 @@ export function useSettings(
   const userSettingsRef = useRef(userSettings);
   userSettingsRef.current = userSettings;
 
-  const savePersonalization = useCallback(async (updates: Personalization) => {
-    setUserSettings(updateUserSettings(updates));
-  }, []);
+  const savePersonalization = useCallback(
+    async (updates: Partial<Personalization>) => {
+      setUserSettings(await updateUserSettings(updates));
+    },
+    [],
+  );
 
   const saveUserSettings = useCallback(
     async (
-      settings: UserSettings,
-      ollamaHostToSave: string,
+      settings: Partial<UserSettings>,
+      ollamaHostToSave: string | undefined,
       comfyui?: ComfyUIConfigPayload,
     ) => {
-      const updated = updateUserSettings(settings);
+      const updated = await updateUserSettings(settings);
       setUserSettings(updated);
-      const res = await fetch("/api/ollama/config", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ host: ollamaHostToSave }),
-      });
-      if (!res.ok) throw new Error("Failed to save Ollama URL");
-      const data = (await res.json()) as { host?: string };
-      if (typeof data.host === "string") setOllamaHost(data.host);
-      void fetchOllamaHealth();
-      void refreshOllamaModels();
-
-      if (comfyui) {
-        const cRes = await fetch("/api/comfyui/config", {
+      if (ollamaHostToSave !== undefined) {
+        const res = await fetch("/api/ollama/config", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(comfyui),
+          body: JSON.stringify({ host: ollamaHostToSave }),
         });
-        if (!cRes.ok) throw new Error("Failed to save ComfyUI settings");
-        const cData = (await cRes.json()) as ComfyConfigResponse;
+        if (!res.ok) throw new Error("Failed to save Ollama URL");
+        const data = (await res.json()) as { host?: string };
+        if (typeof data.host === "string") setOllamaHost(data.host);
+        void fetchOllamaHealth();
+        void refreshOllamaModels();
+      }
+
+      if (comfyui) {
+        const cData = await saveComfyUIConfig(comfyui);
         applyComfyConfigResponse(cData);
         void fetchComfyUIHealth();
       }

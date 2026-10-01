@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 test("modal desktop: showModal, escape dismissal, blocked dismissal while busy, backdrop clicks, and focus restoration", async ({
   page,
 }) => {
+  await mockUserPreferences(page);
   await page.goto("/dev/modal");
 
   const openStandardBtn = page.locator("#open-standard-btn");

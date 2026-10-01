@@ -4,6 +4,7 @@ import {
   parseModelReasoning,
 } from "../../../src/modelCapabilities";
 import { readApiError } from "../../lib/readApiError";
+import { userScopedFetch } from "../../persist/userIdentity";
 import type { ModelOption, ModelReasoning } from "../../types";
 import { OLLAMA_HEALTH_POLL_MS } from "./constants";
 
@@ -106,7 +107,7 @@ export function useOllamaConnection() {
   const refreshOllamaModels = useCallback(async (cached = false) => {
     const requestId = ++modelRequestId.current;
     try {
-      const res = await fetch(
+      const res = await userScopedFetch(
         cached ? "/api/models?catalog=cached" : "/api/models",
       );
       if (requestId !== modelRequestId.current) return;

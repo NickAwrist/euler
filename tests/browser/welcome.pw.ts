@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/**", (route) =>
@@ -12,6 +13,7 @@ for (const device of ["desktop", "mobile"]) {
   }) => {
     if (device === "desktop")
       await page.setViewportSize({ width: 1100, height: 760 });
+    await mockUserPreferences(page);
     await page.goto("/dev/welcome");
     const heading = page.getByRole("heading", { level: 2 });
     await expect(heading).toHaveText("What are we working on today?");
@@ -38,6 +40,7 @@ for (const device of ["desktop", "mobile"]) {
       );
       Math.random = () => 0;
     });
+    await mockUserPreferences(page);
     await page.goto("/dev/welcome");
     const heading = page.getByRole("heading", { level: 2 });
     await expect(heading).toHaveText("What's on your mind, Nick?");
@@ -61,6 +64,7 @@ for (const device of ["desktop", "mobile"]) {
       path: testInfo.outputPath("name-italic.png"),
       animations: "disabled",
     });
+    await mockUserPreferences(page);
     await page.goto("/dev/welcome?ephemeral=true&home=false");
     await expect(page.getByRole("heading", { level: 2 })).toHaveText(
       "What's on your mind, Nick?",
@@ -73,6 +77,7 @@ for (const device of ["desktop", "mobile"]) {
     await expect(
       page.getByRole("button", { name: "Start an ephemeral chat" }),
     ).toHaveCount(0);
+    await mockUserPreferences(page);
     await page.goto("/dev/welcome?name=");
     await expect(page.getByRole("heading", { level: 2 })).toHaveText(
       "What's on your mind?",

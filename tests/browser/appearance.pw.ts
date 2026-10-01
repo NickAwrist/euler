@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 for (const device of ["desktop", "mobile"] as const) {
   test(`settings save ${device}: appearance previews stay local until saved and drafts survive tab changes`, async ({
@@ -13,6 +14,7 @@ for (const device of ["desktop", "mobile"] as const) {
     });
     await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
     try {
+      await mockUserPreferences(page);
       await page.goto("/dev/settings");
       await page
         .getByRole("button", { name: "Appearance", exact: true })
@@ -59,8 +61,11 @@ for (const device of ["desktop", "mobile"] as const) {
         "default",
       );
       expect(
-        await page.evaluate(() => localStorage.getItem("euler:appearance")),
-      ).toBeNull();
+        await page.evaluate(
+          async () =>
+            (await (await fetch("/api/settings/user")).json()).appearance.theme,
+        ),
+      ).toBe("default");
       await expect(page.locator("footer")).toContainText(
         "Unsaved changes in Appearance",
       );
@@ -154,6 +159,7 @@ test("settings save desktop: each font renders in the shared preview without app
   page,
 }) => {
   await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
+  await mockUserPreferences(page);
   await page.goto("/dev/settings");
   await page.getByRole("button", { name: "Appearance", exact: true }).click();
   const preview = page.getByRole("region", { name: "Response preview" });
@@ -217,18 +223,24 @@ test("settings save desktop: invalid preferences fall back and failed saves reta
       "euler:appearance",
       JSON.stringify({ font: "invalid", theme: {}, codeFont: false }),
     );
-    Storage.prototype.setItem = () => {
-      throw new Error("Storage unavailable");
-    };
   });
+  await mockUserPreferences(page);
   await page.goto("/dev/settings");
   await page.getByRole("button", { name: "Appearance", exact: true }).click();
   await page.getByLabel("Font style", { exact: true }).selectOption("serif");
+  await page.route("**/api/settings/user", (route) =>
+    route.request().method() === "PATCH"
+      ? route.fulfill({
+          status: 503,
+          json: { error: { message: "Could not save appearance" } },
+        })
+      : route.fallback(),
+  );
   await page
     .getByRole("button", { name: "Save settings", exact: true })
     .click();
   await expect(
-    page.getByText("Could not save appearance in this browser.", {
+    page.getByText("Could not save appearance", {
       exact: false,
     }),
   ).toBeVisible();

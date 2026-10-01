@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 test.use({ isMobile: false, hasTouch: false, deviceScaleFactor: 1 });
 let server: ChildProcess;
 test.beforeAll(async () => {
@@ -53,6 +54,7 @@ test("session loading: async agents continue across chat messages and browser re
       JSON.stringify({ defaultModel: "openrouter:openai/gpt-5.6-terra" }),
     ),
   );
+  await mockUserPreferences(page);
   await page.goto("/");
   const input = page.getByPlaceholder("Send a message...");
   await input.fill("Research this");

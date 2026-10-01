@@ -1,4 +1,5 @@
 import { type Page, expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 async function mockApp(page: Page) {
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -85,6 +86,7 @@ test("view navigation desktop preserves Back, Forward, reload, tabs and sidebar 
   page,
 }) => {
   await mockApp(page);
+  await mockUserPreferences(page);
   await page.goto("/run/a");
   await page
     .getByRole("button", { name: /Conversation b/ })
@@ -134,7 +136,12 @@ test("view navigation desktop preserves Back, Forward, reload, tabs and sidebar 
     ).toBeVisible();
   }
   expect(
-    await page.evaluate(() => localStorage.getItem("euler:sidebarCollapsed")),
+    await page.evaluate(async () =>
+      String(
+        (await (await fetch("/api/settings/user")).json()).layout
+          .sidebarCollapsed,
+      ),
+    ),
   ).not.toBe("true");
 });
 
@@ -142,6 +149,7 @@ test("view navigation desktop keeps unsaved customization on Back and resumes ap
   page,
 }) => {
   await mockApp(page);
+  await mockUserPreferences(page);
   await page.goto("/run/a");
   await page
     .getByRole("button", { name: "Customization", exact: true })
@@ -182,6 +190,7 @@ test("view navigation desktop opens fresh view links without replacing them with
     ["/customization", "Customization"],
     ["/usage", "Usage insights"],
   ]) {
+    await mockUserPreferences(page);
     await page.goto(path!);
     await expect(page).toHaveURL(new RegExp(`${path}$`));
     await expect(
@@ -200,6 +209,7 @@ test("view navigation desktop keeps settings open when Save and leave fails", as
   await page.route("**/api/ollama/config", (route) =>
     route.fulfill({ status: 500, json: { error: "Unavailable" } }),
   );
+  await mockUserPreferences(page);
   await page.goto("/run/a");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Ollama", exact: true }).click();
@@ -219,6 +229,7 @@ test("view navigation desktop remembers General after Choose models and preserve
   page,
 }) => {
   await mockApp(page);
+  await mockUserPreferences(page);
   await page.goto("/run/a");
   await page.getByRole("button", { name: "Toggle chats" }).click();
   await expect(
@@ -243,7 +254,12 @@ test("view navigation desktop remembers General after Choose models and preserve
     page.getByRole("button", { name: "Toggle chats" }),
   ).toHaveAttribute("aria-expanded", "false");
   expect(
-    await page.evaluate(() => localStorage.getItem("euler:sidebarCollapsed")),
+    await page.evaluate(async () =>
+      String(
+        (await (await fetch("/api/settings/user")).json()).layout
+          .sidebarCollapsed,
+      ),
+    ),
   ).toBe("true");
 });
 
@@ -269,6 +285,7 @@ test("view navigation desktop stays in Customization when a chat sent from Home 
     await created.promise;
     await route.fulfill({ json: { id: "b" } });
   });
+  await mockUserPreferences(page);
   await page.goto("/");
   await page.getByPlaceholder("Send a message...").fill("First message");
   await page.getByRole("button", { name: "Send message" }).click();
@@ -314,6 +331,7 @@ test("view navigation desktop deletes an empty chat left with Back", async ({
       },
     });
   });
+  await mockUserPreferences(page);
   await page.goto("/run/a");
   await page.getByRole("button", { name: /Conversation b/ }).click();
   await expect(
@@ -347,6 +365,7 @@ test("view navigation desktop protects dirty settings after a markdown footnote 
       },
     }),
   );
+  await mockUserPreferences(page);
   await page.goto("/run/a");
   await page.getByRole("link", { name: "1", exact: true }).click();
   await expect(page).toHaveURL(/#user-content-fn-1$/);
@@ -378,6 +397,7 @@ test("view navigation desktop restores the saved chat when loading Home", async 
   await page.addInitScript(() =>
     sessionStorage.setItem("activeSessionId", "b"),
   );
+  await mockUserPreferences(page);
   await page.goto("/");
   await expect(page).toHaveURL(/\/run\/b$/);
   await expect(page.getByText("Stored b", { exact: true })).toBeVisible();
@@ -425,6 +445,7 @@ test("view navigation desktop confirms before discarding a nonempty ephemeral ch
   });
   const badge = page.getByText("Ephemeral", { exact: true });
 
+  await mockUserPreferences(page);
   await page.goto("/run/a");
   await startEphemeral();
   await expect(badge).toHaveAccessibleDescription(
@@ -494,6 +515,7 @@ test("view navigation desktop protects ephemeral history after deleting the open
 }) => {
   await mockApp(page);
   const deleted = await mockEphemeral(page);
+  await mockUserPreferences(page);
   await page.goto("/run/a");
   await page.getByTitle("Ephemeral chat - not saved").click();
   await page.getByRole("button", { name: /Conversation a/ }).click();
@@ -531,6 +553,7 @@ test("view navigation desktop expires customization approval when a later guard 
   page,
 }) => {
   await mockApp(page);
+  await mockUserPreferences(page);
   await page.goto("/run/a");
   await page
     .getByRole("button", { name: "Customization", exact: true })
@@ -557,6 +580,7 @@ test("view navigation desktop guards unsaved appearance and applies it only on S
   page,
 }) => {
   await mockApp(page);
+  await mockUserPreferences(page);
   await page.goto("/settings/appearance");
   await page.getByLabel("Font style", { exact: true }).selectOption("serif");
   await page.getByRole("button", { name: "Back to chat" }).click();

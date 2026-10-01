@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 test("artifacts desktop content previews", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 });
+  await mockUserPreferences(page);
   await page.goto("/dev/artifacts");
   await page.getByRole("button", { name: "Toggle artifacts" }).click();
   const sidebar = page.getByRole("complementary", { name: "Artifacts" });
@@ -70,6 +72,7 @@ test("artifacts desktop resizing, persistence and transitions", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
+  await mockUserPreferences(page);
   await page.goto("/dev/artifacts");
   const sidebar = page.locator("#artifact-sidebar");
   await expect(sidebar).toHaveAttribute("inert", "");
@@ -116,6 +119,7 @@ for (const size of ["desktop", "mobile"] as const) {
         ? { width: 1440, height: 900 }
         : { width: 390, height: 844 },
     );
+    await mockUserPreferences(page);
     await page.goto("/dev/artifacts");
     const toggle = page.getByRole("button", { name: "Toggle artifacts" });
     await expect(toggle).toBeVisible();
@@ -183,6 +187,7 @@ for (const size of ["desktop", "mobile"] as const) {
   test(`artifacts ${size} header dividers stay aligned`, async ({
     page,
   }, testInfo) => {
+    await mockUserPreferences(page);
     await page.goto("/dev/artifacts");
     const widths =
       size === "desktop" ? [901, 1024, 1319, 1320, 1440] : [390, 640, 641, 900];
@@ -227,6 +232,7 @@ test("artifacts desktop file cards preview and downloads are explicit", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
+  await mockUserPreferences(page);
   await page.goto("/dev/artifacts");
   let downloads = 0;
   page.on("download", () => downloads++);
@@ -272,6 +278,7 @@ for (const size of ["desktop", "mobile"] as const) {
         ? { width: 1440, height: 900 }
         : { width: 390, height: 844 },
     );
+    await mockUserPreferences(page);
     await page.goto("/dev/artifacts");
     await page.getByRole("button", { name: "the HTML status page" }).click();
     const sidebar = page.getByRole("complementary", { name: "Artifacts" });

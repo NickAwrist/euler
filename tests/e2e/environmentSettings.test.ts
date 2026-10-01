@@ -55,12 +55,17 @@ for (const setting of settings) {
     const put = (value: string) =>
       fetch(url + setting.path, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111",
+        },
         body: JSON.stringify({ [setting.field]: value }),
       });
     try {
       expect(setting.get()).toBe("http://environment.test");
-      const read = await fetch(url + setting.path);
+      const read = await fetch(url + setting.path, {
+        headers: { "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111" },
+      });
       const data = await read.json();
       if (setting.field === "apiKey") {
         expect(data).toEqual({ hasKey: true, environmentManaged: true });
@@ -102,7 +107,10 @@ test("environment ownership contains only flags and does not lock unrelated Comf
     });
     const save = await fetch(`${url}/api/comfyui/config`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111",
+      },
       body: JSON.stringify({
         host: envConfig.comfyuiHost,
         negativePrompt: "updated",
@@ -112,14 +120,19 @@ test("environment ownership contains only flags and does not lock unrelated Comf
     expect((await save.json()).negativePrompt).toBe("updated");
     const rejected = await fetch(`${url}/api/comfyui/config`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111",
+      },
       body: JSON.stringify({
         host: "http://override.test",
         negativePrompt: "must not save",
       }),
     });
     expect(rejected.status).toBe(409);
-    const read = await fetch(`${url}/api/comfyui/config`);
+    const read = await fetch(`${url}/api/comfyui/config`, {
+      headers: { "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111" },
+    });
     expect((await read.json()).negativePrompt).toBe("updated");
   } finally {
     await close();

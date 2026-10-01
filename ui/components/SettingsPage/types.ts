@@ -38,8 +38,8 @@ export type SettingsPageProps = {
   comfyuiDefaultHeight: number;
   comfyuiNegativePrompt: string;
   onSave: (
-    settings: UserSettings,
-    ollamaHost: string,
+    settings: Partial<UserSettings>,
+    ollamaHost: string | undefined,
     comfyui?: ComfyUIConfigPayload,
   ) => Promise<void>;
   onModelsChanged: () => Promise<void>;

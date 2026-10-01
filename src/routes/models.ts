@@ -12,13 +12,16 @@ import {
   publisherModels,
 } from "../openRouterPreferences";
 import { publisherName } from "../openRouterPublishers";
+import { requireUserId } from "../userIdentity";
 
 const modelsRoutes = Router();
 
 modelsRoutes.get(
   "/",
   asyncRoute(async (req, res) => {
-    const favorites = listModelFavorites();
+    const owner = requireUserId(req, res);
+    if (!owner) return;
+    const favorites = listModelFavorites(owner);
     let ollamaModels: Array<Record<string, unknown>> = [];
     let ollamaError: string | null = null;
     try {
@@ -79,7 +82,7 @@ modelsRoutes.get(
     );
     const openRouterModels = catalog
       ? [...publishers]
-          .flatMap((id) => publisherModels(catalog, id))
+          .flatMap((id) => publisherModels(catalog, id, owner))
           .filter(
             (model) => model.enabled && model.availability !== "unavailable",
           )

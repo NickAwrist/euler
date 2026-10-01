@@ -28,17 +28,11 @@ export type {
 } from "./types";
 export {
   getBraveSearchApiKey,
-  getComfyUIDefaultModel,
+  setBraveSearchApiKey,
   getComfyUIHost,
-  getComfyUIImageSize,
-  getComfyUINegativePrompt,
   getOllamaHost,
   getOpenRouterApiKey,
-  setBraveSearchApiKey,
-  setComfyUIDefaultModel,
   setComfyUIHost,
-  setComfyUIImageSize,
-  setComfyUINegativePrompt,
   setOllamaHost,
   setOpenRouterApiKey,
 } from "./settings";

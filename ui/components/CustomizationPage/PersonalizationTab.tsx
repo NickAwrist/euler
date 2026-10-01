@@ -1,6 +1,7 @@
 import { Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
+import { changedFields } from "../../lib/changedFields";
 import { cx } from "../../styles";
 import type { Personalization } from "../../types";
 import { Button } from "../Button";
@@ -23,7 +24,7 @@ export function PersonalizationTab({
 }: {
   active: boolean;
   currentSettings: Personalization;
-  onSave: (settings: Personalization) => Promise<void>;
+  onSave: (settings: Partial<Personalization>) => Promise<void>;
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const [settings, setSettings] = useState<Personalization>(currentSettings);
@@ -46,13 +47,18 @@ export function PersonalizationTab({
         location,
         preferredFormats,
       } = settings;
-      await onSave({
-        systemPrompt,
-        includeCurrentDate,
-        name,
-        location,
-        preferredFormats,
-      });
+      await onSave(
+        changedFields(
+          {
+            systemPrompt,
+            includeCurrentDate,
+            name,
+            location,
+            preferredFormats,
+          },
+          currentSettings,
+        ),
+      );
       return true;
     } catch (err) {
       setError(
