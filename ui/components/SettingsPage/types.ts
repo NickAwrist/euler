@@ -47,8 +47,8 @@ export type SettingsPageProps = {
   searxngHost: string;
   searxngConnected: boolean | null;
   onSave: (
-    settings: UserSettings,
-    ollamaHost: string,
+    settings: Partial<UserSettings>,
+    ollamaHost: string | undefined,
     comfyui?: ComfyUIConfigPayload,
     searxng?: SearXNGConfigPayload,
   ) => Promise<void>;

@@ -61,28 +61,13 @@ type ChatViewProps = {
   onUsage: () => void;
 };
 
-import { safeStorage } from "./lib/safeStorage";
+import {
+  getUserPreferences,
+  updateUserPreferences,
+} from "./persist/userPreferences";
 
-const ARTIFACT_STATE_KEY = "euler:artifactSidebarState";
-function loadArtifactState(): {
-  open: boolean;
-  workspace: string;
-  path: string | null;
-} {
-  const value = safeStorage.getJSON<unknown>(ARTIFACT_STATE_KEY, null);
-  if (
-    value &&
-    typeof value === "object" &&
-    "open" in value &&
-    "workspace" in value &&
-    "path" in value &&
-    typeof value.open === "boolean" &&
-    typeof value.workspace === "string" &&
-    (value.path === null || typeof value.path === "string")
-  ) {
-    return { open: value.open, workspace: value.workspace, path: value.path };
-  }
-  return { open: false, workspace: "", path: null };
+function loadArtifactState() {
+  return getUserPreferences().layout.artifactState;
 }
 
 function ChatView({
@@ -148,11 +133,15 @@ function ChatView({
 
   useEffect(() => {
     if (!workspaceReady || !app.activeSessionId) return;
-    safeStorage.setJSON(ARTIFACT_STATE_KEY, {
-      open: artifactsOpen,
-      workspace: workspaceKey,
-      path: selectedFile,
-    });
+    void updateUserPreferences({
+      layout: {
+        artifactState: {
+          open: artifactsOpen,
+          workspace: workspaceKey,
+          path: selectedFile,
+        },
+      },
+    }).catch(console.error);
   }, [
     workspaceReady,
     app.activeSessionId,

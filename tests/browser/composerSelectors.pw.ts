@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { ModelOption } from "../../ui/types";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 const models: ModelOption[] = [
   {
@@ -125,6 +126,7 @@ for (const device of ["desktop", "mobile"] as const) {
     // Exercise icon failure without depending on an external service.
     await page.route("https://openrouter.ai/**", (route) => route.abort());
     try {
+      await mockUserPreferences(page);
       await page.goto("/run/selector");
       const model = page.getByRole("button", { name: /^Model:/ });
       const input = page.getByPlaceholder("Send a message...");

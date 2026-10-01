@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 test("session loading: interrupted agents show their reason and fixed model", async ({
   page,
@@ -10,6 +11,7 @@ test("session loading: interrupted agents show their reason and fixed model", as
     }),
   );
   await page.setViewportSize({ width: 390, height: 844 });
+  await mockUserPreferences(page);
   await page.goto("/dev/agents");
   const interrupted = page.getByRole("button", { name: /^Research/ });
   await expect(interrupted).toContainText("Interrupted");

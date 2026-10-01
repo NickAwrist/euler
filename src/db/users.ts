@@ -22,6 +22,19 @@ export function ensureUserData(ownerUuid: string): void {
         ownerUuid,
       ]);
     }
+    if (
+      db
+        .query(
+          "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'legacy_model_favorites'",
+        )
+        .get()
+    ) {
+      db.run(
+        "INSERT OR IGNORE INTO model_favorites (owner_uuid, provider, model_id) SELECT ?, provider, model_id FROM legacy_model_favorites",
+        [legacyOwner?.value ?? ownerUuid],
+      );
+      db.run("DROP TABLE legacy_model_favorites");
+    }
     seedDefaultSkills(ownerUuid);
   });
   tx();

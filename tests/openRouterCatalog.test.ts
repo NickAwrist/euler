@@ -177,14 +177,25 @@ describe("OpenRouter catalog", () => {
       throw new Error("offline");
     });
     setOpenRouterModelEnabled(normalizeCatalog(payload)[0]!, true);
-    setModelFavorite("openrouter", "openai/test", true);
+    setModelFavorite(
+      "11111111-1111-4111-8111-111111111111",
+      "openrouter",
+      "openai/test",
+      true,
+    );
     const result = await catalog.get();
     expect(result).toMatchObject({
       status: "unavailable",
       models: null,
       lastSuccessfulFetchAt: null,
     });
-    expect(publisherModels(result, "openai")[0]).toMatchObject({
+    expect(
+      publisherModels(
+        result,
+        "openai",
+        "11111111-1111-4111-8111-111111111111",
+      )[0],
+    ).toMatchObject({
       enabled: true,
       favorite: true,
       availability: "unverified",
@@ -195,8 +206,11 @@ describe("OpenRouter catalog", () => {
         ?.recentCount,
     ).toBeNull();
     expect(
-      publisherModels({ ...result, status: "fresh", models: [] }, "openai")[0]
-        ?.availability,
+      publisherModels(
+        { ...result, status: "fresh", models: [] },
+        "openai",
+        "11111111-1111-4111-8111-111111111111",
+      )[0]?.availability,
     ).toBe("unavailable");
     expect(listOpenRouterModels()).toHaveLength(1);
   });
@@ -211,9 +225,13 @@ describe("OpenRouter catalog", () => {
     setPublisherSubscription("openai", true, 100);
     await getCatalogPreferences(false, false, catalog);
     expect(listOpenRouterModels()).toEqual([]);
-    expect(publisherModels(result, "openai")[0]?.availability).toBe(
-      "available",
-    );
+    expect(
+      publisherModels(
+        result,
+        "openai",
+        "11111111-1111-4111-8111-111111111111",
+      )[0]?.availability,
+    ).toBe("available");
   });
   test("new catalog discoveries auto-enable only subscribed additions without a worker", async () => {
     let data = [remoteModel];

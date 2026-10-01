@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 for (const device of ["desktop", "mobile"] as const) {
   test(`settings save ${device}: visible controls, dirty tabs, and discard warning`, async ({
@@ -17,6 +18,7 @@ for (const device of ["desktop", "mobile"] as const) {
       }),
     );
     try {
+      await mockUserPreferences(page);
       await page.goto("/dev/settings");
       const save = page.getByRole("button", { name: "Save settings" });
       const footer = page.locator("footer");

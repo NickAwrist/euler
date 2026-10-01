@@ -27,17 +27,11 @@ export type {
   OpenRouterModel,
 } from "./types";
 export {
-  getComfyUIDefaultModel,
   getComfyUIHost,
-  getComfyUIImageSize,
-  getComfyUINegativePrompt,
   getOllamaHost,
   getSearXNGHost,
   getOpenRouterApiKey,
-  setComfyUIDefaultModel,
   setComfyUIHost,
-  setComfyUIImageSize,
-  setComfyUINegativePrompt,
   setOllamaHost,
   setSearXNGHost,
   setOpenRouterApiKey,

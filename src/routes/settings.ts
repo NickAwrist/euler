@@ -10,10 +10,15 @@ import {
   setPublisherSubscription,
   trackOpenRouterPublisher,
 } from "../db/openrouter";
+import {
+  getUserPreferences,
+  updateUserPreferences,
+} from "../db/userPreferences";
 import { envConfig, getEnvironmentSettings } from "../env";
 import { asyncRoute } from "../http/asyncRoute";
 import { canEditEnvironmentSetting } from "../http/environmentSettings";
 import { sendApiError } from "../http/errors";
+import { sendValidationError } from "../http/validation";
 import { catalogFreshness, isInteractiveModel } from "../openRouterModels";
 import {
   catalogSettings,
@@ -23,9 +28,24 @@ import {
   savedModelMetadata,
 } from "../openRouterPreferences";
 import { publisherName } from "../openRouterPublishers";
+import { userPreferencesPatchSchema } from "../schemas/userPreferences";
 import { requireUserId } from "../userIdentity";
 
 const settingsRoutes = Router();
+settingsRoutes.get("/user", (req, res) => {
+  const owner = requireUserId(req, res);
+  if (!owner) return;
+  res.json(getUserPreferences(owner));
+});
+for (const method of ["put", "patch"] as const) {
+  settingsRoutes[method]("/user", (req, res) => {
+    const owner = requireUserId(req, res);
+    if (!owner) return;
+    const parsed = userPreferencesPatchSchema.safeParse(req.body);
+    if (!parsed.success) return sendValidationError(res, parsed.error);
+    res.json(updateUserPreferences(owner, parsed.data, method === "put"));
+  });
+}
 
 settingsRoutes.get("/environment", (_req, res) => {
   res.json(getEnvironmentSettings());
@@ -63,8 +83,10 @@ const routeSchema = z
 
 settingsRoutes.get(
   "/openrouter/catalog",
-  asyncRoute(async (_req, res) => {
-    res.json(catalogSettings(await getCatalogPreferences()));
+  asyncRoute(async (req, res) => {
+    const owner = requireUserId(req, res);
+    if (!owner) return;
+    res.json(catalogSettings(await getCatalogPreferences(), owner));
   }),
 );
 settingsRoutes.delete("/openrouter/publishers/:id", (req, res) => {
@@ -151,6 +173,8 @@ settingsRoutes.patch("/openrouter/publishers/:id/subscription", (req, res) => {
 settingsRoutes.get(
   "/openrouter/publishers/:id/models",
   asyncRoute(async (req, res) => {
+    const owner = requireUserId(req, res);
+    if (!owner) return;
     if (
       !listOpenRouterPublishers().some(
         (publisher) => publisher.id === req.params.id,
@@ -160,7 +184,7 @@ settingsRoutes.get(
     const catalog = await getCatalogPreferences();
     res.json({
       catalog: catalogFreshness(catalog),
-      models: publisherModels(catalog, req.params.id as string),
+      models: publisherModels(catalog, req.params.id as string, owner),
     });
   }),
 );
@@ -205,6 +229,8 @@ settingsRoutes.patch(
   }),
 );
 settingsRoutes.put("/models/favorite", (req, res) => {
+  const owner = requireUserId(req, res);
+  if (!owner) return;
   const parsed = z
     .object({
       provider: z.enum(["openrouter", "ollama"]),
@@ -221,14 +247,16 @@ settingsRoutes.put("/models/favorite", (req, res) => {
       !routeSchema.safeParse(modelId).success)
   )
     return sendApiError(res, 400, "BAD_REQUEST", "Use a raw OpenRouter route");
-  setModelFavorite(provider, modelId, favorite);
+  setModelFavorite(owner, provider, modelId, favorite);
   res.json({ ok: true });
 });
 settingsRoutes.post(
   "/openrouter/catalog/refresh",
-  asyncRoute(async (_req, res) => {
+  asyncRoute(async (req, res) => {
+    const owner = requireUserId(req, res);
+    if (!owner) return;
     const catalog = await getCatalogPreferences(true);
-    res.json(catalogSettings(catalog));
+    res.json(catalogSettings(catalog, owner));
   }),
 );
 

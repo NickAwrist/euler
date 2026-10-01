@@ -77,21 +77,24 @@ export function setOpenRouterModelEnabled(
     );
   })();
 }
-export function listModelFavorites(): ModelFavorite[] {
+export function listModelFavorites(ownerUuid: string): ModelFavorite[] {
   return getDb()
-    .query("SELECT * FROM model_favorites")
-    .all() as ModelFavorite[];
+    .query(
+      "SELECT provider, model_id FROM model_favorites WHERE owner_uuid = ?",
+    )
+    .all(ownerUuid) as ModelFavorite[];
 }
 export function setModelFavorite(
+  ownerUuid: string,
   provider: ModelFavorite["provider"],
   modelId: string,
   favorite: boolean,
 ): void {
   getDb().run(
     favorite
-      ? "INSERT OR IGNORE INTO model_favorites (provider, model_id) VALUES (?, ?)"
-      : "DELETE FROM model_favorites WHERE provider = ? AND model_id = ?",
-    [provider, modelId],
+      ? "INSERT OR IGNORE INTO model_favorites (owner_uuid, provider, model_id) VALUES (?, ?, ?)"
+      : "DELETE FROM model_favorites WHERE owner_uuid = ? AND provider = ? AND model_id = ?",
+    [ownerUuid, provider, modelId],
   );
 }
 export function refreshRegistryMetadata(models: readonly CatalogModel[]): void {

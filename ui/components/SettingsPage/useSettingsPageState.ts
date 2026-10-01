@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { changedFields } from "../../lib/changedFields";
 import {
   applyAppearance,
   loadAppearance,
@@ -33,8 +34,8 @@ type Args = {
   searxngHost: string;
   searxngConnected: boolean | null;
   onSave: (
-    settings: UserSettings,
-    ollamaHost: string,
+    settings: Partial<UserSettings>,
+    ollamaHost: string | undefined,
     comfyui?: ComfyUIConfigPayload,
     searxng?: SearXNGConfigPayload,
   ) => Promise<void>;
@@ -342,27 +343,39 @@ export function useSettingsPageState({
       const { width, height } = parseSize(comfySize);
       if (changes.some((change) => change.tab !== "appearance"))
         await onSave(
-          settings,
-          ollamaUri,
-          {
-            host: comfyUri,
-            defaultModel: comfyModel,
-            defaultWidth: width,
-            defaultHeight: height,
-            negativePrompt: comfyNegative,
-          },
-          {
-            host: searxngUri,
-          },
+          changedFields(settings, currentSettings),
+          ollamaUri !== ollamaHost ? ollamaUri : undefined,
+          comfyUri !== comfyuiHost ||
+            comfyModel !== comfyuiDefaultModel ||
+            comfySize !== savedComfySize ||
+            comfyNegative !== comfyuiNegativePrompt
+            ? {
+                ...(comfyUri !== comfyuiHost ? { host: comfyUri } : {}),
+                ...changedFields(
+                  {
+                    defaultModel: comfyModel,
+                    defaultWidth: width,
+                    defaultHeight: height,
+                    negativePrompt: comfyNegative,
+                  },
+                  {
+                    defaultModel: comfyuiDefaultModel,
+                    defaultWidth: comfyuiDefaultWidth,
+                    defaultHeight: comfyuiDefaultHeight,
+                    negativePrompt: comfyuiNegativePrompt,
+                  },
+                ),
+              }
+            : undefined,
+          searxngUri !== searxngHost ? { host: searxngUri } : undefined,
         );
       if (changes.some((change) => change.tab === "appearance")) {
-        if (!saveAppearance(appearance)) {
-          throw new Error(
-            "Could not save appearance in this browser. Your changes have not been applied.",
-          );
-        }
-        applyAppearance(appearance);
-        setSavedAppearance(appearance);
+        const saved = await saveAppearance(
+          changedFields(appearance, savedAppearance),
+        );
+        applyAppearance(saved);
+        setAppearance(saved);
+        setSavedAppearance(saved);
       }
       setTestState({ status: "idle" });
       setComfyTestState({ status: "idle" });
@@ -385,6 +398,16 @@ export function useSettingsPageState({
     comfySize,
     comfyNegative,
     searxngUri,
+    currentSettings,
+    savedAppearance,
+    ollamaHost,
+    comfyuiHost,
+    comfyuiDefaultModel,
+    comfyuiDefaultWidth,
+    comfyuiDefaultHeight,
+    comfyuiNegativePrompt,
+    savedComfySize,
+    searxngHost,
     onSave,
   ]);
 

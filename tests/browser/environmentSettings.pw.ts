@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 for (const device of ["desktop", "mobile"] as const) {
   test(`environment settings ${device}: locked fields, editable defaults and loading failure`, async ({
@@ -55,6 +56,7 @@ for (const device of ["desktop", "mobile"] as const) {
             },
       });
     });
+    await mockUserPreferences(page);
     await page.goto("/dev/settings");
     await page.getByRole("button", { name: "Ollama", exact: true }).click();
     await expect(page.locator("#ollamaUri")).toBeDisabled();

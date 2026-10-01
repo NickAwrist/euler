@@ -1,13 +1,11 @@
 import crypto from "node:crypto";
 import type { Tool } from "ollama";
+import type { RunContext } from "../RunContext";
 import { COMFYUI_VIEW_PREFIX } from "../attachments/types";
 import { getComfyUIClient } from "../comfyui/client";
 import { buildImageWorkflow } from "../comfyui/workflows";
-import {
-  getComfyUIDefaultModel,
-  getComfyUIImageSize,
-  getComfyUINegativePrompt,
-} from "../db/index";
+import { effectiveUserPreferences } from "../db/userPreferences";
+import { imagePreferencesSchema } from "../schemas/userPreferences";
 import { errorMessage } from "../utils/errors";
 import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
 
@@ -40,7 +38,10 @@ export class GenerateImageTool extends BaseTool {
     };
   }
 
-  override async execute(args: Record<string, unknown>): Promise<ToolResult> {
+  override async execute(
+    args: Record<string, unknown>,
+    ctx?: RunContext,
+  ): Promise<ToolResult> {
     if (typeof args.prompt !== "string" || args.prompt.trim().length === 0) {
       return textToolResult("Error: prompt must be a non-empty string");
     }
@@ -56,7 +57,11 @@ export class GenerateImageTool extends BaseTool {
         );
       }
 
-      const defaultModel = getComfyUIDefaultModel();
+      const image =
+        (ctx?.ownerUuid
+          ? effectiveUserPreferences(ctx.ownerUuid).image
+          : null) ?? imagePreferencesSchema.parse({});
+      const defaultModel = image.defaultModel;
       let checkpointName = defaultModel;
       if (!checkpointName) {
         const models = await client.getModels();
@@ -66,12 +71,12 @@ export class GenerateImageTool extends BaseTool {
         checkpointName = models[0]!;
       }
 
-      const { width, height } = getComfyUIImageSize();
+      const { defaultWidth: width, defaultHeight: height } = image;
       const clientId = crypto.randomUUID();
 
       const workflow = buildImageWorkflow({
         prompt: promptText,
-        negativePrompt: getComfyUINegativePrompt(),
+        negativePrompt: image.negativePrompt,
         checkpointName,
         width,
         height,

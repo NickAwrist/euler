@@ -7,17 +7,19 @@ import {
 } from "react";
 import { cx } from "../../styles";
 
-const WIDTH_KEY = "euler:artifactSidebarWidth";
 const MIN_WIDTH = 320;
 const maxWidth = () =>
   Math.max(MIN_WIDTH, Math.min(960, window.innerWidth - 600));
-import { safeStorage } from "../../lib/safeStorage";
+import {
+  getUserPreferences,
+  updateUserPreferences,
+} from "../../persist/userPreferences";
 
 const clampWidth = (width: number) =>
   Math.min(maxWidth(), Math.max(MIN_WIDTH, width));
 const defaultWidth = () => clampWidth(Math.min(window.innerWidth * 0.42, 560));
 export function initialArtifactWidth() {
-  const stored = Number(safeStorage.getItem(WIDTH_KEY));
+  const stored = getUserPreferences().layout.artifactWidth ?? 0;
   if (stored >= MIN_WIDTH && Number.isFinite(stored)) {
     return clampWidth(stored);
   }
@@ -36,10 +38,15 @@ export function ArtifactSidebar({
   onClose: () => void;
   onWidthChange: (width: number) => void;
 }) {
-  const [width, setWidth] = useState(initialArtifactWidth);
+  const [preferredWidth, setWidth] = useState(
+    () => getUserPreferences().layout.artifactWidth ?? defaultWidth(),
+  );
   const [availableWidth, setAvailableWidth] = useState(maxWidth);
+  const width = Math.min(availableWidth, Math.max(MIN_WIDTH, preferredWidth));
   const [resizing, setResizing] = useState(false);
-  const drag = useRef<{ x: number; width: number } | null>(null);
+  const drag = useRef<{ x: number; width: number; lastWidth: number } | null>(
+    null,
+  );
   const panel = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -61,16 +68,17 @@ export function ArtifactSidebar({
   }, [open]);
   useEffect(() => {
     const resize = () => {
-      setWidth((value) => clampWidth(value));
       setAvailableWidth(maxWidth());
     };
     window.addEventListener("resize", resize);
+    resize();
     return () => window.removeEventListener("resize", resize);
   }, []);
-  useEffect(() => {
-    if (resizing) return;
-    safeStorage.setItem(WIDTH_KEY, String(width));
-  }, [width, resizing]);
+  const saveWidth = (value: number) => {
+    void updateUserPreferences({ layout: { artifactWidth: value } }).catch(
+      console.error,
+    );
+  };
   useEffect(() => onWidthChange(width), [width, onWidthChange]);
 
   useEffect(() => {
@@ -122,34 +130,43 @@ export function ArtifactSidebar({
           if (event.button !== 0) return;
           event.preventDefault();
           event.currentTarget.setPointerCapture(event.pointerId);
-          drag.current = { x: event.clientX, width };
+          drag.current = { x: event.clientX, width, lastWidth: width };
           setResizing(true);
         }}
         onPointerMove={(event) => {
-          if (drag.current)
-            setWidth(
-              clampWidth(drag.current.width + drag.current.x - event.clientX),
-            );
+          if (!drag.current) return;
+          const value = clampWidth(
+            drag.current.width + drag.current.x - event.clientX,
+          );
+          drag.current.lastWidth = value;
+          setWidth(value);
         }}
         onPointerUp={(event) => {
           event.currentTarget.releasePointerCapture(event.pointerId);
         }}
         onLostPointerCapture={() => {
+          if (drag.current && drag.current.lastWidth !== drag.current.width)
+            saveWidth(drag.current.lastWidth);
           drag.current = null;
           setResizing(false);
         }}
-        onDoubleClick={() => setWidth(defaultWidth())}
+        onDoubleClick={() => {
+          const value = defaultWidth();
+          setWidth(value);
+          saveWidth(value);
+        }}
         onKeyDown={(event) => {
           if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key))
             return;
           event.preventDefault();
-          setWidth((value) =>
+          const value =
             event.key === "Home"
               ? MIN_WIDTH
               : event.key === "End"
                 ? maxWidth()
-                : clampWidth(value + (event.key === "ArrowLeft" ? 16 : -16)),
-          );
+                : clampWidth(width + (event.key === "ArrowLeft" ? 16 : -16));
+          setWidth(value);
+          saveWidth(value);
         }}
       />
       {children}

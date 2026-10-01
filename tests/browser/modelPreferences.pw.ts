@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 for (const device of ["desktop", "mobile"] as const) {
   test(`model preferences ${device}: catalog states, mutations, favorites and keyboard controls`, async ({
@@ -169,6 +170,7 @@ for (const device of ["desktop", "mobile"] as const) {
       await route.fulfill({ json });
     });
     try {
+      await mockUserPreferences(page);
       await page.goto("http://127.0.0.1:5199/dev/models");
       await expect(page.getByText("Configured", { exact: true })).toBeVisible();
       const card = page.getByRole("button", { name: /^OpenAI/ });
@@ -349,6 +351,7 @@ for (const device of ["desktop", "mobile"] as const) {
       hasTouch: device === "mobile",
     });
     try {
+      await mockUserPreferences(page);
       await page.goto("/dev/model-playground");
       const settings = page.getByRole("region", {
         name: "OpenRouter settings",
@@ -480,6 +483,7 @@ for (const device of ["desktop", "mobile"] as const) {
       hasTouch: device === "mobile",
     });
     try {
+      await mockUserPreferences(page);
       await page.goto("/dev/model-playground");
       await page
         .getByRole("button", { name: "Large catalog", exact: true })

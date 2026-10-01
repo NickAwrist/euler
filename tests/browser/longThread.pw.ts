@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 test.use({
   viewport: { width: 1280, height: 800 },
@@ -9,6 +10,7 @@ test.use({
 test("long thread skips history work during typing and streaming", async ({
   page,
 }) => {
+  await mockUserPreferences(page);
   await page.goto("/dev/long-thread");
   const reply = page.getByText("Streaming reply", { exact: true });
   await expect(reply).toBeVisible();

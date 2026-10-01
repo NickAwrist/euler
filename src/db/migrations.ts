@@ -118,11 +118,24 @@ export function migrateOpenRouterCatalog(db: Database) {
       CREATE INDEX IF NOT EXISTS idx_openrouter_models_publisher_enabled
         ON openrouter_models(publisher_id, enabled);
       CREATE TABLE IF NOT EXISTS model_favorites (
+        owner_uuid TEXT NOT NULL,
         provider TEXT NOT NULL CHECK (provider IN ('openrouter', 'ollama')),
         model_id TEXT NOT NULL,
-        PRIMARY KEY (provider, model_id)
+        PRIMARY KEY (owner_uuid, provider, model_id)
       );
     `);
+    const favoriteColumns = db
+      .query("PRAGMA table_info(model_favorites)")
+      .all() as { name: string }[];
+    if (!favoriteColumns.some((column) => column.name === "owner_uuid")) {
+      db.run("ALTER TABLE model_favorites RENAME TO legacy_model_favorites");
+      db.run(`CREATE TABLE model_favorites (
+        owner_uuid TEXT NOT NULL,
+        provider TEXT NOT NULL CHECK (provider IN ('openrouter', 'ollama')),
+        model_id TEXT NOT NULL,
+        PRIMARY KEY (owner_uuid, provider, model_id)
+      )`);
+    }
     const publisherColumns = db
       .query("PRAGMA table_info(openrouter_publishers)")
       .all() as { name: string }[];
@@ -191,6 +204,9 @@ export function runMigrations(db: Database) {
     if (!messageColumns.some((c) => c.name === "activation_id"))
       db.run("ALTER TABLE messages ADD COLUMN activation_id TEXT");
   }
+  db.run(
+    "CREATE TABLE IF NOT EXISTS user_preferences (owner_uuid TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)",
+  );
   createAgentTables(db);
   if (tableExists(db, "messages")) migrateChildRuns(db);
   const columns = db.query("PRAGMA table_info(sessions)").all() as {

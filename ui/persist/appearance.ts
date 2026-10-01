@@ -1,33 +1,9 @@
-import { z } from "zod";
-import { safeStorage } from "../lib/safeStorage";
-
-export const appearanceSchema = z.object({
-  theme: z
-    .enum(["default", "one-dark", "dracula", "nord", "catppuccin", "github"])
-    .catch("default"),
-  font: z
-    .enum([
-      "default",
-      "serif",
-      "system",
-      "geist",
-      "source-sans",
-      "atkinson",
-      "opendyslexic",
-    ])
-    .catch("default"),
-  chatWidth: z
-    .enum(["standard", "comfortable", "wide", "full"])
-    .catch("standard"),
-  codeFont: z
-    .enum(["default", "geist-mono", "jetbrains-mono", "source-code"])
-    .catch("default"),
-  shiftForChatList: z.boolean().catch(false),
-  shiftForArtifacts: z.boolean().catch(false),
-  sidebarAnimationMs: z.number().int().min(0).max(600).catch(300),
-});
-export type Appearance = z.infer<typeof appearanceSchema>;
-const STORAGE_KEY = "euler:appearance";
+import type { Appearance } from "../../src/schemas/userPreferences";
+import { getUserPreferences, updateUserPreferences } from "./userPreferences";
+export {
+  appearanceSchema,
+  type Appearance,
+} from "../../src/schemas/userPreferences";
 
 /** Widest the chat column grows, in pixels. */
 export const CHAT_MAX_WIDTHS: Record<Appearance["chatWidth"], number> = {
@@ -38,14 +14,12 @@ export const CHAT_MAX_WIDTHS: Record<Appearance["chatWidth"], number> = {
 };
 
 export function loadAppearance(): Appearance {
-  const result = appearanceSchema.safeParse(
-    safeStorage.getJSON<unknown>(STORAGE_KEY, {}),
-  );
-  return result.success ? result.data : appearanceSchema.parse({});
+  return getUserPreferences().appearance;
 }
-
-export function saveAppearance(appearance: Appearance): boolean {
-  return safeStorage.setJSON(STORAGE_KEY, appearance);
+export async function saveAppearance(
+  appearance: Partial<Appearance>,
+): Promise<Appearance> {
+  return (await updateUserPreferences({ appearance })).appearance;
 }
 
 export function applyAppearance(appearance: Appearance): void {

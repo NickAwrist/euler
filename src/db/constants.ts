@@ -25,5 +25,4 @@ export const COMFYUI_DEFAULT_HEIGHT_KEY = "comfyui_default_height";
 export const COMFYUI_NEGATIVE_PROMPT_KEY = "comfyui_negative_prompt";
 export const SEARXNG_HOST_KEY = "searxng_host";
 export const OPENROUTER_API_KEY_KEY = "openrouter_api_key";
-export const DEFAULT_COMFYUI_NEGATIVE_PROMPT =
-  "low quality, worst quality, blurry, watermark, signature, text, bad anatomy, deformed, ugly, duplicate, extra fingers, poorly drawn hands, poorly drawn face, mutation, cropped";
+export { DEFAULT_COMFYUI_NEGATIVE_PROMPT } from "../schemas/userPreferences";

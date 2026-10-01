@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import type { UsageDashboard, UsageGroup, UsageTotals } from "../../src/usage";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 // Explicit API examples: aggregation and sorting are covered by backend tests.
 const totals: UsageTotals = {
@@ -181,6 +182,7 @@ for (const mode of ["desktop", "mobile"]) {
       });
     });
     const sorting = () => JSON.parse(params.get("sorting") ?? "[]") as unknown;
+    await mockUserPreferences(page);
     await page.goto("/dev/usage");
     await expect(
       page.getByRole("heading", { name: "Usage insights" }),

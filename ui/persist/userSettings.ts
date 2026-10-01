@@ -1,74 +1,16 @@
 import type { z } from "zod";
 import type { RunMetadataSchema } from "../../src/schemas/run";
-
-const STORAGE_KEY = "euler:userSettings";
-
-export interface UserSettings {
-  /** Custom system prompt template; `null` follows the default. */
-  systemPrompt: string | null;
-  name: string;
-  preferredFormats: string;
-  location: string;
-  defaultModel: string;
-  includeCurrentDate: boolean;
-  showDebugButton: boolean;
-}
-
-const DEFAULT_SETTINGS: UserSettings = {
-  systemPrompt: null,
-  name: "",
-  preferredFormats: "",
-  location: "",
-  defaultModel: "",
-  includeCurrentDate: true,
-  showDebugButton: false,
-};
-
-import { safeStorage } from "../lib/safeStorage";
+import type { UserSettings } from "../../src/schemas/userPreferences";
+import { getUserPreferences, updateUserPreferences } from "./userPreferences";
+export type { UserSettings } from "../../src/schemas/userPreferences";
 
 export function loadUserSettings(): UserSettings {
-  const parsed = safeStorage.getJSON<Partial<UserSettings> | null>(
-    STORAGE_KEY,
-    null,
-  );
-  if (!parsed) return DEFAULT_SETTINGS;
-
-  return {
-    systemPrompt:
-      typeof parsed.systemPrompt === "string" ? parsed.systemPrompt : null,
-    name: parsed.name || "",
-    preferredFormats: parsed.preferredFormats || "",
-    location: parsed.location || "",
-    defaultModel: parsed.defaultModel || "",
-    includeCurrentDate: parsed.includeCurrentDate ?? true,
-    showDebugButton: parsed.showDebugButton === true,
-  };
+  return getUserPreferences().settings;
 }
-
-function saveUserSettings(settings: UserSettings): void {
-  const toSave: UserSettings = {
-    systemPrompt: settings.systemPrompt,
-    name: settings.name || "",
-    preferredFormats: settings.preferredFormats || "",
-    location: settings.location || "",
-    defaultModel: settings.defaultModel || "",
-    includeCurrentDate: settings.includeCurrentDate ?? true,
-    showDebugButton: settings.showDebugButton === true,
-  };
-  if (!safeStorage.setJSON(STORAGE_KEY, toSave)) {
-    throw new Error(
-      "Could not save settings in this browser. Your changes have not been applied.",
-    );
-  }
-}
-
-export function updateUserSettings(
+export async function updateUserSettings(
   updates: Partial<UserSettings>,
-): UserSettings {
-  const current = loadUserSettings();
-  const updated = { ...current, ...updates };
-  saveUserSettings(updated);
-  return updated;
+): Promise<UserSettings> {
+  return (await updateUserPreferences({ settings: updates })).settings;
 }
 
 export function buildRunMetadata(
