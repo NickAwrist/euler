@@ -684,8 +684,6 @@ export default function App() {
               comfyuiDefaultWidth={app.comfyuiDefaultWidth}
               comfyuiDefaultHeight={app.comfyuiDefaultHeight}
               comfyuiNegativePrompt={app.comfyuiNegativePrompt}
-              searxngHost={app.searxngHost}
-              searxngConnected={app.searxngConnected}
               onSave={app.saveUserSettings}
               onModelsChanged={() => app.refreshModels(true)}
               onBack={backToChat}

@@ -1,6 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
-import { getOpenRouterApiKey, setOpenRouterApiKey } from "../db/index";
+import {
+  getBraveSearchApiKey,
+  getOpenRouterApiKey,
+  setBraveSearchApiKey,
+  setOpenRouterApiKey,
+} from "../db/index";
 import {
   getOpenRouterModelByRoute,
   listOpenRouterPublishers,
@@ -31,28 +36,47 @@ settingsRoutes.get("/environment", (_req, res) => {
   res.json(getEnvironmentSettings());
 });
 
-settingsRoutes.get("/openrouter", (_req, res) => {
-  res.json({
-    hasKey: getOpenRouterApiKey().length > 0,
-    environmentManaged: Boolean(envConfig.openrouterApiKey),
+/** Expose whether a key exists without ever returning the key itself. */
+function apiKeyRoutes(
+  path: string,
+  environmentKey: () => string,
+  getKey: () => string,
+  setKey: (key: string) => void,
+) {
+  settingsRoutes.get(path, (_req, res) => {
+    res.json({
+      hasKey: getKey().length > 0,
+      environmentManaged: Boolean(environmentKey()),
+    });
   });
-});
 
-settingsRoutes.put("/openrouter", (req, res) => {
-  const parsed = z
-    .object({ apiKey: z.string().max(512).default("") })
-    .safeParse(req.body);
-  if (!parsed.success) {
-    sendApiError(res, 400, "BAD_REQUEST", "apiKey must be a string");
-    return;
-  }
-  if (
-    canEditEnvironmentSetting(envConfig.openrouterApiKey, parsed.data.apiKey)
-  ) {
-    setOpenRouterApiKey(parsed.data.apiKey);
-  }
-  res.json({ ok: true, hasKey: getOpenRouterApiKey().length > 0 });
-});
+  settingsRoutes.put(path, (req, res) => {
+    const parsed = z
+      .object({ apiKey: z.string().max(512).default("") })
+      .safeParse(req.body);
+    if (!parsed.success) {
+      sendApiError(res, 400, "BAD_REQUEST", "apiKey must be a string");
+      return;
+    }
+    if (canEditEnvironmentSetting(environmentKey(), parsed.data.apiKey)) {
+      setKey(parsed.data.apiKey);
+    }
+    res.json({ ok: true, hasKey: getKey().length > 0 });
+  });
+}
+
+apiKeyRoutes(
+  "/openrouter",
+  () => envConfig.openrouterApiKey,
+  getOpenRouterApiKey,
+  setOpenRouterApiKey,
+);
+apiKeyRoutes(
+  "/brave",
+  () => envConfig.braveSearchApiKey,
+  getBraveSearchApiKey,
+  setBraveSearchApiKey,
+);
 
 const routeSchema = z
   .string()

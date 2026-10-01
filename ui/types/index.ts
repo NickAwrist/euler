@@ -11,7 +11,7 @@ export type {
   TruncateConfirmState,
 } from "./run";
 export type { ModelOption, ModelReasoning } from "./models";
-export type { ComfyUIConfigPayload, SearXNGConfigPayload } from "./settingsApi";
+export type { ComfyUIConfigPayload } from "./settingsApi";
 export type { TraceModalOpenPayload, TraceModalSelection } from "./traceModal";
 
 export type { SettingsTab } from "./navigation";

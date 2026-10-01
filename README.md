@@ -56,7 +56,6 @@ EULER_BACKEND_HOST=127.0.0.1
 EULER_FRONTEND_PORT=5174
 EULER_OLLAMA_HOST=http://127.0.0.1:11434
 EULER_COMFYUI_HOST=http://127.0.0.1:8188
-EULER_SEARXNG_HOST=http://127.0.0.1:8080
 ```
 
 Nonempty environment values always take precedence over saved settings and defaults.

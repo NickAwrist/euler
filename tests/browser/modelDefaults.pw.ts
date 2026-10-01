@@ -69,7 +69,6 @@ async function mockApp(
                   ? {
                       ollamaHost: false,
                       comfyuiHost: false,
-                      searxngHost: false,
                     }
                   : {};
     return route.fulfill({ json });

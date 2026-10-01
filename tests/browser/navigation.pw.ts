@@ -9,7 +9,6 @@ async function mockApp(page: Page) {
         json: {
           ollamaHost: false,
           comfyuiHost: false,
-          searxngHost: false,
           openrouterApiKey: false,
         },
       });

@@ -10,5 +10,5 @@ process.env.EULER_OLLAMA_HOST = "";
 process.env.OLLAMA_HOST = "";
 process.env.EULER_COMFYUI_HOST = "";
 process.env.COMFYUI_HOST = "";
-process.env.EULER_SEARXNG_HOST = "";
-process.env.SEARXNG_HOST = "";
+process.env.BRAVE_SEARCH_API_KEY = "";
+process.env.EULER_BRAVE_SEARCH_API_KEY = "";

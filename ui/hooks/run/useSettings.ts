@@ -4,11 +4,7 @@ import {
   loadUserSettings,
   updateUserSettings,
 } from "../../persist/userSettings";
-import type {
-  ComfyUIConfigPayload,
-  Personalization,
-  SearXNGConfigPayload,
-} from "../../types";
+import type { ComfyUIConfigPayload, Personalization } from "../../types";
 
 type ComfyConfigResponse = {
   host?: string;
@@ -18,18 +14,12 @@ type ComfyConfigResponse = {
   negativePrompt?: string;
 };
 
-type SearXNGConfigResponse = {
-  host?: string;
-};
-
 export function useSettings(
   setOllamaHost: (host: string) => void,
   fetchOllamaHealth: () => Promise<void>,
   refreshOllamaModels: () => Promise<void>,
   fetchComfyUIHealth: () => Promise<void>,
   applyComfyConfigResponse: (data: ComfyConfigResponse) => void,
-  fetchSearXNGHealth: () => Promise<void>,
-  applySearXNGConfigResponse: (data: SearXNGConfigResponse) => void,
 ) {
   const [userSettings, setUserSettings] = useState<UserSettings>(() =>
     loadUserSettings(),
@@ -46,7 +36,6 @@ export function useSettings(
       settings: UserSettings,
       ollamaHostToSave: string,
       comfyui?: ComfyUIConfigPayload,
-      searxng?: SearXNGConfigPayload,
     ) => {
       const updated = updateUserSettings(settings);
       setUserSettings(updated);
@@ -72,18 +61,6 @@ export function useSettings(
         applyComfyConfigResponse(cData);
         void fetchComfyUIHealth();
       }
-
-      if (searxng) {
-        const sRes = await fetch("/api/searxng/config", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(searxng),
-        });
-        if (!sRes.ok) throw new Error("Failed to save SearXNG settings");
-        const sData = (await sRes.json()) as SearXNGConfigResponse;
-        applySearXNGConfigResponse(sData);
-        void fetchSearXNGHealth();
-      }
     },
     [
       setOllamaHost,
@@ -91,8 +68,6 @@ export function useSettings(
       refreshOllamaModels,
       fetchComfyUIHealth,
       applyComfyConfigResponse,
-      fetchSearXNGHealth,
-      applySearXNGConfigResponse,
     ],
   );
 
