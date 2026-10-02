@@ -44,6 +44,12 @@ for (const device of ["desktop", "mobile"] as const) {
       isMobile: device === "mobile",
       hasTouch: device === "mobile",
     });
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        "euler:userUuid",
+        "12345678-1234-4234-9234-123456789abc",
+      );
+    });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     let sessionModel = "openrouter:anthropic/claude-sonnet";

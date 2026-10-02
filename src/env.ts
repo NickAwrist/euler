@@ -64,6 +64,7 @@ export const envConfig = {
     ["EULER_MAX_RUNNING_AGENTS"],
     DEFAULT_MAX_RUNNING_AGENTS,
   ),
+  braveApiKey: getFirstEnv(["BRAVE_SEARCH_API_KEY", "EULER_BRAVE_API_KEY"]),
   openrouterApiKey: getFirstEnv([
     "OPENROUTER_API_KEY",
     "EULER_OPENROUTER_API_KEY",

@@ -95,3 +95,39 @@ for (const device of ["desktop", "mobile"] as const) {
     }
   });
 }
+
+test("settings save desktop: Brave key saves from the shared form without browser storage", async ({
+  page,
+}) => {
+  const saves: unknown[] = [];
+  await page.route("**/api/**", (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/settings/brave" && request.method() === "PUT") {
+      saves.push(request.postDataJSON());
+      return route.fulfill({ json: { ok: true, hasKey: true } });
+    }
+    return route.fulfill({
+      json:
+        path === "/api/settings/brave"
+          ? { hasKey: false, environmentManaged: false }
+          : { ollamaHost: false, comfyuiHost: false, searxngHost: false },
+    });
+  });
+  await page.goto("/dev/settings");
+  await page.getByRole("button", { name: "Web Search", exact: true }).click();
+  const key = page.getByLabel("API key", { exact: true });
+  await key.fill("brave-secret");
+  await page.getByRole("button", { name: "Save key" }).click();
+  await expect(page.getByLabel("API key · Configured")).toHaveValue("");
+  await expect(page.getByRole("button", { name: "Remove key" })).toBeVisible();
+  // Saving immediately keeps the key out of the Settings unsaved-changes footer.
+  await expect(
+    page.getByRole("button", { name: "Save settings" }),
+  ).toBeHidden();
+  expect(saves).toEqual([{ apiKey: "brave-secret" }]);
+  const stored = await page.evaluate(() =>
+    Object.keys(localStorage).map((name) => localStorage.getItem(name)),
+  );
+  expect(stored.some((value) => value?.includes("brave-secret"))).toBe(false);
+});

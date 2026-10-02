@@ -6,6 +6,7 @@ import {
   getSearXNGHost,
 } from "../../src/db";
 import { getDb } from "../../src/db/connection";
+import { getBraveApiKey } from "../../src/db/settings";
 import { envConfig } from "../../src/env";
 import { startTestServer } from "../helpers/server";
 
@@ -13,6 +14,13 @@ const original = { ...envConfig };
 afterEach(() => Object.assign(envConfig, original));
 
 const settings = [
+  {
+    env: "braveApiKey",
+    key: "brave_api_key",
+    path: "/api/settings/brave",
+    field: "apiKey",
+    get: getBraveApiKey,
+  },
   {
     env: "ollamaHost",
     key: "ollama_host",

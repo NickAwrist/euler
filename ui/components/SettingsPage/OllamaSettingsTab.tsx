@@ -1,11 +1,11 @@
 import { cx, eyebrowText } from "../../styles";
 import {
   ConnectionTestFeedback,
-  ollamaConnectionFeedback,
+  connectionFeedback,
 } from "./ConnectionTestFeedback";
 import { EnvironmentSettingHint } from "./EnvironmentSettingHint";
 import { inputClass, labelClass } from "./constants";
-import type { OllamaTestState } from "./types";
+import type { ConnectionTestState } from "./types";
 
 export function OllamaSettingsTab({
   environmentManaged,
@@ -19,7 +19,7 @@ export function OllamaSettingsTab({
   ollamaUri: string;
   onOllamaUriInput: (value: string) => void;
   ollamaConnected: boolean | null;
-  testState: OllamaTestState;
+  testState: ConnectionTestState;
   onTestOllama: () => void;
 }) {
   return (
@@ -60,7 +60,7 @@ export function OllamaSettingsTab({
           (http://127.0.0.1:11434).
         </EnvironmentSettingHint>
         <ConnectionTestFeedback
-          {...ollamaConnectionFeedback(testState, ollamaConnected)}
+          {...connectionFeedback(testState, ollamaConnected)}
         />
       </div>
     </section>

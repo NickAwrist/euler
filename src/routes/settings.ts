@@ -10,6 +10,7 @@ import {
   setPublisherSubscription,
   trackOpenRouterPublisher,
 } from "../db/openrouter";
+import { getBraveApiKey, setBraveApiKey } from "../db/settings";
 import { envConfig, getEnvironmentSettings } from "../env";
 import { asyncRoute } from "../http/asyncRoute";
 import { canEditEnvironmentSetting } from "../http/environmentSettings";
@@ -26,6 +27,20 @@ import { publisherName } from "../openRouterPublishers";
 import { requireUserId } from "../userIdentity";
 
 const settingsRoutes = Router();
+settingsRoutes.get("/brave", (_req, res) => {
+  res.json({
+    hasKey: Boolean(getBraveApiKey()),
+    environmentManaged: Boolean(envConfig.braveApiKey),
+  });
+});
+settingsRoutes.put("/brave", (req, res) => {
+  const parsed = z.object({ apiKey: z.string().max(512) }).safeParse(req.body);
+  if (!parsed.success)
+    return sendApiError(res, 400, "BAD_REQUEST", "apiKey must be a string");
+  if (canEditEnvironmentSetting(envConfig.braveApiKey, parsed.data.apiKey))
+    setBraveApiKey(parsed.data.apiKey);
+  res.json({ ok: true, hasKey: Boolean(getBraveApiKey()) });
+});
 
 settingsRoutes.get("/environment", (_req, res) => {
   res.json(getEnvironmentSettings());

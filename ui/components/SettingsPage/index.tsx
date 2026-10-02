@@ -76,8 +76,8 @@ export function SettingsPage(props: SettingsPageProps) {
 
           {tab === "appearance" && (
             <AppearanceSettingsTab
-              appearance={p.appearance}
-              onChange={p.setAppearance}
+              appearance={p.appearance.appearance}
+              onChange={p.appearance.setAppearance}
             />
           )}
 
@@ -85,7 +85,7 @@ export function SettingsPage(props: SettingsPageProps) {
             <GeneralSettingsTab
               settings={p.settings}
               onFieldChange={p.handleChange}
-              availableModels={p.availableModels}
+              availableModels={props.ollamaModels}
               catalogLoaded={props.catalogLoaded}
             />
           )}
@@ -93,29 +93,29 @@ export function SettingsPage(props: SettingsPageProps) {
           {tab === "ollama" && (
             <OllamaSettingsTab
               environmentManaged={environment.settings?.ollamaHost}
-              ollamaUri={p.ollamaUri}
-              onOllamaUriInput={p.onOllamaUriInput}
-              ollamaConnected={props.ollamaConnected}
-              testState={p.testState}
-              onTestOllama={p.handleTestOllama}
+              ollamaUri={p.ollama.host}
+              onOllamaUriInput={p.ollama.onHostInput}
+              ollamaConnected={p.ollama.connected}
+              testState={p.ollama.testState}
+              onTestOllama={p.ollama.test}
             />
           )}
 
           {tab === "image-generation" && (
             <ImageGenerationTab
               environmentManaged={environment.settings?.comfyuiHost}
-              comfyuiConnected={props.comfyuiConnected}
-              comfyUri={p.comfyUri}
-              onComfyUriInput={p.onComfyUriInput}
-              comfyTestState={p.comfyTestState}
-              onTestComfyUI={p.handleTestComfyUI}
-              comfyModel={p.comfyModel}
-              setComfyModel={p.setComfyModel}
-              comfyModels={p.comfyModels}
-              comfySize={p.comfySize}
-              setComfySize={p.setComfySize}
-              comfyNegative={p.comfyNegative}
-              setComfyNegative={p.setComfyNegative}
+              comfyuiConnected={p.comfy.server.connected}
+              comfyUri={p.comfy.server.host}
+              onComfyUriInput={p.comfy.server.onHostInput}
+              comfyTestState={p.comfy.server.testState}
+              onTestComfyUI={p.comfy.server.test}
+              comfyModel={p.comfy.model}
+              setComfyModel={p.comfy.setModel}
+              comfyModels={p.comfy.models}
+              comfySize={p.comfy.size}
+              setComfySize={p.comfy.setSize}
+              comfyNegative={p.comfy.negative}
+              setComfyNegative={p.comfy.setNegative}
             />
           )}
 
@@ -126,11 +126,12 @@ export function SettingsPage(props: SettingsPageProps) {
           {tab === "web-search" && (
             <WebSearchTab
               environmentManaged={environment.settings?.searxngHost}
-              searxngConnected={props.searxngConnected}
-              searxngUri={p.searxngUri}
-              onSearxngUriInput={p.onSearxngUriInput}
-              searxngTestState={p.searxngTestState}
-              onTestSearXNG={p.handleTestSearXNG}
+              searxngConnected={p.searxng.connected}
+              searxngUri={p.searxng.host}
+              onSearxngUriInput={p.searxng.onHostInput}
+              searxngTestState={p.searxng.testState}
+              onTestSearXNG={p.searxng.test}
+              brave={p.brave}
             />
           )}
         </div>

@@ -1,6 +1,4 @@
-import { RotateCcw } from "lucide-react";
 import { useState } from "react";
-import { effectiveDefaultRunModel } from "../../lib/defaultModel";
 import {
   getOrCreateUserId,
   normalizeUserId,
@@ -10,9 +8,8 @@ import type { UserSettings } from "../../persist/userSettings";
 import { cx, eyebrowText } from "../../styles";
 import type { ModelOption } from "../../types";
 import { Button } from "../Button";
-import { IconButton } from "../IconButton";
 import { EnableSwitch } from "../ModelPreferenceControls";
-import { ModelSelectBar } from "../ModelSelectBar";
+import { DefaultModelSetting } from "./DefaultModelSetting";
 import { hintClass, inputClass, labelClass } from "./constants";
 
 type Props = {
@@ -31,10 +28,6 @@ export function GeneralSettingsTab({
   availableModels,
   catalogLoaded,
 }: Props) {
-  const effectiveModel = effectiveDefaultRunModel(
-    settings.defaultModel,
-    availableModels,
-  );
   const [currentUserId] = useState(getOrCreateUserId);
   const [userIdDraft, setUserIdDraft] = useState(currentUserId);
   const normalizedDraft = normalizeUserId(userIdDraft);
@@ -90,46 +83,12 @@ export function GeneralSettingsTab({
 
       <div className="space-y-2">
         <h2 className={cx(eyebrowText, "mb-2")}>Chat Defaults</h2>
-        <div className="space-y-2">
-          <label htmlFor="run-model" className={labelClass}>
-            Default Model
-          </label>
-          <div className="flex items-center gap-2">
-            <div className="min-w-0 flex-1">
-              <ModelSelectBar
-                ollamaModels={availableModels}
-                ollamaConnected={catalogLoaded ? true : null}
-                modelsLoadError={null}
-                selectedModel={effectiveModel}
-                onModelChange={(model) => onFieldChange("defaultModel", model)}
-                disabled={!catalogLoaded || !effectiveModel}
-              />
-            </div>
-            <IconButton
-              icon={RotateCcw}
-              label="Reset default model"
-              title="Reset to first available model"
-              variant="ghost"
-              disabled={!settings.defaultModel}
-              onClick={() => onFieldChange("defaultModel", "")}
-              className="shrink-0"
-            />
-          </div>
-          {!catalogLoaded ? (
-            <p className={hintClass}>Loading models...</p>
-          ) : !effectiveModel ? (
-            <p className={hintClass}>
-              No models available. Connect a provider and enable a model to
-              start chatting.
-            </p>
-          ) : settings.defaultModel &&
-            settings.defaultModel !== effectiveModel ? (
-            <p className={hintClass}>
-              Saved model {settings.defaultModel} is unavailable. New chats will
-              use the model shown above.
-            </p>
-          ) : null}
-        </div>
+        <DefaultModelSetting
+          value={settings.defaultModel}
+          onChange={(model) => onFieldChange("defaultModel", model)}
+          availableModels={availableModels}
+          catalogLoaded={catalogLoaded}
+        />
       </div>
       <details className="border-t border-border-subtle pt-4">
         <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">

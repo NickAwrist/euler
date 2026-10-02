@@ -65,7 +65,9 @@ export function getOrCreateUserId(): string {
   if (fallbackUserId) return fallbackUserId;
 
   fallbackUserId = createBrowserUuid();
-  safeStorage.setItem(USER_ID_STORAGE_KEY, fallbackUserId);
+  if (safeStorage.setItem(USER_ID_STORAGE_KEY, fallbackUserId)) {
+    safeStorage.setItem(`euler:onboarding:${fallbackUserId}`, "pending");
+  }
   return fallbackUserId;
 }
 

@@ -3,16 +3,15 @@ import {
   type WebSourceAttachment,
   WebSourceAttachmentSchema,
 } from "../attachments/types";
+import { searchBrave } from "../brave/search";
+import { getBraveApiKey } from "../db/settings";
 import { getSearXNGClient } from "../searxng/client";
 import { errorMessage } from "../utils/errors";
 import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
 
 export class WebSearchTool extends BaseTool {
   constructor() {
-    super(
-      "web_search",
-      "Search the web using the configured local SearXNG server.",
-    );
+    super("web_search", "Search the web using the configured search provider.");
   }
 
   override toTool(): Tool {
@@ -47,7 +46,10 @@ export class WebSearchTool extends BaseTool {
         : 5;
 
     try {
-      const results = await getSearXNGClient().search(args.query, maxResults);
+      const key = getBraveApiKey();
+      const results = key
+        ? await searchBrave(key, args.query, maxResults)
+        : await getSearXNGClient().search(args.query, maxResults);
 
       if (results.length === 0) {
         return textToolResult("No results found.");

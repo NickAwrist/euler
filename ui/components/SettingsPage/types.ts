@@ -8,26 +8,11 @@ import type {
 
 export type SettingChange = { tab: SettingsTab; label: string };
 
-export type ComfyUITestState =
+export type ConnectionTestState =
   | { status: "idle" }
-  | { status: "loading"; holdConnected?: boolean }
-  | { status: "ok" }
-  | { status: "err"; message: string };
-
-export type OllamaTestState =
-  | { status: "idle" }
-  | {
-      status: "loading";
-      previousVersion?: string;
-      holdSavedConnected?: boolean;
-    }
-  | { status: "ok"; version: string }
-  | { status: "err"; message: string };
-
-export type SearXNGTestState =
-  | { status: "idle" }
-  | { status: "loading"; holdConnected?: boolean }
-  | { status: "ok" }
+  /** `holdLabel` keeps the last known connection visible while re-testing. */
+  | { status: "loading"; holdLabel?: string }
+  | { status: "ok"; label: string }
   | { status: "err"; message: string };
 
 export type SettingsPageProps = {
@@ -48,7 +33,7 @@ export type SettingsPageProps = {
   searxngConnected: boolean | null;
   onSave: (
     settings: UserSettings,
-    ollamaHost: string,
+    ollamaHost?: string,
     comfyui?: ComfyUIConfigPayload,
     searxng?: SearXNGConfigPayload,
   ) => Promise<void>;

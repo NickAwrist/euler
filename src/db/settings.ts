@@ -96,3 +96,11 @@ export function getOpenRouterApiKey(): string {
 export function setOpenRouterApiKey(key: string): void {
   setAppSetting(OPENROUTER_API_KEY_KEY, key);
 }
+
+export function getBraveApiKey(): string {
+  return envConfig.braveApiKey || getAppSetting("brave_api_key");
+}
+
+export function setBraveApiKey(key: string): void {
+  setAppSetting("brave_api_key", key);
+}

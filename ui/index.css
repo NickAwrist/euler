@@ -646,3 +646,9 @@ html[data-window-resizing] aside,
 html[data-window-resizing] main {
   transition: none !important;
 }
+
+@media (prefers-reduced-motion: no-preference) {
+  .onboarding-step {
+    animation: ui-slide-fade-up 200ms ease-out;
+  }
+}

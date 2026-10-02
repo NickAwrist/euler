@@ -1,47 +1,33 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  applyAppearance,
-  loadAppearance,
-  saveAppearance,
-} from "../../persist/appearance";
+import { useCallback, useState } from "react";
+import { useSavedDraft } from "../../hooks/useSavedDraft";
 import type { UserSettings } from "../../persist/userSettings";
-import type {
-  ComfyUIConfigPayload,
-  ModelOption,
-  SearXNGConfigPayload,
-  SettingsTab,
-} from "../../types";
-import { parseSize, sizeKey } from "./constants";
-import type {
-  ComfyUITestState,
-  OllamaTestState,
-  SearXNGTestState,
-  SettingChange,
-} from "./types";
+import type { SettingsTab } from "../../types";
+import type { SettingChange, SettingsPageProps } from "./types";
+import { useAppearanceDraft } from "./useAppearanceDraft";
+import { useBraveSettings } from "./useBraveSettings";
+import {
+  useComfyUIDraft,
+  useOllamaDraft,
+  useSearXNGDraft,
+} from "./useProviderDrafts";
 
-type Args = {
-  ollamaModels: ModelOption[];
-  currentSettings: UserSettings;
-  ollamaHost: string;
-  ollamaConnected: boolean | null;
-  comfyuiHost: string;
-  comfyuiConnected: boolean | null;
-  comfyuiDefaultModel: string;
-  comfyuiDefaultWidth: number;
-  comfyuiDefaultHeight: number;
-  comfyuiNegativePrompt: string;
-  searxngHost: string;
-  searxngConnected: boolean | null;
-  onSave: (
-    settings: UserSettings,
-    ollamaHost: string,
-    comfyui?: ComfyUIConfigPayload,
-    searxng?: SearXNGConfigPayload,
-  ) => Promise<void>;
-};
+type Args = Pick<
+  SettingsPageProps,
+  | "currentSettings"
+  | "ollamaHost"
+  | "ollamaConnected"
+  | "comfyuiHost"
+  | "comfyuiConnected"
+  | "comfyuiDefaultModel"
+  | "comfyuiDefaultWidth"
+  | "comfyuiDefaultHeight"
+  | "comfyuiNegativePrompt"
+  | "searxngHost"
+  | "searxngConnected"
+  | "onSave"
+>;
 
 export function useSettingsPageState({
-  ollamaModels,
   currentSettings,
   ollamaHost,
   ollamaConnected,
@@ -55,318 +41,76 @@ export function useSettingsPageState({
   searxngConnected,
   onSave,
 }: Args) {
-  const [savedAppearance, setSavedAppearance] = useState(loadAppearance);
-  const [appearance, setAppearance] = useState(savedAppearance);
-  const [settings, setSettings] = useState<UserSettings>(currentSettings);
-  const [ollamaUri, setOllamaUri] = useState(ollamaHost);
+  const appearance = useAppearanceDraft();
+  const settings = useSavedDraft(currentSettings);
+  const ollama = useOllamaDraft(ollamaHost, ollamaConnected);
+  const comfy = useComfyUIDraft(
+    {
+      host: comfyuiHost,
+      defaultModel: comfyuiDefaultModel,
+      defaultWidth: comfyuiDefaultWidth,
+      defaultHeight: comfyuiDefaultHeight,
+      negativePrompt: comfyuiNegativePrompt,
+    },
+    comfyuiConnected,
+  );
+  const searxng = useSearXNGDraft(searxngHost, searxngConnected);
+  const brave = useBraveSettings();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [testState, setTestState] = useState<OllamaTestState>({
-    status: "idle",
-  });
-
-  const [comfyUri, setComfyUri] = useState(comfyuiHost);
-  const [comfyModel, setComfyModel] = useState(comfyuiDefaultModel);
-  const [comfySize, setComfySize] = useState(
-    sizeKey(comfyuiDefaultWidth, comfyuiDefaultHeight),
-  );
-  const [comfyModels, setComfyModels] = useState<string[]>([]);
-  const [comfyTestState, setComfyTestState] = useState<ComfyUITestState>({
-    status: "idle",
-  });
-  const [comfyNegative, setComfyNegative] = useState(comfyuiNegativePrompt);
-  const [searxngUri, setSearxngUri] = useState(searxngHost);
-  const [searxngTestState, setSearxngTestState] = useState<SearXNGTestState>({
-    status: "idle",
-  });
-
-  useEffect(() => {
-    setSettings(currentSettings);
-  }, [currentSettings]);
-  useEffect(() => {
-    setOllamaUri(ollamaHost);
-  }, [ollamaHost]);
-  useEffect(() => {
-    setComfyUri(comfyuiHost);
-  }, [comfyuiHost]);
-  useEffect(() => {
-    setComfyModel(comfyuiDefaultModel);
-  }, [comfyuiDefaultModel]);
-  useEffect(() => {
-    setComfySize(sizeKey(comfyuiDefaultWidth, comfyuiDefaultHeight));
-  }, [comfyuiDefaultWidth, comfyuiDefaultHeight]);
-  useEffect(() => {
-    setComfyNegative(comfyuiNegativePrompt);
-  }, [comfyuiNegativePrompt]);
-  useEffect(() => {
-    setSearxngUri(searxngHost);
-  }, [searxngHost]);
-
-  useEffect(() => {
-    if (comfyuiConnected) {
-      void (async () => {
-        try {
-          const res = await fetch("/api/comfyui/models");
-          const data = (await res.json()) as { models?: string[] };
-          if (Array.isArray(data.models)) setComfyModels(data.models);
-        } catch {
-          /* ignore */
-        }
-      })();
-    }
-  }, [comfyuiConnected]);
 
   const handleChange = useCallback(
     <K extends keyof UserSettings>(field: K, value: UserSettings[K]) => {
-      setSettings((prev) => ({ ...prev, [field]: value }));
+      settings.setValue((prev) => ({ ...prev, [field]: value }));
     },
-    [],
+    [settings.setValue],
   );
 
-  const handleTestOllama = useCallback(async () => {
-    setTestState((prev) => {
-      if (prev.status === "ok") {
-        return { status: "loading", previousVersion: prev.version };
-      }
-      if (prev.status === "idle" && ollamaConnected === true) {
-        return { status: "loading", holdSavedConnected: true };
-      }
-      return { status: "loading" };
-    });
-    setError(null);
-    try {
-      const res = await fetch("/api/ollama/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ host: ollamaUri }),
-      });
-      const data = (await res.json()) as {
-        ok?: boolean;
-        version?: string;
-        error?: string;
-      };
-      if (data.ok && typeof data.version === "string") {
-        setTestState({ status: "ok", version: data.version });
-      } else {
-        setTestState({
-          status: "err",
-          message: data.error || "Connection failed",
-        });
-      }
-    } catch (e) {
-      setTestState({
-        status: "err",
-        message: e instanceof Error ? e.message : String(e),
-      });
-    }
-  }, [ollamaUri, ollamaConnected]);
-
-  const handleTestComfyUI = useCallback(async () => {
-    setComfyTestState((prev) => ({
-      status: "loading",
-      holdConnected:
-        prev.status === "ok" ||
-        (prev.status === "idle" && comfyuiConnected === true),
-    }));
-    try {
-      const res = await fetch("/api/comfyui/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ host: comfyUri }),
-      });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (data.ok) {
-        setComfyTestState({ status: "ok" });
-        try {
-          const mRes = await fetch("/api/comfyui/models");
-          const mData = (await mRes.json()) as { models?: string[] };
-          if (Array.isArray(mData.models)) setComfyModels(mData.models);
-        } catch {
-          /* ignore */
-        }
-      } else {
-        setComfyTestState({
-          status: "err",
-          message: data.error || "Connection failed",
-        });
-      }
-    } catch (e) {
-      setComfyTestState({
-        status: "err",
-        message: e instanceof Error ? e.message : String(e),
-      });
-    }
-  }, [comfyUri, comfyuiConnected]);
-
-  const handleTestSearXNG = useCallback(async () => {
-    setSearxngTestState((prev) => ({
-      status: "loading",
-      holdConnected:
-        prev.status === "ok" ||
-        (prev.status === "idle" && searxngConnected === true),
-    }));
-    try {
-      const res = await fetch("/api/searxng/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ host: searxngUri }),
-      });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
-      if (data.ok) {
-        setSearxngTestState({ status: "ok" });
-      } else {
-        setSearxngTestState({
-          status: "err",
-          message: data.error || "Connection failed",
-        });
-      }
-    } catch (e) {
-      setSearxngTestState({
-        status: "err",
-        message: e instanceof Error ? e.message : String(e),
-      });
-    }
-  }, [searxngUri, searxngConnected]);
-
-  const savedComfySize = useMemo(
-    () => sizeKey(comfyuiDefaultWidth, comfyuiDefaultHeight),
-    [comfyuiDefaultWidth, comfyuiDefaultHeight],
-  );
-
-  const changes = useMemo((): SettingChange[] => {
-    const settingChanges: [SettingsTab, string, boolean][] = [
-      [
-        "general",
-        "Default model",
-        settings.defaultModel !== currentSettings.defaultModel,
-      ],
-      [
-        "general",
-        "Display debug button",
-        settings.showDebugButton !== currentSettings.showDebugButton,
-      ],
-      ["appearance", "Color theme", appearance.theme !== savedAppearance.theme],
-      [
-        "appearance",
-        "Chat width",
-        appearance.chatWidth !== savedAppearance.chatWidth,
-      ],
-      ["appearance", "Font style", appearance.font !== savedAppearance.font],
-      [
-        "appearance",
-        "Code block font",
-        appearance.codeFont !== savedAppearance.codeFont,
-      ],
-      [
-        "appearance",
-        "Make room for the chat list",
-        appearance.shiftForChatList !== savedAppearance.shiftForChatList,
-      ],
-      [
-        "appearance",
-        "Make room for artifacts",
-        appearance.shiftForArtifacts !== savedAppearance.shiftForArtifacts,
-      ],
-      [
-        "appearance",
-        "Sidebar animation",
-        appearance.sidebarAnimationMs !== savedAppearance.sidebarAnimationMs,
-      ],
-      ["ollama", "Ollama server URL", ollamaUri !== ollamaHost],
-      ["image-generation", "ComfyUI server URL", comfyUri !== comfyuiHost],
-      [
-        "image-generation",
-        "Default checkpoint model",
-        comfyModel !== comfyuiDefaultModel,
-      ],
-      ["image-generation", "Default image size", comfySize !== savedComfySize],
-      [
-        "image-generation",
-        "Negative prompt",
-        comfyNegative !== comfyuiNegativePrompt,
-      ],
-      ["web-search", "SearXNG server URL", searxngUri !== searxngHost],
-    ];
-    return settingChanges
-      .filter(([, , changed]) => changed)
-      .map(([tab, label]) => ({ tab, label }));
-  }, [
-    appearance,
-    savedAppearance,
-    settings,
-    currentSettings,
-    ollamaUri,
-    ollamaHost,
-    comfyUri,
-    comfyuiHost,
-    comfyModel,
-    comfyuiDefaultModel,
-    comfySize,
-    savedComfySize,
-    comfyNegative,
-    comfyuiNegativePrompt,
-    searxngUri,
-    searxngHost,
-  ]);
+  const tabChanges = (tab: SettingsTab, labels: readonly string[]) =>
+    labels.map((label): SettingChange => ({ tab, label }));
+  const changes: SettingChange[] = [
+    ...tabChanges("general", [
+      ...(settings.value.defaultModel !== currentSettings.defaultModel
+        ? ["Default model"]
+        : []),
+      ...(settings.value.showDebugButton !== currentSettings.showDebugButton
+        ? ["Display debug button"]
+        : []),
+    ]),
+    ...tabChanges("appearance", appearance.changes),
+    ...tabChanges("ollama", ollama.dirty ? ["Ollama server URL"] : []),
+    ...tabChanges("image-generation", comfy.changes),
+    ...tabChanges("web-search", searxng.dirty ? ["SearXNG server URL"] : []),
+  ];
   const isDirty = changes.length > 0;
 
-  const discardChanges = useCallback(() => {
-    setAppearance(savedAppearance);
-    setSettings(currentSettings);
-    setOllamaUri(ollamaHost);
-    setComfyUri(comfyuiHost);
-    setComfyModel(comfyuiDefaultModel);
-    setComfySize(savedComfySize);
-    setComfyNegative(comfyuiNegativePrompt);
-    setSearxngUri(searxngHost);
-    setTestState({ status: "idle" });
-    setComfyTestState({ status: "idle" });
-    setSearxngTestState({ status: "idle" });
+  const discardChanges = () => {
+    appearance.reset();
+    settings.reset();
+    ollama.reset();
+    comfy.reset();
+    searxng.reset();
     setError(null);
-  }, [
-    savedAppearance,
-    currentSettings,
-    ollamaHost,
-    comfyuiHost,
-    comfyuiDefaultModel,
-    savedComfySize,
-    comfyuiNegativePrompt,
-    searxngHost,
-  ]);
+  };
 
-  const handleSubmit = useCallback(async (): Promise<boolean> => {
+  const handleSubmit = async (): Promise<boolean> => {
     if (!isDirty) return true;
     setIsSaving(true);
     setError(null);
     try {
-      const { width, height } = parseSize(comfySize);
-      if (changes.some((change) => change.tab !== "appearance"))
+      if (changes.some((change) => change.tab !== "appearance")) {
         await onSave(
-          settings,
-          ollamaUri,
-          {
-            host: comfyUri,
-            defaultModel: comfyModel,
-            defaultWidth: width,
-            defaultHeight: height,
-            negativePrompt: comfyNegative,
-          },
-          {
-            host: searxngUri,
-          },
+          settings.value,
+          ollama.dirty ? ollama.host : undefined,
+          comfy.changes.length > 0 ? comfy.config : undefined,
+          searxng.dirty ? { host: searxng.host } : undefined,
         );
-      if (changes.some((change) => change.tab === "appearance")) {
-        if (!saveAppearance(appearance)) {
-          throw new Error(
-            "Could not save appearance in this browser. Your changes have not been applied.",
-          );
-        }
-        applyAppearance(appearance);
-        setSavedAppearance(appearance);
+        settings.accept();
+        ollama.accept();
+        comfy.accept();
+        searxng.accept();
       }
-      setTestState({ status: "idle" });
-      setComfyTestState({ status: "idle" });
-      setSearxngTestState({ status: "idle" });
+      if (appearance.changes.length > 0) appearance.save();
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save settings");
@@ -374,67 +118,21 @@ export function useSettingsPageState({
     } finally {
       setIsSaving(false);
     }
-  }, [
-    appearance,
-    changes,
-    isDirty,
-    settings,
-    ollamaUri,
-    comfyUri,
-    comfyModel,
-    comfySize,
-    comfyNegative,
-    searxngUri,
-    onSave,
-  ]);
-
-  const availableModels = ollamaModels;
-
-  const onOllamaUriInput = useCallback((v: string) => {
-    setOllamaUri(v);
-    setTestState({ status: "idle" });
-  }, []);
-
-  const onComfyUriInput = useCallback((v: string) => {
-    setComfyUri(v);
-    setComfyTestState({ status: "idle" });
-  }, []);
-
-  const onSearxngUriInput = useCallback((v: string) => {
-    setSearxngUri(v);
-    setSearxngTestState({ status: "idle" });
-  }, []);
+  };
 
   return {
     appearance,
-    setAppearance,
-    settings,
-    ollamaUri,
-    onOllamaUriInput,
+    settings: settings.value,
+    handleChange,
+    ollama,
+    comfy,
+    searxng,
+    brave,
     isSaving,
     changes,
     isDirty,
     discardChanges,
     error,
-    testState,
-    comfyUri,
-    onComfyUriInput,
-    comfyModel,
-    setComfyModel,
-    comfySize,
-    setComfySize,
-    comfyModels,
-    comfyTestState,
-    comfyNegative,
-    setComfyNegative,
-    searxngUri,
-    onSearxngUriInput,
-    searxngTestState,
-    handleChange,
-    handleTestOllama,
-    handleTestComfyUI,
-    handleTestSearXNG,
     handleSubmit,
-    availableModels,
   };
 }

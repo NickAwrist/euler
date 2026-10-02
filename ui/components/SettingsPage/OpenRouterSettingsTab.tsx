@@ -14,7 +14,12 @@ import { useOpenRouterCatalog } from "./useOpenRouterCatalog";
 
 export function OpenRouterSettingsTab({
   onModelsChanged,
-}: { onModelsChanged: () => Promise<void> }) {
+  onKeyStatusChange,
+}: {
+  onModelsChanged: () => Promise<void>;
+  /** Reports whether a key is saved once known and after each change. */
+  onKeyStatusChange?: (hasKey: boolean) => void;
+}) {
   const [environmentManaged, setEnvironmentManaged] = useState<boolean>();
   const [hasKey, setHasKey] = useState(false);
   const [keyLoading, setKeyLoading] = useState(true);
@@ -51,6 +56,9 @@ export function OpenRouterSettingsTab({
       active = false;
     };
   }, []);
+  useEffect(() => {
+    if (!keyLoading) onKeyStatusChange?.(hasKey);
+  }, [keyLoading, hasKey, onKeyStatusChange]);
   const mutate = async (action: () => Promise<void>) => {
     setBusy(true);
     setError(null);

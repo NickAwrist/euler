@@ -1,5 +1,20 @@
 import { expect, test } from "@playwright/test";
 
+const apiFixture = (url: string) =>
+  url.endsWith("/api/settings/environment")
+    ? { ollamaHost: false, comfyuiHost: false, searxngHost: false }
+    : {};
+
+// These checks exercise returning users; first-visit setup has its own suite.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "euler:userUuid",
+      "12345678-1234-4234-9234-123456789abc",
+    );
+  });
+});
+
 for (const device of ["desktop", "mobile"] as const) {
   test(`settings save ${device}: appearance previews stay local until saved and drafts survive tab changes`, async ({
     browser,
@@ -11,7 +26,9 @@ for (const device of ["desktop", "mobile"] as const) {
           ? { width: 1280, height: 900 }
           : { width: 390, height: 844 },
     });
-    await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
+    await page.route("**/api/**", (route) =>
+      route.fulfill({ json: apiFixture(route.request().url()) }),
+    );
     try {
       await page.goto("/dev/settings");
       await page
@@ -153,7 +170,9 @@ for (const device of ["desktop", "mobile"] as const) {
 test("settings save desktop: each font renders in the shared preview without applying globally", async ({
   page,
 }) => {
-  await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
+  await page.route("**/api/**", (route) =>
+    route.fulfill({ json: apiFixture(route.request().url()) }),
+  );
   await page.goto("/dev/settings");
   await page.getByRole("button", { name: "Appearance", exact: true }).click();
   const preview = page.getByRole("region", { name: "Response preview" });
@@ -211,7 +230,9 @@ test("settings save desktop: each font renders in the shared preview without app
 test("settings save desktop: invalid preferences fall back and failed saves retain drafts without applying", async ({
   page,
 }) => {
-  await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
+  await page.route("**/api/**", (route) =>
+    route.fulfill({ json: apiFixture(route.request().url()) }),
+  );
   await page.addInitScript(() => {
     localStorage.setItem(
       "euler:appearance",

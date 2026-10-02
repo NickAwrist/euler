@@ -1,19 +1,22 @@
 import { cx, eyebrowText } from "../../styles";
+import { BraveSettings } from "./BraveSettings";
 import {
   ConnectionTestFeedback,
-  searxngConnectionFeedback,
+  connectionFeedback,
 } from "./ConnectionTestFeedback";
 import { EnvironmentSettingHint } from "./EnvironmentSettingHint";
 import { inputClass, labelClass } from "./constants";
-import type { SearXNGTestState } from "./types";
+import type { ConnectionTestState } from "./types";
+import type { BraveSettingsState } from "./useBraveSettings";
 
 type Props = {
   searxngConnected: boolean | null;
   environmentManaged: boolean | undefined;
   searxngUri: string;
   onSearxngUriInput: (v: string) => void;
-  searxngTestState: SearXNGTestState;
+  searxngTestState: ConnectionTestState;
   onTestSearXNG: () => void;
+  brave: BraveSettingsState;
 };
 
 export function WebSearchTab({
@@ -23,6 +26,7 @@ export function WebSearchTab({
   onSearxngUriInput,
   searxngTestState,
   onTestSearXNG,
+  brave,
 }: Props) {
   return (
     <div className="space-y-4">
@@ -63,9 +67,11 @@ export function WebSearchTab({
           (http://127.0.0.1:8080).
         </EnvironmentSettingHint>
         <ConnectionTestFeedback
-          {...searxngConnectionFeedback(searxngTestState, searxngConnected)}
+          {...connectionFeedback(searxngTestState, searxngConnected)}
         />
       </div>
+      <hr className="border-border-subtle" />
+      <BraveSettings brave={brave} />
     </div>
   );
 }
