@@ -81,3 +81,23 @@ test("migrations remove legacy agents while preserving sessions", () => {
   ).toBe(1);
   db.close();
 });
+
+test("migrations delete retired search configuration without touching active settings", () => {
+  const db = new Database(":memory:");
+  try {
+    db.run("CREATE TABLE sessions (id TEXT PRIMARY KEY)");
+    db.run("CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT)");
+    db.run(
+      "INSERT INTO app_settings (key, value) VALUES ('searxng_host', 'http://search.test'), ('brave_search_api_key', 'test-key')",
+    );
+
+    runMigrations(db);
+    runMigrations(db);
+
+    expect(db.query("SELECT key, value FROM app_settings").all()).toEqual([
+      { key: "brave_search_api_key", value: "test-key" },
+    ]);
+  } finally {
+    db.close();
+  }
+});
