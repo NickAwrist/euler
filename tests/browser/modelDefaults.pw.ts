@@ -1,4 +1,5 @@
 import { type Page, expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 // These checks exercise returning users; first-visit setup has its own suite.
 test.beforeEach(async ({ page }) => {
@@ -79,7 +80,6 @@ async function mockApp(
                   ? {
                       ollamaHost: false,
                       comfyuiHost: false,
-                      searxngHost: false,
                     }
                   : {};
     return route.fulfill({ json });
@@ -100,6 +100,7 @@ test("model defaults desktop: unavailable preference matches settings, new chats
       deletedTemporarySessions.push(request.url());
     }
   });
+  await mockUserPreferences(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(
@@ -186,6 +187,7 @@ test("model defaults desktop: the Home composer resolves its model when the cata
     () => pending.promise,
   );
   try {
+    await mockUserPreferences(page);
     await page.goto("/");
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     await expect(
@@ -217,6 +219,7 @@ test("model defaults desktop: empty catalogs show no default and cannot send", a
   page,
 }) => {
   const created = await mockApp(page, "removed", async () => []);
+  await mockUserPreferences(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(
@@ -241,6 +244,7 @@ test("model defaults desktop: reset icon clears and saves the explicit preferenc
   page,
 }) => {
   await mockApp(page, "openrouter:test/remote", async () => models);
+  await mockUserPreferences(page);
   await page.goto("/settings/general");
   await expect(
     page.getByText("New chats will use this model.", { exact: true }),
@@ -269,8 +273,155 @@ test("model defaults desktop: reset icon clears and saves the explicit preferenc
   ).toBeHidden();
   expect(
     await page.evaluate(
-      () =>
-        JSON.parse(localStorage.getItem("euler:userSettings")!).defaultModel,
+      async () =>
+        (await (await fetch("/api/settings/user")).json()).settings
+          .defaultModel,
     ),
   ).toBe("");
+});
+
+test("model defaults desktop: two devices share preferences only for the same user", async ({
+  browser,
+}) => {
+  const store = new Map<
+    string,
+    import("../../src/schemas/userPreferences").UserPreferences
+  >();
+  const first = await browser.newPage();
+  const second = await browser.newPage();
+  const other = await browser.newPage();
+  const sameUser = "11111111-1111-4111-8111-111111111111";
+  try {
+    for (const [page, user] of [
+      [first, sameUser],
+      [second, sameUser],
+      [other, "22222222-2222-4222-8222-222222222222"],
+    ] as const) {
+      await mockApp(page, "local", async () => models);
+      await page.addInitScript(
+        (user) => localStorage.setItem("euler:userUuid", user),
+        user,
+      );
+      await mockUserPreferences(page, store);
+    }
+    await first.goto("/settings/general");
+    await first
+      .getByRole("button", { name: "Model: Local", exact: true })
+      .click();
+    await first.getByRole("tab", { name: "Test" }).click();
+    await first
+      .getByRole("button", { name: "Remote Chat only", exact: true })
+      .click();
+    await first
+      .getByRole("button", { name: "Appearance", exact: true })
+      .click();
+    await first.getByText("Nord", { exact: true }).click();
+    await first
+      .getByRole("button", { name: "Save settings", exact: true })
+      .click();
+    await expect(
+      first.getByRole("button", { name: "Save settings", exact: true }),
+    ).toBeHidden();
+    // The second browser starts with stale local settings; the server wins.
+    await second.goto("/settings/general");
+    await expect(
+      second.getByRole("button", { name: "Model: Remote", exact: true }),
+    ).toBeVisible();
+    await expect(second.locator("html")).toHaveAttribute("data-theme", "nord");
+    await other.goto("/settings/general");
+    await expect(
+      other.getByRole("button", { name: "Model: Local", exact: true }),
+    ).toBeVisible();
+    await expect(other.locator("html")).toHaveAttribute(
+      "data-theme",
+      "default",
+    );
+  } finally {
+    await Promise.all([first.close(), second.close(), other.close()]);
+  }
+});
+
+test("model defaults desktop: stale device saves preserve another device's changed fields", async ({
+  browser,
+}) => {
+  const store = new Map<
+    string,
+    import("../../src/schemas/userPreferences").UserPreferences
+  >();
+  const first = await browser.newPage();
+  const second = await browser.newPage();
+  const other = await browser.newPage();
+  const sameUser = "11111111-1111-4111-8111-111111111111";
+  try {
+    for (const [page, user] of [
+      [first, sameUser],
+      [second, sameUser],
+      [other, "22222222-2222-4222-8222-222222222222"],
+    ] as const) {
+      await mockApp(page, "local", async () => models);
+      await page.addInitScript(
+        (user) => localStorage.setItem("euler:userUuid", user),
+        user,
+      );
+      await mockUserPreferences(page, store);
+    }
+    await second.goto("/settings/general");
+    await expect(
+      second.getByRole("button", { name: "Model: Local", exact: true }),
+    ).toBeVisible();
+    await first.goto("/settings/general");
+    await first
+      .getByRole("button", { name: "Model: Local", exact: true })
+      .click();
+    await first.getByRole("tab", { name: "Test" }).click();
+    await first
+      .getByRole("button", { name: "Remote Chat only", exact: true })
+      .click();
+    await first
+      .getByRole("button", { name: "Appearance", exact: true })
+      .click();
+    await first.getByText("Nord", { exact: true }).click();
+    await first
+      .getByRole("button", { name: "Image Generation", exact: true })
+      .click();
+    await first.getByLabel("Negative Prompt").fill("device-one");
+    await first
+      .getByRole("button", { name: "Save settings", exact: true })
+      .click();
+    await expect(
+      first.getByRole("button", { name: "Save settings", exact: true }),
+    ).toBeHidden();
+    await second.getByText("Developer tools", { exact: true }).click();
+    await second.getByRole("switch", { name: "Display debug button" }).click();
+    await second
+      .getByRole("button", { name: "Appearance", exact: true })
+      .click();
+    await second
+      .getByLabel("Font style", { exact: true })
+      .selectOption("serif");
+    await second
+      .getByRole("button", { name: "Save settings", exact: true })
+      .click();
+    await expect(
+      second.getByRole("button", { name: "Save settings", exact: true }),
+    ).toBeHidden();
+    await second.getByRole("button", { name: "General", exact: true }).click();
+    await expect(
+      second.getByRole("button", { name: "Model: Remote", exact: true }),
+    ).toBeVisible();
+    await expect(second.locator("html")).toHaveAttribute("data-theme", "nord");
+    expect(store.get(sameUser)?.image.negativePrompt).toBe("device-one");
+    expect(store.get(sameUser)?.settings.showDebugButton).toBe(true);
+    expect(store.get(sameUser)?.appearance.font).toBe("serif");
+    await other.goto("/settings/general");
+    await expect(
+      other.getByRole("button", { name: "Model: Local", exact: true }),
+    ).toBeVisible();
+    await expect(other.locator("html")).toHaveAttribute(
+      "data-theme",
+      "default",
+    );
+  } finally {
+    await Promise.all([first.close(), second.close(), other.close()]);
+  }
 });

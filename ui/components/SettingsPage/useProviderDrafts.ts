@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSavedDraft } from "../../hooks/useSavedDraft";
+import { changedFields } from "../../lib/changedFields";
 import { loadComfyUIModels, testServiceHost } from "../../persist/services";
 import type { ComfyUIConfigPayload } from "../../types";
 import { parseSize, sizeKey } from "./constants";
@@ -96,15 +97,8 @@ export function useOllamaDraft(savedHost: string, connected: boolean | null) {
   });
 }
 
-export function useSearXNGDraft(savedHost: string, connected: boolean | null) {
-  return useServerHostDraft(savedHost, connected, async (host) => {
-    await testServiceHost("searxng", host);
-    return "Connected";
-  });
-}
-
 export function useComfyUIDraft(
-  saved: ComfyUIConfigPayload,
+  saved: Required<ComfyUIConfigPayload>,
   connected: boolean | null,
 ) {
   const [models, setModels] = useState<string[]>([]);
@@ -140,13 +134,23 @@ export function useComfyUIDraft(
     .filter(([, changed]) => changed)
     .map(([label]) => label);
   const { width, height } = parseSize(size.value);
-  // Always the full config so saving one field never resets the others.
-  const config: ComfyUIConfigPayload = {
-    host: server.host,
-    defaultModel: model.value,
-    defaultWidth: width,
-    defaultHeight: height,
-    negativePrompt: negative.value,
+  // Only edited fields, so saving never overwrites another device's changes.
+  const patch: ComfyUIConfigPayload = {
+    ...(server.dirty ? { host: server.host } : {}),
+    ...changedFields(
+      {
+        defaultModel: model.value,
+        defaultWidth: width,
+        defaultHeight: height,
+        negativePrompt: negative.value,
+      },
+      {
+        defaultModel: saved.defaultModel,
+        defaultWidth: saved.defaultWidth,
+        defaultHeight: saved.defaultHeight,
+        negativePrompt: saved.negativePrompt,
+      },
+    ),
   };
 
   return {
@@ -159,7 +163,7 @@ export function useComfyUIDraft(
     negative: negative.value,
     setNegative: negative.setValue,
     changes,
-    config,
+    patch,
     reset: () => {
       server.reset();
       model.reset();

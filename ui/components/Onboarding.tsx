@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useSavedDraft } from "../hooks/useSavedDraft";
+import { changedFields } from "../lib/changedFields";
 import { effectiveDefaultRunModel } from "../lib/defaultModel";
 import { completeOnboarding } from "../persist/onboarding";
 import type { UserSettings } from "../persist/userSettings";
@@ -8,17 +9,17 @@ import type { ComfyUIConfigPayload, ModelOption } from "../types";
 import { Button } from "./Button";
 import { PersonalizationFields } from "./CustomizationPage/PersonalizationFields";
 import { type OnboardingSection, OnboardingShell } from "./OnboardingShell";
+import { ApiKeySettingsCard } from "./SettingsPage/ApiKeySettingsCard";
 import {
   AppearanceSettingsTab,
   themes,
 } from "./SettingsPage/AppearanceSettingsTab";
-import { BraveSettings } from "./SettingsPage/BraveSettings";
 import { DefaultModelSetting } from "./SettingsPage/DefaultModelSetting";
 import { ImageGenerationTab } from "./SettingsPage/ImageGenerationTab";
 import { OllamaSettingsTab } from "./SettingsPage/OllamaSettingsTab";
 import { OpenRouterSettingsTab } from "./SettingsPage/OpenRouterSettingsTab";
+import { useApiKeySetting } from "./SettingsPage/useApiKeySetting";
 import { useAppearanceDraft } from "./SettingsPage/useAppearanceDraft";
-import { useBraveSettings } from "./SettingsPage/useBraveSettings";
 import { useEnvironmentSettings } from "./SettingsPage/useEnvironmentSettings";
 import {
   type ServiceStatus,
@@ -53,7 +54,7 @@ type Props = {
   models: ModelOption[];
   catalogLoaded: boolean;
   ollama: { host: string; connected: boolean | null };
-  comfyui: ComfyUIConfigPayload & { connected: boolean | null };
+  comfyui: Required<ComfyUIConfigPayload> & { connected: boolean | null };
   onSavePreferences: (updates: Partial<UserSettings>) => Promise<void>;
   onSaveOllamaHost: (host: string) => Promise<void>;
   onSaveComfyUI: (config: ComfyUIConfigPayload) => Promise<void>;
@@ -83,7 +84,7 @@ export function Onboarding({
   const ollamaDraft = useOllamaDraft(ollama.host, ollama.connected);
   const defaultModel = useSavedDraft(settings.defaultModel);
   const comfy = useComfyUIDraft(comfyui, comfyui.connected);
-  const brave = useBraveSettings();
+  const braveKey = useApiKeySetting("brave");
   useEffect(() => {
     heading.current?.focus();
   }, [step]);
@@ -113,12 +114,16 @@ export function Onboarding({
             </div>
           ),
           save: async () => {
-            if (
-              name !== settings.name ||
-              location !== settings.location ||
-              preferredFormats !== settings.preferredFormats
-            )
-              await onSavePreferences({ name, location, preferredFormats });
+            const changes = changedFields(
+              { name, location, preferredFormats },
+              {
+                name: settings.name,
+                location: settings.location,
+                preferredFormats: settings.preferredFormats,
+              },
+            );
+            if (Object.keys(changes).length > 0)
+              await onSavePreferences(changes);
             aboutYou.accept();
             return true;
           },
@@ -141,7 +146,7 @@ export function Onboarding({
             />
           ),
           save: async () => {
-            if (appearance.changes.length > 0) appearance.save();
+            if (appearance.changes.length > 0) await appearance.save();
             return true;
           },
           discard: appearance.reset,
@@ -226,7 +231,7 @@ export function Onboarding({
       title: "Tools",
       summary: servicesSummary([
         ["ComfyUI", comfy.server.status],
-        ["Brave Search", brave.settings?.hasKey ? "configured" : null],
+        ["Brave Search", braveKey.hasKey ? "configured" : null],
       ]),
       steps: [
         {
@@ -253,7 +258,7 @@ export function Onboarding({
           ),
           save: async () => {
             if (comfy.changes.length === 0) return true;
-            await onSaveComfyUI(comfy.config);
+            await onSaveComfyUI(comfy.patch);
             comfy.accept();
             return true;
           },
@@ -261,12 +266,20 @@ export function Onboarding({
         },
         {
           title: "Web search",
-          description: null,
+          description:
+            "Agents search the web with Brave Search. Create a key in the Brave Search API dashboard.",
           sharedServices: true,
-          content: <BraveSettings brave={brave} actions={false} />,
-          save: async () =>
-            brave.key.trim() ? brave.save(brave.key.trim()) : true,
-          discard: brave.reset,
+          content: (
+            <ApiKeySettingsCard
+              setting={braveKey}
+              title="Brave Search API key"
+              inputId="brave-key"
+              placeholder="BSA..."
+            />
+          ),
+          // The key saves from its own form.
+          save: async () => true,
+          discard: () => {},
         },
       ],
     },

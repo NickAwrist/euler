@@ -15,6 +15,7 @@ import {
   type ToolResult,
   textToolResult,
 } from "../tools/BaseTool";
+import { isBackgroundCapable, toolDefinition } from "../tools/background";
 import { toolErrorToString } from "../tools/errors";
 import { missingToolResults } from "./toolResults";
 
@@ -101,7 +102,19 @@ export class BaseAgent {
     }
 
     try {
-      return await tool.execute(args, ctx, parentStep);
+      const { background = false, ...operationArgs } = args;
+      if (typeof background !== "boolean")
+        throw new Error("background must be a boolean");
+      if ("background" in args) {
+        if (!isBackgroundCapable(tool))
+          throw new Error("This tool does not support background execution");
+        if (background) {
+          if (!ctx?.jobs)
+            throw new Error("Background execution is unavailable");
+          return await ctx.jobs.start(tool, operationArgs, ctx, parentStep);
+        }
+      }
+      return await tool.execute(operationArgs, ctx, parentStep);
     } catch (e) {
       return textToolResult(
         `Error: ${toolErrorToString(e, toolName, ctx?.sessionDir)}`,
@@ -191,7 +204,7 @@ export class BaseAgent {
       const stream = await streamModelChat({
         model: this.model,
         messages,
-        tools: this.tools.map((tool) => tool.toTool()),
+        tools: this.tools.map(toolDefinition),
         ...(this.reasoningEffort
           ? { reasoningEffort: this.reasoningEffort }
           : {}),

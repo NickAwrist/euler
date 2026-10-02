@@ -13,7 +13,7 @@ export function CustomizationPage({
 }: {
   onBack: () => void;
   currentSettings: UserSettings;
-  onSave: (settings: Personalization) => Promise<void>;
+  onSave: (settings: Partial<Personalization>) => Promise<void>;
 }) {
   const [tab, setTab] = useState<"personalization" | "skills">(
     "personalization",

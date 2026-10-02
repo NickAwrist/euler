@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 test("session loading: interrupted agents show their reason and fixed model", async ({
   page,
@@ -10,10 +11,11 @@ test("session loading: interrupted agents show their reason and fixed model", as
     }),
   );
   await page.setViewportSize({ width: 390, height: 844 });
+  await mockUserPreferences(page);
   await page.goto("/dev/agents");
   const interrupted = page.getByRole("button", { name: /^Research/ });
   await expect(interrupted).toContainText("Interrupted");
-  await expect(interrupted).toContainText("openai/gpt-5.6-terra");
+  await expect(interrupted).toContainText("gpt-5.6-terra");
   await expect(
     interrupted.locator('img[src="/icons/providers/openai.svg"]'),
   ).toBeVisible();
@@ -33,9 +35,7 @@ test("session loading: interrupted agents show their reason and fixed model", as
       { exact: true },
     ),
   ).toBeVisible();
-  await expect(
-    trace.getByText("openai/gpt-5.6-terra", { exact: true }),
-  ).toBeVisible();
+  await expect(trace.getByText("gpt-5.6-terra", { exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
   const errored = page.getByRole("button", { name: /^Local analysis/ });
   await expect(

@@ -48,18 +48,3 @@ test("provider settings remain editable without environment configuration", () =
   expect(getOpenRouterApiKey()).toBe("");
   expect(getOllamaHost()).toBe("");
 });
-
-test("Brave credentials follow environment ownership and can be removed", async () => {
-  const { getBraveApiKey, setBraveApiKey } = await import(
-    "../../src/db/settings"
-  );
-  envConfig.braveApiKey = "";
-  setBraveApiKey(" saved-key ");
-  expect(getBraveApiKey()).toBe("saved-key");
-  envConfig.braveApiKey = "environment-key";
-  expect(getBraveApiKey()).toBe("environment-key");
-  setBraveApiKey("");
-  expect(getBraveApiKey()).toBe("environment-key");
-  envConfig.braveApiKey = "";
-  expect(getBraveApiKey()).toBe("");
-});

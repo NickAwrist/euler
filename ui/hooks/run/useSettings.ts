@@ -1,28 +1,20 @@
 import { useCallback, useRef, useState } from "react";
-import {
-  saveComfyUIConfig,
-  saveOllamaConfig,
-  saveSearXNGConfig,
-} from "../../persist/services";
+import type { ComfyUIConfigResponse } from "../../../src/schemas/comfyui";
+import { saveComfyUIConfig } from "../../persist/comfyui";
+import { saveOllamaConfig } from "../../persist/services";
 import {
   type UserSettings,
   loadUserSettings,
   updateUserSettings,
 } from "../../persist/userSettings";
-import type {
-  ComfyUIConfigPayload,
-  Personalization,
-  SearXNGConfigPayload,
-} from "../../types";
+import type { ComfyUIConfigPayload, Personalization } from "../../types";
 
 export function useSettings(
   setOllamaHost: (host: string) => void,
   fetchOllamaHealth: () => Promise<void>,
   refreshOllamaModels: () => Promise<void>,
   fetchComfyUIHealth: () => Promise<void>,
-  applyComfyConfigResponse: (data: ComfyUIConfigPayload) => void,
-  fetchSearXNGHealth: () => Promise<void>,
-  applySearXNGConfigResponse: (data: SearXNGConfigPayload) => void,
+  applyComfyConfigResponse: (data: ComfyUIConfigResponse) => void,
 ) {
   const [userSettings, setUserSettings] = useState<UserSettings>(() =>
     loadUserSettings(),
@@ -32,12 +24,13 @@ export function useSettings(
 
   const savePreferences = useCallback(
     async (updates: Partial<UserSettings>) => {
-      setUserSettings(updateUserSettings(updates));
+      setUserSettings(await updateUserSettings(updates));
     },
     [],
   );
-  const savePersonalization: (updates: Personalization) => Promise<void> =
-    savePreferences;
+  const savePersonalization: (
+    updates: Partial<Personalization>,
+  ) => Promise<void> = savePreferences;
 
   const saveOllamaHost = useCallback(
     async (host: string) => {
@@ -58,26 +51,16 @@ export function useSettings(
 
   const saveUserSettings = useCallback(
     async (
-      settings: UserSettings,
-      ollamaHostToSave?: string,
+      settings: Partial<UserSettings>,
+      ollamaHostToSave: string | undefined,
       comfyui?: ComfyUIConfigPayload,
-      searxng?: SearXNGConfigPayload,
     ) => {
-      setUserSettings(updateUserSettings(settings));
+      await savePreferences(settings);
       if (ollamaHostToSave !== undefined)
         await saveOllamaHost(ollamaHostToSave);
       if (comfyui) await saveComfyUISettings(comfyui);
-      if (searxng) {
-        applySearXNGConfigResponse(await saveSearXNGConfig(searxng));
-        void fetchSearXNGHealth();
-      }
     },
-    [
-      saveOllamaHost,
-      saveComfyUISettings,
-      fetchSearXNGHealth,
-      applySearXNGConfigResponse,
-    ],
+    [savePreferences, saveOllamaHost, saveComfyUISettings],
   );
 
   return {

@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 test("markdown rendering preserves lists, lines, code, tables, and link navigation", async ({
   page,
 }) => {
+  await mockUserPreferences(page);
   await page.goto("/dev/messages?markdown");
   const reply = page.getByRole("region", { name: "Message 1", exact: true });
   await expect(reply.locator("ol")).toHaveCSS("list-style-type", "decimal");
@@ -52,6 +54,7 @@ test("markdown rendering preserves lists, lines, code, tables, and link navigati
   await expect(page).toHaveURL(/\/dev\/messages\?markdown$/);
   await popup.close();
 
+  await mockUserPreferences(page);
   await page.goto("/dev/artifacts");
   await page.getByRole("button", { name: "the notes", exact: true }).click();
   await expect(
@@ -72,6 +75,7 @@ test("markdown rendering shows tool output images once and opens sources in a ne
       ),
     }),
   );
+  await mockUserPreferences(page);
   await page.goto("/dev/messages?markdown");
   const reply = page.getByRole("region", { name: "Message 2", exact: true });
   await expect(reply.getByRole("img")).toHaveCount(2);

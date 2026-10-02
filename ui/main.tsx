@@ -2,11 +2,10 @@ import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App";
+import { UserPreferencesGate } from "./components/UserPreferencesGate";
 import { initializeNavigation } from "./lib/navigation";
-import { applyAppearance, loadAppearance } from "./persist/appearance";
 
 initializeNavigation();
-applyAppearance(loadAppearance());
 
 const Root =
   import.meta.env.DEV && window.location.pathname === "/dev/onboarding"
@@ -45,7 +44,9 @@ const Root =
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <Suspense fallback={null}>
-      <Root />
+      <UserPreferencesGate>
+        <Root />
+      </UserPreferencesGate>
     </Suspense>
   </StrictMode>,
 );

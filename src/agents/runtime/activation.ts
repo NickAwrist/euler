@@ -22,6 +22,7 @@ import {
 import { changedWorkspaceFiles } from "./workspaceOutputs";
 
 export interface ActivationHost {
+  jobs: import("../../jobs/JobManager").JobManager;
   store: AgentStore;
   temporaryHistory: Map<string, WireMessageInput[]>;
   status(agent: AgentRecord): void;
@@ -208,6 +209,7 @@ export async function runActivation(
       agent.ownerUuid,
       workspace,
     );
+    ctx.jobs = host.jobs.executor(agent.id, agent.sessionId, partial.id);
     model.checkpoint = () => host.store.saveHistory(agent, model.history);
     model.hasPendingInput = () =>
       !waiting && host.store.hasWakingMessage(agent.id, false);
@@ -226,6 +228,18 @@ export async function runActivation(
             .undelivered(agent.id)
             .filter((m) => !m.held);
           const agents = host.store.list(agent.ownerUuid, agent.sessionId);
+          const jobs = host.jobs
+            .list(agent.ownerUuid, agent.sessionId)
+            .filter(
+              (j) =>
+                j.agentId === agent.id &&
+                (j.status === "running" || j.status === "starting"),
+            );
+          if (jobs.length)
+            model.history.push({
+              role: "user",
+              content: `<background_jobs>${JSON.stringify(jobs.map(({ id, tool, description, status }) => ({ id, tool, description, status })))}</background_jobs>`,
+            });
           let summarized = false;
           for (const message of messages) {
             if (message.kind === "user") {

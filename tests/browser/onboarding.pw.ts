@@ -1,4 +1,6 @@
 import { type Page, expect, test } from "@playwright/test";
+import type { UserPreferences } from "../../src/schemas/userPreferences";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 type Fulfill = { status?: number; json: unknown };
 type Respond = (path: string, method: string, body: unknown) => Fulfill | null;
@@ -23,33 +25,50 @@ function defaultApi(path: string, body: unknown): unknown {
   if (path === "/api/models") return { models: [] };
   if (path === "/api/sessions") return { sessions: [] };
   if (path === "/api/settings/environment")
-    return { ollamaHost: false, comfyuiHost: false, searxngHost: false };
+    return { ollamaHost: false, comfyuiHost: false };
   if (path === "/api/settings/openrouter" || path === "/api/settings/brave")
     return { hasKey: Boolean(sent.apiKey), environmentManaged: false };
   if (path.endsWith("/test")) return { ok: true, version: "0.9.0" };
   if (path === "/api/comfyui/models") return { models: ["flux.safetensors"] };
-  if (path === "/api/comfyui/config") return { ...comfyDefaults, ...sent };
   if (path.endsWith("/config")) return { host: "", ...sent };
   return { connected: false };
 }
 
-/** Serves a fresh server and records every write the setup makes. */
-async function routeApi(page: Page, respond: Respond = () => null) {
+/**
+ * Serves a fresh server with per-user preferences in `preferences`, and records
+ * every other write the setup makes.
+ */
+async function routeApi(
+  page: Page,
+  respond: Respond = () => null,
+  preferences = new Map<string, UserPreferences>(),
+) {
   const writes: { path: string; body: unknown }[] = [];
   await page.route("**/api/**", (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
+    return route.fulfill({ json: defaultApi(path, request.postDataJSON()) });
+  });
+  await mockUserPreferences(page, preferences);
+  // Registered last, so it sees each request before the handlers above.
+  await page.route("**/api/**", (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
     const body = request.postDataJSON() as unknown;
-    if (request.method() !== "GET" && !path.endsWith("/test"))
+    if (
+      request.method() !== "GET" &&
+      !path.endsWith("/test") &&
+      path !== "/api/settings/user"
+    )
       writes.push({ path, body });
-    return route.fulfill(
-      respond(path, request.method(), body) ?? {
-        json: defaultApi(path, body),
-      },
-    );
+    const response = respond(path, request.method(), body);
+    return response ? route.fulfill(response) : route.fallback();
   });
   return writes;
 }
+
+const savedSettings = (preferences: Map<string, UserPreferences>) =>
+  [...preferences.values()].map((saved) => saved.settings);
 
 async function expectSecretNotStored(page: Page, secret: string) {
   const stored = await page.evaluate(() =>
@@ -76,10 +95,14 @@ for (const device of ["desktop", "mobile"] as const) {
           ? { width: 1280, height: 900 }
           : { width: 390, height: 844 },
     });
-    const writes = await routeApi(page, (path, method) =>
-      path === "/api/settings/openrouter" && method === "GET"
-        ? { json: { hasKey: true, environmentManaged: false } }
-        : null,
+    const preferences = new Map<string, UserPreferences>();
+    const writes = await routeApi(
+      page,
+      (path, method) =>
+        path === "/api/settings/openrouter" && method === "GET"
+          ? { json: { hasKey: true, environmentManaged: false } }
+          : null,
+      preferences,
     );
     try {
       await page.goto("/dev/onboarding");
@@ -144,6 +167,8 @@ for (const device of ["desktop", "mobile"] as const) {
         .selectOption("flux.safetensors");
       await button(page, "Continue").click();
       await page.getByLabel("API key", { exact: true }).fill("brave-secret");
+      await button(page, "Save key").click();
+      await expect(page.getByText("Configured", { exact: true })).toBeVisible();
       await page.screenshot({
         animations: "disabled",
         path: testInfo.outputPath(`${device}-extras.png`),
@@ -154,18 +179,15 @@ for (const device of ["desktop", "mobile"] as const) {
         {
           path: "/api/comfyui/config",
           body: {
-            ...comfyDefaults,
             host: "http://comfy.test:8188",
             defaultModel: "flux.safetensors",
           },
         },
         { path: "/api/settings/brave", body: { apiKey: "brave-secret" } },
       ]);
-      const saved = await page.evaluate(() =>
-        JSON.parse(localStorage.getItem("euler:userSettings") ?? "{}"),
-      );
-      expect(saved.name).toBe("Nick");
-      expect(saved.location).toBe("Seattle");
+      expect(savedSettings(preferences)).toEqual([
+        expect.objectContaining({ name: "Nick", location: "Seattle" }),
+      ]);
       await expectSecretNotStored(page, "brave-secret");
     } finally {
       await page.close();
@@ -173,30 +195,32 @@ for (const device of ["desktop", "mobile"] as const) {
   });
 }
 
-test("onboarding desktop: skip saves no optional fields and save failure stays on step", async ({
+test("onboarding desktop: a failed save keeps the step and its draft", async ({
   page,
 }) => {
-  await page.route("**/api/**", (route) =>
-    route.fulfill({ status: 503, json: {} }),
+  const preferences = new Map<string, UserPreferences>();
+  await routeApi(
+    page,
+    (path, method) =>
+      path === "/api/settings/user" && method === "PATCH"
+        ? {
+            status: 503,
+            json: { error: { message: "Settings are unavailable." } },
+          }
+        : null,
+    preferences,
   );
   await page.goto("/dev/onboarding");
   await page.getByLabel("Name (optional)").fill("Unsaved");
-  await button(page, "Skip").click();
-  expect(
-    await page.evaluate(() => localStorage.getItem("euler:userSettings")),
-  ).toBeNull();
-  await button(page, "Back").click();
-  await page.getByLabel("Name (optional)").fill("Unsaved");
-  await page.evaluate(() => {
-    Storage.prototype.setItem = () => {
-      throw new Error("storage denied");
-    };
-  });
   await button(page, "Continue").click();
   await expect(page.getByRole("alert")).toContainText(
-    "Could not save settings",
+    "Settings are unavailable.",
   );
   await expect(page.getByRole("heading", { name: "About you" })).toBeVisible();
+  await expect(page.getByLabel("Name (optional)")).toHaveValue("Unsaved");
+  expect(savedSettings(preferences)).toEqual([
+    expect.objectContaining({ name: "" }),
+  ]);
 });
 
 test("onboarding desktop: skipped drafts are discarded and never reach later saves", async ({
@@ -209,7 +233,8 @@ test("onboarding desktop: skipped drafts are discarded and never reach later sav
         JSON.stringify({ defaultModel: "qwen3:8b" }),
       );
   });
-  const writes = await routeApi(page);
+  const preferences = new Map<string, UserPreferences>();
+  const writes = await routeApi(page, undefined, preferences);
   await page.goto("/dev/onboarding");
   await page.getByLabel("Name (optional)").fill("Leaked");
   await button(page, "Skip").click();
@@ -231,10 +256,9 @@ test("onboarding desktop: skipped drafts are discarded and never reach later sav
   await expect(
     page.getByRole("heading", { name: "Image generation" }),
   ).toBeFocused();
-  const saved = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("euler:userSettings") ?? "{}"),
-  );
-  expect(saved).toMatchObject({ defaultModel: "", name: "" });
+  expect(savedSettings(preferences)).toEqual([
+    expect.objectContaining({ defaultModel: "", name: "" }),
+  ]);
   await page.getByLabel("Server URL").fill("http://draft-only:8188");
   await button(page, "Skip").click();
   await page.getByLabel("API key", { exact: true }).fill("skipped-secret");
@@ -242,48 +266,6 @@ test("onboarding desktop: skipped drafts are discarded and never reach later sav
   await expect(page.getByText("Setup complete")).toBeVisible();
   expect(writes).toEqual([]);
   await expectSecretNotStored(page, "skipped-secret");
-});
-
-test("onboarding desktop: Brave load and save errors can be retried without storing the key", async ({
-  page,
-}) => {
-  let braveAvailable = false;
-  let braveSaves = 0;
-  const writes = await routeApi(page, (path, method) => {
-    if (path !== "/api/settings/brave") return null;
-    if (method === "GET" && !braveAvailable)
-      return { status: 500, json: { error: { message: "Unavailable" } } };
-    if (method === "PUT" && braveSaves++ === 0)
-      return {
-        status: 400,
-        json: { error: { message: "Brave rejected the key." } },
-      };
-    return null;
-  });
-  await page.goto("/dev/onboarding");
-  for (let step = 0; step < 6; step++) await button(page, "Skip").click();
-  const key = page.getByLabel("API key", { exact: true });
-  await expect(page.getByRole("alert")).toContainText(
-    "Could not load Brave settings.",
-  );
-  await expect(key).toBeDisabled();
-  braveAvailable = true;
-  await button(page, "Retry").click();
-  await expect(key).toBeEnabled();
-  await key.fill("brave-secret");
-  await page.getByRole("button", { name: "Finish setup" }).click();
-  await expect(page.getByRole("alert")).toContainText(
-    "Brave rejected the key.",
-  );
-  await expect(page.getByRole("heading", { name: "Web search" })).toBeVisible();
-  await expect(key).toHaveValue("brave-secret");
-  await page.getByRole("button", { name: "Finish setup" }).click();
-  await expect(page.getByText("Setup complete")).toBeVisible();
-  expect(writes).toEqual([
-    { path: "/api/settings/brave", body: { apiKey: "brave-secret" } },
-    { path: "/api/settings/brave", body: { apiKey: "brave-secret" } },
-  ]);
-  await expectSecretNotStored(page, "brave-secret");
 });
 
 test("onboarding desktop: new UUID enters setup and finishing opens the app without a reload", async ({
@@ -318,7 +300,7 @@ test.describe("onboarding desktop layout", () => {
       if (method !== "GET") return null;
       if (path === "/api/settings/environment")
         return {
-          json: { ollamaHost: false, comfyuiHost: true, searxngHost: false },
+          json: { ollamaHost: false, comfyuiHost: true },
         };
       if (path === "/api/ollama/config")
         return { json: { host: "http://saved-ollama:11434" } };

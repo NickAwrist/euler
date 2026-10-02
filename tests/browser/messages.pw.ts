@@ -1,8 +1,10 @@
 import { type Locator, type Page, expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 test("mobile message actions and code layout", async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
+  await mockUserPreferences(page);
   await page.goto("/dev/messages");
   const lastReply = page.getByRole("region", {
     name: "Message 7",
@@ -133,6 +135,7 @@ test("mobile message actions and code layout", async ({ page }, testInfo) => {
 test("sheet dismissal, busy actions, and regenerate confirmation", async ({
   page,
 }) => {
+  await mockUserPreferences(page);
   await page.goto("/dev/messages");
   const more = page
     .getByRole("region", { name: "Message 2", exact: true })
@@ -216,6 +219,7 @@ test("desktop hover and keyboard access", async ({ browser }, testInfo) => {
     hasTouch: false,
     isMobile: false,
   });
+  await mockUserPreferences(page);
   await page.goto("http://127.0.0.1:5199/dev/messages");
   const user = page.getByRole("region", { name: "Message 1", exact: true });
   await user.hover();

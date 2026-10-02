@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Onboarding } from "../components/Onboarding";
-import { saveComfyUIConfig, saveOllamaConfig } from "../persist/services";
+import { saveComfyUIConfig } from "../persist/comfyui";
+import { saveOllamaConfig } from "../persist/services";
 import { loadUserSettings, updateUserSettings } from "../persist/userSettings";
 
 export default function OnboardingDemo() {
@@ -31,7 +32,7 @@ export default function OnboardingDemo() {
         connected: null,
       }}
       onSavePreferences={async (updates) => {
-        setSettings(updateUserSettings(updates));
+        setSettings(await updateUserSettings(updates));
       }}
       onSaveOllamaHost={async (host) => {
         await saveOllamaConfig(host);

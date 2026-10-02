@@ -1,5 +1,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 // These checks exercise returning users; first-visit setup has its own suite.
 test.beforeEach(async ({ page }) => {
@@ -63,6 +64,7 @@ test("session loading: async agents continue across chat messages and browser re
       JSON.stringify({ defaultModel: "openrouter:openai/gpt-5.6-terra" }),
     ),
   );
+  await mockUserPreferences(page);
   await page.goto("/");
   const input = page.getByPlaceholder("Send a message...");
   await input.fill("Research this");
@@ -84,7 +86,7 @@ test("session loading: async agents continue across chat messages and browser re
   ).toBeVisible();
   await expect(page.getByText("Ready", { exact: true })).toBeVisible();
   const agentRow = page.getByRole("button", {
-    name: "Research openai/gpt-5.6-terra Ready",
+    name: "Research gpt-5.6-terra Ready",
     exact: true,
   });
   await agentRow.click();

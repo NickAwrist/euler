@@ -27,19 +27,13 @@ export type {
   OpenRouterModel,
 } from "./types";
 export {
-  getComfyUIDefaultModel,
+  getBraveSearchApiKey,
+  setBraveSearchApiKey,
   getComfyUIHost,
-  getComfyUIImageSize,
-  getComfyUINegativePrompt,
   getOllamaHost,
-  getSearXNGHost,
   getOpenRouterApiKey,
-  setComfyUIDefaultModel,
   setComfyUIHost,
-  setComfyUIImageSize,
-  setComfyUINegativePrompt,
   setOllamaHost,
-  setSearXNGHost,
   setOpenRouterApiKey,
 } from "./settings";
 

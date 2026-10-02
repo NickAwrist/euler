@@ -8,15 +8,11 @@ import {
   invalidateComfyUIClient,
 } from "../comfyui/client";
 import { withContainerLoopbackHint } from "../containerNetworkHint";
+import { setComfyUIHost } from "../db/index";
 import {
-  getComfyUIDefaultModel,
-  getComfyUIImageSize,
-  getComfyUINegativePrompt,
-  setComfyUIDefaultModel,
-  setComfyUIHost,
-  setComfyUIImageSize,
-  setComfyUINegativePrompt,
-} from "../db/index";
+  effectiveUserPreferences,
+  updateUserPreferences,
+} from "../db/userPreferences";
 import { envConfig } from "../env";
 import { asyncRoute } from "../http/asyncRoute";
 import { canEditEnvironmentSetting } from "../http/environmentSettings";
@@ -28,6 +24,7 @@ import {
   ComfyUITestBodySchema,
   ComfyUIViewQuerySchema,
 } from "../schemas/comfyui";
+import { requireUserId } from "../userIdentity";
 import { errorMessage } from "../utils/errors";
 
 const router = Router();
@@ -49,19 +46,17 @@ router.get("/health", async (_req, res) => {
 });
 
 // Getting the user's comfyUI configuration.
-router.get("/config", (_req, res) => {
-  const { width, height } = getComfyUIImageSize();
-  res.json({
-    ...getComfyUIHostConfig(),
-    defaultModel: getComfyUIDefaultModel(),
-    defaultWidth: width,
-    defaultHeight: height,
-    negativePrompt: getComfyUINegativePrompt(),
-  });
+router.get("/config", (req, res) => {
+  const owner = requireUserId(req, res);
+  if (!owner) return;
+  const image = effectiveUserPreferences(owner).image;
+  res.json({ ...getComfyUIHostConfig(), ...image });
 });
 
 // Updating the user's comfyUI configuration.
 router.put("/config", (req, res) => {
+  const owner = requireUserId(req, res);
+  if (!owner) return;
   const parsed = ComfyUIConfigPutSchema.safeParse(req.body);
   if (!parsed.success) {
     sendValidationError(res, parsed.error);
@@ -74,23 +69,9 @@ router.put("/config", (req, res) => {
     }
     invalidateComfyUIClient();
   }
-  if (body.defaultModel !== undefined) {
-    setComfyUIDefaultModel(body.defaultModel);
-  }
-  if (body.defaultWidth !== undefined && body.defaultHeight !== undefined) {
-    setComfyUIImageSize(body.defaultWidth, body.defaultHeight);
-  }
-  if (body.negativePrompt !== undefined) {
-    setComfyUINegativePrompt(body.negativePrompt);
-  }
-  const { width, height } = getComfyUIImageSize();
-  res.json({
-    ...getComfyUIHostConfig(),
-    defaultModel: getComfyUIDefaultModel(),
-    defaultWidth: width,
-    defaultHeight: height,
-    negativePrompt: getComfyUINegativePrompt(),
-  });
+  const { host: _host, ...image } = body;
+  const saved = updateUserPreferences(owner, { image });
+  res.json({ ...getComfyUIHostConfig(), ...saved.image });
 });
 
 // Testing the connection to the ComfyUI server.

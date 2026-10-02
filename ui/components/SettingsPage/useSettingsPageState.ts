@@ -1,15 +1,11 @@
 import { useCallback, useState } from "react";
 import { useSavedDraft } from "../../hooks/useSavedDraft";
+import { changedFields } from "../../lib/changedFields";
 import type { UserSettings } from "../../persist/userSettings";
 import type { SettingsTab } from "../../types";
 import type { SettingChange, SettingsPageProps } from "./types";
 import { useAppearanceDraft } from "./useAppearanceDraft";
-import { useBraveSettings } from "./useBraveSettings";
-import {
-  useComfyUIDraft,
-  useOllamaDraft,
-  useSearXNGDraft,
-} from "./useProviderDrafts";
+import { useComfyUIDraft, useOllamaDraft } from "./useProviderDrafts";
 
 type Args = Pick<
   SettingsPageProps,
@@ -22,8 +18,6 @@ type Args = Pick<
   | "comfyuiDefaultWidth"
   | "comfyuiDefaultHeight"
   | "comfyuiNegativePrompt"
-  | "searxngHost"
-  | "searxngConnected"
   | "onSave"
 >;
 
@@ -37,8 +31,6 @@ export function useSettingsPageState({
   comfyuiDefaultWidth,
   comfyuiDefaultHeight,
   comfyuiNegativePrompt,
-  searxngHost,
-  searxngConnected,
   onSave,
 }: Args) {
   const appearance = useAppearanceDraft();
@@ -54,8 +46,6 @@ export function useSettingsPageState({
     },
     comfyuiConnected,
   );
-  const searxng = useSearXNGDraft(searxngHost, searxngConnected);
-  const brave = useBraveSettings();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -80,7 +70,6 @@ export function useSettingsPageState({
     ...tabChanges("appearance", appearance.changes),
     ...tabChanges("ollama", ollama.dirty ? ["Ollama server URL"] : []),
     ...tabChanges("image-generation", comfy.changes),
-    ...tabChanges("web-search", searxng.dirty ? ["SearXNG server URL"] : []),
   ];
   const isDirty = changes.length > 0;
 
@@ -89,7 +78,6 @@ export function useSettingsPageState({
     settings.reset();
     ollama.reset();
     comfy.reset();
-    searxng.reset();
     setError(null);
   };
 
@@ -100,17 +88,15 @@ export function useSettingsPageState({
     try {
       if (changes.some((change) => change.tab !== "appearance")) {
         await onSave(
-          settings.value,
+          changedFields(settings.value, currentSettings),
           ollama.dirty ? ollama.host : undefined,
-          comfy.changes.length > 0 ? comfy.config : undefined,
-          searxng.dirty ? { host: searxng.host } : undefined,
+          comfy.changes.length > 0 ? comfy.patch : undefined,
         );
         settings.accept();
         ollama.accept();
         comfy.accept();
-        searxng.accept();
       }
-      if (appearance.changes.length > 0) appearance.save();
+      if (appearance.changes.length > 0) await appearance.save();
       return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save settings");
@@ -126,8 +112,6 @@ export function useSettingsPageState({
     handleChange,
     ollama,
     comfy,
-    searxng,
-    brave,
     isSaving,
     changes,
     isDirty,

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 for (const device of ["desktop", "mobile"] as const) {
   test(`environment settings ${device}: locked fields, editable defaults and loading failure`, async ({
@@ -32,11 +33,13 @@ for (const device of ["desktop", "mobile"] as const) {
             : {
                 ollamaHost: managed,
                 comfyuiHost: managed,
-                searxngHost: managed,
               },
         });
       }
-      if (path === "/api/settings/openrouter") {
+      if (
+        path === "/api/settings/openrouter" ||
+        path === "/api/settings/brave"
+      ) {
         return route.fulfill({
           json: { hasKey: true, environmentManaged: managed },
         });
@@ -55,6 +58,7 @@ for (const device of ["desktop", "mobile"] as const) {
             },
       });
     });
+    await mockUserPreferences(page);
     await page.goto("/dev/settings");
     await page.getByRole("button", { name: "Ollama", exact: true }).click();
     await expect(page.locator("#ollamaUri")).toBeDisabled();
@@ -67,7 +71,6 @@ for (const device of ["desktop", "mobile"] as const) {
     for (const [tab, id, host] of [
       ["Ollama", "ollamaUri", "http://ollama.test"],
       ["Image Generation", "comfyUri", "http://comfyui.test"],
-      ["Web Search", "searxngUri", "http://searxng.test"],
     ]) {
       await page.getByRole("button", { name: tab, exact: true }).click();
       await expect(page.locator(`#${id}`)).toBeDisabled();
@@ -87,29 +90,26 @@ for (const device of ["desktop", "mobile"] as const) {
         ).toBeEnabled();
       }
     }
-    await page.getByRole("button", { name: "OpenRouter", exact: true }).click();
-    await expect(page.getByLabel("API key", { exact: true })).toBeDisabled();
-    await expect(page.getByLabel("API key", { exact: true })).toHaveValue(
-      "••••••••",
-    );
-    await expect(page.getByRole("button", { name: "Remove key" })).toHaveCount(
-      0,
-    );
+    for (const tab of ["OpenRouter", "Web Search"]) {
+      await page.getByRole("button", { name: tab, exact: true }).click();
+      await expect(page.getByLabel("API key", { exact: true })).toBeDisabled();
+      await expect(page.getByLabel("API key", { exact: true })).toHaveValue(
+        "••••••••",
+      );
+      await expect(
+        page.getByRole("button", { name: "Remove key" }),
+      ).toHaveCount(0);
+    }
     await page.screenshot({
       path: testInfo.outputPath("environment-managed.png"),
     });
-    expect(writes).toEqual([
-      "/api/ollama/test",
-      "/api/comfyui/test",
-      "/api/searxng/test",
-    ]);
+    expect(writes).toEqual(["/api/ollama/test", "/api/comfyui/test"]);
 
     managed = false;
     await page.reload();
     for (const [tab, id] of [
       ["Ollama", "ollamaUri"],
       ["Image Generation", "comfyUri"],
-      ["Web Search", "searxngUri"],
     ]) {
       await page.getByRole("button", { name: tab, exact: true }).click();
       await expect(page.locator(`#${id}`)).toBeEnabled();

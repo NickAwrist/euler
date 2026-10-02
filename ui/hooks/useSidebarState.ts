@@ -1,16 +1,21 @@
 import { useEffect, useState } from "react";
-import { safeStorage } from "../lib/safeStorage";
-
-const SIDEBAR_COLLAPSED_KEY = "euler:sidebarCollapsed";
+import {
+  getUserPreferences,
+  updateUserPreferences,
+} from "../persist/userPreferences";
 
 export function useSidebarState() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    return safeStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+    return getUserPreferences().layout.sidebarCollapsed;
   });
 
   useEffect(() => {
-    safeStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
+    if (sidebarCollapsed === getUserPreferences().layout.sidebarCollapsed)
+      return;
+    void updateUserPreferences({ layout: { sidebarCollapsed } }).catch(
+      console.error,
+    );
   }, [sidebarCollapsed]);
 
   useEffect(() => {

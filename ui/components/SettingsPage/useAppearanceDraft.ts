@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useSavedDraft } from "../../hooks/useSavedDraft";
+import { changedFields } from "../../lib/changedFields";
 import {
   type Appearance,
   applyAppearance,
@@ -29,15 +30,11 @@ export function useAppearanceDraft() {
     appearance: draft.value,
     setAppearance: draft.setValue,
     changes,
-    /** Throws when browser storage rejects the change. */
-    save: () => {
-      if (!saveAppearance(draft.value)) {
-        throw new Error(
-          "Could not save appearance in this browser. Your changes have not been applied.",
-        );
-      }
-      applyAppearance(draft.value);
-      setSaved(draft.value);
+    /** Saves only edited fields; throws when the server rejects them. */
+    save: async () => {
+      const next = await saveAppearance(changedFields(draft.value, saved));
+      applyAppearance(next);
+      setSaved(next);
       draft.accept();
     },
     reset: draft.reset,

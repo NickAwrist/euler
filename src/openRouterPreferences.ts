@@ -29,12 +29,16 @@ export async function getCatalogPreferences(
   }
   return catalog;
 }
-export function publisherModels(catalog: CatalogResult, publisherId: string) {
+export function publisherModels(
+  catalog: CatalogResult,
+  publisherId: string,
+  ownerUuid: string,
+) {
   const registered = listOpenRouterModels().filter(
     (model) => model.publisher_id === publisherId,
   );
   const favorites = new Set(
-    listModelFavorites()
+    listModelFavorites(ownerUuid)
       .filter((row) => row.provider === "openrouter")
       .map((row) => row.model_id),
   );
@@ -110,7 +114,7 @@ export function savedModelMetadata(
   };
 }
 
-export function catalogSettings(catalog: CatalogResult) {
+export function catalogSettings(catalog: CatalogResult, ownerUuid: string) {
   const overview = publisherOverview(catalog);
   const tracked = new Set(overview.publishers.map((publisher) => publisher.id));
   const ids = new Set([
@@ -122,7 +126,7 @@ export function catalogSettings(catalog: CatalogResult) {
   return {
     ...overview,
     modelsByPublisher: Object.fromEntries(
-      [...ids].map((id) => [id, publisherModels(catalog, id)]),
+      [...ids].map((id) => [id, publisherModels(catalog, id, ownerUuid)]),
     ),
     discoveredPublishers:
       catalog.models === null

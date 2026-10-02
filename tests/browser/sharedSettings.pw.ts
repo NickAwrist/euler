@@ -1,4 +1,6 @@
 import { type Page, expect, test } from "@playwright/test";
+import type { UserPreferences } from "../../src/schemas/userPreferences";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 test.use({
   viewport: { width: 1280, height: 900 },
@@ -12,7 +14,7 @@ function mockSettings(page: Page, writes: string[] = []) {
     if (route.request().method() === "PUT") writes.push(path);
     return route.fulfill({
       json: path.endsWith("/environment")
-        ? { ollamaHost: false, comfyuiHost: false, searxngHost: false }
+        ? { ollamaHost: false, comfyuiHost: false }
         : path.endsWith("/openrouter") || path.endsWith("/brave")
           ? { hasKey: false, environmentManaged: false }
           : path.endsWith("/catalog")
@@ -116,7 +118,9 @@ test("settings save desktop: saving a user preference does not rewrite shared pr
   page,
 }) => {
   const writes: string[] = [];
+  const preferences = new Map<string, UserPreferences>();
   await mockSettings(page, writes);
+  await mockUserPreferences(page, preferences);
   await page.goto("/");
   for (let step = 0; step < 7; step++)
     await page.getByRole("button", { name: "Skip", exact: true }).click();
@@ -134,10 +138,6 @@ test("settings save desktop: saving a user preference does not rewrite shared pr
   ).toBeHidden();
   expect(writes).toEqual([]);
   expect(
-    await page.evaluate(
-      () =>
-        JSON.parse(localStorage.getItem("euler:userSettings") ?? "{}")
-          .showDebugButton,
-    ),
-  ).toBe(true);
+    [...preferences.values()].map((saved) => saved.settings.showDebugButton),
+  ).toEqual([true]);
 });

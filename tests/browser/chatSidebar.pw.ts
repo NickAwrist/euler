@@ -1,4 +1,5 @@
 import { type Page, expect, test } from "@playwright/test";
+import { mockUserPreferences } from "./userPreferencesFixture";
 
 // These checks exercise returning users; first-visit setup has its own suite.
 test.beforeEach(async ({ page }) => {
@@ -62,11 +63,7 @@ async function mockApp(page: Page) {
                 : path.endsWith("/artifacts/tree")
                   ? { entries: [] }
                   : path === "/api/settings/environment"
-                    ? {
-                        ollamaHost: false,
-                        comfyuiHost: false,
-                        searxngHost: false,
-                      }
+                    ? { ollamaHost: false, comfyuiHost: false }
                     : {};
     await route.fulfill({ json });
   });
@@ -79,6 +76,7 @@ for (const width of [390, 1024, 1440]) {
   }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     await mockApp(page);
+    await mockUserPreferences(page);
     await page.goto("/");
     const toggle = page.getByRole("button", {
       name: "Toggle chats",
@@ -255,6 +253,7 @@ test("chat sidebar desktop workspace changes refresh open artifacts without remo
       },
     });
   });
+  await mockUserPreferences(page);
   await page.goto("/run/sidebar-test");
   for (const code of ["foo.bar", "v1.2", "a/b"]) {
     await expect(page.locator("code").filter({ hasText: code })).toBeVisible();
@@ -335,6 +334,7 @@ test("chat sidebar desktop preserves collapsed state on reload", async ({
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockApp(page);
+  await mockUserPreferences(page);
   await page.goto("/");
   const toggle = page.getByRole("button", {
     name: "Toggle chats",
@@ -370,6 +370,7 @@ test("chat sidebar desktop restores artifact preview and width on reload", async
       },
     }),
   );
+  await mockUserPreferences(page);
   await page.goto("/run/sidebar-test");
   const toggle = page.getByRole("button", { name: "Toggle artifacts" });
   await toggle.click();
@@ -402,6 +403,7 @@ test("chat sidebar desktop rename starts empty and ignores unchanged saves", asy
   page.on("request", (request) => {
     if (request.method() === "PATCH") patches.push(request.url());
   });
+  await mockUserPreferences(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Chat options" }).click();
   await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
@@ -418,6 +420,7 @@ test("chat sidebar desktop export and opt-in debug access", async ({
 }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockApp(page);
+  await mockUserPreferences(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Chat options" }).click();
   await expect(page.getByRole("menuitem")).toHaveText([
@@ -508,6 +511,7 @@ test("chat sidebar desktop keeps a remembered files panel closed for an empty wo
     ),
   );
   const tree = page.waitForResponse("**/artifacts/tree?*");
+  await mockUserPreferences(page);
   await page.goto("/run/sidebar-test");
   await tree;
   await expect(page).toHaveTitle("Sidebar test chat · Euler");
@@ -546,6 +550,7 @@ test("chat sidebar desktop jumps to the latest message after scrolling up", asyn
       },
     }),
   );
+  await mockUserPreferences(page);
   await page.goto("/run/sidebar-test");
   const latest = page.getByText("Message 39", { exact: true });
   const jump = page.getByRole("button", { name: "Jump to latest" });
@@ -581,6 +586,7 @@ async function openLayoutChat(
       },
     }),
   );
+  await mockUserPreferences(page);
   await page.goto("/run/sidebar-test");
   await expect(page.getByText("Check the sidebar controls.")).toBeVisible();
   const chats = page.getByRole("button", { name: "Toggle chats", exact: true });
@@ -650,4 +656,40 @@ test("chat sidebar mobile chat uses the full width with any setting", async ({
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
+});
+
+test("chat sidebar desktop: narrow windows do not overwrite the shared artifact width", async ({
+  page,
+}) => {
+  const store = new Map<
+    string,
+    import("../../src/schemas/userPreferences").UserPreferences
+  >();
+  const user = "11111111-1111-4111-8111-111111111111";
+  await page.addInitScript((user) => {
+    localStorage.setItem("euler:userUuid", user);
+    localStorage.setItem("euler:artifactSidebarWidth", "800");
+  }, user);
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await mockApp(page);
+  await mockUserPreferences(page, store);
+  await page.goto("/run/sidebar-test");
+  await expect(
+    page.getByRole("button", { name: "Toggle artifacts" }),
+  ).toBeVisible();
+  await expect.poll(() => store.get(user)?.layout.artifactWidth).toBe(800);
+  await expect(page.locator("#artifact-sidebar")).toHaveCSS("width", "400px");
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await page.getByRole("button", { name: "Toggle artifacts" }).click();
+  await expect(page.locator("#artifact-sidebar")).toHaveCSS("width", "800px");
+  await page.setViewportSize({ width: 1000, height: 900 });
+  await expect(page.locator("#artifact-sidebar")).toHaveCSS("width", "400px");
+  await page
+    .getByRole("separator", { name: "Resize artifact sidebar" })
+    .click();
+  expect(store.get(user)?.layout.artifactWidth).toBe(800);
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await expect(page.locator("#artifact-sidebar")).toHaveCSS("width", "800px");
+  await page.reload();
+  await expect(page.locator("#artifact-sidebar")).toHaveCSS("width", "800px");
 });

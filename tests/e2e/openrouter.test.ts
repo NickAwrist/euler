@@ -34,7 +34,9 @@ describe("OpenRouter API integration", () => {
     setOpenRouterApiKey("");
     const { url, close } = await startTestServer();
     try {
-      let response = await fetch(`${url}/api/models`);
+      let response = await fetch(`${url}/api/models`, {
+        headers: { "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111" },
+      });
       expect(response.status).toBe(200);
       let body = (await response.json()) as {
         models: Array<{
@@ -62,13 +64,20 @@ describe("OpenRouter API integration", () => {
         }),
         body: JSON.stringify({ apiKey: "sk-or-api-test" }),
       });
-      await fetch(`${url}/api/settings/openrouter/catalog`);
+      await fetch(`${url}/api/settings/openrouter/catalog`, {
+        headers: { "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111" },
+      });
       await fetch(`${url}/api/settings/openrouter/models`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111",
+        },
         body: JSON.stringify({ route: "openai/gpt-5.6-terra", enabled: true }),
       });
-      response = await fetch(`${url}/api/models`);
+      response = await fetch(`${url}/api/models`, {
+        headers: { "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111" },
+      });
       body = await response.json();
       expect(
         body.models
@@ -90,12 +99,17 @@ describe("OpenRouter API integration", () => {
     const request = (path: string, method: string, body: unknown) =>
       fetch(`${url}/api/settings/${path}`, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111",
+        },
         body: JSON.stringify(body),
       });
     try {
       const route = "example/test-model";
-      await fetch(`${url}/api/settings/openrouter/catalog`);
+      await fetch(`${url}/api/settings/openrouter/catalog`, {
+        headers: { "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111" },
+      });
       expect(
         (
           await request("models/favorite", "PUT", {
@@ -126,6 +140,11 @@ describe("OpenRouter API integration", () => {
       ).toBe(200);
       const response = await fetch(
         `${url}/api/settings/openrouter/publishers/example/models`,
+        {
+          headers: {
+            "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111",
+          },
+        },
       );
       expect(await response.json()).toMatchObject({
         models: [{ route, enabled: true, favorite: true }],
@@ -152,7 +171,9 @@ describe("OpenRouter API integration", () => {
       expect(removed.status).toBe(200);
       expect(listOpenRouterModels()[0]?.enabled).toBe(0);
       expect(
-        listModelFavorites().some((favorite) => favorite.model_id === route),
+        listModelFavorites("11111111-1111-4111-8111-111111111111").some(
+          (favorite) => favorite.model_id === route,
+        ),
       ).toBeTrue();
       expect(
         (
@@ -182,7 +203,12 @@ describe("OpenRouter API integration", () => {
       ],
     })[0]!;
     setOpenRouterModelEnabled(model, true);
-    setModelFavorite("openrouter", model.route, true);
+    setModelFavorite(
+      "11111111-1111-4111-8111-111111111111",
+      "openrouter",
+      model.route,
+      true,
+    );
     setOpenRouterApiKey("key");
     let catalog: CatalogResult = {
       status: "unavailable",
@@ -200,11 +226,16 @@ describe("OpenRouter API integration", () => {
     const update = (path: string, method: string, body: unknown) =>
       fetch(`${url}/api/settings/${path}`, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111",
+        },
         body: JSON.stringify(body),
       });
     try {
-      let response = await fetch(`${url}/api/models`);
+      let response = await fetch(`${url}/api/models`, {
+        headers: { "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111" },
+      });
       let body = (await response.json()) as {
         models: { id: string; availability?: string }[];
       };
@@ -240,20 +271,29 @@ describe("OpenRouter API integration", () => {
       ).toBe(200);
       expect(lookup).not.toHaveBeenCalled();
       setOpenRouterModelEnabled(model, true);
-      setModelFavorite("openrouter", model.route, true);
+      setModelFavorite(
+        "11111111-1111-4111-8111-111111111111",
+        "openrouter",
+        model.route,
+        true,
+      );
       catalog = {
         status: "fresh",
         models: [],
         lastSuccessfulFetchAt: Date.now(),
         error: null,
       };
-      response = await fetch(`${url}/api/models`);
+      response = await fetch(`${url}/api/models`, {
+        headers: { "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111" },
+      });
       body = await response.json();
       expect(
         body.models.some((m) => m.id === "openrouter:openai/test"),
       ).toBeFalse();
       expect(listOpenRouterModels()[0]?.enabled).toBe(1);
-      expect(listModelFavorites()).toHaveLength(1);
+      expect(
+        listModelFavorites("11111111-1111-4111-8111-111111111111"),
+      ).toHaveLength(1);
       catalog = {
         ...catalog,
         models: [{ ...model, route: "openai/test:batch" }],

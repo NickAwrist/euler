@@ -2,7 +2,6 @@ import type { UserSettings } from "../../persist/userSettings";
 import type {
   ComfyUIConfigPayload,
   ModelOption,
-  SearXNGConfigPayload,
   SettingsTab,
 } from "../../types";
 
@@ -29,13 +28,10 @@ export type SettingsPageProps = {
   comfyuiDefaultWidth: number;
   comfyuiDefaultHeight: number;
   comfyuiNegativePrompt: string;
-  searxngHost: string;
-  searxngConnected: boolean | null;
   onSave: (
-    settings: UserSettings,
-    ollamaHost?: string,
+    settings: Partial<UserSettings>,
+    ollamaHost: string | undefined,
     comfyui?: ComfyUIConfigPayload,
-    searxng?: SearXNGConfigPayload,
   ) => Promise<void>;
   onModelsChanged: () => Promise<void>;
   onBack: () => void;
