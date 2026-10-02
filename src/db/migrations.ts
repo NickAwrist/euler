@@ -2,7 +2,6 @@ import type { Database } from "bun:sqlite";
 import { POPULAR_PUBLISHERS } from "../openRouterPublishers";
 import { createAgentTables } from "./agentTables";
 import { migrateAttachmentMetadata } from "./attachmentMetadataMigration";
-import { migrateChildRuns } from "./childRunMigration";
 
 function tableExists(db: Database, name: string): boolean {
   return (
@@ -188,6 +187,9 @@ export function migrateRemoveAgents(db: Database) {
 }
 
 export function runMigrations(db: Database) {
+  if (tableExists(db, "app_settings")) {
+    db.run("DELETE FROM app_settings WHERE key = 'searxng_host'");
+  }
   migrateOpenRouterCatalog(db);
   migrateSessionsDirectoryColumn(db);
   migrateSessionsWorkspaceKindColumn(db);
@@ -214,7 +216,6 @@ export function runMigrations(db: Database) {
   db.run(
     "CREATE INDEX IF NOT EXISTS idx_jobs_session ON jobs(session_id, owner_uuid)",
   );
-  if (tableExists(db, "messages")) migrateChildRuns(db);
   const columns = db.query("PRAGMA table_info(sessions)").all() as {
     name: string;
   }[];
