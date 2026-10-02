@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NEW_MODEL_DAYS } from "../../../src/newModels";
 import { Button } from "../Button";
 import { NewBadge } from "../ModelPreferenceControls";
@@ -13,7 +13,12 @@ import { useOpenRouterCatalog } from "./useOpenRouterCatalog";
 
 export function OpenRouterSettingsTab({
   onModelsChanged,
-}: { onModelsChanged: () => Promise<void> }) {
+  onKeyStatusChange,
+}: {
+  onModelsChanged: () => Promise<void>;
+  /** Reports whether a key is saved once known and after each change. */
+  onKeyStatusChange?: (hasKey: boolean) => void;
+}) {
   const key = useApiKeySetting("openrouter");
   const {
     data: overview,
@@ -26,6 +31,9 @@ export function OpenRouterSettingsTab({
   const [refreshing, setRefreshing] = useState(false);
   const [dialog, setDialog] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!key.loading) onKeyStatusChange?.(key.hasKey);
+  }, [key.loading, key.hasKey, onKeyStatusChange]);
   const mutate = async (action: () => Promise<void>) => {
     setBusy(true);
     setError(null);

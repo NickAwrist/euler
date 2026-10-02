@@ -1,16 +1,15 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { EnvironmentSettings } from "../../../src/env";
-import { globalApiJson } from "../../lib/api";
+import { loadEnvironmentSettings } from "../../persist/services";
 
 export function useEnvironmentSettings() {
   const [settings, setSettings] = useState<EnvironmentSettings | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     const controller = new AbortController();
-    void globalApiJson<EnvironmentSettings>("/api/settings/environment", {
-      signal: controller.signal,
-    })
+    setError(null);
+    void loadEnvironmentSettings(controller.signal)
       .then(setSettings)
       .catch(() => {
         if (!controller.signal.aborted) {
@@ -19,8 +18,15 @@ export function useEnvironmentSettings() {
           );
         }
       });
-    return () => controller.abort();
+    return controller;
   }, []);
 
-  return { settings, error };
+  useEffect(() => {
+    const controller = load();
+    return () => controller.abort();
+  }, [load]);
+
+  const reload = useCallback(() => void load(), [load]);
+
+  return { settings, error, reload };
 }

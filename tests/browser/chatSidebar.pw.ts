@@ -1,6 +1,16 @@
 import { type Page, expect, test } from "@playwright/test";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
+// These checks exercise returning users; first-visit setup has its own suite.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "euler:userUuid",
+      "12345678-1234-4234-9234-123456789abc",
+    );
+  });
+});
+
 async function mockApp(page: Page) {
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -52,7 +62,9 @@ async function mockApp(page: Page) {
                   }
                 : path.endsWith("/artifacts/tree")
                   ? { entries: [] }
-                  : {};
+                  : path === "/api/settings/environment"
+                    ? { ollamaHost: false, comfyuiHost: false }
+                    : {};
     await route.fulfill({ json });
   });
 }

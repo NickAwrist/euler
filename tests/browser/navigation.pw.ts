@@ -1,6 +1,16 @@
 import { type Page, expect, test } from "@playwright/test";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
+// These checks exercise returning users; first-visit setup has its own suite.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "euler:userUuid",
+      "12345678-1234-4234-9234-123456789abc",
+    );
+  });
+});
+
 async function mockApp(page: Page) {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.route("**/api/**", async (route) => {
@@ -222,7 +232,8 @@ test("view navigation desktop keeps settings open when Save and leave fails", as
     .getByRole("button", { name: "Keep editing", exact: true })
     .last()
     .click();
-  await expect(page.getByText("Failed to save Ollama URL")).toBeVisible();
+  // The server's reason is shown; "Failed to save Ollama URL" is only the fallback.
+  await expect(page.getByText("Unavailable", { exact: true })).toBeVisible();
 });
 
 test("view navigation desktop remembers General after Choose models and preserves a collapsed sidebar", async ({

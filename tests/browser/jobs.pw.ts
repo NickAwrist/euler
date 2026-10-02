@@ -44,6 +44,15 @@ test.beforeAll(async () => {
   });
 });
 test.afterAll(() => server?.kill());
+// These checks exercise returning users; first-visit setup has its own suite.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "euler:userUuid",
+      "12345678-1234-4234-9234-123456789abc",
+    );
+  });
+});
 test("session loading: background Bash jobs complete after ten seconds and remain inspectable after reload", async ({
   page,
 }) => {

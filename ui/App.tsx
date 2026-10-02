@@ -19,6 +19,7 @@ import { JobContext } from "./components/Jobs/JobContext";
 import { JobTraceModal } from "./components/Jobs/JobTraceModal";
 import { JobsList } from "./components/Jobs/JobsList";
 import { ProviderSetupBanner } from "./components/OllamaDisconnectedBanner";
+import { Onboarding } from "./components/Onboarding";
 import { RenameSessionModal } from "./components/RenameSessionModal";
 import { RunArea } from "./components/RunArea";
 import { RunInputDock } from "./components/RunInputDock";
@@ -52,6 +53,7 @@ import {
 import { cancelAgent } from "./persist/agents";
 import { CHAT_MAX_WIDTHS, loadAppearance } from "./persist/appearance";
 import { cancelJob } from "./persist/jobs";
+import { needsOnboarding } from "./persist/onboarding";
 import { fetchSession } from "./persist/sessions";
 import { cx } from "./styles";
 
@@ -585,6 +587,7 @@ function ChatView({
 
 export default function App() {
   const app = useRunApp();
+  const [onboarding, setOnboarding] = useState(needsOnboarding);
   const [path, setPath] = useState(() => window.location.pathname);
   const route = parseRoute(path);
   useEffect(() => {
@@ -635,6 +638,29 @@ export default function App() {
       app.setStepsModalData(null);
     }
   }, [app.stepsModalData, app.setStepsModalData, stepsModalOpen]);
+
+  if (onboarding)
+    return (
+      <Onboarding
+        settings={app.userSettings}
+        models={app.ollamaModels}
+        catalogLoaded={app.catalogLoaded}
+        ollama={{ host: app.ollamaHost, connected: app.ollamaConnected }}
+        comfyui={{
+          host: app.comfyuiHost,
+          defaultModel: app.comfyuiDefaultModel,
+          defaultWidth: app.comfyuiDefaultWidth,
+          defaultHeight: app.comfyuiDefaultHeight,
+          negativePrompt: app.comfyuiNegativePrompt,
+          connected: app.comfyuiConnected,
+        }}
+        onSavePreferences={app.savePreferences}
+        onSaveOllamaHost={app.saveOllamaHost}
+        onSaveComfyUI={app.saveComfyUISettings}
+        onModelsChanged={() => app.refreshModels(true)}
+        onComplete={() => setOnboarding(false)}
+      />
+    );
 
   return (
     <>

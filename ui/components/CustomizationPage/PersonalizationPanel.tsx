@@ -1,6 +1,7 @@
-import { hintClass, inputClass, labelClass, textareaClass } from "../../styles";
+import { hintClass, labelClass } from "../../styles";
 import type { Personalization } from "../../types";
 import { EnableSwitch } from "../ModelPreferenceControls";
+import { PersonalizationFields } from "./PersonalizationFields";
 import { SystemPromptField } from "./SystemPromptField";
 
 export function PersonalizationPanel({
@@ -52,56 +53,7 @@ export function PersonalizationPanel({
             Tell the agent about yourself and how you prefer responses.
           </p>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <label htmlFor="name" className={labelClass}>
-              Name{" "}
-              <span className="font-normal text-muted-foreground">
-                (optional)
-              </span>
-            </label>
-            <input
-              id="name"
-              value={settings.name}
-              onChange={(event) => onChange("name", event.target.value)}
-              placeholder="Enter your name"
-              className={inputClass}
-            />
-          </div>
-          <div className="space-y-2">
-            <label htmlFor="location" className={labelClass}>
-              Location{" "}
-              <span className="font-normal text-muted-foreground">
-                (optional)
-              </span>
-            </label>
-            <input
-              id="location"
-              value={settings.location}
-              onChange={(event) => onChange("location", event.target.value)}
-              placeholder="e.g., New York, USA"
-              className={inputClass}
-            />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <label htmlFor="preferredFormats" className={labelClass}>
-            Preferred response formats{" "}
-            <span className="font-normal text-muted-foreground">
-              (optional)
-            </span>
-          </label>
-          <textarea
-            id="preferredFormats"
-            value={settings.preferredFormats}
-            onChange={(event) =>
-              onChange("preferredFormats", event.target.value)
-            }
-            placeholder="e.g., Markdown tables, bullet points, code snippets"
-            rows={3}
-            className={textareaClass}
-          />
-        </div>
+        <PersonalizationFields settings={settings} onChange={onChange} />
       </section>
     </div>
   );

@@ -242,3 +242,27 @@ test("getOrCreateUserId retains identity if localStorage throws after initial re
   const secondId = getOrCreateUserId();
   expect(secondId).toBe(existingId);
 });
+
+test("new UUIDs start onboarding and existing UUIDs keep their completion state", async () => {
+  const values = new Map<string, string>();
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    },
+  });
+  const { needsOnboarding, completeOnboarding } = await import(
+    "../../ui/persist/onboarding"
+  );
+  expect(needsOnboarding()).toBe(true);
+  const id = getOrCreateUserId();
+  completeOnboarding();
+  resetFallbackUserIdForTests();
+  expect(getOrCreateUserId()).toBe(id);
+  expect(needsOnboarding()).toBe(false);
+  values.clear();
+  resetFallbackUserIdForTests();
+  values.set(USER_ID_STORAGE_KEY, "12345678-1234-4234-9234-123456789abc");
+  expect(needsOnboarding()).toBe(false);
+});

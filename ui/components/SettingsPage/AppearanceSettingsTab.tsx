@@ -6,7 +6,7 @@ import { hintClass, labelClass, selectClass } from "./constants";
 
 type Option<T extends string> = { id: T; name: string };
 
-const themes: Option<Appearance["theme"]>[] = [
+export const themes: Option<Appearance["theme"]>[] = [
   { id: "default", name: "Default" },
   { id: "one-dark", name: "One Dark" },
   { id: "dracula", name: "Dracula" },
@@ -128,7 +128,9 @@ function ShiftSwitch({
 export function AppearanceSettingsTab({
   appearance,
   onChange,
+  compact = false,
 }: {
+  compact?: boolean;
   appearance: Appearance;
   onChange: (appearance: Appearance) => void;
 }) {
@@ -203,62 +205,66 @@ export function AppearanceSettingsTab({
         </section>
       </div>
 
-      <hr className="border-border-subtle" />
+      {!compact && (
+        <>
+          <hr className="border-border-subtle" />
 
-      <div className="space-y-4">
-        <h2 className={eyebrowText}>Layout</h2>
-        <OptionSelect
-          id="chat-width"
-          label="Chat width"
-          value={appearance.chatWidth}
-          options={chatWidths}
-          onChange={(chatWidth) => onChange({ ...appearance, chatWidth })}
-        />
-        <ShiftSwitch
-          id="shift-for-chat-list"
-          label="Make room for the chat list"
-          hint="Always move the chat aside when the chat list opens. When off, the list slides over empty space and only nudges the chat if it would cover messages."
-          checked={appearance.shiftForChatList}
-          onChange={(shiftForChatList) =>
-            onChange({ ...appearance, shiftForChatList })
-          }
-        />
-        <ShiftSwitch
-          id="shift-for-artifacts"
-          label="Make room for artifacts"
-          hint="Always move the chat aside when the artifacts panel opens. When off, the panel slides over empty space and only nudges the chat if it would cover messages."
-          checked={appearance.shiftForArtifacts}
-          onChange={(shiftForArtifacts) =>
-            onChange({ ...appearance, shiftForArtifacts })
-          }
-        />
-        <div className="max-w-64 space-y-2">
-          <div className="flex items-baseline justify-between">
-            <label htmlFor="sidebar-animation" className={labelClass}>
-              Sidebar animation
-            </label>
-            <span className="text-xs tabular-nums text-muted-foreground">
-              {appearance.sidebarAnimationMs} ms
-            </span>
+          <div className="space-y-4">
+            <h2 className={eyebrowText}>Layout</h2>
+            <OptionSelect
+              id="chat-width"
+              label="Chat width"
+              value={appearance.chatWidth}
+              options={chatWidths}
+              onChange={(chatWidth) => onChange({ ...appearance, chatWidth })}
+            />
+            <ShiftSwitch
+              id="shift-for-chat-list"
+              label="Make room for the chat list"
+              hint="Always move the chat aside when the chat list opens. When off, the list slides over empty space and only nudges the chat if it would cover messages."
+              checked={appearance.shiftForChatList}
+              onChange={(shiftForChatList) =>
+                onChange({ ...appearance, shiftForChatList })
+              }
+            />
+            <ShiftSwitch
+              id="shift-for-artifacts"
+              label="Make room for artifacts"
+              hint="Always move the chat aside when the artifacts panel opens. When off, the panel slides over empty space and only nudges the chat if it would cover messages."
+              checked={appearance.shiftForArtifacts}
+              onChange={(shiftForArtifacts) =>
+                onChange({ ...appearance, shiftForArtifacts })
+              }
+            />
+            <div className="max-w-64 space-y-2">
+              <div className="flex items-baseline justify-between">
+                <label htmlFor="sidebar-animation" className={labelClass}>
+                  Sidebar animation
+                </label>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {appearance.sidebarAnimationMs} ms
+                </span>
+              </div>
+              <input
+                id="sidebar-animation"
+                type="range"
+                min={0}
+                max={600}
+                step={25}
+                value={appearance.sidebarAnimationMs}
+                aria-valuetext={`${appearance.sidebarAnimationMs} ms`}
+                onChange={(event) =>
+                  onChange({
+                    ...appearance,
+                    sidebarAnimationMs: event.target.valueAsNumber,
+                  })
+                }
+                className="w-full accent-foreground"
+              />
+            </div>
           </div>
-          <input
-            id="sidebar-animation"
-            type="range"
-            min={0}
-            max={600}
-            step={25}
-            value={appearance.sidebarAnimationMs}
-            aria-valuetext={`${appearance.sidebarAnimationMs} ms`}
-            onChange={(event) =>
-              onChange({
-                ...appearance,
-                sidebarAnimationMs: event.target.valueAsNumber,
-              })
-            }
-            className="w-full accent-foreground"
-          />
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }

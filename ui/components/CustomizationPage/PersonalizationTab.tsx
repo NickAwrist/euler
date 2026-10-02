@@ -1,5 +1,6 @@
 import { Save } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useSavedDraft } from "../../hooks/useSavedDraft";
 import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
 import { changedFields } from "../../lib/changedFields";
 import { cx } from "../../styles";
@@ -27,10 +28,10 @@ export function PersonalizationTab({
   onSave: (settings: Partial<Personalization>) => Promise<void>;
   onDirtyChange: (dirty: boolean) => void;
 }) {
-  const [settings, setSettings] = useState<Personalization>(currentSettings);
+  const draft = useSavedDraft(currentSettings);
+  const settings = draft.value;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => setSettings(currentSettings), [currentSettings]);
   const changes = PERSONALIZATION_FIELDS.filter(
     ({ key }) => settings[key] !== currentSettings[key],
   ).map(({ label }) => ({ label }));
@@ -59,6 +60,7 @@ export function PersonalizationTab({
           currentSettings,
         ),
       );
+      draft.accept();
       return true;
     } catch (err) {
       setError(
@@ -74,7 +76,7 @@ export function PersonalizationTab({
   const update = <K extends keyof Personalization>(
     key: K,
     value: Personalization[K],
-  ) => setSettings((previous) => ({ ...previous, [key]: value }));
+  ) => draft.setValue((previous) => ({ ...previous, [key]: value }));
   return (
     <div
       className={cx("flex min-h-0 flex-col", active ? "flex-1" : "shrink-0")}
@@ -124,7 +126,7 @@ export function PersonalizationTab({
           onDiscard={() => {
             if (prompt === "leave") resolveLeave(true);
             else {
-              setSettings(currentSettings);
+              draft.reset();
               setError(null);
               setPrompt(null);
             }
