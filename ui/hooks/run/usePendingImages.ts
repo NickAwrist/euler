@@ -17,13 +17,11 @@ type PendingImage = {
 type Args = {
   activeSessionId: string | null;
   supportsImageInput: boolean;
-  isEphemeral: boolean;
 };
 
 export function usePendingImages({
   activeSessionId,
   supportsImageInput,
-  isEphemeral,
 }: Args) {
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [imageError, setImageError] = useState<string | null>(null);
@@ -48,21 +46,14 @@ export function usePendingImages({
 
   useEffect(() => {
     if (pendingImages.length === 0) return;
-    if (!supportsImageInput) {
+    if (!supportsImageInput)
       setImageError("The selected model does not accept images.");
-    } else if (isEphemeral) {
-      setImageError("Images are not available in temporary sessions.");
-    }
-  }, [isEphemeral, supportsImageInput, pendingImages.length]);
+  }, [supportsImageInput, pendingImages.length]);
 
   const addPendingImages = useCallback(
     (files: File[]) => {
       if (!supportsImageInput) {
         setImageError("The selected model does not accept images.");
-        return;
-      }
-      if (isEphemeral) {
-        setImageError("Images are not available in temporary sessions.");
         return;
       }
 
@@ -97,7 +88,7 @@ export function usePendingImages({
         if (accepted.length === files.length) setImageError(null);
       }
     },
-    [isEphemeral, supportsImageInput],
+    [supportsImageInput],
   );
 
   const removePendingImage = useCallback((id: string) => {
@@ -130,7 +121,7 @@ export function usePendingImages({
     [pendingImages],
   );
 
-  const canAttachImages = supportsImageInput && !isEphemeral;
+  const canAttachImages = supportsImageInput;
 
   return {
     pendingImages,
@@ -145,8 +136,6 @@ export function usePendingImages({
     attachmentsSendReady: pendingImages.length === 0 || canAttachImages,
     attachImageDisabledReason: !supportsImageInput
       ? "The selected model does not accept images"
-      : isEphemeral
-        ? "Images are not available in temporary sessions"
-        : undefined,
+      : undefined,
   };
 }

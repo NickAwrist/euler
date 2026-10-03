@@ -23,6 +23,7 @@ async function mockApp(page: Page) {
                 preview: "Sidebar test chat",
                 createdAt: 1,
                 updatedAt: 1,
+                expiresAt: null,
               },
             ],
           }
@@ -204,7 +205,6 @@ test("chat sidebar desktop workspace changes refresh open artifacts without remo
                 size: 10,
                 sessionId: "sidebar-test",
                 workspaceKind: "sandbox",
-                temporary: false,
               },
             ],
           },

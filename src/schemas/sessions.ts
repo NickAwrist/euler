@@ -21,6 +21,8 @@ export const SessionSummarySchema = z.object({
   updatedAt: z.number(),
   customTitle: z.string().nullable().optional(),
   preview: z.string(),
+  /** When an ephemeral chat is deleted; null for saved chats. */
+  expiresAt: z.number().nullable(),
 });
 
 export type SessionSummary = z.infer<typeof SessionSummarySchema>;
@@ -41,15 +43,25 @@ export const StoredRunSessionSchema = z.object({
     .optional(),
   model: z.string().nullable().optional(),
   workspace: SessionWorkspaceSchema.default({ kind: "sandbox" }),
+  expiresAt: z.number().nullable(),
 });
 
 export type StoredRunSession = z.infer<typeof StoredRunSessionSchema>;
 
 export const CreateSessionBodySchema = z.object({
   model: z.string().trim().nullable().optional(),
+  /** An ephemeral chat is deleted once its lifetime ends. */
+  ephemeral: z.boolean().optional(),
 });
 
 export type CreateSessionBody = z.infer<typeof CreateSessionBodySchema>;
+
+export const CreatedSessionSchema = z.object({
+  id: z.string(),
+  expiresAt: z.number().nullable(),
+});
+
+export type CreatedSession = z.infer<typeof CreatedSessionSchema>;
 
 export const PatchSessionBodySchema = z.strictObject({
   customTitle: z.string().trim().nullable().optional(),

@@ -16,13 +16,8 @@ export type ArtifactSource = {
   ) => Promise<import("../../../src/schemas/artifacts").FilePreview>;
 };
 
-export function workspaceArtifactSource(
-  sessionId: string,
-  temporary: boolean,
-): ArtifactSource {
-  const base = temporary
-    ? `/api/temporary-sessions/${encodeURIComponent(sessionId)}/artifacts`
-    : `/api/sessions/${encodeURIComponent(sessionId)}/workspace/artifacts`;
+export function workspaceArtifactSource(sessionId: string): ArtifactSource {
+  const base = `/api/sessions/${encodeURIComponent(sessionId)}/workspace/artifacts`;
 
   return {
     download: (path, signal) =>

@@ -71,7 +71,7 @@ for (const device of ["desktop", "mobile"]) {
     );
     await expect(
       page.getByText(
-        "Nothing here is saved. Messages and files are deleted when you leave.",
+        "This chat, its messages, and its files are deleted when it expires.",
       ),
     ).toBeVisible();
     await expect(

@@ -36,6 +36,5 @@ export const RunMetadataSchema = z.object({
 export const DebugPromptBodySchema = z.object({
   sessionId: z.string().trim().min(1).optional(),
   metadata: RunMetadataSchema.optional(),
-  ephemeral: z.boolean().optional(),
   message: z.string().optional(),
 });

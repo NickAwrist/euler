@@ -78,19 +78,13 @@ function applyEvent(
 
 export function useAgentEvents(
   sessionId: string | null,
-  temporary: boolean,
   setMessages: (messages: Message[]) => void,
   refreshSessions: () => Promise<void>,
 ) {
   const [state, setState] = useState<RuntimeSnapshot>(empty);
   const [phases, setPhases] = useState<AgentPhases>({});
-  const current = useRef({
-    sessionId,
-    temporary,
-    setMessages,
-    refreshSessions,
-  });
-  current.current = { sessionId, temporary, setMessages, refreshSessions };
+  const current = useRef({ sessionId, setMessages, refreshSessions });
+  current.current = { sessionId, setMessages, refreshSessions };
   const views = useRef(new Map<string, RuntimeSnapshot>());
   const recent = useRef<AgentEvent[]>([]);
   const publish = (id: string, value: RuntimeSnapshot) => {
@@ -115,19 +109,15 @@ export function useAgentEvents(
     )
       return;
     current.current.setMessages((value.history ?? []) as Message[]);
-    if (
-      !current.current.temporary &&
-      document.visibilityState === "visible" &&
-      !value.activation
-    )
+    if (document.visibilityState === "visible" && !value.activation)
       void agentAction(id, "viewed")
         .then(current.current.refreshSessions)
         .catch(console.error);
   };
   const refresh = async () => {
-    const { sessionId: id, temporary: ephemeral } = current.current;
+    const id = current.current.sessionId;
     if (!id) return;
-    let snapshot = await fetchRuntime(id, ephemeral);
+    let snapshot = await fetchRuntime(id);
     for (const event of recent.current)
       if (event.sessionId === id) snapshot = applyEvent(snapshot, event);
     const previous = views.current.get(id);
@@ -141,7 +131,7 @@ export function useAgentEvents(
   useEffect(() => {
     setState(sessionId ? (views.current.get(sessionId) ?? empty()) : empty());
     void refreshRef.current().catch(console.error);
-  }, [sessionId, temporary]);
+  }, [sessionId]);
   useEffect(() => {
     const controller = new AbortController();
     void subscribeEvents(controller.signal, (event) => {

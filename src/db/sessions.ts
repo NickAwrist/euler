@@ -27,13 +27,14 @@ export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
   const db = getDb();
   const sessions = db
     .query(
-      "SELECT id, created_at, updated_at, title, last_activity_at > last_viewed_at AS unread FROM sessions WHERE owner_uuid = ? ORDER BY updated_at DESC",
+      "SELECT id, created_at, updated_at, title, expires_at, last_activity_at > last_viewed_at AS unread FROM sessions WHERE owner_uuid = ? ORDER BY updated_at DESC",
     )
     .all(ownerUuid) as Array<{
     id: string;
     created_at: number;
     updated_at: number;
     title: string | null;
+    expires_at: number | null;
     unread: number;
   }>;
 
@@ -49,6 +50,7 @@ export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
       created_at: s.created_at,
       updated_at: s.updated_at,
       title: s.title,
+      expires_at: s.expires_at,
       unread: s.unread === 1,
       preview: previewFromTitleAndFirstUser(
         s.title,
@@ -65,10 +67,19 @@ export function getSessionById(
 ): SessionRow | null {
   const row = getDb()
     .query(
-      "SELECT id, owner_uuid, created_at, updated_at, title, model, session_directory, workspace_kind FROM sessions WHERE owner_uuid = ? AND id = ?",
+      "SELECT id, owner_uuid, created_at, updated_at, title, model, session_directory, workspace_kind, expires_at FROM sessions WHERE owner_uuid = ? AND id = ?",
     )
     .get(ownerUuid, id) as SessionRow | null;
   return row ?? null;
+}
+
+/** Ephemeral chats whose expiry has passed, across owners. */
+export function listExpiredSessions(now: number): SessionRow[] {
+  return getDb()
+    .query(
+      "SELECT id, owner_uuid, created_at, updated_at, title, model, session_directory, workspace_kind, expires_at FROM sessions WHERE expires_at <= ?",
+    )
+    .all(now) as SessionRow[];
 }
 
 export function countMessagesForSession(sessionId: string): number {
@@ -181,11 +192,12 @@ export function createSessionRow(
   id: string,
   now: number,
   model: string | null,
+  expiresAt: number | null = null,
 ): SessionRow {
   const db = getDb();
   db.run(
-    "INSERT INTO sessions (id, owner_uuid, created_at, updated_at, title, model) VALUES (?, ?, ?, ?, NULL, ?)",
-    [id, ownerUuid, now, now, model],
+    "INSERT INTO sessions (id, owner_uuid, created_at, updated_at, title, model, expires_at) VALUES (?, ?, ?, ?, NULL, ?, ?)",
+    [id, ownerUuid, now, now, model, expiresAt],
   );
   return {
     id,
@@ -196,6 +208,7 @@ export function createSessionRow(
     model,
     session_directory: null,
     workspace_kind: "sandbox",
+    expires_at: expiresAt,
   };
 }
 

@@ -21,7 +21,6 @@ export function useRunApp() {
   const comfy = useComfyUIConnection();
 
   const activeSessionIdRef = useRef<string | null>(null);
-  const isEphemeralRef = useRef(false);
   const settings = useSettings(
     ollama.setOllamaHost,
     ollama.fetchOllamaHealth,
@@ -51,7 +50,6 @@ export function useRunApp() {
     setDebugOpen,
     setDebugData,
     activeSessionIdRef,
-    isEphemeralRef,
     onNavigate: () => sidebar.setSidebarOpen(false),
   });
 
@@ -84,7 +82,6 @@ export function useRunApp() {
     messages,
     setMessages,
     activeSessionId: sessions.activeSessionId,
-    isEphemeralRef,
     userSettingsRef: settings.userSettingsRef,
     debugOpen,
     setDebugOpen,
@@ -98,7 +95,6 @@ export function useRunApp() {
     truncateConfirm,
     setTruncateConfirm,
     supportsImageInput,
-    isEphemeral: sessions.isEphemeral,
     startSession: sessions.startSession,
   });
 
@@ -157,8 +153,6 @@ export function useRunApp() {
       : [],
     pendingDeleteSessionId: sessions.pendingDeleteSessionId,
     setPendingDeleteSessionId: sessions.setPendingDeleteSessionId,
-    ephemeralExitPromptOpen: sessions.ephemeralExitPromptOpen,
-    resolveEphemeralExit: sessions.resolveEphemeralExit,
     runPending: stream.runPending,
     ollamaModels: ollama.ollamaModels,
     catalogLoaded: ollama.catalogLoaded,
@@ -173,7 +167,7 @@ export function useRunApp() {
     thinkingEffort: sessions.thinkingEffort,
     handleThinkingEffortChange: sessions.handleThinkingEffortChange,
     handleModelChange: sessions.handleModelChange,
-    isEphemeral: sessions.isEphemeral,
+    activeExpiresAt: sessions.activeExpiresAt,
     userSettings: settings.userSettings,
     ollamaHost: ollama.ollamaHost,
     comfyuiHost: comfy.comfyuiHost,

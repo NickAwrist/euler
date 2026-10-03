@@ -26,7 +26,6 @@ type Args = {
   messages: Message[];
   setMessages: Dispatch<SetStateAction<Message[]>>;
   activeSessionId: string | null;
-  isEphemeralRef: MutableRefObject<boolean>;
   userSettingsRef: MutableRefObject<UserSettings>;
   debugOpen: boolean;
   setDebugOpen: Dispatch<SetStateAction<boolean>>;
@@ -40,7 +39,6 @@ type Args = {
   truncateConfirm: TruncateConfirmState;
   setTruncateConfirm: Dispatch<SetStateAction<TruncateConfirmState>>;
   supportsImageInput: boolean;
-  isEphemeral: boolean;
   startSession: () => Promise<string>;
 };
 
@@ -49,20 +47,17 @@ export function useRunStreaming(p: Args) {
   const sending = useRef(false);
   const events = useAgentEvents(
     p.activeSessionId,
-    p.isEphemeral,
     p.setMessages,
     p.refreshSessions,
   );
   const fetchDebugData = useRunDebug({
     userSettingsRef: p.userSettingsRef,
-    isEphemeralRef: p.isEphemeralRef,
     setDebugData: p.setDebugData,
   });
 
   const images = usePendingImages({
     activeSessionId: p.activeSessionId,
     supportsImageInput: p.supportsImageInput,
-    isEphemeral: p.isEphemeral,
   });
 
   const runTurn = async (
@@ -79,28 +74,18 @@ export function useRunStreaming(p: Args) {
     };
     try {
       if (options.rewind) {
-        await agentAction(
-          sessionId,
-          "rewind",
-          {
-            ...settings,
-            position: priorMessages.length,
-            content: message,
-            versions: options.versions,
-          },
-          p.isEphemeral,
-        );
+        await agentAction(sessionId, "rewind", {
+          ...settings,
+          position: priorMessages.length,
+          content: message,
+          versions: options.versions,
+        });
       } else {
-        await agentAction(
-          sessionId,
-          "messages",
-          {
-            ...settings,
-            content: message,
-            attachmentIds: attachments.map((a) => a.id),
-          },
-          p.isEphemeral,
-        );
+        await agentAction(sessionId, "messages", {
+          ...settings,
+          content: message,
+          attachmentIds: attachments.map((a) => a.id),
+        });
       }
       void events.refresh().catch(console.error);
       return true;
@@ -113,7 +98,7 @@ export function useRunStreaming(p: Args) {
   };
   const stopGeneration = () => {
     if (p.activeSessionId)
-      void agentAction(p.activeSessionId, "stop", {}, p.isEphemeral)
+      void agentAction(p.activeSessionId, "stop")
         .then(events.refresh)
         .catch(console.error);
   };
@@ -123,11 +108,7 @@ export function useRunStreaming(p: Args) {
     const message = input.trim();
     if (!message || !p.modelSendReady || sending.current) return;
     if (images.pendingImages.length > 0 && !images.canAttachImages) {
-      images.setImageError(
-        !p.supportsImageInput
-          ? "The selected model does not accept images."
-          : "Images are not available in temporary sessions.",
-      );
+      images.setImageError("The selected model does not accept images.");
       return;
     }
     sending.current = true;

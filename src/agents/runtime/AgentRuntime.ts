@@ -63,7 +63,6 @@ export class AgentRuntime {
   readonly store = new AgentStore();
   readonly jobs = new JobManager({
     position: (id) => this.transcriptLength(id),
-    temporary: (id) => this.temporaryHistory.has(id),
     blocked: (id) => this.isChanging(id),
     changed: (job) => this.resync(job.ownerUuid, job.sessionId),
     notify: (job, wakes) => {
@@ -109,7 +108,6 @@ export class AgentRuntime {
     string,
     { controller: AbortController; promise: Promise<void>; partial: Activation }
   >();
-  private temporaryHistory = new Map<string, WireMessageInput[]>();
   private deleting = new Set<string>();
   private rewinding = new Set<string>();
   /** Agents being cancelled, which must not start again before it settles. */
@@ -156,16 +154,7 @@ export class AgentRuntime {
     });
   }
   private atomically<T>(sessionId: string, write: () => T): T {
-    const restore = this.store.checkpoint(sessionId);
-    // A temporary transcript only grows, unless a rewind replaces it.
-    const history = this.temporaryHistory.get(sessionId);
-    const length = history?.length ?? 0;
-    return this.transactions.run(write, () => {
-      restore();
-      if (!history) return this.temporaryHistory.delete(sessionId);
-      history.length = length;
-      this.temporaryHistory.set(sessionId, history);
-    });
+    return this.transactions.run(write, this.store.checkpoint(sessionId));
   }
   private emit(owner: string, event: Unsequenced) {
     const snapshot = structuredClone(event);
@@ -181,7 +170,7 @@ export class AgentRuntime {
     this.store.release(sessionId);
   }
 
-  main(owner: string, sessionId: string, temporary = false): AgentRecord {
+  main(owner: string, sessionId: string): AgentRecord {
     // Its agents are gone, so one must not be created for a chat being deleted.
     if (this.deleting.has(sessionId))
       throw new OperationError("CONFLICT", {
@@ -193,7 +182,7 @@ export class AgentRuntime {
       .find((a) => a.kind === "main");
     if (existing) return existing;
     const session = getSessionById(owner, sessionId);
-    if (!session && !temporary) throw new Error("Session not found");
+    if (!session) throw new Error("Session not found");
     const agent = createAgentRecord({
       ownerUuid: owner,
       sessionId,
@@ -201,13 +190,12 @@ export class AgentRuntime {
       kind: "main",
       title: MAIN_AGENT_TITLE,
       status: "idle",
-      model: session?.model ?? DEFAULT_RUN_MODEL,
+      model: session.model ?? DEFAULT_RUN_MODEL,
       spawnPosition: 0,
       activity: "",
       config: {},
     });
-    this.store.save(agent, temporary);
-    if (temporary) this.temporaryHistory.set(sessionId, []);
+    this.store.save(agent);
     return agent;
   }
   snapshot(owner: string, sessionId: string) {
@@ -222,9 +210,7 @@ export class AgentRuntime {
         ? this.store.undelivered(main.id).filter((m) => m.kind === "user")
         : [],
       held: main ? this.store.isHeld(main.id) : false,
-      history:
-        this.temporaryHistory.get(sessionId) ??
-        getMessagesForSession(owner, sessionId),
+      history: getMessagesForSession(owner, sessionId),
     };
   }
   busy(owner: string, sessionId: string) {
@@ -482,20 +468,14 @@ export class AgentRuntime {
   }
   /** The number of transcript messages, without loading them. */
   private transcriptLength(sessionId: string) {
-    return (
-      this.temporaryHistory.get(sessionId)?.length ??
-      countMessagesForSession(sessionId)
-    );
+    return countMessagesForSession(sessionId);
   }
   private append(agent: AgentRecord, message: WireMessageInput) {
-    const temporary = this.temporaryHistory.get(agent.sessionId);
-    if (temporary) temporary.push(message);
-    else
-      message.id = appendRuntimeMessage(
-        agent.ownerUuid,
-        agent.sessionId,
-        message,
-      );
+    message.id = appendRuntimeMessage(
+      agent.ownerUuid,
+      agent.sessionId,
+      message,
+    );
     this.emit(agent.ownerUuid, {
       type: "transcript_appended",
       sessionId: agent.sessionId,
@@ -512,7 +492,6 @@ export class AgentRuntime {
       {
         store: this.store,
         jobs: this.jobs,
-        temporaryHistory: this.temporaryHistory,
         status: (record) => this.status(record),
         emit: (owner, event) => this.emit(owner, event),
         append: (record, message) => this.append(record, message),
@@ -617,7 +596,7 @@ export class AgentRuntime {
       config: parent.config,
     });
     this.atomically(parent.sessionId, () => {
-      this.store.save(child, this.temporaryHistory.has(parent.sessionId));
+      this.store.save(child);
       this.status(child);
       this.enqueue(child, parent.id, "task", request.prompt);
     });
@@ -782,22 +761,14 @@ export class AgentRuntime {
         this.store.remove(agent);
       }
       this.jobs.remove(owner, sessionId);
-      this.temporaryHistory.delete(sessionId);
       return await remove?.();
     } finally {
       this.deleting.delete(sessionId);
     }
   }
-  async rewind(
-    owner: string,
-    sessionId: string,
-    request: RewindRequest,
-    temporary = false,
-  ) {
-    const main = this.main(owner, sessionId, temporary);
-    const history =
-      this.temporaryHistory.get(sessionId) ??
-      getMessagesForSession(owner, sessionId);
+  async rewind(owner: string, sessionId: string, request: RewindRequest) {
+    const main = this.main(owner, sessionId);
+    const history = getMessagesForSession(owner, sessionId);
     const target = history[request.position];
     if (!target || target.role !== "user")
       throw new OperationError("INVALID_REQUEST", {
@@ -822,9 +793,7 @@ export class AgentRuntime {
       const checkpoint = current.checkpoints[String(request.position)];
       // The transcript, model history, and inbox change together or not at all.
       this.atomically(sessionId, () => {
-        if (temporary)
-          this.temporaryHistory.set(sessionId, kept as WireMessageInput[]);
-        else truncateSessionMessages(sessionId, request.position);
+        truncateSessionMessages(sessionId, request.position);
         this.store.saveHistory(
           current,
           checkpoint === undefined

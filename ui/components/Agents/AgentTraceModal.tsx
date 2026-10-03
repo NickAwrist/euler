@@ -17,12 +17,10 @@ import { AgentStopButton } from "./AgentTaskCard";
 
 export function AgentTraceModal({
   sessionId,
-  temporary,
   agent,
   onClose,
 }: {
   sessionId: string;
-  temporary: boolean;
   agent: Agent;
   onClose: () => void;
 }) {
@@ -36,7 +34,7 @@ export function AgentTraceModal({
   useEffect(() => {
     let disposed = false;
     const refresh = () =>
-      void fetchAgent(sessionId, agent.id, temporary)
+      void fetchAgent(sessionId, agent.id)
         .then((value) => {
           if (!disposed) {
             setDetail(value);
@@ -52,7 +50,7 @@ export function AgentTraceModal({
       disposed = true;
       clearInterval(timer);
     };
-  }, [sessionId, temporary, agent.id, agent.status, working]);
+  }, [sessionId, agent.id, agent.status, working]);
   const initialPrompt = detail?.messages.find(
     (m) => m.kind === "task",
   )?.content;

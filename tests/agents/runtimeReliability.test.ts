@@ -22,16 +22,12 @@ async function until(check: () => boolean) {
     await Bun.sleep(5);
   }
 }
-async function session(runtime: AgentRuntime, temporary = false) {
-  const id = temporary
-    ? (await workspaceService.createTemporary(owner)).id
-    : crypto.randomUUID();
-  if (!temporary) {
-    createSessionRow(owner, id, Date.now(), model);
-    await workspaceService.provisionRetained(owner, id);
-  }
+async function session(runtime: AgentRuntime) {
+  const id = crypto.randomUUID();
+  createSessionRow(owner, id, Date.now(), model);
+  await workspaceService.provisionRetained(owner, id);
   setOpenRouterApiKey("test");
-  const main = runtime.main(owner, id, temporary);
+  const main = runtime.main(owner, id);
   main.model = model;
   runtime.store.save(main);
   return main;
@@ -151,77 +147,72 @@ test("model selection and message acceptance commit together and survive reload"
   }
 });
 
-for (const temporary of [false, true]) {
-  test(`${temporary ? "temporary" : "retained"} child outputs survive waiting and result delivery without depending on reply text`, async () => {
-    const runtime = new AgentRuntime();
-    const main = await session(runtime, temporary);
-    const child = {
-      ...main,
-      id: crypto.randomUUID(),
-      parentId: main.id,
-      kind: "general" as const,
-    };
-    runtime.store.save(child, temporary);
-    setBraveSearchApiKey("brave-child-outputs-test");
-    setOpenRouterScenario("child-outputs");
-    const image = {
-      kind: "generated_image",
-      url: "/api/comfyui/view/child.png",
-    } as const;
-    const generate = spyOn(
-      GenerateImageTool.prototype,
-      "execute",
-    ).mockResolvedValue({ text: "Image created", attachments: [image] });
-    try {
-      runtime.enqueue(child, main.id, "task", "Generate a report");
-      await until(() => runtime.store.get(child.id)?.status === "waiting");
-      const outputs = runtime.store.get(child.id)!.pendingOutputs;
-      expect(outputs).toEqual([
-        image,
-        {
-          kind: "web_source",
-          title: "Mocked Search Result 1",
-          url: "https://example.com/result1",
-        },
-        expect.objectContaining({
-          kind: "file",
-          path: "report.txt",
-          temporary,
-        }),
-      ]);
-      if (!temporary)
-        expect(new AgentStore().get(child.id)?.pendingOutputs).toEqual(outputs);
-      runtime.enqueue(child, main.id, "message", "Finish");
-      const report = () =>
-        runtime.store.inbox(main.id).find((m) => m.kind === "result");
-      await until(
-        () =>
-          report()?.deliveredAt != null && !runtime.busy(owner, main.sessionId),
-      );
-      expect(report()?.attachments).toEqual(outputs);
-      expect(report()?.content).not.toContain("child.png");
-      const { history } = runtime.snapshot(owner, main.sessionId);
-      const replies = history.length;
-      expect(history.at(-1)?.attachments).toEqual(outputs);
-      runtime.send(runtime.store.get(main.id)!, {
-        content: "Thanks",
-        attachmentIds: [],
-      });
-      await until(
-        () =>
-          runtime.snapshot(owner, main.sessionId).history.length ===
-            replies + 2 && !runtime.busy(owner, main.sessionId),
-      );
-      expect(
-        runtime.snapshot(owner, main.sessionId).history.at(-1)?.attachments ??
-          [],
-      ).toEqual([]);
-    } finally {
-      generate.mockRestore();
-      await runtime.deleteSession(owner, main.sessionId);
-    }
-  });
-}
+test("child outputs survive waiting and result delivery without depending on reply text", async () => {
+  const runtime = new AgentRuntime();
+  const main = await session(runtime);
+  const child = {
+    ...main,
+    id: crypto.randomUUID(),
+    parentId: main.id,
+    kind: "general" as const,
+  };
+  runtime.store.save(child);
+  setBraveSearchApiKey("brave-child-outputs-test");
+  setOpenRouterScenario("child-outputs");
+  const image = {
+    kind: "generated_image",
+    url: "/api/comfyui/view/child.png",
+  } as const;
+  const generate = spyOn(
+    GenerateImageTool.prototype,
+    "execute",
+  ).mockResolvedValue({ text: "Image created", attachments: [image] });
+  try {
+    runtime.enqueue(child, main.id, "task", "Generate a report");
+    await until(() => runtime.store.get(child.id)?.status === "waiting");
+    const outputs = runtime.store.get(child.id)!.pendingOutputs;
+    expect(outputs).toEqual([
+      image,
+      {
+        kind: "web_source",
+        title: "Mocked Search Result 1",
+        url: "https://example.com/result1",
+      },
+      expect.objectContaining({
+        kind: "file",
+        path: "report.txt",
+      }),
+    ]);
+    expect(new AgentStore().get(child.id)?.pendingOutputs).toEqual(outputs);
+    runtime.enqueue(child, main.id, "message", "Finish");
+    const report = () =>
+      runtime.store.inbox(main.id).find((m) => m.kind === "result");
+    await until(
+      () =>
+        report()?.deliveredAt != null && !runtime.busy(owner, main.sessionId),
+    );
+    expect(report()?.attachments).toEqual(outputs);
+    expect(report()?.content).not.toContain("child.png");
+    const { history } = runtime.snapshot(owner, main.sessionId);
+    const replies = history.length;
+    expect(history.at(-1)?.attachments).toEqual(outputs);
+    runtime.send(runtime.store.get(main.id)!, {
+      content: "Thanks",
+      attachmentIds: [],
+    });
+    await until(
+      () =>
+        runtime.snapshot(owner, main.sessionId).history.length ===
+          replies + 2 && !runtime.busy(owner, main.sessionId),
+    );
+    expect(
+      runtime.snapshot(owner, main.sessionId).history.at(-1)?.attachments ?? [],
+    ).toEqual([]);
+  } finally {
+    generate.mockRestore();
+    await runtime.deleteSession(owner, main.sessionId);
+  }
+});
 
 test("restart preserves outputs already delivered to an interrupted parent exactly once", async () => {
   const first = new AgentRuntime();

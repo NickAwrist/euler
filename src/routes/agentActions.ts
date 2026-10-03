@@ -11,7 +11,6 @@ import {
   SendMessageSchema,
 } from "../schemas/agents";
 import { requireUserId } from "../userIdentity";
-import { workspaceService } from "../workspaces/WorkspaceService";
 
 /** Sends an error for a model that cannot run and returns false. */
 function modelAvailable(res: Response, model: string) {
@@ -29,19 +28,12 @@ function modelAvailable(res: Response, model: string) {
   return true;
 }
 
-export function agentActions(temporary = false) {
+export function agentActions() {
   const router = Router();
   router.use("/:id", (req, res, next) => {
     const owner = requireUserId(req, res);
     if (!owner) return;
-    if (temporary) {
-      try {
-        workspaceService.temporaryPresentation(owner, req.params.id);
-      } catch {
-        sendError(res, "NOT_FOUND", "Temporary chat not found");
-        return;
-      }
-    } else if (!getSessionById(owner, req.params.id)) {
+    if (!getSessionById(owner, req.params.id)) {
       sendError(res, "NOT_FOUND", "Session not found");
       return;
     }
@@ -50,7 +42,7 @@ export function agentActions(temporary = false) {
   router.post("/:id/viewed", (req, res) => {
     const owner = requireUserId(req, res);
     if (!owner) return;
-    if (!temporary) markSessionViewed(owner, req.params.id);
+    markSessionViewed(owner, req.params.id);
     res.json({ ok: true });
   });
   router.post("/:id/messages", (req, res) => {
@@ -78,7 +70,7 @@ export function agentActions(temporary = false) {
       sendError(res, "INVALID_REQUEST", "Invalid attachment");
       return;
     }
-    const main = agentRuntime.main(owner, req.params.id, temporary);
+    const main = agentRuntime.main(owner, req.params.id);
     if (!modelAvailable(res, body.model ?? main.model)) return;
     const { message, queued } = agentRuntime.send(main, body);
     res.status(202).json({ messageId: message.id, queued });
@@ -86,15 +78,13 @@ export function agentActions(temporary = false) {
   router.post("/:id/stop", async (req, res) => {
     const owner = requireUserId(req, res);
     if (!owner) return;
-    await agentRuntime.cancel(
-      agentRuntime.main(owner, req.params.id, temporary),
-    );
+    await agentRuntime.cancel(agentRuntime.main(owner, req.params.id));
     res.json({ ok: true });
   });
   router.post("/:id/deliver", (req, res) => {
     const owner = requireUserId(req, res);
     if (!owner) return;
-    agentRuntime.deliver(agentRuntime.main(owner, req.params.id, temporary));
+    agentRuntime.deliver(agentRuntime.main(owner, req.params.id));
     res.json({ ok: true });
   });
   router.patch("/:id/messages/:messageId", (req, res) => {
@@ -105,7 +95,7 @@ export function agentActions(temporary = false) {
       sendValidationError(res, parsed.error);
       return;
     }
-    const main = agentRuntime.main(owner, req.params.id, temporary);
+    const main = agentRuntime.main(owner, req.params.id);
     if (
       !agentRuntime.store.editQueued(
         main.id,
@@ -122,7 +112,7 @@ export function agentActions(temporary = false) {
   router.delete("/:id/messages/:messageId", (req, res) => {
     const owner = requireUserId(req, res);
     if (!owner) return;
-    const main = agentRuntime.main(owner, req.params.id, temporary);
+    const main = agentRuntime.main(owner, req.params.id);
     if (!agentRuntime.removeQueued(main, Number(req.params.messageId))) {
       sendError(res, "CONFLICT", "Message was already delivered");
       return;
@@ -195,9 +185,9 @@ export function agentActions(temporary = false) {
       sendValidationError(res, parsed.error);
       return;
     }
-    const main = agentRuntime.main(owner, req.params.id, temporary);
+    const main = agentRuntime.main(owner, req.params.id);
     if (!modelAvailable(res, parsed.data.model ?? main.model)) return;
-    await agentRuntime.rewind(owner, req.params.id, parsed.data, temporary);
+    await agentRuntime.rewind(owner, req.params.id, parsed.data);
     res.json({ ok: true });
   });
   return router;

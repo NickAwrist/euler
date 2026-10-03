@@ -446,19 +446,19 @@ test("Stop holds input already queued until Deliver, and invalid rewind is rejec
   }
 });
 
-for (const temporary of [false, true])
-  test(`deleting a ${temporary ? "temporary" : "retained"} chat settles its main and child activations before deleting it`, async () => {
+for (const ephemeral of [false, true])
+  test(`deleting ${ephemeral ? "an ephemeral" : "a saved"} chat settles its main and child activations before deleting it`, async () => {
     setOpenRouterApiKey("test");
     setOpenRouterScenario("async-agents");
     const { url, close } = await startTestServer();
     const headers = userHeaders(undefined, {
       "Content-Type": "application/json",
     });
-    const base = `${url}/api/${temporary ? "temporary-sessions" : "sessions"}`;
+    const base = `${url}/api/sessions`;
     const created = await fetch(base, {
       method: "POST",
       headers,
-      body: JSON.stringify({ model }),
+      body: JSON.stringify({ model, ephemeral }),
     });
     const { id } = (await created.json()) as { id: string };
     try {

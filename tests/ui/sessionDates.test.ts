@@ -12,6 +12,7 @@ function session(id: string, updatedAt: Date) {
     preview: id,
     createdAt: 0,
     updatedAt: updatedAt.getTime(),
+    expiresAt: null,
   };
 }
 

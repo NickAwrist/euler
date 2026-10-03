@@ -64,9 +64,8 @@ works. An e2e test covers the rejection.
 ### SEC-2. No authentication on filesystem and settings routes (High, M)
 
 **Where:** `src/userIdentity.ts`, `src/routes/directories.ts`,
-`src/routes/sessions.ts` and `src/routes/temporarySessions.ts`
-(`select-directory`), `src/routes/settings.ts` (API keys and OpenRouter
-publisher routes have no owner check).
+`src/routes/sessions.ts` (`select-directory`), `src/routes/settings.ts` (API keys
+and OpenRouter publisher routes have no owner check).
 
 **Problem:** Identity comes from the client. `/api/directories` lists any
 directory on the host. `select-directory` binds any readable and writable
@@ -98,9 +97,8 @@ development.
 ### SEC-4. Local workspace downloads bypass the stated policy (Medium, S)
 
 **Where:** `src/routes/sessions.ts` (`GET /:id/workspace/file` refuses local
-workspaces) and `src/routes/temporarySessions.ts` (`GET /:id/file`), compared
-with `src/routes/artifacts.ts` (`GET .../artifacts/download` serves local
-workspaces).
+workspaces), compared with `src/routes/artifacts.ts`
+(`GET .../artifacts/download` serves local workspaces).
 
 **Problem:** Two routes download workspace files with opposite rules for local
 directories, so the restriction gives no protection. See also `API-1`.
@@ -519,44 +517,6 @@ needed for import removal.
 
 ## 5. Architecture
 
-### ARCH-1. Temporary chats are a parallel implementation (High, L)
-
-**Where:**
-- `src/db/agents.ts`: `temporary`, `temporaryInbox`, `temporarySteps`,
-  `nextTemporaryId`, and the in-memory branches in nearly every method and
-  `checkpoint()`
-- `src/agents/runtime/AgentRuntime.ts`: `temporaryHistory`, the `temporary`
-  parameters, and the rollback handling in `atomically`
-- `src/jobs/JobManager.ts`: `host.temporary`
-- `src/workspaces/WorkspaceService.ts`: in-memory `temporaryLeases` and the
-  `*Temporary*` methods
-- `src/routes/temporarySessions.ts`, which duplicates select-directory,
-  use-sandbox, files, file, and reveal from `src/routes/sessions.ts`
-- `src/routes/agentActions.ts` and `src/routes/artifacts.ts` (`temporary`
-  parameter)
-- UI: the `temporary`/`isEphemeral` parameters throughout `ui/persist/*.ts`
-
-**Problem:** Every runtime path has a database variant and an in-memory variant,
-and each needs its own tests. Temporary chats also disappear on server restart,
-so an open temporary chat returns 404 after every deploy (see `UX-4`).
-
-**Fix:** Store temporary chats as normal `sessions` rows with
-`ephemeral INTEGER NOT NULL DEFAULT 0` and `expires_at INTEGER`. Exclude them
-from `listSessionSummaries`. Have the cleanup timer delete expired ones through
-`agentRuntime.deleteSession`. Then delete the in-memory variants,
-`temporarySessions.ts`, and the `temporary` parameters on server and client.
-Keep the user-facing behavior: no sidebar entry, deleted when the user leaves,
-expires after 24 hours.
-
-**Done when:** No `temporary`/`ephemeral` branches remain in `AgentStore`,
-`JobManager`, or the routes. The existing ephemeral browser tests pass, and a
-temporary chat survives a server restart until it expires.
-
-**Implementation note:** Decide the intended durability before applying this
-refactor. Database-backed expiry changes whether temporary contents are persisted.
-Restart survival is useful but is not established as a requirement by the current
-README. Preserve the agreed deletion/privacy behavior when consolidating storage.
-
 ### ARCH-2. `useRunApp` is a god hook (Medium, L)
 
 **Where:** `ui/hooks/useRunApp.ts` (returns about 95 fields), `ui/App.tsx`
@@ -575,8 +535,7 @@ any change touches `App.tsx`.
 - a model catalog hook (models, provider readiness; see `CONS-5`)
 - composer state local to `RunInputDock`
 
-Pass narrow props or use context. Do this after `ARCH-1`, which removes the
-ephemeral branches these hooks carry.
+Pass narrow props or use context.
 
 ### ARCH-3. Fragile route mounting order (Low, S)
 
@@ -643,8 +602,7 @@ from the schema, add a `CHECK` constraint on the column, and remove the cast.
 
 **Where:** `ui/lib/api.ts` (`userApiJson<T>` returns `response.json() as
 Promise<T>`, and `null as T`). Callers that trust the shape include
-`selectSessionDirectory`, `fetchWorkspaceFiles`, `createSessionApi`, and
-`createTemporarySessionApi` in `ui/persist/sessions.ts`.
+`selectSessionDirectory` and `fetchWorkspaceFiles` in `ui/persist/sessions.ts`.
 
 **Fix:** Make the JSON helpers take a Zod schema
 (`userApiJson(url, Schema, options)`) and return `z.infer` of it. Use a separate
@@ -752,8 +710,7 @@ write.
 ### API-1. Duplicate workspace file routes (Medium, S)
 
 **Where:** `GET /api/sessions/:id/workspace/files` and `/workspace/file`,
-`GET /api/temporary-sessions/:id/files` and `/file`, compared with
-`/workspace/artifacts/{tree,preview,download}`. The UI still uses both, through
+compared with `/workspace/artifacts/{tree,preview,download}`. The UI still uses both, through
 `ui/persist/sessions.ts` (`fetchWorkspaceFiles`, `downloadWorkspaceFile`) and
 `ui/components/Artifacts/api.ts`.
 
@@ -789,26 +746,22 @@ present. The schema already trims and validates the type.
 
 ### API-5. Workspace changes race with activation admission (High, M)
 
-**Where:** `src/routes/sessions.ts` (`POST /:id/workspace/use-sandbox`),
-`src/routes/temporarySessions.ts` (`select-directory`),
-`src/workspaces/WorkspaceService.ts` (`selectTemporaryDirectory`).
+**Where:** `src/routes/sessions.ts` (`POST /:id/workspace/use-sandbox`).
 
-**Problem:** Retained `use-sandbox` checks busy, awaits provisioning, then changes
-the workspace without another busy check. Temporary selection rechecks busy after
-canonicalization but then calls a service method that awaits canonicalization
-again before mutating the lease. A message can begin activation during those
-awaits, leaving the active tools on their previously resolved directory while
+**Problem:** `use-sandbox` checks busy, awaits provisioning, then changes the
+workspace without another busy check. A message can begin activation during that
+await, leaving the active tools on their previously resolved directory while
 the stored workspace and UI change. The asynchronous gaps are confirmed
 statically; concurrent execution was not reproduced during the audit.
 
 **Fix:** Put workspace transitions under a runtime-owned changing-session guard
 respected by message/job admission, deletion, and competing workspace changes.
-At minimum, perform the final busy check immediately before synchronous mutation
-and eliminate duplicate canonicalization. Preserve local workspace containment.
+At minimum, perform the final busy check immediately before synchronous mutation.
+Preserve local workspace containment.
 
 **Done when:** Barrier-controlled tests race workspace selection/use-sandbox
-against message admission and competing changes for retained and temporary chats.
-No activation can run in a workspace different from the committed selection.
+against message admission and competing changes. No activation can run in a
+workspace different from the committed selection.
 
 ---
 
@@ -876,7 +829,7 @@ job outputs, plus server RSS after many completed jobs and inactive owners.
 
 **Fix if confirmed:** Bound snapshots by entries/bytes and invalidate deleted
 chats. Release completed persisted job records when no active caller needs them,
-and expire inactive EventHub owners. Preserve replay and temporary-chat behavior.
+and expire inactive EventHub owners. Preserve replay behavior.
 The artifact preview cache and agent-store release logic provide existing
 patterns to reuse where appropriate.
 
@@ -982,11 +935,6 @@ before changing persistence and the tests that protect it.
 Fixed by `FE-2`. Users should see when Stop, a preference save, or the session
 list refresh fails.
 
-### UX-4. Temporary chats vanish after a server restart (Medium, L)
-
-Fixed by `ARCH-1`. Until then, show a clear "this temporary chat ended when the
-server restarted" message instead of a generic not-found error.
-
 ### UX-5. "Run" and "chat" are used for the same thing (Low, S)
 
 **Where:** `src/db/sessions.ts` (preview fallback `"New run"`), `ui/App.tsx`
@@ -1045,9 +993,8 @@ Add these with the related fixes:
 4. Requests with an unknown `Host` header are rejected (`SEC-1`).
 5. The local workspace download policy is enforced on the single download route
    (`SEC-4`, `API-1`).
-6. A temporary chat survives a restart and expires on schedule (`ARCH-1`).
-7. A failed Stop or preference save shows an error (`FE-2`).
-8. An OpenRouter 429 is retried, and a mid-stream error leaves a held, retryable
+6. A failed Stop or preference save shows an error (`FE-2`).
+7. An OpenRouter 429 is retried, and a mid-stream error leaves a held, retryable
    turn (`LLM-3`).
 
 ### TEST-4. Tests for removed behavior (Low, S)
@@ -1175,7 +1122,7 @@ invalid configured values cannot silently select a different port or limit.
 3. **Cleanup:** `LEG-1` through `LEG-9`, `TEST-4`, `DX-5`.
 4. **Safety net:** `TEST-1`, `TEST-2`.
 5. **Contracts:** `TYPE-1`, `TYPE-2`, `TYPE-3`.
-6. **Structural:** `ARCH-1`, then `ARCH-2` with `FE-1`.
+6. **Structural:** `ARCH-2` with `FE-1`.
 
 Include `LLM-6`, `LLM-7`, and `API-5` in the early reliability work, `OBS-5`
 with logging, and `TEST-6` with the safety net. Investigate `SEC-7` alongside the
