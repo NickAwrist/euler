@@ -169,16 +169,40 @@ test("fetchSessionSummaries parses valid sessions using SessionSummaryListSchema
   fetchSpy.mockResolvedValue(
     Response.json({
       sessions: [
-        { id: "s1", createdAt: 100, updatedAt: 200, preview: "Chat 1" },
-        { id: "s2", createdAt: 100, updatedAt: 500, preview: "Chat 2" },
+        {
+          id: "s1",
+          createdAt: 100,
+          updatedAt: 200,
+          preview: "Chat 1",
+          expiresAt: null,
+        },
+        {
+          id: "s2",
+          createdAt: 100,
+          updatedAt: 500,
+          preview: "Chat 2",
+          expiresAt: null,
+        },
       ],
     }),
   );
 
   const summaries = await fetchSessionSummaries();
   expect(summaries).toEqual([
-    { id: "s2", createdAt: 100, updatedAt: 500, preview: "Chat 2" },
-    { id: "s1", createdAt: 100, updatedAt: 200, preview: "Chat 1" },
+    {
+      id: "s2",
+      createdAt: 100,
+      updatedAt: 500,
+      preview: "Chat 2",
+      expiresAt: null,
+    },
+    {
+      id: "s1",
+      createdAt: 100,
+      updatedAt: 200,
+      preview: "Chat 1",
+      expiresAt: null,
+    },
   ]);
 });
 

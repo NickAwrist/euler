@@ -1,10 +1,10 @@
 import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
-import { workspaceService } from "../../src/workspaces/WorkspaceService";
 import { waitForActivation } from "../helpers/activation";
 import { TEST_USER_ID } from "../helpers/server";
 import "../setup";
 import { describe, expect, spyOn, test } from "bun:test";
 import {
+  createSessionRow,
   getOpenRouterApiKey,
   listOpenRouterModels,
   setOllamaHost,
@@ -315,10 +315,11 @@ describe("OpenRouter API integration", () => {
 
   test("validates model configuration before enqueueing a turn", async () => {
     const { url, close } = await startTestServer();
-    const lease = await workspaceService.createTemporary(TEST_USER_ID);
+    const id = crypto.randomUUID();
+    createSessionRow(TEST_USER_ID, id, Date.now(), null);
     try {
       const post = (model: string) =>
-        fetch(`${url}/api/temporary-sessions/${lease.id}/messages`, {
+        fetch(`${url}/api/sessions/${id}/messages`, {
           method: "POST",
           headers: userHeaders(undefined, {
             "Content-Type": "application/json",
@@ -329,12 +330,11 @@ describe("OpenRouter API integration", () => {
       expect((await post("openrouter:openai/gpt-5.6-terra")).status).toBe(400);
       setOpenRouterApiKey("sk-or-run-test");
       expect((await post("openrouter:openai/gpt-5.6-terra")).status).toBe(202);
-      const state = await waitForActivation(lease.id);
+      const state = await waitForActivation(id);
       expect(state.history?.at(-1)?.content).toBe("Hello from OpenRouter.");
       expect(getOpenRouterApiKey()).toBe("sk-or-run-test");
     } finally {
-      await agentRuntime.deleteSession(TEST_USER_ID, lease.id);
-      await workspaceService.deleteTemporary(TEST_USER_ID, lease.id);
+      await agentRuntime.deleteSession(TEST_USER_ID, id);
       await close();
     }
   });

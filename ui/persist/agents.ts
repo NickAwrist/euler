@@ -4,8 +4,8 @@ import { ActivationSchema } from "../../src/schemas/events";
 import { JobSchema } from "../../src/schemas/jobs";
 import { WireMessageSchema, WireStepSchema } from "../../src/schemas/run";
 import { apiJson, apiVoid } from "../lib/api";
-export const runtimePath = (id: string, temporary = false) =>
-  `/api/${temporary ? "temporary-sessions" : "sessions"}/${encodeURIComponent(id)}`;
+export const runtimePath = (id: string) =>
+  `/api/sessions/${encodeURIComponent(id)}`;
 export const RuntimeSnapshotSchema = z.object({
   sequence: z.number(),
   agents: z.array(AgentSchema),
@@ -16,27 +16,18 @@ export const RuntimeSnapshotSchema = z.object({
   history: z.array(WireMessageSchema).optional(),
 });
 export type RuntimeSnapshot = z.infer<typeof RuntimeSnapshotSchema>;
-export async function fetchRuntime(id: string, temporary = false) {
+export async function fetchRuntime(id: string) {
   return RuntimeSnapshotSchema.parse(
-    await apiJson(`${runtimePath(id, temporary)}/runtime`),
+    await apiJson(`${runtimePath(id)}/runtime`),
   );
 }
-export function agentAction(
-  id: string,
-  action: string,
-  json: unknown = {},
-  temporary = false,
-) {
-  return apiVoid(`${runtimePath(id, temporary)}/${action}`, {
+export function agentAction(id: string, action: string, json: unknown = {}) {
+  return apiVoid(`${runtimePath(id)}/${action}`, {
     method: "POST",
     json,
   });
 }
-export async function fetchAgent(
-  id: string,
-  agentId: string,
-  temporary = false,
-) {
+export async function fetchAgent(id: string, agentId: string) {
   return z
     .object({
       agent: AgentSchema,
@@ -44,25 +35,14 @@ export async function fetchAgent(
       messages: z.array(InboxMessageSchema),
     })
     .parse(
-      await apiJson(
-        `${runtimePath(id, temporary)}/agents/${encodeURIComponent(agentId)}`,
-      ),
+      await apiJson(`${runtimePath(id)}/agents/${encodeURIComponent(agentId)}`),
     );
 }
-export function cancelAgent(id: string, agentId: string, temporary = false) {
-  return agentAction(
-    id,
-    `agents/${encodeURIComponent(agentId)}/cancel`,
-    {},
-    temporary,
-  );
+export function cancelAgent(id: string, agentId: string) {
+  return agentAction(id, `agents/${encodeURIComponent(agentId)}/cancel`);
 }
-export function removeQueuedMessage(
-  id: string,
-  messageId: number,
-  temporary = false,
-) {
-  return apiVoid(`${runtimePath(id, temporary)}/messages/${messageId}`, {
+export function removeQueuedMessage(id: string, messageId: number) {
+  return apiVoid(`${runtimePath(id)}/messages/${messageId}`, {
     method: "DELETE",
   });
 }
@@ -71,9 +51,8 @@ export function editQueuedMessage(
   id: string,
   messageId: number,
   content: string,
-  temporary = false,
 ) {
-  return apiVoid(`${runtimePath(id, temporary)}/messages/${messageId}`, {
+  return apiVoid(`${runtimePath(id)}/messages/${messageId}`, {
     method: "PATCH",
     json: { content },
   });

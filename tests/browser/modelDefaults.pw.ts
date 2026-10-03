@@ -41,7 +41,7 @@ async function mockApp(
       JSON.stringify({ defaultModel }),
     );
   }, saved);
-  const created: Array<{ model?: string }> = [];
+  const created: Array<{ model?: string; ephemeral?: boolean }> = [];
   let sessionModel: string | null = null;
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -49,10 +49,17 @@ async function mockApp(
     if (path === "/api/models")
       return route.fulfill({ json: { models: await catalog() } });
     if (path === "/api/sessions" && method === "POST") {
-      const body = route.request().postDataJSON() as { model?: string };
+      const body = route.request().postDataJSON() as {
+        model?: string;
+        ephemeral?: boolean;
+      };
       created.push(body);
+      if (body.ephemeral)
+        return route.fulfill({
+          json: { id: "ephemeral", expiresAt: Date.now() + 5.5 * 3_600_000 },
+        });
       sessionModel = body.model ?? null;
-      return route.fulfill({ json: { id: "new", createdAt: 1, updatedAt: 1 } });
+      return route.fulfill({ json: { id: "new", expiresAt: null } });
     }
     if (path === "/api/sessions/new" && method === "PATCH") {
       sessionModel = (route.request().postDataJSON() as { model: string })
@@ -62,26 +69,24 @@ async function mockApp(
       path === "/api/sessions"
         ? { sessions: [] }
         : path === "/api/sessions/new"
-          ? { id: "new", model: sessionModel, history: [] }
-          : path === "/api/temporary-sessions"
-            ? { id: "temporary" }
-            : path.endsWith("/runtime")
-              ? {
-                  agents: [],
-                  activation: null,
-                  queued: [],
-                  held: false,
-                  sequence: 0,
-                  history: [],
-                }
-              : path.endsWith("/health")
-                ? { connected: true }
-                : path === "/api/settings/environment"
-                  ? {
-                      ollamaHost: false,
-                      comfyuiHost: false,
-                    }
-                  : {};
+          ? { id: "new", model: sessionModel, history: [], expiresAt: null }
+          : path.endsWith("/runtime")
+            ? {
+                agents: [],
+                activation: null,
+                queued: [],
+                held: false,
+                sequence: 0,
+                history: [],
+              }
+            : path.endsWith("/health")
+              ? { connected: true }
+              : path === "/api/settings/environment"
+                ? {
+                    ollamaHost: false,
+                    comfyuiHost: false,
+                  }
+                : {};
     return route.fulfill({ json });
   });
   return created;
@@ -91,14 +96,10 @@ test("model defaults desktop: unavailable preference matches settings, new chats
   page,
 }) => {
   const created = await mockApp(page, "removed", async () => models);
-  const deletedTemporarySessions: string[] = [];
+  const deleted: string[] = [];
   page.on("request", (request) => {
-    if (
-      request.method() === "DELETE" &&
-      new URL(request.url()).pathname.startsWith("/api/temporary-sessions/")
-    ) {
-      deletedTemporarySessions.push(request.url());
-    }
+    if (request.method() === "DELETE")
+      deleted.push(new URL(request.url()).pathname);
   });
   await mockUserPreferences(page);
   await page.goto("/");
@@ -132,19 +133,24 @@ test("model defaults desktop: unavailable preference matches settings, new chats
   await expect(
     page.getByRole("button", { name: "Model: Remote", exact: true }),
   ).toBeVisible();
-  await page.getByTitle("Ephemeral chat - not saved").click();
+  await page.getByTitle("Ephemeral chat - deleted automatically").click();
   await expect(
     page.getByRole("button", { name: "Model: Local", exact: true }),
   ).toBeVisible();
+  expect(created.at(-1)).toEqual({ ephemeral: true });
+  const badge = page.getByTitle(
+    "Messages and files are deleted when this chat expires.",
+  );
   await page.getByPlaceholder("Send a message...").fill("Ephemeral draft");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(page).toHaveURL(/\/settings\/general$/);
   await page.goBack();
-  await expect(page.getByText("Ephemeral", { exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/run\/ephemeral$/);
+  await expect(badge).toBeVisible();
   await expect(page.getByPlaceholder("Send a message...")).toHaveValue(
     "Ephemeral draft",
   );
-  expect(deletedTemporarySessions).toEqual([]);
+  expect(deleted).not.toContain("/api/sessions/ephemeral");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Model: Local", exact: true }).click();
   await page.getByRole("tab", { name: "Test" }).click();
@@ -159,11 +165,11 @@ test("model defaults desktop: unavailable preference matches settings, new chats
     page.getByRole("button", { name: "Save settings", exact: true }),
   ).toBeHidden();
   await page.getByRole("button", { name: "Back to chat" }).click();
-  await expect(page.getByText("Ephemeral", { exact: true })).toBeVisible();
+  await expect(badge).toBeVisible();
   await expect(page.getByPlaceholder("Send a message...")).toHaveValue(
     "Ephemeral draft",
   );
-  expect(deletedTemporarySessions).toEqual([]);
+  expect(deleted).not.toContain("/api/sessions/ephemeral");
   await page
     .getByRole("button", { name: "New chat", exact: true })
     .first()

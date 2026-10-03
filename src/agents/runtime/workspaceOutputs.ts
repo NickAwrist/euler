@@ -10,7 +10,6 @@ export async function changedWorkspaceFiles(
   workspace: Workspace,
   paths: ReadonlySet<string>,
   sessionId: string,
-  temporary: boolean,
 ): Promise<WorkspaceFileAttachment[]> {
   const files = new Map<string, WorkspaceFileAttachment>();
   for (const requested of paths) {
@@ -32,7 +31,6 @@ export async function changedWorkspaceFiles(
         size: stat.size,
         sessionId,
         workspaceKind: workspace.kind,
-        temporary,
       });
     } catch {
       // Deleted or inaccessible outputs cannot be attached.

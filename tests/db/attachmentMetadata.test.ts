@@ -28,7 +28,6 @@ test("legacy attachment migration removes embedded bytes without changing histor
     path: "output.txt",
     sessionId: "session",
     workspaceKind: "sandbox",
-    temporary: false,
   };
   db.run("INSERT INTO messages VALUES (1, 'original text', ?)", [
     JSON.stringify([

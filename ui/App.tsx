@@ -15,6 +15,7 @@ import { CustomizationPage } from "./components/CustomizationPage";
 import { DebugModal } from "./components/DebugModal";
 import { DirectoryModal } from "./components/DirectoryModal";
 import { shouldShowStepsModal } from "./components/ExecutionTrace";
+import { ExpiresIn } from "./components/ExpiresIn";
 import { JobContext } from "./components/Jobs/JobContext";
 import { JobTraceModal } from "./components/Jobs/JobTraceModal";
 import { JobsList } from "./components/Jobs/JobsList";
@@ -93,7 +94,7 @@ function ChatView({
   const selectedJob = app.jobs.find((job) => job.id === selectedJobId);
   const stopJob = async (id: string) => {
     if (app.activeSessionId) {
-      await cancelJob(app.activeSessionId, id, app.isEphemeral);
+      await cancelJob(app.activeSessionId, id);
       await app.refreshRuntime();
     }
   };
@@ -101,7 +102,7 @@ function ChatView({
   const selectedAgent = app.agents.find((a) => a.id === selectedAgentId);
   const stopAgent = async (id: string) => {
     if (app.activeSessionId) {
-      await cancelAgent(app.activeSessionId, id, app.isEphemeral);
+      await cancelAgent(app.activeSessionId, id);
       await app.refreshRuntime();
     }
   };
@@ -170,8 +171,8 @@ function ChatView({
     if (!app.runPending) setRevision((value) => value + 1);
   }, [app.runPending]);
   const source = useMemo(
-    () => workspaceArtifactSource(app.activeSessionId ?? "", app.isEphemeral),
-    [app.activeSessionId, app.isEphemeral],
+    () => workspaceArtifactSource(app.activeSessionId ?? ""),
+    [app.activeSessionId],
   );
   const hasFiles = useWorkspaceHasFiles(
     source,
@@ -274,7 +275,6 @@ function ChatView({
       Boolean(app.renameSessionId) ||
       app.truncateConfirm != null ||
       Boolean(app.pendingDeleteSessionId) ||
-      app.ephemeralExitPromptOpen ||
       directoryOpen ||
       app.debugOpen ||
       stepsModalOpen,
@@ -405,9 +405,9 @@ function ChatView({
                   <Bug size={16} />
                 </button>
               )}
-              {app.isEphemeral && (
+              {app.activeExpiresAt !== null && (
                 <span
-                  title="Not saved. Messages and files are deleted when you leave."
+                  title="Messages and files are deleted when this chat expires."
                   // Keep clear of the chat list, which may overlay the chat.
                   style={{
                     left:
@@ -419,6 +419,10 @@ function ChatView({
                 >
                   <EyeOff size={12} />
                   Ephemeral
+                  <ExpiresIn
+                    expiresAt={app.activeExpiresAt}
+                    className="font-normal normal-case tracking-normal text-muted-foreground"
+                  />
                 </span>
               )}
 
@@ -456,14 +460,11 @@ function ChatView({
                   </div>
                 ) : (
                   <WelcomeHome
-                    key={
-                      app.activeSessionId ??
-                      (app.isEphemeral ? "ephemeral" : "home")
-                    }
+                    key={app.activeSessionId ?? "home"}
                     name={app.userSettings.name}
                     sessions={app.sessions}
                     home={!app.activeSessionId}
-                    ephemeral={app.isEphemeral}
+                    ephemeral={app.activeExpiresAt !== null}
                     composerHeight={runFooterInset}
                     onNewEphemeralRun={app.createEphemeralSession}
                     onOpenSession={app.switchToSession}
@@ -481,7 +482,6 @@ function ChatView({
                       />
                       <QueuedMessages
                         sessionId={app.activeSessionId}
-                        temporary={app.isEphemeral}
                         messages={app.queuedMessages}
                         held={app.heldUpdates}
                         refresh={app.refreshRuntime}
@@ -565,7 +565,6 @@ function ChatView({
           {selectedAgent && app.activeSessionId && (
             <AgentTraceModal
               sessionId={app.activeSessionId}
-              temporary={app.isEphemeral}
               agent={selectedAgent}
               onClose={() => setSelectedAgentId(null)}
             />
@@ -574,7 +573,6 @@ function ChatView({
             <JobTraceModal
               key={selectedJob.id}
               sessionId={app.activeSessionId}
-              temporary={app.isEphemeral}
               job={selectedJob}
               onClose={() => setSelectedJobId(null)}
             />
@@ -596,7 +594,7 @@ export default function App() {
     return () => window.removeEventListener(NAVIGATION_EVENT, update);
   }, []);
   const backToChat = () => {
-    void navigate(sessionPath(app.isEphemeral ? null : app.activeSessionId));
+    void navigate(sessionPath(app.activeSessionId));
   };
 
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
@@ -767,15 +765,6 @@ export default function App() {
             onConfirm={app.performDeleteSession}
           />
         )}
-        {app.ephemeralExitPromptOpen && (
-          <TruncateConfirmModal
-            title="Discard this ephemeral chat?"
-            description="This chat is not saved. Its messages and files will be permanently deleted. This cannot be undone."
-            confirmLabel="Discard"
-            onClose={() => app.resolveEphemeralExit(false)}
-            onConfirm={() => app.resolveEphemeralExit(true)}
-          />
-        )}
         {directoryOpen && (
           <DirectoryModal
             initialPath={
@@ -789,7 +778,6 @@ export default function App() {
           <WorkspaceModal
             sessionId={app.activeSessionId}
             workspace={app.workspace}
-            temporary={app.isEphemeral}
             onClose={() => setWorkspaceOpen(false)}
           />
         )}

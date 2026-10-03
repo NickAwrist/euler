@@ -91,7 +91,7 @@ primary checkout has no dependencies installed.
 New worktrees copy the primary checkout's SQLite database and retained workspaces.
 The database snapshot includes committed WAL data. Existing destination data is
 preserved, and rerunning setup with an existing `.env` does not copy data again.
-Temporary workspaces and trash are not copied. Environment values
+Workspace trash is not copied. Environment values
 in `.env` take precedence over copied Settings values, including in existing worktrees.
 The primary database and existing worktrees are unchanged. Service endpoints,
 environment API keys, and `EULER_HOST_DIRECTORY` are copied unchanged. Open `/` on your configured Vite
@@ -149,10 +149,10 @@ listing, and scans open path components without following symlinks. Deletes use
 an open parent directory and unlink the final entry without following it. Ignore
 rules are read only from within the workspace through the same protected access.
 
-Temporary workspaces expire after 24 hours. The server checks for expired leases
-and abandoned directories every minute, deferring deletion during active turns.
-Leaving a temporary chat requests deletion immediately. Selected local directories
-are never removed by temporary workspace cleanup.
+Ephemeral chats expire after 24 hours, or `EULER_EPHEMERAL_CHAT_TTL_HOURS`. The
+server checks for expired chats every minute, deferring deletion during active
+turns, and permanently deletes their messages, agents, jobs, and sandbox without
+moving it to the trash. Selected local directories are never removed.
 
 The sandbox integration tests report skips when Bubblewrap is unavailable. Run
 `bun test --preload ./tests/setup.ts tests/sandbox` on a Linux host with working

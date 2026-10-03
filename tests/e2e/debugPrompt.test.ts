@@ -2,8 +2,11 @@ import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
 import { waitForActivation } from "../helpers/activation";
 import "../setup";
 import { expect, test } from "bun:test";
-import { createSkillRow, setOpenRouterApiKey } from "../../src/db";
-import { workspaceService } from "../../src/workspaces/WorkspaceService";
+import {
+  createSessionRow,
+  createSkillRow,
+  setOpenRouterApiKey,
+} from "../../src/db";
 import { getOpenRouterRequests } from "../helpers/mockOpenRouter";
 import { TEST_USER_ID, startTestServer, userHeaders } from "../helpers/server";
 
@@ -74,7 +77,8 @@ for (const includeCurrentDate of [undefined, false]) {
   test(`run sends the same custom prompt as the preview with date ${includeCurrentDate === false ? "disabled" : "defaulted"}`, async () => {
     const { url, close } = await startTestServer();
     setOpenRouterApiKey("sk-or-prompt-test");
-    const lease = await workspaceService.createTemporary(TEST_USER_ID);
+    const id = crypto.randomUUID();
+    createSessionRow(TEST_USER_ID, id, Date.now(), null);
     try {
       const skill = createSkillRow(TEST_USER_ID, {
         name: "prompt-check",
@@ -84,8 +88,7 @@ for (const includeCurrentDate of [undefined, false]) {
         disable_model_invocation: false,
       });
       const input = {
-        sessionId: lease.id,
-        ephemeral: true,
+        sessionId: id,
         message: "Use $prompt-check",
         metadata: {
           systemPrompt:
@@ -108,22 +111,19 @@ for (const includeCurrentDate of [undefined, false]) {
       );
       expect(systemPrompt).toStartWith("Follow these instructions.");
       expect(systemPrompt).toContain("<tool_format>");
-      const run = await fetch(
-        `${url}/api/temporary-sessions/${lease.id}/messages`,
-        {
-          method: "POST",
-          headers: userHeaders(undefined, {
-            "Content-Type": "application/json",
-          }),
-          body: JSON.stringify({
-            content: input.message,
-            metadata: input.metadata,
-            model: "openrouter:openai/gpt-5.4-mini",
-          }),
-        },
-      );
+      const run = await fetch(`${url}/api/sessions/${id}/messages`, {
+        method: "POST",
+        headers: userHeaders(undefined, {
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({
+          content: input.message,
+          metadata: input.metadata,
+          model: "openrouter:openai/gpt-5.4-mini",
+        }),
+      });
       expect(run.status).toBe(202);
-      await waitForActivation(lease.id);
+      await waitForActivation(id);
       expect(getOpenRouterRequests()).toHaveLength(1);
       const messages = getOpenRouterRequests()[0]!.body.messages as Array<{
         role: string;
@@ -131,19 +131,17 @@ for (const includeCurrentDate of [undefined, false]) {
       }>;
       expect(messages[0]).toEqual({ role: "system", content: systemPrompt });
     } finally {
-      await agentRuntime.deleteSession(TEST_USER_ID, lease.id);
-      await workspaceService.deleteTemporary(TEST_USER_ID, lease.id);
+      await agentRuntime.deleteSession(TEST_USER_ID, id);
       await close();
     }
   });
 }
 
-test("debug preview rejects invalid sessions and expired workspaces", async () => {
+test("debug preview rejects invalid sessions and metadata", async () => {
   const { url, close } = await startTestServer();
   try {
     for (const [body, status] of [
       [{ sessionId: "missing-session" }, 404],
-      [{ sessionId: "expired-lease", ephemeral: true }, 400],
       [{ metadata: { includeCurrentDate: "false" } }, 400],
     ] as const) {
       const response = await fetch(`${url}/api/sessions/debug-prompt`, {

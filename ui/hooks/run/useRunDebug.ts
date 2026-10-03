@@ -7,15 +7,10 @@ import type { DebugData } from "../../types";
 
 type Args = {
   userSettingsRef: MutableRefObject<UserSettings>;
-  isEphemeralRef: MutableRefObject<boolean>;
   setDebugData: (data: DebugData | null) => void;
 };
 
-export function useRunDebug({
-  userSettingsRef,
-  isEphemeralRef,
-  setDebugData,
-}: Args) {
+export function useRunDebug({ userSettingsRef, setDebugData }: Args) {
   return useCallback(
     async (sessionId: string, message = "") => {
       try {
@@ -26,14 +21,9 @@ export function useRunDebug({
           userScopedFetch("/api/sessions/debug-prompt", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sessionId,
-              metadata,
-              message,
-              ephemeral: isEphemeralRef.current,
-            }),
+            body: JSON.stringify({ sessionId, metadata, message }),
           }),
-          isEphemeralRef.current ? null : fetchSession(sessionId),
+          fetchSession(sessionId),
         ]);
 
         if (!promptRes.ok) {
@@ -61,6 +51,6 @@ export function useRunDebug({
         });
       }
     },
-    [isEphemeralRef, setDebugData, userSettingsRef],
+    [setDebugData, userSettingsRef],
   );
 }

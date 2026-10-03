@@ -21,19 +21,15 @@ import ollamaRoutes from "./routes/ollama";
 import sessionRoutes from "./routes/sessions";
 import settingsRoutes from "./routes/settings";
 import skillsRoutes from "./routes/skills";
-import temporarySessionRoutes from "./routes/temporarySessions";
 import usageRoutes from "./routes/usage";
+import { startSessionExpiry } from "./sessions/lifecycle";
 import { requireUserId } from "./userIdentity";
 import { workspaceService } from "./workspaces/WorkspaceService";
 
 getDb();
-workspaceService.setAgentLifecycle({
-  isBusy: (owner, session) => agentRuntime.busy(owner, session),
-  onExpire: (owner, session, remove) =>
-    agentRuntime.deleteSession(owner, session, remove),
-});
 // Recover before the server accepts requests so no live turn looks interrupted.
 agentRuntime.recover();
+startSessionExpiry();
 void workspaceService.initialize();
 
 const DEFAULT_FRONTEND_PORTS = [5173, 5174];
@@ -65,7 +61,6 @@ app.use("/api/ollama", ollamaRoutes);
 app.use("/api/models", modelsRoutes);
 app.use("/api/sessions", debugPromptRoutes);
 app.use("/api/sessions", sessionRoutes);
-app.use("/api/temporary-sessions", temporarySessionRoutes);
 app.get("/api/events", (req, res) => {
   const owner = requireUserId(req, res);
   if (owner)

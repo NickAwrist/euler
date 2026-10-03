@@ -111,7 +111,6 @@ export default function AgentsDemo() {
         {agent && (
           <AgentTraceModal
             sessionId="fixture"
-            temporary={false}
             agent={agent}
             onClose={() => setSelected(null)}
           />

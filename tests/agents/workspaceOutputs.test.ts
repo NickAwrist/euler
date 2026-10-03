@@ -39,7 +39,6 @@ test("attaches only tool-reported paths without scanning or leaking outside the 
       workspace,
       ctx.writtenFiles,
       "chat",
-      false,
     );
     expect(files.map((file) => file.path)).toEqual(["mine.txt"]);
     expect(scan).not.toHaveBeenCalled();

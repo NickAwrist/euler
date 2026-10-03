@@ -186,7 +186,7 @@ test("stress: admission, bounded logs, failures, descendant cancellation, rewind
   }
 }, 20000);
 
-test("temporary jobs survive reply completion and stop cancels them without waking the agent", async () => {
+test("ephemeral chat jobs persist, survive reply completion, and stop cancels them without waking the agent", async () => {
   setOpenRouterApiKey("test");
   setOpenRouterScenario("background-jobs");
   const { url, close } = await startTestServer();
@@ -196,10 +196,10 @@ test("temporary jobs survive reply completion and stop cancels them without waki
   const post = (path: string, json: unknown = {}) =>
     fetch(url + path, { method: "POST", headers, body: JSON.stringify(json) });
   const { id } = (await (
-    await post("/api/temporary-sessions", { model })
+    await post("/api/sessions", { model, ephemeral: true })
   ).json()) as { id: string };
   try {
-    await post(`/api/temporary-sessions/${id}/messages`, {
+    await post(`/api/sessions/${id}/messages`, {
       content: "command:echo START; sleep 30",
       model,
     });
@@ -215,14 +215,14 @@ test("temporary jobs survive reply completion and stop cancels them without waki
           "SELECT count(*) AS count FROM jobs WHERE session_id=?",
         )
         .get(id)?.count,
-    ).toBe(0);
-    await post(`/api/temporary-sessions/${id}/stop`);
+    ).toBe(1);
+    await post(`/api/sessions/${id}/stop`);
     expect(agentRuntime.jobs.list(TEST_USER_ID, id)[0]?.status).toBe(
       "cancelled",
     );
     expect(
       agentRuntime.store
-        .inbox(agentRuntime.main(TEST_USER_ID, id, true).id)
+        .inbox(agentRuntime.main(TEST_USER_ID, id).id)
         .filter((m) => m.kind === "job"),
     ).toHaveLength(0);
   } finally {

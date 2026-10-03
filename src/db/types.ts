@@ -20,6 +20,8 @@ export type SessionRow = {
   model: string | null;
   session_directory: string | null;
   workspace_kind: "sandbox" | "local";
+  /** When an ephemeral chat is deleted; null for saved chats. */
+  expires_at: number | null;
 };
 
 export type SessionSummaryRow = {
@@ -29,6 +31,7 @@ export type SessionSummaryRow = {
   title: string | null;
   unread: boolean;
   preview: string;
+  expires_at: number | null;
 };
 
 export type OpenRouterModel = {

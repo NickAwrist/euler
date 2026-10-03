@@ -22,14 +22,15 @@ import {
   RevealFileSchema,
 } from "../schemas/sessions";
 import { SelectDirectorySchema } from "../schemas/workspace";
+import { deleteSession, ephemeralExpiry } from "../sessions/lifecycle";
 import { requireUserId } from "../userIdentity";
 import { workspaceService } from "../workspaces/WorkspaceService";
 import { agentActions } from "./agentActions";
 import { artifactRoutes } from "./artifacts";
 
 const router = Router();
-router.use(agentActions(false));
-router.use("/:id/workspace/artifacts", artifactRoutes(false));
+router.use(agentActions());
+router.use("/:id/workspace/artifacts", artifactRoutes());
 
 router.post("/:id/workspace/select-directory", async (req, res) => {
   const ownerUuid = requireUserId(req, res);
@@ -194,6 +195,7 @@ router.get("/", (req, res) => {
       customTitle: r.title,
       preview: r.preview,
       badge: working.has(r.id) ? "working" : r.unread ? "unread" : null,
+      expiresAt: r.expires_at,
     })),
   });
 });
@@ -219,6 +221,7 @@ router.get("/:id", (req, res) => {
     ),
     model: row.model,
     workspace: workspaceService.presentation(row),
+    expiresAt: row.expires_at,
   });
 });
 
@@ -233,7 +236,8 @@ router.post("/", async (req, res) => {
   const id = crypto.randomUUID();
   const now = Date.now();
   const model = parsed.data.model?.trim() || null;
-  createSessionRow(ownerUuid, id, now, model);
+  const expiresAt = parsed.data.ephemeral ? ephemeralExpiry(now) : null;
+  createSessionRow(ownerUuid, id, now, model, expiresAt);
   try {
     await workspaceService.provisionRetained(ownerUuid, id);
   } catch (error) {
@@ -241,7 +245,7 @@ router.post("/", async (req, res) => {
     throw error;
   }
   agentRuntime.main(ownerUuid, id);
-  res.status(201).json({ id, createdAt: now, updatedAt: now });
+  res.status(201).json({ id, createdAt: now, updatedAt: now, expiresAt });
 });
 
 router.patch("/:id", (req, res) => {
@@ -284,10 +288,7 @@ router.delete("/:id", async (req, res) => {
     sendError(res, "NOT_FOUND", "Session not found");
     return;
   }
-  const ok = await agentRuntime.deleteSession(ownerUuid, row.id, async () => {
-    await workspaceService.trashRetained(ownerUuid, row.id);
-    return deleteSessionRow(ownerUuid, row.id);
-  });
+  const ok = await deleteSession(row);
   if (!ok) {
     sendError(res, "NOT_FOUND", "Session not found");
     return;

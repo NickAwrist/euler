@@ -32,7 +32,6 @@ export class JobManager {
   >();
   constructor(
     private host: {
-      temporary(sessionId: string): boolean;
       blocked(sessionId: string): boolean;
       notify(job: Job, wakes: boolean): void;
       changed(job: Job): void;
@@ -50,23 +49,21 @@ export class JobManager {
       .parse(process.env.EULER_MAX_OWNER_JOBS ?? 16),
   ) {}
   private save(job: Job) {
-    if (!this.host.temporary(job.sessionId))
-      getDb().run(
-        "INSERT INTO jobs VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",
-        [job.id, job.sessionId, job.ownerUuid, JSON.stringify(job)],
-      );
+    getDb().run(
+      "INSERT INTO jobs VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload",
+      [job.id, job.sessionId, job.ownerUuid, JSON.stringify(job)],
+    );
     this.records.set(job.id, job);
   }
   list(owner: string, sessionId: string) {
-    if (!this.host.temporary(sessionId))
-      for (const row of getDb()
-        .query<{ id: string; payload: string }, [string, string]>(
-          "SELECT id, payload FROM jobs WHERE owner_uuid=? AND session_id=?",
-        )
-        .all(owner, sessionId)) {
-        if (!this.records.has(row.id))
-          this.records.set(row.id, JobSchema.parse(JSON.parse(row.payload)));
-      }
+    for (const row of getDb()
+      .query<{ id: string; payload: string }, [string, string]>(
+        "SELECT id, payload FROM jobs WHERE owner_uuid=? AND session_id=?",
+      )
+      .all(owner, sessionId)) {
+      if (!this.records.has(row.id))
+        this.records.set(row.id, JobSchema.parse(JSON.parse(row.payload)));
+    }
     return [...this.records.values()].filter(
       (j) => j.ownerUuid === owner && j.sessionId === sessionId,
     );
@@ -171,7 +168,6 @@ export class JobManager {
               workspace,
               new Set(result.outputFiles ?? []),
               sessionId,
-              this.host.temporary(sessionId),
             );
             job.result.attachments = [...(result.attachments ?? []), ...files];
           }
@@ -284,11 +280,10 @@ export class JobManager {
   }
   remove(owner: string, sessionId: string) {
     for (const job of this.list(owner, sessionId)) this.records.delete(job.id);
-    if (!this.host.temporary(sessionId))
-      getDb().run("DELETE FROM jobs WHERE session_id=? AND owner_uuid=?", [
-        sessionId,
-        owner,
-      ]);
+    getDb().run("DELETE FROM jobs WHERE session_id=? AND owner_uuid=?", [
+      sessionId,
+      owner,
+    ]);
   }
   recover() {
     for (const row of getDb()

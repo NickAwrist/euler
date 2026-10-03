@@ -2,6 +2,7 @@ const DEFAULT_BACKEND_PORT = 3000;
 const DEFAULT_FRONTEND_PORT = 5174;
 const DEFAULT_BACKEND_HOST = "127.0.0.1";
 const DEFAULT_MAX_RUNNING_AGENTS = 4;
+const DEFAULT_EPHEMERAL_CHAT_TTL_HOURS = 24;
 export const DEFAULT_COMFYUI_HOST = "http://127.0.0.1:8188";
 
 function getEnv(name: string): string {
@@ -61,6 +62,11 @@ export const envConfig = {
   maxRunningAgents: getPositiveInteger(
     ["EULER_MAX_RUNNING_AGENTS"],
     DEFAULT_MAX_RUNNING_AGENTS,
+  ),
+  /** Hours until an ephemeral chat and its workspace are deleted. */
+  ephemeralChatTtlHours: getPositiveInteger(
+    ["EULER_EPHEMERAL_CHAT_TTL_HOURS"],
+    DEFAULT_EPHEMERAL_CHAT_TTL_HOURS,
   ),
   openrouterApiKey: getFirstEnv([
     "OPENROUTER_API_KEY",

@@ -11,10 +11,9 @@ import { ToolContentView } from "./ToolContentView";
 
 export function JobTraceModal({
   sessionId,
-  temporary,
   job,
   onClose,
-}: { sessionId: string; temporary: boolean; job: Job; onClose: () => void }) {
+}: { sessionId: string; job: Job; onClose: () => void }) {
   const [detail, setDetail] = useState<Job | null>(null);
   const [error, setError] = useState<Diagnostic | null>(null);
   useEffect(() => {
@@ -23,12 +22,7 @@ export function JobTraceModal({
     const refresh = async () => {
       let polling = activeJob(job);
       try {
-        const updated = await fetchJob(
-          sessionId,
-          job.id,
-          temporary,
-          controller.signal,
-        );
+        const updated = await fetchJob(sessionId, job.id, controller.signal);
         if (!controller.signal.aborted) {
           setDetail(updated);
           setError(null);
@@ -45,7 +39,7 @@ export function JobTraceModal({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [sessionId, temporary, job.id, job.status]);
+  }, [sessionId, job.id, job.status]);
   const current = detail ?? job;
   const running = activeJob(current);
   return (

@@ -112,6 +112,7 @@ for (const device of ["desktop", "mobile"] as const) {
                       preview: "Selector test",
                       createdAt: 1,
                       updatedAt: 1,
+                      expiresAt: null,
                     },
                   ],
                 }

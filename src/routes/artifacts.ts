@@ -9,21 +9,18 @@ import {
   readArtifactPreview,
 } from "../workspaces/artifacts";
 
-export function artifactRoutes(temporary: boolean) {
+export function artifactRoutes() {
   const router = Router({ mergeParams: true });
   for (const action of ["tree", "preview", "download"] as const) {
     router.get(`/${action}`, async (req, res) => {
       const owner = requireUserId(req, res);
       if (!owner) return;
-      const id = (req.params as { id: string }).id;
-      const row = temporary ? null : getSessionById(owner, id);
-      if (!temporary && !row) {
+      const row = getSessionById(owner, (req.params as { id: string }).id);
+      if (!row) {
         sendError(res, "NOT_FOUND", "Session not found");
         return;
       }
-      const workspace = row
-        ? await workspaceService.resolveSession(row)
-        : await workspaceService.resolveTemporary(owner, id);
+      const workspace = await workspaceService.resolveSession(row);
       const path = typeof req.query.path === "string" ? req.query.path : ".";
       res.setHeader("Cache-Control", "no-store");
       if (action === "download") {

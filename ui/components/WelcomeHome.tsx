@@ -66,7 +66,7 @@ export function WelcomeHome({
           className={`m-0 max-w-[40ch] leading-[1.6] text-muted-foreground ${ephemeral ? "text-[0.9375rem]" : "text-[0.75rem]"}`}
         >
           {ephemeral
-            ? "Nothing here is saved. Messages and files are deleted when you leave."
+            ? "This chat, its messages, and its files are deleted when it expires."
             : "Type / for commands or $ to use a skill."}
         </p>
       </div>

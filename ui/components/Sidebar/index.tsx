@@ -56,7 +56,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={onNewEphemeralSession}
-            title="Ephemeral chat - not saved"
+            title="Ephemeral chat - deleted automatically"
             className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/5 px-2.5 py-2 text-[0.8125rem] font-semibold text-amber-400 transition-[color,background-color,border-color,transform] duration-150 ease-out hover:border-amber-500/35 hover:bg-amber-500/10 active:scale-[0.99] active:bg-amber-500/15"
           >
             <EyeOff size={16} />
