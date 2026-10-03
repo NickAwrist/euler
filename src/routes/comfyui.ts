@@ -16,9 +16,8 @@ import {
 import { envConfig } from "../env";
 import { asyncRoute } from "../http/asyncRoute";
 import { canEditEnvironmentSetting } from "../http/environmentSettings";
-import { sendApiError } from "../http/errors";
-import { sendValidationError } from "../http/validation";
-import { logger } from "../logger";
+import { sendError, sendValidationError } from "../observability/http";
+import { logEvent } from "../observability/logger";
 import {
   ComfyUIConfigPutSchema,
   ComfyUITestBodySchema,
@@ -28,7 +27,6 @@ import { requireUserId } from "../userIdentity";
 import { errorMessage } from "../utils/errors";
 
 const router = Router();
-const log = logger.child({ route: "comfyui" });
 
 // Checking the health of the ComfyUI server.
 router.get("/health", async (_req, res) => {
@@ -37,7 +35,7 @@ router.get("/health", async (_req, res) => {
     const result = await client.healthCheck();
     res.json({ connected: result.ok, error: result.error });
   } catch (e) {
-    log.error({ err: e }, "comfyui health");
+    logEvent("warn", "comfyui.unavailable", { stage: "health" }, e);
     res.json({
       connected: false,
       error: errorMessage(e),
@@ -100,7 +98,7 @@ router.get("/models", async (_req, res) => {
     const models = await client.getModels();
     res.json({ models });
   } catch (e) {
-    log.error({ err: e }, "comfyui models");
+    logEvent("warn", "comfyui.unavailable", { stage: "models" }, e);
     res.json({ models: [], error: errorMessage(e) });
   }
 });
@@ -112,47 +110,38 @@ router.get(
     const rawFilename = req.params.filename;
     const filename = Array.isArray(rawFilename) ? rawFilename[0] : rawFilename;
     if (!filename) {
-      sendApiError(res, 400, "BAD_REQUEST", "filename is required");
+      sendError(res, "INVALID_REQUEST", "filename is required");
       return;
     }
     const q = ComfyUIViewQuerySchema.safeParse(req.query);
     if (!q.success) {
-      sendValidationError(res, q.error, "Invalid query");
+      sendValidationError(res, q.error);
       return;
     }
     const { subfolder, type } = q.data;
 
-    try {
-      const client = getComfyUIClient();
-      const upstream = await client.fetchViewAsset(filename, subfolder, type);
-      if (!upstream.ok) {
-        sendApiError(
-          res,
-          upstream.status,
-          "UPSTREAM_ERROR",
-          `ComfyUI returned ${upstream.status}`,
-        );
-        return;
-      }
+    const client = getComfyUIClient();
+    const upstream = await client.fetchViewAsset(filename, subfolder, type);
+    if (!upstream.ok) {
+      logEvent("warn", "comfyui.view_rejected", { status: upstream.status });
+      sendError(res, "COMFY_ASSET_UNAVAILABLE");
+      return;
+    }
 
-      res.setHeader("Cache-Control", "public, max-age=86400, immutable");
-      const contentType = upstream.headers.get("content-type");
-      if (contentType) res.setHeader("Content-Type", contentType);
+    res.setHeader("Cache-Control", "public, max-age=86400, immutable");
+    const contentType = upstream.headers.get("content-type");
+    if (contentType) res.setHeader("Content-Type", contentType);
 
-      const contentLength = upstream.headers.get("content-length");
-      if (contentLength) res.setHeader("Content-Length", contentLength);
+    const contentLength = upstream.headers.get("content-length");
+    if (contentLength) res.setHeader("Content-Length", contentLength);
 
-      if (upstream.body) {
-        Readable.fromWeb(
-          upstream.body as unknown as import("node:stream/web").ReadableStream,
-        ).pipe(res);
-      } else {
-        const buffer = Buffer.from(await upstream.arrayBuffer());
-        res.send(buffer);
-      }
-    } catch (e) {
-      log.error({ err: e }, "comfyui view proxy");
-      sendApiError(res, 502, "UPSTREAM_ERROR", errorMessage(e));
+    if (upstream.body) {
+      Readable.fromWeb(
+        upstream.body as unknown as import("node:stream/web").ReadableStream,
+      ).pipe(res);
+    } else {
+      const buffer = Buffer.from(await upstream.arrayBuffer());
+      res.send(buffer);
     }
   }),
 );

@@ -76,7 +76,7 @@ for (const setting of settings) {
       for (const value of ["", "http://replacement.test"]) {
         const rejected = await put(value);
         expect(rejected.status).toBe(409);
-        expect((await rejected.json()).error.code).toBe("CONFLICT");
+        expect((await rejected.json()).error.code).toBe("ENVIRONMENT_MANAGED");
       }
       // Saving a form that includes an unchanged locked field is a no-op.
       expect((await put(" http://environment.test ")).status).toBe(200);

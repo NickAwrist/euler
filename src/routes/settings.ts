@@ -22,8 +22,7 @@ import {
 import { envConfig, getEnvironmentSettings } from "../env";
 import { asyncRoute } from "../http/asyncRoute";
 import { canEditEnvironmentSetting } from "../http/environmentSettings";
-import { sendApiError } from "../http/errors";
-import { sendValidationError } from "../http/validation";
+import { sendError, sendValidationError } from "../observability/http";
 import { catalogFreshness, isInteractiveModel } from "../openRouterModels";
 import {
   catalogSettings,
@@ -75,7 +74,7 @@ function apiKeyRoutes(
       .object({ apiKey: z.string().max(512).default("") })
       .safeParse(req.body);
     if (!parsed.success) {
-      sendApiError(res, 400, "BAD_REQUEST", "apiKey must be a string");
+      sendError(res, "INVALID_REQUEST", "apiKey must be a string");
       return;
     }
     if (canEditEnvironmentSetting(environmentKey(), parsed.data.apiKey)) {
@@ -115,7 +114,7 @@ settingsRoutes.get(
 );
 settingsRoutes.delete("/openrouter/publishers/:id", (req, res) => {
   if (!removeOpenRouterPublisher(req.params.id))
-    return sendApiError(res, 404, "NOT_FOUND", "Publisher not found");
+    return sendError(res, "NOT_FOUND", "Publisher not found");
   res.json({ ok: true });
 });
 settingsRoutes.get(
@@ -159,10 +158,9 @@ settingsRoutes.post(
       .object({ publisherId: z.string().min(1).max(200) })
       .safeParse(req.body);
     if (!parsed.success)
-      return sendApiError(res, 400, "BAD_REQUEST", "Invalid publisher ID");
+      return sendError(res, "INVALID_REQUEST", "Invalid publisher ID");
     const catalog = await getCatalogPreferences(false, true);
-    if (!catalog.models)
-      return sendApiError(res, 503, "UPSTREAM_ERROR", "Catalog unavailable");
+    if (!catalog.models) return sendError(res, "CATALOG_UNAVAILABLE");
     if (
       !catalog.models.some(
         (model) =>
@@ -170,10 +168,9 @@ settingsRoutes.post(
           isInteractiveModel(model),
       )
     ) {
-      return sendApiError(
+      return sendError(
         res,
-        400,
-        "BAD_REQUEST",
+        "INVALID_REQUEST",
         "Choose a publisher from the catalog",
       );
     }
@@ -184,14 +181,9 @@ settingsRoutes.post(
 settingsRoutes.patch("/openrouter/publishers/:id/subscription", (req, res) => {
   const parsed = z.object({ subscribed: z.boolean() }).safeParse(req.body);
   if (!parsed.success)
-    return sendApiError(
-      res,
-      400,
-      "BAD_REQUEST",
-      "subscribed must be a boolean",
-    );
+    return sendError(res, "INVALID_REQUEST", "subscribed must be a boolean");
   if (!setPublisherSubscription(req.params.id, parsed.data.subscribed))
-    return sendApiError(res, 404, "NOT_FOUND", "Publisher not found");
+    return sendError(res, "NOT_FOUND", "Publisher not found");
   res.json({ ok: true });
 });
 settingsRoutes.get(
@@ -204,7 +196,7 @@ settingsRoutes.get(
         (publisher) => publisher.id === req.params.id,
       )
     )
-      return sendApiError(res, 404, "NOT_FOUND", "Publisher not found");
+      return sendError(res, "NOT_FOUND", "Publisher not found");
     const catalog = await getCatalogPreferences();
     res.json({
       catalog: catalogFreshness(catalog),
@@ -219,10 +211,9 @@ settingsRoutes.patch(
       .object({ route: routeSchema, enabled: z.boolean() })
       .safeParse(req.body);
     if (!parsed.success)
-      return sendApiError(
+      return sendError(
         res,
-        400,
-        "BAD_REQUEST",
+        "INVALID_REQUEST",
         "Provide a route and enabled boolean",
       );
     const { route, enabled } = parsed.data;
@@ -233,19 +224,12 @@ settingsRoutes.patch(
       return;
     }
     const catalog = await getCatalogPreferences(false, true);
-    if (!catalog.models)
-      return sendApiError(
-        res,
-        503,
-        "UPSTREAM_ERROR",
-        "Catalog unavailable. Try again before enabling a model.",
-      );
+    if (!catalog.models) return sendError(res, "CATALOG_UNAVAILABLE");
     const model = catalog.models.find((entry) => entry.route === route);
     if (!model || !isInteractiveModel(model))
-      return sendApiError(
+      return sendError(
         res,
-        400,
-        "BAD_REQUEST",
+        "INVALID_REQUEST",
         "Model is not available for interactive use",
       );
     setOpenRouterModelEnabled(model, enabled);
@@ -263,14 +247,14 @@ settingsRoutes.put("/models/favorite", (req, res) => {
     })
     .safeParse(req.body);
   if (!parsed.success)
-    return sendApiError(res, 400, "BAD_REQUEST", "Invalid model favorite");
+    return sendError(res, "INVALID_REQUEST", "Invalid model favorite");
   const { provider, modelId, favorite } = parsed.data;
   if (
     provider === "openrouter" &&
     (modelId.startsWith("openrouter:") ||
       !routeSchema.safeParse(modelId).success)
   )
-    return sendApiError(res, 400, "BAD_REQUEST", "Use a raw OpenRouter route");
+    return sendError(res, "INVALID_REQUEST", "Use a raw OpenRouter route");
   setModelFavorite(owner, provider, modelId, favorite);
   res.json({ ok: true });
 });

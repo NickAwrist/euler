@@ -2,7 +2,6 @@ import { Router } from "express";
 import { getOpenRouterApiKey, listOpenRouterModels } from "../db/index";
 import { listModelFavorites, listOpenRouterPublishers } from "../db/openrouter";
 import { asyncRoute } from "../http/asyncRoute";
-import { errorMessage } from "../http/errors";
 import { openRouterModelId } from "../llm/index";
 import { ollamaReasoning } from "../llm/ollamaProvider";
 import { InputCapability } from "../modelCapabilities";
@@ -13,6 +12,7 @@ import {
 } from "../openRouterPreferences";
 import { publisherName } from "../openRouterPublishers";
 import { requireUserId } from "../userIdentity";
+import { errorMessage } from "../utils/errors";
 
 const modelsRoutes = Router();
 

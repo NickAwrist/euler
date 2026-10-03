@@ -82,7 +82,12 @@ for (const device of ["desktop", "mobile"] as const) {
         if (failMutation)
           return route.fulfill({
             status: 500,
-            json: { error: { message: "Preference could not be saved" } },
+            json: {
+              error: {
+                code: "INTERNAL_ERROR",
+                message: "Preference could not be saved",
+              },
+            },
           });
         const body = route.request().postDataJSON();
         if (path.endsWith("/favorite")) {

@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { type Job, activeJob } from "../../../src/schemas/jobs";
+import type { Diagnostic } from "../../../src/schemas/observability";
+import { toDiagnostic } from "../../lib/apiError";
 import { fetchJob } from "../../persist/jobs";
+import { ErrorNotice } from "../ErrorNotice";
 import { Modal } from "../Modal";
 import { JobElapsed } from "./JobElapsed";
 import { JobCancelButton } from "./JobTaskCard";
@@ -13,7 +16,7 @@ export function JobTraceModal({
   onClose,
 }: { sessionId: string; temporary: boolean; job: Job; onClose: () => void }) {
   const [detail, setDetail] = useState<Job | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<Diagnostic | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
@@ -28,11 +31,11 @@ export function JobTraceModal({
         );
         if (!controller.signal.aborted) {
           setDetail(updated);
-          setError("");
+          setError(null);
         }
         polling = activeJob(updated);
       } catch (error) {
-        if (!controller.signal.aborted) setError(String(error));
+        if (!controller.signal.aborted) setError(toDiagnostic(error));
       }
       if (polling && !controller.signal.aborted)
         timer = setTimeout(refresh, 1000);
@@ -54,11 +57,7 @@ export function JobTraceModal({
       headerActions={<JobCancelButton job={current} />}
     >
       <div className="min-h-0 overflow-auto p-4 text-sm space-y-4">
-        {error && (
-          <p role="alert" className="text-red-400">
-            {error}
-          </p>
-        )}
+        {error && <ErrorNotice error={error} />}
         <section aria-label="Job timing">
           <h3 className="mb-2 text-xs font-semibold text-muted-foreground">
             Timing
@@ -144,11 +143,7 @@ export function JobTraceModal({
             </div>
           </details>
         )}
-        {current.error && (
-          <p role="alert" className="text-sm text-red-400">
-            {current.error}
-          </p>
-        )}
+        {current.error && <ErrorNotice error={current.error} />}
       </div>
     </Modal>
   );

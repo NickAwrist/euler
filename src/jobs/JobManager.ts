@@ -2,7 +2,9 @@ import { z } from "zod";
 import type { RunContext, Step } from "../RunContext";
 import { changedWorkspaceFiles } from "../agents/runtime/workspaceOutputs";
 import { getDb, transaction } from "../db/connection";
+import { logEvent, withBackgroundLogContext } from "../observability/logger";
 import { type Job, JobSchema, activeJob } from "../schemas/jobs";
+import { errorDetails } from "../schemas/observability";
 import {
   ToolContentSchema,
   type ToolContentUpdate,
@@ -147,14 +149,16 @@ export class JobManager {
       result?: BackgroundResult,
       executionError?: unknown,
     ) => {
-      let error = executionError ?? presentationError;
+      let outputError = presentationError;
       for (const target of ["output", "metadata"] as const) {
         const content = result?.[target];
         if (!content) continue;
         const parsed = ToolContentSchema.safeParse(content);
         if (parsed.success) job[target] = parsed.data;
-        else error = new Error(z.prettifyError(parsed.error));
+        else outputError = new Error(z.prettifyError(parsed.error));
       }
+      // Invalid output aborts the job, so it outranks the abort it causes.
+      const failure = presentationError ?? executionError ?? outputError;
       try {
         if (result) {
           job.result = {
@@ -162,7 +166,7 @@ export class JobManager {
             failed: result.failed,
             attachments: result.attachments,
           };
-          if (!controller.signal.aborted && !error && !result.failed) {
+          if (!controller.signal.aborted && !failure && !result.failed) {
             const files = await changedWorkspaceFiles(
               workspace,
               new Set(result.outputFiles ?? []),
@@ -172,16 +176,31 @@ export class JobManager {
             job.result.attachments = [...(result.attachments ?? []), ...files];
           }
         }
-        if (error)
-          job.error = error instanceof Error ? error.message : String(error);
         job.status = presentationError
           ? "failed"
           : controller.signal.aborted
             ? "cancelled"
-            : error || result?.failed
+            : failure || result?.failed
               ? "failed"
               : "succeeded";
+        const code =
+          job.status !== "failed" || !failure
+            ? undefined
+            : executionError && !presentationError
+              ? "JOB_FAILED"
+              : "JOB_OUTPUT_INVALID";
+        if (code) job.error = errorDetails(code, { jobId: job.id });
         job.endedAt = Date.now();
+        logEvent(
+          code ? "error" : "info",
+          "job.finished",
+          {
+            status: job.status,
+            code,
+            durationMs: job.endedAt - job.createdAt,
+          },
+          failure,
+        );
         transaction(() => {
           this.save(job);
           if (job.status !== "cancelled" && !this.host.blocked(sessionId)) {
@@ -214,26 +233,36 @@ export class JobManager {
           (parsed.data.mode === "append" && job.outputTruncated) ||
           updated.truncated;
     };
-    try {
-      handle.execution = await tool.start(args, {
-        workspace,
-        signal: controller.signal,
-        background: true,
-        emitProgress: (update) => publish("progress", update),
-        emitOutput: (update) => publish("output", update),
-      });
-      job.status = "running";
-      this.save(job);
-      this.host.changed(job);
-      void handle.execution.completion
-        .then(
-          (result) => settle(result),
-          (error) => settle(undefined, error),
-        )
-        .catch((error) => console.error("Job settlement failed", error));
-    } catch (error) {
-      await settle(undefined, error);
-    }
+    // A job outlives the activation that started it.
+    await withBackgroundLogContext(
+      { sessionId, agentId, jobId: job.id },
+      async () => {
+        logEvent("info", "job.started", { tool: tool.name });
+        try {
+          const execution = await tool.start(args, {
+            workspace,
+            signal: controller.signal,
+            background: true,
+            emitProgress: (update) => publish("progress", update),
+            emitOutput: (update) => publish("output", update),
+          });
+          handle.execution = execution;
+          job.status = "running";
+          this.save(job);
+          this.host.changed(job);
+          void execution.completion
+            .then(
+              (result) => settle(result),
+              (error) => settle(undefined, error),
+            )
+            .catch((error) =>
+              logEvent("error", "job.settlement_failed", {}, error),
+            );
+        } catch (error) {
+          await settle(undefined, error);
+        }
+      },
+    );
     return { text: JSON.stringify({ jobId: job.id, status: job.status }) };
   }
   async cancel(owner: string, sessionId: string, id: string) {
@@ -269,7 +298,12 @@ export class JobManager {
       if (activeJob(job)) {
         job.status = "interrupted";
         job.endedAt = Date.now();
-        job.error = "Interrupted by backend restart";
+        job.error = errorDetails("JOB_INTERRUPTED", { jobId: job.id });
+        logEvent("warn", "job.interrupted", {
+          sessionId: job.sessionId,
+          agentId: job.agentId,
+          jobId: job.id,
+        });
         transaction(() => {
           this.save(job);
           if (!job.notified) {

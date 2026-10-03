@@ -8,7 +8,7 @@ import {
   type LlmToolCall,
   streamModelChat,
 } from "../llm/index";
-import { logger } from "../logger";
+import { logEvent } from "../observability/logger";
 import { CORE_DIRECTIVES } from "../prompts/render";
 import {
   type BaseTool,
@@ -18,8 +18,6 @@ import {
 import { isBackgroundCapable, toolDefinition } from "../tools/background";
 import { toolErrorToString } from "../tools/errors";
 import { missingToolResults } from "./toolResults";
-
-const log = logger.child({ component: "BaseAgent" });
 
 export class BaseAgent {
   model: string;
@@ -81,27 +79,12 @@ export class BaseAgent {
   ): Promise<ToolResult> {
     const toolName = toolCall.function.name;
     const args = this.parseToolArguments(toolCall.function.arguments);
-    const startedAt = Date.now();
-    log.debug({
-      event: "tool_call_start",
-      toolName,
-      agentName: ctx?.agentName,
-      turnIndex,
-    });
-
-    const tool = this.TOOL_MAP[toolName];
-    if (!tool) {
-      log.debug({
-        event: "tool_call_done",
-        toolName,
-        agentName: ctx?.agentName,
-        turnIndex,
-        runMs: Date.now() - startedAt,
-      });
-      return textToolResult(`Error: tool ${toolName} not found`);
-    }
-
+    const started = performance.now();
+    let failure: unknown;
+    let result: ToolResult | undefined;
     try {
+      const tool = this.TOOL_MAP[toolName];
+      if (!tool) throw new Error(`tool ${toolName} not found`);
       const { background = false, ...operationArgs } = args;
       if (typeof background !== "boolean")
         throw new Error("background must be a boolean");
@@ -111,22 +94,32 @@ export class BaseAgent {
         if (background) {
           if (!ctx?.jobs)
             throw new Error("Background execution is unavailable");
-          return await ctx.jobs.start(tool, operationArgs, ctx, parentStep);
+          result = await ctx.jobs.start(tool, operationArgs, ctx, parentStep);
+          return result;
         }
       }
-      return await tool.execute(operationArgs, ctx, parentStep);
+      result = await tool.execute(operationArgs, ctx, parentStep);
+      return result;
     } catch (e) {
-      return textToolResult(
-        `Error: ${toolErrorToString(e, toolName, ctx?.sessionDir)}`,
+      failure = e;
+      result = textToolResult(
+        `Error: ${toolErrorToString(e, ctx?.sessionDir)}`,
       );
+      return result;
     } finally {
-      log.debug({
-        event: "tool_call_done",
-        toolName,
-        agentName: ctx?.agentName,
-        turnIndex,
-        runMs: Date.now() - startedAt,
-      });
+      const failed = failure !== undefined || result?.failed === true;
+      logEvent(
+        failed ? "warn" : "info",
+        "tool.finished",
+        {
+          tool: toolName,
+          turnIndex,
+          durationMs: Math.round(performance.now() - started),
+          outcome: failed ? "failure" : "success",
+          reason: failure === undefined ? undefined : result?.text,
+        },
+        failure,
+      );
     }
   }
 
@@ -250,8 +243,13 @@ export class BaseAgent {
         if (llmMetrics && ctx.ownerUuid) {
           try {
             recordUsage(ctx.ownerUuid, this.model, llmMetrics);
-          } catch (err) {
-            log.error({ err }, "Could not record model usage");
+          } catch (error) {
+            logEvent(
+              "error",
+              "usage.record_failed",
+              { model: this.model },
+              error,
+            );
           }
         }
       }

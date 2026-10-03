@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { OutputAttachmentSchema } from "../attachments/types";
+import { ErrorDetailsSchema } from "./observability";
 import { ToolContentSchema } from "./toolContent";
 export const JobStatusSchema = z.enum([
   "starting",
@@ -33,7 +34,7 @@ export const JobSchema = z.object({
       failed: z.boolean().optional(),
     })
     .optional(),
-  error: z.string().optional(),
+  error: ErrorDetailsSchema.optional(),
   notified: z.boolean(),
 });
 export type Job = z.infer<typeof JobSchema>;

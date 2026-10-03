@@ -52,7 +52,10 @@ test("attachment image loading retries failures without resizing the preview", a
   await page.route("**/api/attachments/*", async (route) => {
     await route.fulfill(
       fail
-        ? { status: 500, json: { error: "Unavailable" } }
+        ? {
+            status: 500,
+            json: { error: { code: "INTERNAL_ERROR", message: "Unavailable" } },
+          }
         : { contentType: "image/png", body: png },
     );
   });

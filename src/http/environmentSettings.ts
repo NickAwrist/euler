@@ -1,4 +1,4 @@
-import { ApiError } from "./errors";
+import { OperationError } from "../observability/errors";
 
 /** Accept unchanged fields in a settings form without persisting environment values. */
 export function canEditEnvironmentSetting(
@@ -7,11 +7,7 @@ export function canEditEnvironmentSetting(
 ): boolean {
   if (!configuredValue) return true;
   if (requestedValue.trim() !== configuredValue) {
-    throw new ApiError(
-      409,
-      "CONFLICT",
-      "This setting is managed by the environment.",
-    );
+    throw new OperationError("ENVIRONMENT_MANAGED");
   }
   return false;
 }

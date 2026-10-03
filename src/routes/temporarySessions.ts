@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { agentRuntime } from "../agents/runtime/AgentRuntime";
 import { downloadWorkspaceFile } from "../http/downloadWorkspaceFile";
-import { errorMessage, sendApiError } from "../http/errors";
 import { agentActions } from "./agentActions";
 
 import { isLoopbackRequest } from "../http/isLoopbackRequest";
 import { revealFileNative } from "../nativeFolderPicker";
+import { sendError } from "../observability/http";
 import { SelectDirectorySchema } from "../schemas/workspace";
 import { requireUserId } from "../userIdentity";
 import {
@@ -31,58 +31,45 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
   if (!ownerUuid) return;
   const parsed = SelectDirectorySchema.safeParse(req.body);
   if (!parsed.success) {
-    sendApiError(
+    sendError(
       res,
-      400,
-      "BAD_REQUEST",
+      "INVALID_REQUEST",
       "Enter an absolute folder path on the server",
     );
     return;
   }
   if (agentRuntime.busy(ownerUuid, req.params.id)) {
-    sendApiError(
+    sendError(
       res,
-      409,
       "CONFLICT",
       "Wait for the current turn to finish before changing workspaces",
     );
     return;
   }
-  try {
-    workspaceService.temporaryPresentation(ownerUuid, req.params.id);
-    const path = await workspaceService.canonicalDirectory(parsed.data.path);
-    if (agentRuntime.busy(ownerUuid, req.params.id)) {
-      sendApiError(
-        res,
-        409,
-        "CONFLICT",
-        "Wait for the current turn to finish before changing workspaces",
-      );
-      return;
-    }
-    const workspace = await workspaceService.selectTemporaryDirectory(
-      ownerUuid,
-      req.params.id,
-      path,
-    );
-    res.json({ workspace });
-  } catch (error) {
-    sendApiError(
+  workspaceService.temporaryPresentation(ownerUuid, req.params.id);
+  const path = await workspaceService.canonicalDirectory(parsed.data.path);
+  if (agentRuntime.busy(ownerUuid, req.params.id)) {
+    sendError(
       res,
-      error instanceof WorkspaceError ? 400 : 500,
-      error instanceof WorkspaceError ? "BAD_REQUEST" : "INTERNAL_ERROR",
-      errorMessage(error) || "Could not select directory",
+      "CONFLICT",
+      "Wait for the current turn to finish before changing workspaces",
     );
+    return;
   }
+  const workspace = await workspaceService.selectTemporaryDirectory(
+    ownerUuid,
+    req.params.id,
+    path,
+  );
+  res.json({ workspace });
 });
 
 router.post("/:id/workspace/use-sandbox", (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
   if (agentRuntime.busy(ownerUuid, req.params.id)) {
-    sendApiError(
+    sendError(
       res,
-      409,
       "CONFLICT",
       "Wait for the current turn to finish before changing workspaces",
     );
@@ -93,43 +80,29 @@ router.post("/:id/workspace/use-sandbox", (req, res) => {
       workspace: workspaceService.useTemporarySandbox(ownerUuid, req.params.id),
     });
   } catch (error) {
-    sendApiError(
-      res,
-      404,
-      "NOT_FOUND",
-      errorMessage(error) || "Temporary chat not found",
-    );
+    if (!(error instanceof WorkspaceError)) throw error;
+    sendError(res, "NOT_FOUND", error.message);
   }
 });
 
 router.get("/:id/files", async (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
-  try {
-    const workspace = await workspaceService.resolveTemporary(
-      ownerUuid,
-      req.params.id,
-    );
-    res.json({
-      files: (await workspaceService.listFiles(workspace)).slice(0, 200),
-    });
-  } catch (error) {
-    sendApiError(
-      res,
-      400,
-      "BAD_REQUEST",
-      errorMessage(error) || "Could not list workspace files",
-    );
-  }
+  const workspace = await workspaceService.resolveTemporary(
+    ownerUuid,
+    req.params.id,
+  );
+  res.json({
+    files: (await workspaceService.listFiles(workspace)).slice(0, 200),
+  });
 });
 
 router.post("/:id/reveal", async (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
   if (!isLoopbackRequest(req)) {
-    sendApiError(
+    sendError(
       res,
-      403,
       "FORBIDDEN",
       "Files can only be revealed on the machine running Euler",
     );
@@ -139,28 +112,19 @@ router.post("/:id/reveal", async (req, res) => {
     typeof (req.body as { path?: unknown }).path === "string"
       ? (req.body as { path: string }).path
       : "";
-  try {
-    const workspace = await workspaceService.resolveTemporary(
-      ownerUuid,
-      req.params.id,
-    );
-    if (workspace.kind !== "local") {
-      throw new WorkspaceError("Only local workspace files can be revealed");
-    }
-    const path = await workspaceService.resolveExistingPath(
-      workspace,
-      requestedPath,
-    );
-    await revealFileNative(path);
-    res.json({ ok: true });
-  } catch (error) {
-    sendApiError(
-      res,
-      400,
-      "BAD_REQUEST",
-      errorMessage(error) || "Could not reveal file",
-    );
+  const workspace = await workspaceService.resolveTemporary(
+    ownerUuid,
+    req.params.id,
+  );
+  if (workspace.kind !== "local") {
+    throw new WorkspaceError("Only local workspace files can be revealed");
   }
+  const path = await workspaceService.resolveExistingPath(
+    workspace,
+    requestedPath,
+  );
+  await revealFileNative(path);
+  res.json({ ok: true });
 });
 
 router.delete("/:id", async (req, res) => {
@@ -173,7 +137,7 @@ router.delete("/:id", async (req, res) => {
     () => workspaceService.deleteTemporary(ownerUuid, req.params.id),
   );
   if (!deleted) {
-    sendApiError(res, 404, "NOT_FOUND", "Temporary chat not found");
+    sendError(res, "NOT_FOUND", "Temporary chat not found");
     return;
   }
   res.json({ ok: true });
@@ -184,30 +148,19 @@ router.get("/:id/file", async (req, res) => {
   if (!ownerUuid) return;
   const requestedPath =
     typeof req.query.path === "string" ? req.query.path : "";
-  try {
-    const workspace = await workspaceService.resolveTemporary(
-      ownerUuid,
-      req.params.id,
-    );
-    if (workspace.kind !== "sandbox") {
-      sendApiError(
-        res,
-        403,
-        "FORBIDDEN",
-        "Local files cannot be downloaded through this route",
-      );
-      return;
-    }
-    await downloadWorkspaceFile(res, workspace, requestedPath);
-  } catch (error) {
-    if (res.headersSent || res.destroyed) return;
-    sendApiError(
+  const workspace = await workspaceService.resolveTemporary(
+    ownerUuid,
+    req.params.id,
+  );
+  if (workspace.kind !== "sandbox") {
+    sendError(
       res,
-      400,
-      "BAD_REQUEST",
-      errorMessage(error) || "Could not download file",
+      "FORBIDDEN",
+      "Local files cannot be downloaded through this route",
     );
+    return;
   }
+  await downloadWorkspaceFile(res, workspace, requestedPath);
 });
 
 export default router;

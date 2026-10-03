@@ -7,7 +7,9 @@ test("session loading: interrupted agents show their reason and fixed model", as
   await page.route("**/api/**", (route) =>
     route.fulfill({
       status: 503,
-      json: { error: { message: "Fixture: no backend" } },
+      json: {
+        error: { code: "INTERNAL_ERROR", message: "Fixture: no backend" },
+      },
     }),
   );
   await page.setViewportSize({ width: 390, height: 844 });

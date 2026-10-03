@@ -1,15 +1,18 @@
 import { Activity, ChevronRight, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { type Job, activeJob } from "../../../src/schemas/jobs";
+import type { Diagnostic } from "../../../src/schemas/observability";
+import { toDiagnostic } from "../../lib/apiError";
 import { chipSurface, cx } from "../../styles";
 import { Button } from "../Button";
+import { ErrorNotice } from "../ErrorNotice";
 import { useJobs } from "./JobContext";
 import { JobElapsed } from "./JobElapsed";
 
 export function JobCancelButton({ job }: { job: Job }) {
   const { stop } = useJobs();
   const [cancelling, setCancelling] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<Diagnostic | null>(null);
   if (!activeJob(job)) return null;
   return (
     <>
@@ -19,19 +22,15 @@ export function JobCancelButton({ job }: { job: Job }) {
         loading={cancelling}
         onClick={() => {
           setCancelling(true);
-          setError("");
+          setError(null);
           void stop(job.id)
-            .catch((error) => setError(String(error)))
+            .catch((error) => setError(toDiagnostic(error)))
             .finally(() => setCancelling(false));
         }}
       >
         Cancel job
       </Button>
-      {error && (
-        <p role="alert" className="text-sm text-red-400">
-          {error}
-        </p>
-      )}
+      {error && <ErrorNotice error={error} />}
     </>
   );
 }

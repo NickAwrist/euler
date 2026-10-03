@@ -4,8 +4,11 @@ import {
   isFinalAgent,
   isWorkingAgent,
 } from "../../../src/schemas/agents";
+import type { Diagnostic } from "../../../src/schemas/observability";
+import { toDiagnostic } from "../../lib/apiError";
 import { fetchAgent } from "../../persist/agents";
 import type { MessageStep } from "../../types";
+import { ErrorNotice } from "../ErrorNotice";
 import { ModelLabel } from "../ModelLabel";
 import { StepsModal } from "../StepsModal";
 import { AgentAvatar } from "./AgentAvatar";
@@ -26,7 +29,7 @@ export function AgentTraceModal({
   const [detail, setDetail] = useState<Awaited<
     ReturnType<typeof fetchAgent>
   > | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<Diagnostic | null>(null);
   const working = isWorkingAgent(agent);
   // Step events cover only the main agent's activation, so poll while it works
   // and refetch when its status changes.
@@ -37,11 +40,11 @@ export function AgentTraceModal({
         .then((value) => {
           if (!disposed) {
             setDetail(value);
-            setError("");
+            setError(null);
           }
         })
         .catch((e) => {
-          if (!disposed) setError(String(e));
+          if (!disposed) setError(toDiagnostic(e));
         });
     refresh();
     const timer = working ? setInterval(refresh, 1000) : undefined;
@@ -78,11 +81,7 @@ export function AgentTraceModal({
           {agent.interruption}
         </p>
       )}
-      {error && (
-        <p role="alert" className="mb-3 text-sm text-red-400">
-          {error}
-        </p>
-      )}
+      {error && <ErrorNotice error={error} className="mb-3" />}
       {initialPrompt && (
         <p className="mb-4 whitespace-pre-wrap break-words rounded-xl border border-border-subtle bg-muted/25 p-3 text-[0.8125rem] text-muted-foreground">
           {initialPrompt}

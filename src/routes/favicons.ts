@@ -1,8 +1,7 @@
 import { Router } from "express";
 import { getFavicon } from "../favicons/faviconService";
 import { asyncRoute } from "../http/asyncRoute";
-import { sendApiError } from "../http/errors";
-import { sendValidationError } from "../http/validation";
+import { sendError, sendValidationError } from "../observability/http";
 import { FaviconParamsSchema } from "../schemas/favicons";
 
 const router = Router();
@@ -18,7 +17,7 @@ router.get(
     }
     const favicon = await getFavicon(parsed.data.hostname);
     if (!favicon) {
-      sendApiError(res, 404, "NOT_FOUND", "Favicon not found");
+      sendError(res, "NOT_FOUND", "Favicon not found");
       return;
     }
     res.setHeader("Content-Type", favicon.contentType);

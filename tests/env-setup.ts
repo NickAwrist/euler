@@ -12,3 +12,4 @@ process.env.EULER_COMFYUI_HOST = "";
 process.env.COMFYUI_HOST = "";
 process.env.BRAVE_SEARCH_API_KEY = "";
 process.env.EULER_BRAVE_SEARCH_API_KEY = "";
+process.env.LOG_LEVEL = "silent";

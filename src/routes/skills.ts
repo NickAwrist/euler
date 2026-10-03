@@ -1,3 +1,4 @@
+import { SQLiteError } from "bun:sqlite";
 import { Router } from "express";
 import {
   createSkillRow,
@@ -6,12 +7,17 @@ import {
   listSkills,
   updateSkillRow,
 } from "../db/index";
-import { errorMessage, sendApiError } from "../http/errors";
-import { sendValidationError } from "../http/validation";
+import { sendError, sendValidationError } from "../observability/http";
 import { SkillWriteSchema } from "../schemas/skills";
 import { requireUserId } from "../userIdentity";
 
 const skillsRoutes = Router();
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    error instanceof SQLiteError && error.code === "SQLITE_CONSTRAINT_UNIQUE"
+  );
+}
 
 skillsRoutes.get("/", (req, res) => {
   const ownerUuid = requireUserId(req, res);
@@ -24,7 +30,7 @@ skillsRoutes.get("/:id", (req, res) => {
   if (!ownerUuid) return;
   const skill = getSkillById(ownerUuid, req.params.id);
   if (!skill) {
-    sendApiError(res, 404, "NOT_FOUND", "Skill not found");
+    sendError(res, "NOT_FOUND", "Skill not found");
     return;
   }
   res.json(skill);
@@ -41,13 +47,8 @@ skillsRoutes.post("/", (req, res) => {
   try {
     res.status(201).json(createSkillRow(ownerUuid, parsed.data));
   } catch (error: unknown) {
-    if (errorMessage(error).includes("UNIQUE constraint")) {
-      sendApiError(
-        res,
-        409,
-        "CONFLICT",
-        "A skill with that name already exists",
-      );
+    if (isUniqueViolation(error)) {
+      sendError(res, "CONFLICT", "A skill with that name already exists");
       return;
     }
     throw error;
@@ -65,18 +66,13 @@ skillsRoutes.put("/:id", (req, res) => {
   try {
     const skill = updateSkillRow(ownerUuid, req.params.id, parsed.data);
     if (!skill) {
-      sendApiError(res, 404, "NOT_FOUND", "Skill not found");
+      sendError(res, "NOT_FOUND", "Skill not found");
       return;
     }
     res.json(skill);
   } catch (error: unknown) {
-    if (errorMessage(error).includes("UNIQUE constraint")) {
-      sendApiError(
-        res,
-        409,
-        "CONFLICT",
-        "A skill with that name already exists",
-      );
+    if (isUniqueViolation(error)) {
+      sendError(res, "CONFLICT", "A skill with that name already exists");
       return;
     }
     throw error;
@@ -87,7 +83,7 @@ skillsRoutes.delete("/:id", (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
   if (!deleteSkillRow(ownerUuid, req.params.id)) {
-    sendApiError(res, 404, "NOT_FOUND", "Skill not found");
+    sendError(res, "NOT_FOUND", "Skill not found");
     return;
   }
   res.json({ ok: true });

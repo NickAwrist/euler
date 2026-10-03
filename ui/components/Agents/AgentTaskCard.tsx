@@ -5,7 +5,10 @@ import {
   isFinalAgent,
   isWorkingAgent,
 } from "../../../src/schemas/agents";
+import type { Diagnostic } from "../../../src/schemas/observability";
+import { toDiagnostic } from "../../lib/apiError";
 import { chipSurface, cx } from "../../styles";
+import { ErrorNotice } from "../ErrorNotice";
 import { IconButton } from "../IconButton";
 import { ModelLabel } from "../ModelLabel";
 import { AgentAvatar } from "./AgentAvatar";
@@ -14,7 +17,7 @@ import { AgentStatus } from "./AgentStatus";
 /** Stops a working agent or dismisses a ready one. */
 export function AgentStopButton({ agent }: { agent: Agent }) {
   const { stop } = useAgents();
-  const [error, setError] = useState("");
+  const [error, setError] = useState<Diagnostic | null>(null);
   const [stopping, setStopping] = useState(false);
   const working = isWorkingAgent(agent);
   return (
@@ -30,17 +33,13 @@ export function AgentStopButton({ agent }: { agent: Agent }) {
         loading={stopping}
         onClick={() => {
           setStopping(true);
-          setError("");
+          setError(null);
           void stop(agent.id)
-            .catch((e) => setError(String(e)))
+            .catch((e) => setError(toDiagnostic(e)))
             .finally(() => setStopping(false));
         }}
       />
-      {error && (
-        <p role="alert" className="text-sm text-red-400">
-          {error}
-        </p>
-      )}
+      {error && <ErrorNotice error={error} />}
     </>
   );
 }

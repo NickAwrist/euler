@@ -257,6 +257,7 @@ export function installDemoApi() {
         return Response.json(
           {
             error: {
+              code: "INTERNAL_ERROR",
               message: "Couldn't save change. Try again.",
             },
           },
@@ -302,7 +303,10 @@ export function installDemoApi() {
         if (body.enabled && (!model || scenario === "unavailable"))
           return Response.json(
             {
-              error: { message: "Model is not available for interactive use" },
+              error: {
+                code: "INVALID_REQUEST",
+                message: "Model is not available for interactive use",
+              },
             },
             { status: 400 },
           );
@@ -399,7 +403,9 @@ export function installDemoApi() {
       if (path === "ollama/health") return Response.json({ connected: true });
       if (path === "ollama/config") return Response.json({ host: "Demo only" });
       return Response.json(
-        { error: { message: `No demo handler for ${path}` } },
+        {
+          error: { code: "NOT_FOUND", message: `No demo handler for ${path}` },
+        },
         { status: 404 },
       );
     },

@@ -29,7 +29,7 @@ for (const device of ["desktop", "mobile"] as const) {
         return route.fulfill({
           status: failOwnership ? 500 : 200,
           json: failOwnership
-            ? { error: { message: "Unavailable" } }
+            ? { error: { code: "INTERNAL_ERROR", message: "Unavailable" } }
             : {
                 ollamaHost: managed,
                 comfyuiHost: managed,

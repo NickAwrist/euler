@@ -2,6 +2,7 @@ import { StrictMode, Suspense, lazy } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { UserPreferencesGate } from "./components/UserPreferencesGate";
 import { initializeNavigation } from "./lib/navigation";
 
@@ -43,10 +44,12 @@ const Root =
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <Suspense fallback={null}>
-      <UserPreferencesGate>
-        <Root />
-      </UserPreferencesGate>
-    </Suspense>
+    <ErrorBoundary>
+      <Suspense fallback={null}>
+        <UserPreferencesGate>
+          <Root />
+        </UserPreferencesGate>
+      </Suspense>
+    </ErrorBoundary>
   </StrictMode>,
 );

@@ -116,7 +116,12 @@ for (const device of ["desktop", "mobile"] as const) {
       route.request().method() === "PATCH"
         ? route.fulfill({
             status: 503,
-            json: { error: { message: "Could not save settings" } },
+            json: {
+              error: {
+                code: "INTERNAL_ERROR",
+                message: "Could not save settings",
+              },
+            },
           })
         : route.fallback(),
     );

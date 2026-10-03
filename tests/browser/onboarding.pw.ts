@@ -205,7 +205,12 @@ test("onboarding desktop: a failed save keeps the step and its draft", async ({
       path === "/api/settings/user" && method === "PATCH"
         ? {
             status: 503,
-            json: { error: { message: "Settings are unavailable." } },
+            json: {
+              error: {
+                code: "INTERNAL_ERROR",
+                message: "Settings are unavailable.",
+              },
+            },
           }
         : null,
     preferences,
