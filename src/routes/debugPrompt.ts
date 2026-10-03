@@ -5,13 +5,11 @@ import {
 } from "../agents/agentManager";
 import { INBOX_DIRECTIVES } from "../agents/runtime/agentContext";
 import { type SessionRow, getSessionById } from "../db/index";
-import { sendApiError } from "../http/errors";
-import { sendValidationError } from "../http/validation";
+import { sendError, sendValidationError } from "../observability/http";
 import { DebugPromptBodySchema } from "../schemas/run";
 import { requireUserId } from "../userIdentity";
 import {
   type Workspace,
-  WorkspaceError,
   workspaceService,
 } from "../workspaces/WorkspaceService";
 
@@ -35,26 +33,14 @@ router.post("/debug-prompt", async (req, res) => {
   if (!ephemeral && sessionId) {
     persistedSession = getSessionById(ownerUuid, sessionId);
     if (!persistedSession) {
-      sendApiError(res, 404, "NOT_FOUND", "Session not found");
+      sendError(res, "NOT_FOUND", "Session not found");
       return;
     }
   }
-  try {
-    if (persistedSession) {
-      workspace = await workspaceService.resolveSession(persistedSession);
-    } else if (ephemeral && sessionId) {
-      workspace = await workspaceService.resolveTemporary(ownerUuid, sessionId);
-    }
-  } catch (error) {
-    sendApiError(
-      res,
-      400,
-      "BAD_REQUEST",
-      error instanceof WorkspaceError
-        ? error.message
-        : "The chat workspace is unavailable",
-    );
-    return;
+  if (persistedSession) {
+    workspace = await workspaceService.resolveSession(persistedSession);
+  } else if (ephemeral && sessionId) {
+    workspace = await workspaceService.resolveTemporary(ownerUuid, sessionId);
   }
 
   const promptContext = buildServerRunPromptContext({

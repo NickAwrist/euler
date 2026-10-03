@@ -3,7 +3,7 @@ import {
   parseInputCapabilities,
   parseModelReasoning,
 } from "../../../src/modelCapabilities";
-import { readApiError } from "../../lib/readApiError";
+import { createApiError } from "../../lib/apiError";
 import { userScopedFetch } from "../../persist/userIdentity";
 import type { ModelOption, ModelReasoning } from "../../types";
 import { OLLAMA_HEALTH_POLL_MS } from "./constants";
@@ -112,7 +112,7 @@ export function useOllamaConnection() {
       );
       if (requestId !== modelRequestId.current) return;
       if (!res.ok) {
-        setModelsLoadError(await readApiError(res));
+        setModelsLoadError((await createApiError(res)).message);
         setOllamaModels([]);
         setCatalogLoaded(true);
         return;

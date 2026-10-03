@@ -1,5 +1,5 @@
 import { userScopedFetch } from "../persist/userIdentity";
-import { readApiError } from "./readApiError";
+import { createApiError } from "./apiError";
 
 export interface ApiRequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -38,7 +38,7 @@ export async function userApiFetch(
   }
 
   if (!response.ok) {
-    throw new Error(await readApiError(response, options.errorMessage));
+    throw await createApiError(response, options.errorMessage);
   }
 
   return response;
@@ -70,7 +70,7 @@ export async function globalApiFetch(
   }
 
   if (!response.ok) {
-    throw new Error(await readApiError(response, options.errorMessage));
+    throw await createApiError(response, options.errorMessage);
   }
 
   return response;

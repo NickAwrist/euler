@@ -141,7 +141,7 @@ test("invalid content fails jobs without persisting malformed presentation", asy
       .start(new InvalidTool(), {}, ctx);
     const job = await terminal(manager, JSON.parse(result.text).jobId);
     expect(job.status).toBe("failed");
-    expect(job.error).toBeTruthy();
+    expect(job.error?.code).toBe("JOB_OUTPUT_INVALID");
     expect(job.output).toBeNull();
     expect(job.progress).toBeNull();
     expect(job.metadata).toBeNull();

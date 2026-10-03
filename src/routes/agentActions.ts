@@ -3,9 +3,8 @@ import { agentRuntime } from "../agents/runtime/AgentRuntime";
 import { getOpenRouterApiKey } from "../db";
 import { getAttachment } from "../db/attachments";
 import { getSessionById, markSessionViewed } from "../db/sessions";
-import { sendApiError } from "../http/errors";
-import { sendValidationError } from "../http/validation";
 import { resolveModelSelection } from "../llm";
+import { sendError, sendValidationError } from "../observability/http";
 import {
   EditQueuedMessageSchema,
   RewindSchema,
@@ -20,10 +19,9 @@ function modelAvailable(res: Response, model: string) {
     resolveModelSelection(model).provider === "openrouter" &&
     !getOpenRouterApiKey()
   ) {
-    sendApiError(
+    sendError(
       res,
-      400,
-      "BAD_REQUEST",
+      "INVALID_REQUEST",
       "Configure an OpenRouter API key in Settings before using this model",
     );
     return false;
@@ -40,11 +38,11 @@ export function agentActions(temporary = false) {
       try {
         workspaceService.temporaryPresentation(owner, req.params.id);
       } catch {
-        sendApiError(res, 404, "NOT_FOUND", "Temporary chat not found");
+        sendError(res, "NOT_FOUND", "Temporary chat not found");
         return;
       }
     } else if (!getSessionById(owner, req.params.id)) {
-      sendApiError(res, 404, "NOT_FOUND", "Session not found");
+      sendError(res, "NOT_FOUND", "Session not found");
       return;
     }
     next();
@@ -65,9 +63,8 @@ export function agentActions(temporary = false) {
     }
     const body = parsed.data;
     if (agentRuntime.isChanging(req.params.id)) {
-      sendApiError(
+      sendError(
         res,
-        409,
         "CONFLICT",
         "The conversation is being changed. Try again when it finishes.",
       );
@@ -78,7 +75,7 @@ export function agentActions(temporary = false) {
         (id) => getAttachment(owner, id)?.sessionId !== req.params.id,
       )
     ) {
-      sendApiError(res, 400, "BAD_REQUEST", "Invalid attachment");
+      sendError(res, "INVALID_REQUEST", "Invalid attachment");
       return;
     }
     const main = agentRuntime.main(owner, req.params.id, temporary);
@@ -116,7 +113,7 @@ export function agentActions(temporary = false) {
         parsed.data.content,
       )
     ) {
-      sendApiError(res, 409, "CONFLICT", "Message was already delivered");
+      sendError(res, "CONFLICT", "Message was already delivered");
       return;
     }
     agentRuntime.resync(owner, req.params.id);
@@ -127,7 +124,7 @@ export function agentActions(temporary = false) {
     if (!owner) return;
     const main = agentRuntime.main(owner, req.params.id, temporary);
     if (!agentRuntime.removeQueued(main, Number(req.params.messageId))) {
-      sendApiError(res, 409, "CONFLICT", "Message was already delivered");
+      sendError(res, "CONFLICT", "Message was already delivered");
       return;
     }
     res.json({ ok: true });
@@ -142,7 +139,7 @@ export function agentActions(temporary = false) {
     try {
       res.json(agentRuntime.jobs.read(owner, req.params.id, req.params.jobId));
     } catch {
-      sendApiError(res, 404, "NOT_FOUND", "Job not found");
+      sendError(res, "NOT_FOUND", "Job not found");
     }
   });
   router.post("/:id/jobs/:jobId/cancel", async (req, res) => {
@@ -153,7 +150,7 @@ export function agentActions(temporary = false) {
         await agentRuntime.jobs.cancel(owner, req.params.id, req.params.jobId),
       );
     } catch {
-      sendApiError(res, 404, "NOT_FOUND", "Job not found");
+      sendError(res, "NOT_FOUND", "Job not found");
     }
   });
   router.get("/:id/runtime", (req, res) => {
@@ -167,7 +164,7 @@ export function agentActions(temporary = false) {
     const agents = agentRuntime.store.view(owner, req.params.id);
     const agent = agents.find((a) => a.id === req.params.agentId);
     if (!agent) {
-      sendApiError(res, 404, "NOT_FOUND", "Agent not found");
+      sendError(res, "NOT_FOUND", "Agent not found");
       return;
     }
     const messages = agents
@@ -184,7 +181,7 @@ export function agentActions(temporary = false) {
       .find((a) => a.id === req.params.agentId && a.kind !== "main");
     const agent = visible ? agentRuntime.store.get(visible.id) : undefined;
     if (!agent) {
-      sendApiError(res, 404, "NOT_FOUND", "Agent not found");
+      sendError(res, "NOT_FOUND", "Agent not found");
       return;
     }
     await agentRuntime.cancel(agent);

@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { ensureUserData } from "./db/index";
-import { sendApiError } from "./http/errors";
+import { sendError } from "./observability/http";
 
 export const USER_ID_HEADER = "x-euler-user-id";
 
@@ -16,10 +16,9 @@ export function normalizeUserId(value: unknown): string | null {
 export function requireUserId(req: Request, res: Response): string | null {
   const ownerUuid = normalizeUserId(req.get(USER_ID_HEADER));
   if (!ownerUuid) {
-    sendApiError(
+    sendError(
       res,
-      400,
-      "BAD_REQUEST",
+      "INVALID_REQUEST",
       `A valid ${USER_ID_HEADER} header is required`,
     );
     return null;

@@ -6,7 +6,11 @@ import { agentRuntime } from "./agents/runtime/AgentRuntime";
 import { getDb } from "./db/index";
 import { envConfig } from "./env";
 import { eventHub } from "./events/eventHub";
-import { errorHandler, sendApiError } from "./http/errors";
+import {
+  errorHandler,
+  requestObservability,
+  sendError,
+} from "./observability/http";
 import attachmentsRoutes from "./routes/attachments";
 import comfyuiRoutes from "./routes/comfyui";
 import debugPromptRoutes from "./routes/debugPrompt";
@@ -42,6 +46,7 @@ const allowedOrigins = allowedFrontendPorts.flatMap((port) => [
 ]);
 
 export const app = express();
+app.use(requestObservability);
 app.use(
   cors({
     origin: allowedOrigins,
@@ -87,7 +92,7 @@ if (envConfig.serveFrontend && existsSync(indexPath)) {
 }
 
 app.use("/api", (_req, res) => {
-  sendApiError(res, 404, "NOT_FOUND", "API route not found");
+  sendError(res, "NOT_FOUND", "API route not found");
 });
 
 app.use(errorHandler);

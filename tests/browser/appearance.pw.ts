@@ -253,7 +253,12 @@ test("settings save desktop: invalid preferences fall back and failed saves reta
     route.request().method() === "PATCH"
       ? route.fulfill({
           status: 503,
-          json: { error: { message: "Could not save appearance" } },
+          json: {
+            error: {
+              code: "INTERNAL_ERROR",
+              message: "Could not save appearance",
+            },
+          },
         })
       : route.fallback(),
   );

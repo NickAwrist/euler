@@ -1,15 +1,11 @@
 import { app } from "./app";
 import { envConfig } from "./env";
-import { logger } from "./logger";
+import { logEvent } from "./observability/logger";
 
 const PORT = envConfig.backendPort;
 app.listen(PORT, envConfig.backendHost, () => {
-  logger.info(
-    {
-      port: PORT,
-      host: envConfig.backendHost,
-      serveFrontend: envConfig.serveFrontend,
-    },
-    "API server listening",
-  );
+  logEvent("info", "server.listening", {
+    port: PORT,
+    host: envConfig.backendHost,
+  });
 });

@@ -12,7 +12,7 @@ import {
   getAttachment,
   getSessionById,
 } from "../db/index";
-import { sendApiError } from "../http/errors";
+import { sendError } from "../observability/http";
 import { requireUserId } from "../userIdentity";
 
 const router = Router();
@@ -85,16 +85,16 @@ router.post(
     if (!ownerUuid) return;
     const sessionId = req.header("X-Euler-Session-ID")?.trim() ?? "";
     if (!sessionId || !getSessionById(ownerUuid, sessionId)) {
-      sendApiError(res, 404, "NOT_FOUND", "Session not found");
+      sendError(res, "NOT_FOUND", "Session not found");
       return;
     }
     if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
-      sendApiError(res, 400, "BAD_REQUEST", "Image data is required");
+      sendError(res, "INVALID_REQUEST", "Image data is required");
       return;
     }
     const mimeType = detectImageMimeType(req.body);
     if (!mimeType || mimeType !== req.header("Content-Type")) {
-      sendApiError(res, 415, "BAD_REQUEST", "Unsupported image type");
+      sendError(res, "UNSUPPORTED_MEDIA_TYPE", "Unsupported image type");
       return;
     }
     const attachment: MessageAttachment = createImageAttachment({
@@ -113,7 +113,7 @@ router.get("/:id", (req, res) => {
   if (!ownerUuid) return;
   const attachment = getAttachment(ownerUuid, req.params.id);
   if (!attachment) {
-    sendApiError(res, 404, "NOT_FOUND", "Attachment not found");
+    sendError(res, "NOT_FOUND", "Attachment not found");
     return;
   }
   res.setHeader("Content-Type", attachment.mimeType);
@@ -127,7 +127,7 @@ router.delete("/:id", (req, res) => {
   const ownerUuid = requireUserId(req, res);
   if (!ownerUuid) return;
   if (!deleteAttachment(ownerUuid, req.params.id)) {
-    sendApiError(res, 404, "NOT_FOUND", "Attachment not found");
+    sendError(res, "NOT_FOUND", "Attachment not found");
     return;
   }
   res.json({ ok: true });

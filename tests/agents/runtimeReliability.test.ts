@@ -258,17 +258,20 @@ test("a failure while recording an activation does not stop the runtime", async 
       publish(target, event);
     },
   );
+  process.env.LOG_LEVEL = "error";
   const errors = spyOn(console, "error").mockImplementation(() => {});
+  const logged = (event: string) =>
+    errors.mock.calls.some(
+      ([line]) =>
+        typeof line === "string" &&
+        (JSON.parse(line) as { event?: string }).event === event,
+    );
   const settled = (length: number) =>
     runtime.snapshot(owner, main.sessionId).history.length === length &&
     !runtime.busy(owner, main.sessionId);
   try {
     runtime.send(main, { content: "Hello", attachmentIds: [] });
-    await until(() => settled(2) && errors.mock.calls.length > 0);
-    expect(errors).toHaveBeenCalledWith(
-      "Agent activation failed",
-      expect.any(Error),
-    );
+    await until(() => settled(2) && logged("activation.unrecorded"));
     // The end event was lost, so clients are told to reload the chat.
     expect(fault).toHaveBeenCalledWith(
       owner,
@@ -283,6 +286,7 @@ test("a failure while recording an activation does not stop the runtime", async 
   } finally {
     fault.mockRestore();
     errors.mockRestore();
+    process.env.LOG_LEVEL = "silent";
     await runtime.deleteSession(owner, main.sessionId);
   }
 });

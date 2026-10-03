@@ -1,7 +1,8 @@
 import WebSocket from "ws";
 import { getComfyUIHost } from "../db/index";
 import { DEFAULT_COMFYUI_HOST } from "../env";
-import { logger } from "../logger";
+import { OperationError } from "../observability/errors";
+import { observe } from "../observability/logger";
 import { providerHostConfig } from "../providerHostConfig";
 import { errorMessage } from "../utils/errors";
 
@@ -48,27 +49,15 @@ export class ComfyUIClient {
    * Serialize GPU/WebSocket work so concurrent image generations do not disconnect each other's WS.
    */
   runSerialized<T>(task: () => Promise<T>, label?: string): Promise<T> {
-    const log = logger.child({ component: "ComfyUIClient" });
     const enteredAt = Date.now();
-    const next = this.serializedQueue.then(async () => {
-      const startedAt = Date.now();
-      log.debug({
-        event: "comfy_queue_start",
+    const next = this.serializedQueue.then(() =>
+      observe("comfyui.generate", task, {
         label,
-        queueWaitMs: startedAt - enteredAt,
-      });
-      try {
-        return await task();
-      } finally {
-        log.debug({
-          event: "comfy_queue_done",
-          label,
-          runMs: Date.now() - startedAt,
-        });
-      }
-    });
+        queueWaitMs: Date.now() - enteredAt,
+      }),
+    );
     this.serializedQueue = next.catch(() => {});
-    return next as Promise<T>;
+    return next;
   }
 
   private get wsUrl(): string {
@@ -263,7 +252,11 @@ export class ComfyUIClient {
     type = "output",
   ): Promise<Response> {
     const url = this.getImageUrl(filename, subfolder, type);
-    return fetch(url);
+    try {
+      return await fetch(url);
+    } catch (cause) {
+      throw new OperationError("COMFY_UNREACHABLE", { cause });
+    }
   }
 
   disconnect(): void {

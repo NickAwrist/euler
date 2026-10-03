@@ -11,6 +11,8 @@ import {
 } from "node:path";
 import { DATA_ROOT } from "../db/constants";
 import type { SessionRow } from "../db/types";
+import { OperationError } from "../observability/errors";
+import { logEvent } from "../observability/logger";
 import { loadWorkspaceIgnore } from "./WorkspaceIgnore";
 
 export type WorkspaceKind = "sandbox" | "local";
@@ -45,9 +47,10 @@ const TEMPORARY_WORKSPACE_TTL_MS = 24 * 60 * 60 * 1000;
 const TRASH_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const SAFE_SEGMENT = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
 
-export class WorkspaceError extends Error {
+/** A rejected workspace operation whose message is safe to show. */
+export class WorkspaceError extends OperationError {
   constructor(message: string) {
-    super(message);
+    super("INVALID_REQUEST", { message });
     this.name = "WorkspaceError";
   }
 }
@@ -84,7 +87,7 @@ export class WorkspaceService {
   async initialize(): Promise<void> {
     this.cleanupTimer ??= setInterval(() => {
       void this.cleanupExpired().catch((error) =>
-        console.error("Workspace cleanup failed", error),
+        logEvent("error", "workspace.cleanup_failed", {}, error),
       );
     }, 60_000);
     this.cleanupTimer.unref();
@@ -441,6 +444,9 @@ export class WorkspaceService {
         (error.code === "ENOENT" || error.code === "ENOTDIR")
       )
         throw new WorkspaceError(`Path does not exist: ${path}`);
+      // NOFOLLOW refuses a link, which could lead outside the workspace.
+      if (error instanceof Error && "code" in error && error.code === "ELOOP")
+        throw new WorkspaceError("Path escapes the active workspace");
       throw error;
     } finally {
       await directory.close();

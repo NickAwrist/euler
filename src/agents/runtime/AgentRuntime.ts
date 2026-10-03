@@ -12,8 +12,9 @@ import {
 } from "../../db/sessions";
 import { envConfig } from "../../env";
 import { type Unsequenced, eventHub } from "../../events/eventHub";
-import { ApiError } from "../../http/errors";
 import { JobManager } from "../../jobs/JobManager";
+import { OperationError } from "../../observability/errors";
+import { logEvent, withBackgroundLogContext } from "../../observability/logger";
 import {
   type InboxMessage,
   type RewindRequest,
@@ -183,7 +184,9 @@ export class AgentRuntime {
   main(owner: string, sessionId: string, temporary = false): AgentRecord {
     // Its agents are gone, so one must not be created for a chat being deleted.
     if (this.deleting.has(sessionId))
-      throw new ApiError(409, "CONFLICT", "The conversation is being deleted");
+      throw new OperationError("CONFLICT", {
+        message: "The conversation is being deleted",
+      });
     queueMicrotask(() => this.release(sessionId));
     const existing = this.store
       .list(owner, sessionId)
@@ -372,7 +375,7 @@ export class AgentRuntime {
       try {
         this.pump();
       } catch (error) {
-        console.error("Agent scheduling failed", error);
+        logEvent("error", "agent.schedule_failed", {}, error);
       }
     });
   }
@@ -427,22 +430,32 @@ export class AgentRuntime {
         thinking: "",
         steps: [],
       };
-      const run = async () => {
-        try {
-          await this.activate(agent, controller.signal, partial);
-        } catch (error) {
-          this.contain(agent, error);
-        } finally {
-          this.active.delete(agent.id);
-          this.release(agent.sessionId);
-          this.notify();
-          this.schedule();
-        }
-      };
+      const run = () =>
+        withBackgroundLogContext(
+          {
+            sessionId: agent.sessionId,
+            agentId: agent.id,
+            activationId: partial.id,
+          },
+          async () => {
+            try {
+              await this.activate(agent, controller.signal, partial);
+            } catch (error) {
+              this.contain(agent, error);
+            } finally {
+              this.active.delete(agent.id);
+              this.release(agent.sessionId);
+              this.notify();
+              this.schedule();
+            }
+          },
+        );
       // Install the lock before activation starts, including workspace resolution.
       const promise = Promise.resolve()
         .then(run)
-        .catch((error) => console.error("Agent scheduling failed", error));
+        .catch((error) =>
+          logEvent("error", "agent.schedule_failed", {}, error),
+        );
       this.active.set(agent.id, { controller, promise, partial });
     }
     for (const sessionId of this.store.cachedSessions())
@@ -453,7 +466,7 @@ export class AgentRuntime {
    * failed, such as a database error. It must not stop the runtime.
    */
   private contain(record: AgentRecord, error: unknown) {
-    console.error("Agent activation failed", error);
+    logEvent("error", "activation.unrecorded", {}, error);
     // Clients may have missed the activation's end, so they reload its chat.
     this.resync(record.ownerUuid, record.sessionId);
     try {
@@ -464,7 +477,7 @@ export class AgentRuntime {
         error instanceof Error ? error.message : String(error);
       this.status(agent);
     } catch (followup) {
-      console.error("Could not record the failed activation", followup);
+      logEvent("error", "activation.containment_failed", {}, followup);
     }
   }
   /** The number of transcript messages, without loading them. */
@@ -787,17 +800,13 @@ export class AgentRuntime {
       getMessagesForSession(owner, sessionId);
     const target = history[request.position];
     if (!target || target.role !== "user")
-      throw new ApiError(
-        400,
-        "BAD_REQUEST",
-        "Rewind must target a user message",
-      );
+      throw new OperationError("INVALID_REQUEST", {
+        message: "Rewind must target a user message",
+      });
     if (this.isChanging(sessionId))
-      throw new ApiError(
-        409,
-        "CONFLICT",
-        "The conversation is already being changed",
-      );
+      throw new OperationError("CONFLICT", {
+        message: "The conversation is already being changed",
+      });
     this.rewinding.add(sessionId);
     try {
       await this.jobs.cancelAgent(owner, sessionId);

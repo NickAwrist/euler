@@ -217,7 +217,10 @@ test("view navigation desktop keeps settings open when Save and leave fails", as
 }) => {
   await mockApp(page);
   await page.route("**/api/ollama/config", (route) =>
-    route.fulfill({ status: 500, json: { error: "Unavailable" } }),
+    route.fulfill({
+      status: 500,
+      json: { error: { code: "INTERNAL_ERROR", message: "Unavailable" } },
+    }),
   );
   await mockUserPreferences(page);
   await page.goto("/run/a");

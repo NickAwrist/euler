@@ -154,7 +154,7 @@ test("session loading: async agents continue across chat messages and browser re
   await page.route("**/api/sessions/*/messages", (route) =>
     route.fulfill({
       status: 400,
-      json: { error: { code: "BAD_REQUEST", message: "Message rejected" } },
+      json: { error: { code: "INVALID_REQUEST", message: "Message rejected" } },
     }),
   );
   await input.fill("Retain this draft");

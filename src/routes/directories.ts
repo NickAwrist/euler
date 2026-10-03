@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { Router } from "express";
 import { envConfig } from "../env";
-import { sendApiError } from "../http/errors";
+import { sendError } from "../observability/http";
 import { requireUserId } from "../userIdentity";
 
 const router = Router();
@@ -11,10 +11,9 @@ const router = Router();
 router.get("/", async (req, res) => {
   if (!requireUserId(req, res)) return;
   if (req.query.path !== undefined && typeof req.query.path !== "string") {
-    sendApiError(
+    sendError(
       res,
-      400,
-      "BAD_REQUEST",
+      "INVALID_REQUEST",
       "Enter an absolute folder path on the server",
     );
     return;
@@ -26,10 +25,9 @@ router.get("/", async (req, res) => {
       ? join(home, input.slice(1))
       : input || home;
   if (!isAbsolute(expanded) || expanded.includes("\0")) {
-    sendApiError(
+    sendError(
       res,
-      400,
-      "BAD_REQUEST",
+      "INVALID_REQUEST",
       "Enter an absolute folder path on the server",
     );
     return;
@@ -39,12 +37,7 @@ router.get("/", async (req, res) => {
     let prefix = "";
     try {
       if (!(await fs.stat(path)).isDirectory()) {
-        sendApiError(
-          res,
-          400,
-          "BAD_REQUEST",
-          "Selected path is not a directory",
-        );
+        sendError(res, "INVALID_REQUEST", "Selected path is not a directory");
         return;
       }
     } catch (error) {
@@ -84,10 +77,9 @@ router.get("/", async (req, res) => {
       directories,
     });
   } catch {
-    sendApiError(
+    sendError(
       res,
-      400,
-      "BAD_REQUEST",
+      "INVALID_REQUEST",
       "Could not browse this directory. Check that it exists and is accessible.",
     );
   }

@@ -1,3 +1,4 @@
+import { logEvent } from "../../observability/logger";
 import { missingToolResults } from "../toolResults";
 import type { ActivationHost } from "./activation";
 import { inboxModelContent } from "./agentContext";
@@ -15,6 +16,10 @@ export type RecoveryHost = Pick<
 export function recoverInterrupted(host: RecoveryHost) {
   const { store } = host;
   for (const agent of store.interrupted()) {
+    logEvent("warn", "activation.interrupted", {
+      sessionId: agent.sessionId,
+      agentId: agent.id,
+    });
     store.failRunningSteps(agent.id, "Interrupted by server restart");
     const reply = agent.kind === "main" ? store.reply(agent.id) : undefined;
     const steps = agent.kind === "main" ? store.steps(agent.id) : [];

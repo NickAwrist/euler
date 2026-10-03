@@ -8,6 +8,7 @@ import { getAttachment } from "../../db/attachments";
 import { getSessionById } from "../../db/sessions";
 import type { Unsequenced } from "../../events/eventHub";
 import type { LlmMessage } from "../../llm";
+import { logEvent } from "../../observability/logger";
 import { isFinalAgent } from "../../schemas/agents";
 import type { Activation } from "../../schemas/events";
 import type { WireMessageInput } from "../../schemas/run";
@@ -81,6 +82,9 @@ export async function runActivation(
   agent.status = "running";
   agent.interruption = undefined;
   host.status(agent);
+  const started = performance.now();
+  let failure: unknown;
+  logEvent("info", "activation.started", { model: agent.model });
   host.emit(agent.ownerUuid, {
     type: "activation_started",
     sessionId: agent.sessionId,
@@ -351,6 +355,7 @@ export async function runActivation(
     });
   } catch (error) {
     outcome = signal.aborted ? "aborted" : "error";
+    failure = error;
     // An error ends the activation, not the agent: it keeps its context.
     agent.status =
       signal.aborted && agent.kind !== "main" ? "cancelled" : "idle";
@@ -373,6 +378,17 @@ export async function runActivation(
       });
     }
   } finally {
+    logEvent(
+      outcome === "error" ? "warn" : "info",
+      "activation.finished",
+      {
+        model: agent.model,
+        outcome,
+        durationMs: Math.round(performance.now() - started),
+        reason: outcome === "error" ? agent.activity : undefined,
+      },
+      outcome === "error" ? failure : undefined,
+    );
     if (isFinalAgent(agent)) agent.endedAt = Date.now();
     host.status(agent);
     host.emit(agent.ownerUuid, {

@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import { POPULAR_PUBLISHERS } from "../openRouterPublishers";
 import { createAgentTables } from "./agentTables";
 import { migrateAttachmentMetadata } from "./attachmentMetadataMigration";
+import { migrateJobErrors } from "./jobErrorMigration";
 
 function tableExists(db: Database, name: string): boolean {
   return (
@@ -216,6 +217,7 @@ export function runMigrations(db: Database) {
   db.run(
     "CREATE INDEX IF NOT EXISTS idx_jobs_session ON jobs(session_id, owner_uuid)",
   );
+  migrateJobErrors(db);
   const columns = db.query("PRAGMA table_info(sessions)").all() as {
     name: string;
   }[];
