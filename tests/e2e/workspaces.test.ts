@@ -29,6 +29,21 @@ async function createSession(url: string): Promise<string> {
   return String(((await response.json()) as { id: string }).id);
 }
 
+function postWorkspace(url: string, id: string, action: string, body = {}) {
+  return fetch(`${url}/api/sessions/${id}/workspace/${action}`, {
+    method: "POST",
+    headers: userHeaders(undefined, { "Content-Type": "application/json" }),
+    body: JSON.stringify(body),
+  });
+}
+
+function deleteChat(url: string, id: string) {
+  return fetch(`${url}/api/sessions/${id}`, {
+    method: "DELETE",
+    headers: userHeaders(),
+  });
+}
+
 describe("workspace API", () => {
   test("selects and switches server directories remotely", async () => {
     const { url, close } = await startTestServer();
@@ -211,19 +226,8 @@ describe("workspace API", () => {
 
   test("a linked sandbox survives until the last chat using it is gone", async () => {
     const { url, close } = await startTestServer();
-    const post = (path: string, body?: unknown) =>
-      fetch(`${url}/api/sessions/${path}`, {
-        method: "POST",
-        headers: userHeaders(undefined, { "Content-Type": "application/json" }),
-        body: JSON.stringify(body ?? {}),
-      });
     const link = (id: string, sessionId: string) =>
-      post(`${id}/workspace/link`, { sessionId });
-    const remove = (id: string) =>
-      fetch(`${url}/api/sessions/${id}`, {
-        method: "DELETE",
-        headers: userHeaders(),
-      });
+      postWorkspace(url, id, "link", { sessionId });
     try {
       const [a, b, c] = [
         await createSession(url),
@@ -256,7 +260,7 @@ describe("workspace API", () => {
       expect((await link(c, b)).status).toBe(200);
       expect(getSessionById(TEST_USER_ID, c)?.linked_workspace_id).toBe(a);
 
-      expect((await remove(a)).status).toBe(200);
+      expect((await deleteChat(url, a)).status).toBe(200);
       expect(await fs.readFile(file, "utf8")).toBe("linked");
       const stored = await fetch(`${url}/api/sessions/${b}`, {
         headers: userHeaders(),
@@ -266,7 +270,7 @@ describe("workspace API", () => {
         workspace: { linked: { workspaceId: a, sessionId: c } },
       });
 
-      expect((await post(`${b}/workspace/use-sandbox`)).status).toBe(200);
+      expect((await postWorkspace(url, b, "use-sandbox")).status).toBe(200);
       expect(getSessionById(TEST_USER_ID, b)?.linked_workspace_id).toBeNull();
       expect(await fs.readFile(file, "utf8")).toBe("linked");
 
@@ -275,13 +279,10 @@ describe("workspace API", () => {
         join(tmpdir(), "orbis-link-release-test-"),
       );
       temporaryDirectories.push(localDirectory);
-      expect(
-        (
-          await post(`${c}/workspace/select-directory`, {
-            path: localDirectory,
-          })
-        ).status,
-      ).toBe(200);
+      const selected = await postWorkspace(url, c, "select-directory", {
+        path: localDirectory,
+      });
+      expect(selected.status).toBe(200);
       expect(await fs.exists(original.hostPath)).toBeFalse();
     } finally {
       await close();
@@ -296,23 +297,10 @@ describe("workspace API", () => {
       const original = await workspaceService.resolveSession(
         getSessionById(TEST_USER_ID, a)!,
       );
-      const response = await fetch(`${url}/api/sessions/${b}/workspace/link`, {
-        method: "POST",
-        headers: userHeaders(undefined, {
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({ sessionId: a }),
-      });
-      expect(response.status).toBe(200);
+      const linked = await postWorkspace(url, b, "link", { sessionId: a });
+      expect(linked.status).toBe(200);
       for (const id of [a, b]) {
-        expect(
-          (
-            await fetch(`${url}/api/sessions/${id}`, {
-              method: "DELETE",
-              headers: userHeaders(),
-            })
-          ).status,
-        ).toBe(200);
+        expect((await deleteChat(url, id)).status).toBe(200);
         expect(await fs.exists(original.hostPath)).toBe(id === a);
       }
     } finally {
@@ -325,14 +313,7 @@ describe("workspace API", () => {
     try {
       const a = await createSession(url);
       const b = await createSession(url);
-      const link = () =>
-        fetch(`${url}/api/sessions/${b}/workspace/link`, {
-          method: "POST",
-          headers: userHeaders(undefined, {
-            "Content-Type": "application/json",
-          }),
-          body: JSON.stringify({ sessionId: a }),
-        });
+      const link = () => postWorkspace(url, b, "link", { sessionId: a });
       const active = spyOn(agentRuntime, "busy").mockReturnValue(true);
       try {
         expect((await link()).status).toBe(409);

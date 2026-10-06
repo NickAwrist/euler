@@ -149,10 +149,16 @@ listing, and scans open path components without following symlinks. Deletes use
 an open parent directory and unlink the final entry without following it. Ignore
 rules are read only from within the workspace through the same protected access.
 
+Run `/link` in a chat to work in another chat's sandbox. Linking to a chat that
+is itself linked joins the same sandbox, so links never chain. `/sandbox`
+returns the chat to its own sandbox. A sandbox is kept while any chat created it
+or links to it, and is removed once the last of them is deleted or switches away.
+
 Ephemeral chats expire after 24 hours, or `EULER_EPHEMERAL_CHAT_TTL_HOURS`. The
 server checks for expired chats every minute, deferring deletion during active
 turns, and permanently deletes their messages, agents, jobs, and sandbox without
-moving it to the trash. Selected local directories are never removed.
+moving it to the trash. A sandbox another chat still links to is kept, and goes
+to the trash once no chat uses it. Selected local directories are never removed.
 
 The sandbox integration tests report skips when Bubblewrap is unavailable. Run
 `bun test --preload ./tests/setup.ts tests/sandbox` on a Linux host with working

@@ -114,17 +114,16 @@ export function useSessionPreferences({
     [activeSessionIdRef, applyWorkspace],
   );
 
-  const privateSandbox = workspace.kind === "sandbox" && !workspace.linked;
   const returnToSandbox = useCallback(async () => {
     const sid = activeSessionIdRef.current;
-    if (!sid || privateSandbox || returningToSandboxRef.current) return;
+    if (!sid || returningToSandboxRef.current) return;
     returningToSandboxRef.current = true;
     try {
       await applyWorkspace(sid, await useSessionSandbox(sid));
     } finally {
       returningToSandboxRef.current = false;
     }
-  }, [activeSessionIdRef, applyWorkspace, privateSandbox]);
+  }, [activeSessionIdRef, applyWorkspace]);
 
   return {
     selectedModel,

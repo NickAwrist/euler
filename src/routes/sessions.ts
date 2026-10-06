@@ -84,6 +84,7 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
     return;
   }
   const path = await workspaceService.canonicalDirectory(parsed.data.path);
+  // Re-read after the await: a turn may have started or the link changed.
   const row = idleSession(req, res);
   if (!row) return;
   patchSessionRow(row.owner_uuid, row.id, {
