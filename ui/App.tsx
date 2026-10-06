@@ -19,6 +19,7 @@ import { ExpiresIn } from "./components/ExpiresIn";
 import { JobContext } from "./components/Jobs/JobContext";
 import { JobTraceModal } from "./components/Jobs/JobTraceModal";
 import { JobsList } from "./components/Jobs/JobsList";
+import { LinkWorkspaceModal } from "./components/LinkWorkspaceModal";
 import { ProviderSetupBanner } from "./components/OllamaDisconnectedBanner";
 import { Onboarding } from "./components/Onboarding";
 import { RenameSessionModal } from "./components/RenameSessionModal";
@@ -51,6 +52,7 @@ import {
   parseRoute,
   sessionPath,
 } from "./lib/navigation";
+import { linkedChatLabel } from "./lib/sessionLabel";
 import { cancelAgent } from "./persist/agents";
 import { CHAT_MAX_WIDTHS, loadAppearance } from "./persist/appearance";
 import { cancelJob } from "./persist/jobs";
@@ -60,7 +62,7 @@ import { cx } from "./styles";
 
 type ChatViewProps = {
   app: ReturnType<typeof useRunApp>;
-  directoryOpen: boolean;
+  sessionModalOpen: boolean;
   stepsModalOpen: boolean;
   runCommand: (command: RunCommandName) => Promise<void>;
   onCustomization: () => void;
@@ -79,14 +81,14 @@ function loadArtifactState() {
 
 function ChatView({
   app,
-  directoryOpen,
+  sessionModalOpen,
   stepsModalOpen,
   runCommand,
   onCustomization,
   onSettings,
   onUsage,
 }: ChatViewProps) {
-  const workspaceKey = `${app.activeSessionId}:${app.workspace.kind === "local" ? app.workspace.path : "sandbox"}`;
+  const workspaceKey = `${app.activeSessionId}:${app.workspace.kind === "local" ? app.workspace.path : (app.workspace.linked?.workspaceId ?? "sandbox")}`;
   const [artifactView, setArtifactView] = useState<"files" | "agents" | "jobs">(
     "files",
   );
@@ -275,7 +277,7 @@ function ChatView({
       Boolean(app.renameSessionId) ||
       app.truncateConfirm != null ||
       Boolean(app.pendingDeleteSessionId) ||
-      directoryOpen ||
+      sessionModalOpen ||
       app.debugOpen ||
       stepsModalOpen,
     sessions: app.sessions,
@@ -513,6 +515,7 @@ function ChatView({
                 attachImageDisabledReason={app.attachImageDisabledReason}
                 attachmentsSendReady={app.attachmentsSendReady}
                 workspace={app.workspace}
+                linkedLabel={linkedChatLabel(app.workspace, app.sessions)}
                 onRunCommand={runCommand}
                 onFooterHeightChange={setRunFooterInset}
               />
@@ -598,11 +601,13 @@ export default function App() {
   };
 
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const [directorySessionId, setDirectorySessionId] = useState<string | null>(
-    null,
-  );
-  const directoryOpen =
-    directorySessionId !== null && directorySessionId === app.activeSessionId;
+  // A picker belongs to the chat it was opened in.
+  const [sessionModal, setSessionModal] = useState<{
+    kind: "directory" | "link";
+    sessionId: string;
+  } | null>(null);
+  const openSessionModal =
+    sessionModal?.sessionId === app.activeSessionId ? sessionModal.kind : null;
 
   const openCustomization = () => {
     app.setSidebarOpen(false);
@@ -617,7 +622,8 @@ export default function App() {
   const runCommand = async (command: RunCommandName) => {
     try {
       const sessionId = app.activeSessionId ?? (await app.startSession());
-      if (command === "directory") setDirectorySessionId(sessionId);
+      if (command === "directory" || command === "link")
+        setSessionModal({ kind: command, sessionId });
       if (command === "sandbox") await app.returnToSandbox();
       if (command === "workspace") setWorkspaceOpen(true);
     } catch (error) {
@@ -705,7 +711,7 @@ export default function App() {
         ) : (
           <ChatView
             app={app}
-            directoryOpen={directoryOpen}
+            sessionModalOpen={openSessionModal !== null}
             stepsModalOpen={stepsModalOpen}
             runCommand={runCommand}
             onCustomization={openCustomization}
@@ -765,19 +771,29 @@ export default function App() {
             onConfirm={app.performDeleteSession}
           />
         )}
-        {directoryOpen && (
+        {openSessionModal === "directory" && (
           <DirectoryModal
             initialPath={
               app.workspace.kind === "local" ? app.workspace.path : ""
             }
             onSelect={app.chooseDirectory}
-            onClose={() => setDirectorySessionId(null)}
+            onClose={() => setSessionModal(null)}
+          />
+        )}
+        {openSessionModal === "link" && (
+          <LinkWorkspaceModal
+            sessions={app.sessions.filter(
+              (session) => session.id !== app.activeSessionId,
+            )}
+            onSelect={app.linkWorkspace}
+            onClose={() => setSessionModal(null)}
           />
         )}
         {workspaceOpen && app.activeSessionId && (
           <WorkspaceModal
             sessionId={app.activeSessionId}
             workspace={app.workspace}
+            linkedLabel={linkedChatLabel(app.workspace, app.sessions)}
             onClose={() => setWorkspaceOpen(false)}
           />
         )}

@@ -61,13 +61,32 @@ export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
   });
 }
 
+/**
+ * A chat working in sandbox `workspaceId`, preferring the chat that created it.
+ * Null means no chat other than `excludeId` uses it.
+ */
+export function findWorkspaceUser(
+  ownerUuid: string,
+  workspaceId: string,
+  excludeId = "",
+): string | null {
+  const row = getDb()
+    .query(
+      "SELECT id FROM sessions WHERE owner_uuid = ? AND id != ? AND (id = ? OR linked_workspace_id = ?) ORDER BY id = ? DESC, created_at LIMIT 1",
+    )
+    .get(ownerUuid, excludeId, workspaceId, workspaceId, workspaceId) as {
+    id: string;
+  } | null;
+  return row?.id ?? null;
+}
+
 export function getSessionById(
   ownerUuid: string,
   id: string,
 ): SessionRow | null {
   const row = getDb()
     .query(
-      "SELECT id, owner_uuid, created_at, updated_at, title, model, session_directory, workspace_kind, expires_at FROM sessions WHERE owner_uuid = ? AND id = ?",
+      "SELECT id, owner_uuid, created_at, updated_at, title, model, session_directory, workspace_kind, expires_at, linked_workspace_id FROM sessions WHERE owner_uuid = ? AND id = ?",
     )
     .get(ownerUuid, id) as SessionRow | null;
   return row ?? null;
@@ -77,7 +96,7 @@ export function getSessionById(
 export function listExpiredSessions(now: number): SessionRow[] {
   return getDb()
     .query(
-      "SELECT id, owner_uuid, created_at, updated_at, title, model, session_directory, workspace_kind, expires_at FROM sessions WHERE expires_at <= ?",
+      "SELECT id, owner_uuid, created_at, updated_at, title, model, session_directory, workspace_kind, expires_at, linked_workspace_id FROM sessions WHERE expires_at <= ?",
     )
     .all(now) as SessionRow[];
 }
@@ -209,6 +228,7 @@ export function createSessionRow(
     session_directory: null,
     workspace_kind: "sandbox",
     expires_at: expiresAt,
+    linked_workspace_id: null,
   };
 }
 
@@ -229,6 +249,7 @@ export function patchSessionRow(
     model?: string | null;
     session_directory?: string | null;
     workspace_kind?: "sandbox" | "local";
+    linked_workspace_id?: string | null;
     updated_at?: number;
   },
 ): boolean {
@@ -242,11 +263,24 @@ export function patchSessionRow(
       ? patch.session_directory
       : existing.session_directory;
   const workspaceKind = patch.workspace_kind ?? existing.workspace_kind;
+  const linkedWorkspaceId =
+    patch.linked_workspace_id !== undefined
+      ? patch.linked_workspace_id
+      : existing.linked_workspace_id;
   const updatedAt = patch.updated_at ?? Date.now();
 
   getDb().run(
-    "UPDATE sessions SET title = ?, model = ?, session_directory = ?, workspace_kind = ?, updated_at = ? WHERE owner_uuid = ? AND id = ?",
-    [title, model, sessionDirectory, workspaceKind, updatedAt, ownerUuid, id],
+    "UPDATE sessions SET title = ?, model = ?, session_directory = ?, workspace_kind = ?, linked_workspace_id = ?, updated_at = ? WHERE owner_uuid = ? AND id = ?",
+    [
+      title,
+      model,
+      sessionDirectory,
+      workspaceKind,
+      linkedWorkspaceId,
+      updatedAt,
+      ownerUuid,
+      id,
+    ],
   );
   return true;
 }

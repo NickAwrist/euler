@@ -2,7 +2,11 @@ import "../setup";
 import { expect, spyOn, test } from "bun:test";
 import fs from "node:fs/promises";
 import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
-import { createSessionRow, getSessionById } from "../../src/db/sessions";
+import {
+  createSessionRow,
+  getSessionById,
+  patchSessionRow,
+} from "../../src/db/sessions";
 import { deleteExpiredSessions } from "../../src/sessions/lifecycle";
 import { workspaceService } from "../../src/workspaces/WorkspaceService";
 
@@ -42,4 +46,18 @@ test("expiry hard-deletes idle expired chats and leaves busy, unexpired, and sav
 
   await deleteExpiredSessions(now);
   expect(getSessionById(owner, busy.id)).toBeNull();
+});
+
+test("expiry keeps an ephemeral chat's sandbox while a saved chat links to it", async () => {
+  const now = Date.now();
+  const expired = await chat(now - 1);
+  const saved = await chat(null);
+  patchSessionRow(owner, saved.id, { linked_workspace_id: expired.id });
+
+  await deleteExpiredSessions(now);
+
+  expect(getSessionById(owner, expired.id)).toBeNull();
+  expect(await fs.readFile(`${expired.hostPath}/output.txt`, "utf8")).toBe(
+    "output",
+  );
 });

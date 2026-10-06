@@ -13,6 +13,7 @@ import { DATA_ROOT } from "../db/constants";
 import type { SessionRow } from "../db/types";
 import { OperationError } from "../observability/errors";
 import { logEvent } from "../observability/logger";
+import type { SessionWorkspace } from "../schemas/sessions";
 import { loadWorkspaceIgnore } from "./WorkspaceIgnore";
 
 export type WorkspaceKind = "sandbox" | "local";
@@ -22,10 +23,6 @@ export type Workspace = {
   hostPath: string;
   displayPath: string;
 };
-
-export type SessionWorkspace =
-  | { kind: "sandbox" }
-  | { kind: "local"; path: string; label: string };
 
 export type WorkspaceFile = {
   path: string;
@@ -112,15 +109,31 @@ export class WorkspaceService {
       const hostPath = await this.canonicalDirectory(row.session_directory);
       return { kind: "local", hostPath, displayPath: "/workspace" };
     }
-    return this.provisionRetained(row.owner_uuid, row.id);
+    return this.provisionRetained(
+      row.owner_uuid,
+      row.linked_workspace_id ?? row.id,
+    );
   }
 
-  presentation(row: SessionRow): SessionWorkspace {
+  /** `linkedSessionId` is another chat using the linked sandbox, if any. */
+  presentation(
+    row: SessionRow,
+    linkedSessionId: string | null = null,
+  ): SessionWorkspace {
     if (row.workspace_kind === "local" && row.session_directory?.trim()) {
       return {
         kind: "local",
         path: row.session_directory,
         label: basename(row.session_directory) || row.session_directory,
+      };
+    }
+    if (row.linked_workspace_id) {
+      return {
+        kind: "sandbox",
+        linked: {
+          workspaceId: row.linked_workspace_id,
+          sessionId: linkedSessionId,
+        },
       };
     }
     return { kind: "sandbox" };

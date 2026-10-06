@@ -1,5 +1,6 @@
 import { Download, Loader2, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { sessionLabel } from "../../lib/sessionLabel";
 import { cx } from "../../styles";
 import type { SessionSummary } from "../../types";
 import { ExpiresIn } from "../ExpiresIn";
@@ -62,7 +63,7 @@ export function SessionListItem({
                 aria-label="New reply"
               />
             )}
-            {session.preview || "New chat"}
+            {sessionLabel(session)}
           </div>
           <div className="mt-0.5 flex gap-1 text-[0.6875rem] text-muted-foreground">
             <time

@@ -160,6 +160,7 @@ export function useRunApp() {
     selectedModel: sessions.selectedModel,
     workspace: sessions.workspace,
     chooseDirectory: sessions.chooseDirectory,
+    linkWorkspace: sessions.linkWorkspace,
     returnToSandbox: sessions.returnToSandbox,
     ollamaConnected: ollama.ollamaConnected,
     noProviderAvailable,

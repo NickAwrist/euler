@@ -4,6 +4,14 @@ import { WireMessageSchema } from "./run";
 export const SessionWorkspaceSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("sandbox"),
+    /** Present when this chat is linked to another chat's sandbox. */
+    linked: z
+      .object({
+        workspaceId: z.string(),
+        /** Another chat using the sandbox, preferring the one that created it. */
+        sessionId: z.string().nullable(),
+      })
+      .optional(),
   }),
   z.object({
     kind: z.literal("local"),
@@ -13,6 +21,10 @@ export const SessionWorkspaceSchema = z.discriminatedUnion("kind", [
 ]);
 
 export type SessionWorkspace = z.infer<typeof SessionWorkspaceSchema>;
+
+export const WorkspaceResponseSchema = z.object({
+  workspace: SessionWorkspaceSchema,
+});
 
 export const SessionSummarySchema = z.object({
   badge: z.enum(["working", "unread"]).nullable().optional(),

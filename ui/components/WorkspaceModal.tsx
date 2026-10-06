@@ -13,10 +13,13 @@ import { Modal } from "./Modal";
 export function WorkspaceModal({
   sessionId,
   workspace,
+  linkedLabel,
   onClose,
 }: {
   sessionId: string;
   workspace: SessionWorkspace;
+  /** The chat whose sandbox this chat is linked to, if any. */
+  linkedLabel: string | null;
   onClose: () => void;
 }) {
   const [files, setFiles] = useState<WorkspaceFile[] | null>(null);
@@ -56,7 +59,11 @@ export function WorkspaceModal({
     <Modal
       title="Workspace files"
       subtitle={
-        workspace.kind === "local" ? workspace.path : "Private chat workspace"
+        workspace.kind === "local"
+          ? workspace.path
+          : linkedLabel
+            ? `Linked to ${linkedLabel}'s workspace`
+            : "Private chat workspace"
       }
       ariaLabel="Workspace files"
       onClose={onClose}

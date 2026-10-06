@@ -233,4 +233,6 @@ export function runMigrations(db: Database) {
   db.run(
     "CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at) WHERE expires_at IS NOT NULL",
   );
+  if (!columns.some((c) => c.name === "linked_workspace_id"))
+    db.run("ALTER TABLE sessions ADD COLUMN linked_workspace_id TEXT");
 }

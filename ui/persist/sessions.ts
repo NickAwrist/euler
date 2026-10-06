@@ -7,6 +7,7 @@ import {
   SessionSummaryListSchema,
   type SessionWorkspace,
   StoredRunSessionSchema,
+  WorkspaceResponseSchema,
 } from "../../src/schemas/sessions";
 import { apiBlob, apiJson, apiVoid } from "../lib/api";
 import type { Message, WorkspaceFile } from "../types";
@@ -124,14 +125,24 @@ export async function selectSessionDirectory(
   id: string,
   path: string,
 ): Promise<SessionWorkspace> {
-  const data = await apiJson<{ workspace: SessionWorkspace }>(
-    `${workspacePath(id)}/select-directory`,
-    {
+  return WorkspaceResponseSchema.parse(
+    await apiJson(`${workspacePath(id)}/select-directory`, {
       method: "POST",
       json: { path },
-    },
-  );
-  return data.workspace;
+    }),
+  ).workspace;
+}
+
+export async function linkSessionWorkspace(
+  id: string,
+  sourceSessionId: string,
+): Promise<SessionWorkspace> {
+  return WorkspaceResponseSchema.parse(
+    await apiJson(`${workspacePath(id)}/link`, {
+      method: "POST",
+      json: { sessionId: sourceSessionId },
+    }),
+  ).workspace;
 }
 
 export async function useSessionSandbox(id: string): Promise<SessionWorkspace> {

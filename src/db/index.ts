@@ -14,6 +14,7 @@ export {
   deleteSessionRow,
   getMessagesForSession,
   getSessionById,
+  findWorkspaceUser,
   listSessionSummaries,
   patchSessionRow,
   countMessagesForSession,

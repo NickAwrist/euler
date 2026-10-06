@@ -10,6 +10,7 @@ import {
 import { effectiveDefaultRunModel } from "../../lib/defaultModel";
 import {
   fetchSession,
+  linkSessionWorkspace,
   patchSessionApi,
   selectSessionDirectory,
   useSessionSandbox,
@@ -79,35 +80,51 @@ export function useSessionPreferences({
     [activeSessionIdRef, refreshSessions],
   );
 
-  const chooseDirectory = useCallback(
-    async (path: string) => {
-      const sid = activeSessionIdRef.current;
-      if (!sid) return;
-      const selected = await selectSessionDirectory(sid, path);
-      if (activeSessionIdRef.current === sid) {
-        setWorkspace(selected);
-        const refreshed = await fetchSession(sid);
-        if (refreshed && activeSessionIdRef.current === sid) {
-          setMessages(refreshed.history);
-        }
+  /** Shows a changed workspace and the event it recorded, if still active. */
+  const applyWorkspace = useCallback(
+    async (sid: string, next: SessionWorkspace) => {
+      if (activeSessionIdRef.current !== sid) return;
+      setWorkspace(next);
+      const refreshed = await fetchSession(sid);
+      if (refreshed && activeSessionIdRef.current === sid) {
+        setMessages(refreshed.history);
       }
     },
     [activeSessionIdRef, setMessages],
   );
 
+  const chooseDirectory = useCallback(
+    async (path: string) => {
+      const sid = activeSessionIdRef.current;
+      if (sid)
+        await applyWorkspace(sid, await selectSessionDirectory(sid, path));
+    },
+    [activeSessionIdRef, applyWorkspace],
+  );
+
+  const linkWorkspace = useCallback(
+    async (sourceSessionId: string) => {
+      const sid = activeSessionIdRef.current;
+      if (sid)
+        await applyWorkspace(
+          sid,
+          await linkSessionWorkspace(sid, sourceSessionId),
+        );
+    },
+    [activeSessionIdRef, applyWorkspace],
+  );
+
+  const privateSandbox = workspace.kind === "sandbox" && !workspace.linked;
   const returnToSandbox = useCallback(async () => {
     const sid = activeSessionIdRef.current;
-    if (!sid || workspace.kind !== "local" || returningToSandboxRef.current)
-      return;
+    if (!sid || privateSandbox || returningToSandboxRef.current) return;
     returningToSandboxRef.current = true;
     try {
-      setWorkspace(await useSessionSandbox(sid));
-      const refreshed = await fetchSession(sid);
-      if (refreshed) setMessages(refreshed.history);
+      await applyWorkspace(sid, await useSessionSandbox(sid));
     } finally {
       returningToSandboxRef.current = false;
     }
-  }, [activeSessionIdRef, setMessages, workspace.kind]);
+  }, [activeSessionIdRef, applyWorkspace, privateSandbox]);
 
   return {
     selectedModel,
@@ -121,6 +138,7 @@ export function useSessionPreferences({
     handleThinkingEffortChange,
     handleModelChange,
     chooseDirectory,
+    linkWorkspace,
     returnToSandbox,
   };
 }

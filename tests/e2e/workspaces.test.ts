@@ -209,6 +209,147 @@ describe("workspace API", () => {
     }
   });
 
+  test("a linked sandbox survives until the last chat using it is gone", async () => {
+    const { url, close } = await startTestServer();
+    const post = (path: string, body?: unknown) =>
+      fetch(`${url}/api/sessions/${path}`, {
+        method: "POST",
+        headers: userHeaders(undefined, { "Content-Type": "application/json" }),
+        body: JSON.stringify(body ?? {}),
+      });
+    const link = (id: string, sessionId: string) =>
+      post(`${id}/workspace/link`, { sessionId });
+    const remove = (id: string) =>
+      fetch(`${url}/api/sessions/${id}`, {
+        method: "DELETE",
+        headers: userHeaders(),
+      });
+    try {
+      const [a, b, c] = [
+        await createSession(url),
+        await createSession(url),
+        await createSession(url),
+      ];
+      const original = await workspaceService.resolveSession(
+        getSessionById(TEST_USER_ID, a)!,
+      );
+      const file = join(original.hostPath, "notes.txt");
+      await fs.writeFile(file, "linked");
+
+      expect((await link(a, a)).status).toBe(400);
+      const linkedResponse = await link(b, a);
+      expect(linkedResponse.status).toBe(200);
+      expect(await linkedResponse.json()).toMatchObject({
+        workspace: {
+          kind: "sandbox",
+          linked: { workspaceId: a, sessionId: a },
+        },
+      });
+      expect(
+        (
+          await workspaceService.resolveSession(
+            getSessionById(TEST_USER_ID, b)!,
+          )
+        ).hostPath,
+      ).toBe(original.hostPath);
+      // Linking to B joins the sandbox B works in rather than chaining to B.
+      expect((await link(c, b)).status).toBe(200);
+      expect(getSessionById(TEST_USER_ID, c)?.linked_workspace_id).toBe(a);
+
+      expect((await remove(a)).status).toBe(200);
+      expect(await fs.readFile(file, "utf8")).toBe("linked");
+      const stored = await fetch(`${url}/api/sessions/${b}`, {
+        headers: userHeaders(),
+      });
+      expect(await stored.json()).toMatchObject({
+        // With A gone, B is shown as linked to C, which still uses the sandbox.
+        workspace: { linked: { workspaceId: a, sessionId: c } },
+      });
+
+      expect((await post(`${b}/workspace/use-sandbox`)).status).toBe(200);
+      expect(getSessionById(TEST_USER_ID, b)?.linked_workspace_id).toBeNull();
+      expect(await fs.readFile(file, "utf8")).toBe("linked");
+
+      // The last reference switching away releases the orphaned sandbox.
+      const localDirectory = await fs.mkdtemp(
+        join(tmpdir(), "orbis-link-release-test-"),
+      );
+      temporaryDirectories.push(localDirectory);
+      expect(
+        (
+          await post(`${c}/workspace/select-directory`, {
+            path: localDirectory,
+          })
+        ).status,
+      ).toBe(200);
+      expect(await fs.exists(original.hostPath)).toBeFalse();
+    } finally {
+      await close();
+    }
+  });
+
+  test("deleting the last linked chat trashes the sandbox", async () => {
+    const { url, close } = await startTestServer();
+    try {
+      const a = await createSession(url);
+      const b = await createSession(url);
+      const original = await workspaceService.resolveSession(
+        getSessionById(TEST_USER_ID, a)!,
+      );
+      const response = await fetch(`${url}/api/sessions/${b}/workspace/link`, {
+        method: "POST",
+        headers: userHeaders(undefined, {
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({ sessionId: a }),
+      });
+      expect(response.status).toBe(200);
+      for (const id of [a, b]) {
+        expect(
+          (
+            await fetch(`${url}/api/sessions/${id}`, {
+              method: "DELETE",
+              headers: userHeaders(),
+            })
+          ).status,
+        ).toBe(200);
+        expect(await fs.exists(original.hostPath)).toBe(id === a);
+      }
+    } finally {
+      await close();
+    }
+  });
+
+  test("linking refuses local chats and busy chats", async () => {
+    const { url, close } = await startTestServer();
+    try {
+      const a = await createSession(url);
+      const b = await createSession(url);
+      const link = () =>
+        fetch(`${url}/api/sessions/${b}/workspace/link`, {
+          method: "POST",
+          headers: userHeaders(undefined, {
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify({ sessionId: a }),
+        });
+      const active = spyOn(agentRuntime, "busy").mockReturnValue(true);
+      try {
+        expect((await link()).status).toBe(409);
+      } finally {
+        active.mockRestore();
+      }
+      patchSessionRow(TEST_USER_ID, a, {
+        workspace_kind: "local",
+        session_directory: tmpdir(),
+      });
+      expect((await link()).status).toBe(400);
+      expect(getSessionById(TEST_USER_ID, b)?.linked_workspace_id).toBeNull();
+    } finally {
+      await close();
+    }
+  });
+
   for (const swap of ["file", "parent"] as const) {
     test(`download pins the ${swap} during replacement`, async () => {
       const { url, close } = await startTestServer();

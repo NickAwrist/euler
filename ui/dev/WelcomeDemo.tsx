@@ -57,6 +57,7 @@ export default function WelcomeDemo() {
         removePendingImage={noop}
         canAttachImages={false}
         attachmentsSendReady
+        linkedLabel={null}
         workspace={{ kind: "sandbox" }}
         onRunCommand={noop}
         onFooterHeightChange={setComposerHeight}

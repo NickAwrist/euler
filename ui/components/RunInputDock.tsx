@@ -1,4 +1,12 @@
-import { ArrowUp, Folder, ImagePlus, Square, Upload, X } from "lucide-react";
+import {
+  ArrowUp,
+  Folder,
+  ImagePlus,
+  Link,
+  Square,
+  Upload,
+  X,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import {
   useCallback,
@@ -50,6 +58,7 @@ export function RunInputDock({
   attachImageDisabledReason,
   attachmentsSendReady,
   workspace,
+  linkedLabel,
   onRunCommand,
   onFooterHeightChange,
 }: {
@@ -78,6 +87,8 @@ export function RunInputDock({
   attachImageDisabledReason?: string;
   attachmentsSendReady: boolean;
   workspace: SessionWorkspace;
+  /** The chat whose sandbox this chat is linked to, if any. */
+  linkedLabel: string | null;
   onRunCommand: (command: RunCommandName) => void | Promise<void>;
   onFooterHeightChange: (heightPx: number) => void;
 }) {
@@ -108,7 +119,7 @@ export function RunInputDock({
         .slice(0, 8)
     : [];
   const skillPickerOpen = matchingSkills.length > 0;
-  const matchingCommands = matchingRunCommands(input, workspace.kind);
+  const matchingCommands = matchingRunCommands(input, workspace);
   const commandPickerOpen = !isBusy && matchingCommands.length > 0;
 
   const runCommand = (command: RunCommandName) => {
@@ -207,6 +218,14 @@ export function RunInputDock({
           <Folder size={13} />
           <span className="min-w-0 truncate" title={workspace.path}>
             Working in {workspace.label}
+          </span>
+        </div>
+      )}
+      {linkedLabel && (
+        <div className="pointer-events-auto flex w-full max-w-[var(--chat-width)] items-center gap-2 px-1 text-xs text-muted-foreground">
+          <Link size={13} />
+          <span className="min-w-0 truncate" title={linkedLabel}>
+            Linked to {linkedLabel}'s workspace
           </span>
         </div>
       )}

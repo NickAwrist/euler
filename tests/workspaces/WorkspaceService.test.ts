@@ -37,6 +37,7 @@ function sessionRow(directory: string | null): SessionRow {
     session_directory: directory,
     workspace_kind: directory ? "local" : "sandbox",
     expires_at: Date.now(),
+    linked_workspace_id: null,
   };
 }
 
