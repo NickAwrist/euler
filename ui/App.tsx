@@ -52,7 +52,6 @@ import {
   parseRoute,
   sessionPath,
 } from "./lib/navigation";
-import { linkedChatLabel } from "./lib/sessionLabel";
 import { cancelAgent } from "./persist/agents";
 import { CHAT_MAX_WIDTHS, loadAppearance } from "./persist/appearance";
 import { cancelJob } from "./persist/jobs";
@@ -515,7 +514,7 @@ function ChatView({
                 attachImageDisabledReason={app.attachImageDisabledReason}
                 attachmentsSendReady={app.attachmentsSendReady}
                 workspace={app.workspace}
-                linkedLabel={linkedChatLabel(app.workspace, app.sessions)}
+                linkedLabel={app.linkedLabel}
                 onRunCommand={runCommand}
                 onFooterHeightChange={setRunFooterInset}
               />
@@ -793,7 +792,7 @@ export default function App() {
           <WorkspaceModal
             sessionId={app.activeSessionId}
             workspace={app.workspace}
-            linkedLabel={linkedChatLabel(app.workspace, app.sessions)}
+            linkedLabel={app.linkedLabel}
             onClose={() => setWorkspaceOpen(false)}
           />
         )}

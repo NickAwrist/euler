@@ -62,17 +62,17 @@ export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
 }
 
 /**
- * A chat working in sandbox `workspaceId`, preferring the chat that created it.
- * Null means no chat other than `excludeId` uses it.
+ * A chat other than `excludeId` working in sandbox `workspaceId`, preferring
+ * the chat that created it. Null means no such chat exists.
  */
 export function findWorkspaceUser(
   ownerUuid: string,
   workspaceId: string,
-  excludeId = "",
+  excludeId: string | null = null,
 ): string | null {
   const row = getDb()
     .query(
-      "SELECT id FROM sessions WHERE owner_uuid = ? AND id != ? AND (id = ? OR linked_workspace_id = ?) ORDER BY id = ? DESC, created_at LIMIT 1",
+      "SELECT id FROM sessions WHERE owner_uuid = ? AND id IS NOT ? AND (id = ? OR linked_workspace_id = ?) ORDER BY id = ? DESC, created_at LIMIT 1",
     )
     .get(ownerUuid, excludeId, workspaceId, workspaceId, workspaceId) as {
     id: string;

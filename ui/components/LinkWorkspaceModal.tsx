@@ -14,11 +14,11 @@ export function LinkWorkspaceModal({
   onSelect: (sessionId: string) => Promise<void>;
   onClose: () => void;
 }) {
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const select = async (sessionId: string) => {
-    setPendingId(sessionId);
+    setPending(true);
     setError(null);
     try {
       await onSelect(sessionId);
@@ -28,7 +28,7 @@ export function LinkWorkspaceModal({
         cause instanceof Error ? cause.message : "Could not link workspace",
       );
     } finally {
-      setPendingId(null);
+      setPending(false);
     }
   };
 
@@ -37,7 +37,7 @@ export function LinkWorkspaceModal({
       title="Link a chat's workspace"
       subtitle="This chat will read, edit, and run commands in the other chat's files. Linked files are kept until every chat using them is deleted."
       onClose={onClose}
-      closeDisabled={pendingId !== null}
+      closeDisabled={pending}
       maxWidthClass="max-w-[520px]"
     >
       {error && (
@@ -48,7 +48,7 @@ export function LinkWorkspaceModal({
       <div
         className="max-h-[min(420px,60dvh)] overflow-y-auto p-1"
         aria-label="Chats"
-        aria-busy={pendingId !== null}
+        aria-busy={pending}
       >
         {sessions.length === 0 && (
           <output className="block px-3 py-3 text-sm text-muted-foreground">
@@ -59,7 +59,7 @@ export function LinkWorkspaceModal({
           <button
             key={session.id}
             type="button"
-            disabled={pendingId !== null}
+            disabled={pending}
             onClick={() => void select(session.id)}
             className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-muted focus-visible:bg-muted focus-visible:outline-none disabled:opacity-40"
           >

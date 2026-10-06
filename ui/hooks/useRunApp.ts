@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { InputCapability } from "../../src/modelCapabilities";
 import { traceStepsForModal } from "../components/ExecutionTrace";
+import { linkedChatLabel } from "../lib/sessionLabel";
 import { resolveEffectiveThinkingEffort } from "../lib/thinkingLevel";
 import type {
   DebugData,
@@ -159,6 +160,7 @@ export function useRunApp() {
     modelsLoadError: ollama.modelsLoadError,
     selectedModel: sessions.selectedModel,
     workspace: sessions.workspace,
+    linkedLabel: linkedChatLabel(sessions.workspace, sessions.sessions),
     chooseDirectory: sessions.chooseDirectory,
     linkWorkspace: sessions.linkWorkspace,
     returnToSandbox: sessions.returnToSandbox,
