@@ -58,7 +58,7 @@ export function RunInputDock({
   attachImageDisabledReason,
   attachmentsSendReady,
   workspace,
-  temporary,
+  linkedLabel,
   onRunCommand,
   onFooterHeightChange,
 }: {
@@ -87,7 +87,8 @@ export function RunInputDock({
   attachImageDisabledReason?: string;
   attachmentsSendReady: boolean;
   workspace: SessionWorkspace;
-  temporary: boolean;
+  /** The chat whose sandbox this chat is linked to, if any. */
+  linkedLabel: string | null;
   onRunCommand: (command: RunCommandName) => void | Promise<void>;
   onFooterHeightChange: (heightPx: number) => void;
 }) {
@@ -118,7 +119,7 @@ export function RunInputDock({
         .slice(0, 8)
     : [];
   const skillPickerOpen = matchingSkills.length > 0;
-  const matchingCommands = matchingRunCommands(input, workspace, temporary);
+  const matchingCommands = matchingRunCommands(input, workspace);
   const commandPickerOpen = !isBusy && matchingCommands.length > 0;
 
   const runCommand = (command: RunCommandName) => {
@@ -220,11 +221,11 @@ export function RunInputDock({
           </span>
         </div>
       )}
-      {workspace.kind === "sandbox" && workspace.linked && (
+      {linkedLabel && (
         <div className="pointer-events-auto flex w-full max-w-[var(--chat-width)] items-center gap-2 px-1 text-xs text-muted-foreground">
           <Link size={13} />
-          <span className="min-w-0 truncate" title={workspace.linked.label}>
-            Linked to {workspace.linked.label}'s workspace
+          <span className="min-w-0 truncate" title={linkedLabel}>
+            Linked to {linkedLabel}'s workspace
           </span>
         </div>
       )}

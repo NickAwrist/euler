@@ -1,10 +1,13 @@
 import {
+  type CreateSessionBody,
+  type CreatedSession,
+  CreatedSessionSchema,
   type StoredRunSession as SchemaStoredRunSession,
   type SessionSummary,
   SessionSummaryListSchema,
   type SessionWorkspace,
-  SessionWorkspaceSchema,
   StoredRunSessionSchema,
+  WorkspaceResponseSchema,
 } from "../../src/schemas/sessions";
 import { apiBlob, apiJson, apiVoid } from "../lib/api";
 import type { Message, WorkspaceFile } from "../types";
@@ -77,29 +80,25 @@ async function fetchSessionData(id: string): Promise<StoredRunSession | null> {
               label: String((raw.workspace as { label?: unknown }).label ?? ""),
             }
           : { kind: "sandbox" },
+      expiresAt: typeof raw.expiresAt === "number" ? raw.expiresAt : null,
     };
   }
   return null;
 }
 
-export async function createSessionApi(opts?: {
+export async function createSessionApi(opts: {
   model?: string | null;
-}): Promise<{
-  id: string;
-  createdAt: number;
-  updatedAt: number;
-}> {
-  const body: Record<string, string> = {};
-  if (opts?.model?.trim()) body.model = opts.model.trim();
-  const j = await apiJson<Record<string, unknown>>("/api/sessions", {
-    method: "POST",
-    json: body,
-  });
-  return {
-    id: String(j.id ?? ""),
-    createdAt: Number(j.createdAt) || Date.now(),
-    updatedAt: Number(j.updatedAt) || Date.now(),
-  };
+  ephemeral?: boolean;
+}): Promise<CreatedSession> {
+  const body: CreateSessionBody = {};
+  if (opts.model?.trim()) body.model = opts.model.trim();
+  if (opts.ephemeral) body.ephemeral = true;
+  return CreatedSessionSchema.parse(
+    await apiJson<unknown>("/api/sessions", {
+      method: "POST",
+      json: body,
+    }),
+  );
 }
 
 export function patchSessionApi(
@@ -119,41 +118,35 @@ export function deleteSessionApi(id: string): Promise<void> {
   });
 }
 
+const workspacePath = (id: string) =>
+  `/api/sessions/${encodeURIComponent(id)}/workspace`;
+
 export async function selectSessionDirectory(
   id: string,
   path: string,
-  temporary = false,
 ): Promise<SessionWorkspace> {
-  const base = temporary ? "/api/temporary-sessions" : "/api/sessions";
-  const data = await apiJson<{ workspace: SessionWorkspace }>(
-    `${base}/${encodeURIComponent(id)}/workspace/select-directory`,
-    {
+  return WorkspaceResponseSchema.parse(
+    await apiJson(`${workspacePath(id)}/select-directory`, {
       method: "POST",
       json: { path },
-    },
-  );
-  return data.workspace;
+    }),
+  ).workspace;
 }
 
 export async function linkSessionWorkspace(
   id: string,
   sourceSessionId: string,
 ): Promise<SessionWorkspace> {
-  const data = await apiJson<unknown>(
-    `/api/sessions/${encodeURIComponent(id)}/workspace/link`,
-    { method: "POST", json: { sessionId: sourceSessionId } },
-  );
-  return SessionWorkspaceSchema.parse(
-    (data as { workspace?: unknown } | null)?.workspace,
-  );
+  return WorkspaceResponseSchema.parse(
+    await apiJson(`${workspacePath(id)}/link`, {
+      method: "POST",
+      json: { sessionId: sourceSessionId },
+    }),
+  ).workspace;
 }
 
-export async function useSessionSandbox(
-  id: string,
-  temporary = false,
-): Promise<SessionWorkspace> {
-  const base = temporary ? "/api/temporary-sessions" : "/api/sessions";
-  await apiVoid(`${base}/${encodeURIComponent(id)}/workspace/use-sandbox`, {
+export async function useSessionSandbox(id: string): Promise<SessionWorkspace> {
+  await apiVoid(`${workspacePath(id)}/use-sandbox`, {
     method: "POST",
   });
   return { kind: "sandbox" };
@@ -161,51 +154,28 @@ export async function useSessionSandbox(
 
 export async function fetchWorkspaceFiles(
   id: string,
-  temporary = false,
 ): Promise<WorkspaceFile[]> {
-  const path = temporary
-    ? `/api/temporary-sessions/${encodeURIComponent(id)}/files`
-    : `/api/sessions/${encodeURIComponent(id)}/workspace/files`;
-  const data = await apiJson<{ files?: WorkspaceFile[] }>(path);
+  const data = await apiJson<{ files?: WorkspaceFile[] }>(
+    `${workspacePath(id)}/files`,
+  );
   return Array.isArray(data.files) ? data.files : [];
 }
 
 export async function downloadWorkspaceFile(
   sessionId: string,
   filePath: string,
-  temporary = false,
 ): Promise<Blob> {
-  const path = temporary
-    ? `/api/temporary-sessions/${encodeURIComponent(sessionId)}/file?path=${encodeURIComponent(filePath)}`
-    : `/api/sessions/${encodeURIComponent(sessionId)}/workspace/file?path=${encodeURIComponent(filePath)}`;
-  return apiBlob(path);
+  return apiBlob(
+    `${workspacePath(sessionId)}/file?path=${encodeURIComponent(filePath)}`,
+  );
 }
 
 export function revealWorkspaceFile(
   sessionId: string,
   filePath: string,
-  temporary = false,
 ): Promise<void> {
-  const base = temporary
-    ? `/api/temporary-sessions/${encodeURIComponent(sessionId)}`
-    : `/api/sessions/${encodeURIComponent(sessionId)}/workspace`;
-  return apiVoid(`${base}/reveal`, {
+  return apiVoid(`${workspacePath(sessionId)}/reveal`, {
     method: "POST",
     json: { path: filePath },
-  });
-}
-
-export async function createTemporarySessionApi(): Promise<{ id: string }> {
-  const data = await apiJson<{ id?: unknown }>("/api/temporary-sessions", {
-    method: "POST",
-  });
-  return { id: String(data.id ?? "") };
-}
-
-export function deleteTemporarySessionApi(id: string): Promise<void> {
-  return apiVoid(`/api/temporary-sessions/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-    keepalive: true,
-    notFound: "null",
   });
 }

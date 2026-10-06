@@ -38,7 +38,6 @@ export const WorkspaceFileAttachmentSchema = z.object({
   path: z.string().min(1),
   sessionId: z.string().min(1),
   workspaceKind: z.enum(["sandbox", "local"]),
-  temporary: z.boolean(),
 });
 
 export const COMFYUI_VIEW_PREFIX = "/api/comfyui/view/";

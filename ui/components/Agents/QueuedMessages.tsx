@@ -8,13 +8,11 @@ import {
 import { Button } from "../Button";
 export function QueuedMessages({
   sessionId,
-  temporary,
   messages,
   held,
   refresh,
 }: {
   sessionId: string;
-  temporary: boolean;
   messages: InboxMessage[];
   held: boolean;
   refresh: () => Promise<void>;
@@ -58,12 +56,7 @@ export function QueuedMessages({
                 disabled={pending || !draft.trim()}
                 onClick={() =>
                   void act(async () => {
-                    await editQueuedMessage(
-                      sessionId,
-                      message.id,
-                      draft,
-                      temporary,
-                    );
+                    await editQueuedMessage(sessionId, message.id, draft);
                     setEditing(null);
                   })
                 }
@@ -102,9 +95,7 @@ export function QueuedMessages({
             size="sm"
             disabled={pending}
             onClick={() =>
-              void act(() =>
-                removeQueuedMessage(sessionId, message.id, temporary),
-              )
+              void act(() => removeQueuedMessage(sessionId, message.id))
             }
           >
             Remove
@@ -118,9 +109,7 @@ export function QueuedMessages({
             variant="ghost"
             size="sm"
             disabled={pending}
-            onClick={() =>
-              void act(() => agentAction(sessionId, "deliver", {}, temporary))
-            }
+            onClick={() => void act(() => agentAction(sessionId, "deliver"))}
           >
             Deliver
           </Button>

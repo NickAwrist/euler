@@ -27,13 +27,14 @@ export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
   const db = getDb();
   const sessions = db
     .query(
-      "SELECT id, created_at, updated_at, title, last_activity_at > last_viewed_at AS unread FROM sessions WHERE owner_uuid = ? ORDER BY updated_at DESC",
+      "SELECT id, created_at, updated_at, title, expires_at, last_activity_at > last_viewed_at AS unread FROM sessions WHERE owner_uuid = ? ORDER BY updated_at DESC",
     )
     .all(ownerUuid) as Array<{
     id: string;
     created_at: number;
     updated_at: number;
     title: string | null;
+    expires_at: number | null;
     unread: number;
   }>;
 
@@ -49,6 +50,7 @@ export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
       created_at: s.created_at,
       updated_at: s.updated_at,
       title: s.title,
+      expires_at: s.expires_at,
       unread: s.unread === 1,
       preview: previewFromTitleAndFirstUser(
         s.title,
@@ -59,37 +61,23 @@ export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
   });
 }
 
-/** The sidebar label of one chat, or null when it no longer exists. */
-export function getSessionLabel(ownerUuid: string, id: string): string | null {
-  const row = getDb()
-    .query(
-      `SELECT s.title, (SELECT content FROM messages WHERE session_id = s.id AND role = 'user' ORDER BY position ASC LIMIT 1) AS first_user
-       FROM sessions s WHERE s.owner_uuid = ? AND s.id = ?`,
-    )
-    .get(ownerUuid, id) as {
-    title: string | null;
-    first_user: string | null;
-  } | null;
-  if (!row) return null;
-  return previewFromTitleAndFirstUser(
-    row.title,
-    row.first_user,
-    new Set(listSkills(ownerUuid).map((skill) => skill.name)),
-  );
-}
-
-/** A sandbox stays alive while its originating chat or any linked chat exists. */
-export function isWorkspaceReferenced(
+/**
+ * A chat working in sandbox `workspaceId`, preferring the chat that created it.
+ * Null means no chat other than `excludeId` uses it.
+ */
+export function findWorkspaceUser(
   ownerUuid: string,
   workspaceId: string,
-): boolean {
-  return (
-    getDb()
-      .query(
-        "SELECT 1 FROM sessions WHERE owner_uuid = ? AND (id = ? OR linked_workspace_id = ?) LIMIT 1",
-      )
-      .get(ownerUuid, workspaceId, workspaceId) !== null
-  );
+  excludeId = "",
+): string | null {
+  const row = getDb()
+    .query(
+      "SELECT id FROM sessions WHERE owner_uuid = ? AND id != ? AND (id = ? OR linked_workspace_id = ?) ORDER BY id = ? DESC, created_at LIMIT 1",
+    )
+    .get(ownerUuid, excludeId, workspaceId, workspaceId, workspaceId) as {
+    id: string;
+  } | null;
+  return row?.id ?? null;
 }
 
 export function getSessionById(
@@ -98,10 +86,19 @@ export function getSessionById(
 ): SessionRow | null {
   const row = getDb()
     .query(
-      "SELECT id, owner_uuid, created_at, updated_at, title, model, session_directory, workspace_kind, linked_workspace_id FROM sessions WHERE owner_uuid = ? AND id = ?",
+      "SELECT id, owner_uuid, created_at, updated_at, title, model, session_directory, workspace_kind, expires_at, linked_workspace_id FROM sessions WHERE owner_uuid = ? AND id = ?",
     )
     .get(ownerUuid, id) as SessionRow | null;
   return row ?? null;
+}
+
+/** Ephemeral chats whose expiry has passed, across owners. */
+export function listExpiredSessions(now: number): SessionRow[] {
+  return getDb()
+    .query(
+      "SELECT id, owner_uuid, created_at, updated_at, title, model, session_directory, workspace_kind, expires_at, linked_workspace_id FROM sessions WHERE expires_at <= ?",
+    )
+    .all(now) as SessionRow[];
 }
 
 export function countMessagesForSession(sessionId: string): number {
@@ -214,11 +211,12 @@ export function createSessionRow(
   id: string,
   now: number,
   model: string | null,
+  expiresAt: number | null = null,
 ): SessionRow {
   const db = getDb();
   db.run(
-    "INSERT INTO sessions (id, owner_uuid, created_at, updated_at, title, model) VALUES (?, ?, ?, ?, NULL, ?)",
-    [id, ownerUuid, now, now, model],
+    "INSERT INTO sessions (id, owner_uuid, created_at, updated_at, title, model, expires_at) VALUES (?, ?, ?, ?, NULL, ?, ?)",
+    [id, ownerUuid, now, now, model, expiresAt],
   );
   return {
     id,
@@ -229,6 +227,7 @@ export function createSessionRow(
     model,
     session_directory: null,
     workspace_kind: "sandbox",
+    expires_at: expiresAt,
     linked_workspace_id: null,
   };
 }

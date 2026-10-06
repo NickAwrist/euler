@@ -25,7 +25,6 @@ import { changedWorkspaceFiles } from "./workspaceOutputs";
 export interface ActivationHost {
   jobs: import("../../jobs/JobManager").JobManager;
   store: AgentStore;
-  temporaryHistory: Map<string, WireMessageInput[]>;
   status(agent: AgentRecord): void;
   emit(owner: string, event: Unsequenced): void;
   append(agent: AgentRecord, message: WireMessageInput): void;
@@ -129,12 +128,8 @@ export async function runActivation(
   };
   try {
     const session = getSessionById(agent.ownerUuid, agent.sessionId);
-    const workspace = session
-      ? await workspaceService.resolveSession(session)
-      : await workspaceService.resolveTemporary(
-          agent.ownerUuid,
-          agent.sessionId,
-        );
+    if (!session) throw new Error("Session not found");
+    const workspace = await workspaceService.resolveSession(session);
     const options = {
       ownerUuid: agent.ownerUuid,
       toolSessionDir: workspace.hostPath,
@@ -319,7 +314,6 @@ export async function runActivation(
       workspace,
       ctx.writtenFiles,
       agent.sessionId,
-      host.temporaryHistory.has(agent.sessionId),
     );
     host.atomically(agent.sessionId, closeSegment);
     if (signal.aborted) {

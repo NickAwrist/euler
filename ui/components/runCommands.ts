@@ -20,7 +20,6 @@ export const RUN_COMMANDS: readonly RunCommand[] = [
 export function matchingRunCommands(
   input: string,
   workspace: SessionWorkspace,
-  temporary: boolean,
 ): readonly RunCommand[] {
   const trimmed = input.trimStart();
   if (
@@ -35,9 +34,7 @@ export function matchingRunCommands(
   return RUN_COMMANDS.filter(
     (command) =>
       command.name.startsWith(query) &&
-      (command.name !== "sandbox" || !privateSandbox) &&
-      // Temporary chats are discarded with their workspace, so they never link.
-      (command.name !== "link" || !temporary),
+      (command.name !== "sandbox" || !privateSandbox),
   );
 }
 

@@ -8,7 +8,6 @@ export interface ApiRequestOptions {
   headers?: HeadersInit;
   signal?: AbortSignal;
   errorMessage?: string;
-  keepalive?: boolean;
   notFound?: "null" | "throw";
 }
 
@@ -30,7 +29,6 @@ export async function userApiFetch(
     headers,
     body,
     signal: options.signal,
-    keepalive: options.keepalive,
   });
 
   if (response.status === 404 && options.notFound === "null") {
@@ -62,7 +60,6 @@ export async function globalApiFetch(
     headers,
     body,
     signal: options.signal,
-    keepalive: options.keepalive,
   });
 
   if (response.status === 404 && options.notFound === "null") {

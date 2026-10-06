@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import { Router } from "express";
+import { type Request, type Response, Router } from "express";
 import { agentRuntime } from "../agents/runtime/AgentRuntime";
 import { withoutImageData } from "../db/agents";
 import {
@@ -7,10 +7,9 @@ import {
   appendSessionEvent,
   createSessionRow,
   deleteSessionRow,
+  findWorkspaceUser,
   getMessagesForSession,
   getSessionById,
-  getSessionLabel,
-  isWorkspaceReferenced,
   listSessionSummaries,
   patchSessionRow,
 } from "../db/index";
@@ -28,41 +27,27 @@ import {
   LinkWorkspaceSchema,
   SelectDirectorySchema,
 } from "../schemas/workspace";
+import {
+  deleteSession,
+  ephemeralExpiry,
+  releaseWorkspace,
+} from "../sessions/lifecycle";
 import { requireUserId } from "../userIdentity";
 import { workspaceService } from "../workspaces/WorkspaceService";
 import { agentActions } from "./agentActions";
 import { artifactRoutes } from "./artifacts";
 
-/** Trashes sandboxes that no remaining chat originates or links. */
-async function releaseWorkspaces(
-  ownerUuid: string,
-  workspaceIds: Array<string | null>,
-) {
-  for (const id of new Set(workspaceIds)) {
-    if (id && !isWorkspaceReferenced(ownerUuid, id))
-      await workspaceService.trashRetained(ownerUuid, id);
-  }
-}
-
-function presentWorkspace(row: SessionRow) {
-  return workspaceService.presentation(
-    row,
-    row.linked_workspace_id &&
-      getSessionLabel(row.owner_uuid, row.linked_workspace_id),
-  );
-}
-
-const router = Router();
-router.use(agentActions(false));
-router.use("/:id/workspace/artifacts", artifactRoutes(false));
-
-router.post("/:id/workspace/select-directory", async (req, res) => {
+/** The chat when it exists and is idle; otherwise responds with the error. */
+function idleSession(
+  req: Request<{ id: string }>,
+  res: Response,
+): SessionRow | null {
   const ownerUuid = requireUserId(req, res);
-  if (!ownerUuid) return;
+  if (!ownerUuid) return null;
   const row = getSessionById(ownerUuid, req.params.id);
   if (!row) {
     sendError(res, "NOT_FOUND", "Session not found");
-    return;
+    return null;
   }
   if (agentRuntime.busy(ownerUuid, row.id)) {
     sendError(
@@ -70,8 +55,25 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
       "CONFLICT",
       "Wait for the current turn to finish before changing workspaces",
     );
-    return;
+    return null;
   }
+  return row;
+}
+
+function presentWorkspace(row: SessionRow) {
+  const workspaceId = row.linked_workspace_id;
+  return workspaceService.presentation(
+    row,
+    workspaceId && findWorkspaceUser(row.owner_uuid, workspaceId, row.id),
+  );
+}
+
+const router = Router();
+router.use(agentActions());
+router.use("/:id/workspace/artifacts", artifactRoutes());
+
+router.post("/:id/workspace/select-directory", async (req, res) => {
+  if (!idleSession(req, res)) return;
   const parsed = SelectDirectorySchema.safeParse(req.body);
   if (!parsed.success) {
     sendError(
@@ -82,22 +84,19 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
     return;
   }
   const path = await workspaceService.canonicalDirectory(parsed.data.path);
-  if (agentRuntime.busy(ownerUuid, row.id)) {
-    sendError(
-      res,
-      "CONFLICT",
-      "Wait for the current turn to finish before changing workspaces",
-    );
-    return;
-  }
-  const previous = getSessionById(ownerUuid, row.id)?.linked_workspace_id;
-  patchSessionRow(ownerUuid, row.id, {
+  const row = idleSession(req, res);
+  if (!row) return;
+  patchSessionRow(row.owner_uuid, row.id, {
     workspace_kind: "local",
     session_directory: path,
     linked_workspace_id: null,
   });
-  appendSessionEvent(ownerUuid, row.id, `Working directory changed to ${path}`);
-  await releaseWorkspaces(ownerUuid, [previous ?? null]);
+  appendSessionEvent(
+    row.owner_uuid,
+    row.id,
+    `Working directory changed to ${path}`,
+  );
+  await releaseWorkspace(row.owner_uuid, row.linked_workspace_id);
   res.json({
     workspace: {
       kind: "local",
@@ -108,69 +107,41 @@ router.post("/:id/workspace/select-directory", async (req, res) => {
 });
 
 router.post("/:id/workspace/use-sandbox", async (req, res) => {
-  const ownerUuid = requireUserId(req, res);
-  if (!ownerUuid) return;
-  const row = getSessionById(ownerUuid, req.params.id);
-  if (!row) {
-    sendError(res, "NOT_FOUND", "Session not found");
-    return;
-  }
-  if (agentRuntime.busy(ownerUuid, row.id)) {
-    sendError(
-      res,
-      "CONFLICT",
-      "Wait for the current turn to finish before changing workspaces",
+  const row = idleSession(req, res);
+  if (!row) return;
+  await workspaceService.provisionRetained(row.owner_uuid, row.id);
+  const current = getSessionById(row.owner_uuid, row.id);
+  if (current?.workspace_kind === "local" || current?.linked_workspace_id) {
+    patchSessionRow(row.owner_uuid, row.id, {
+      workspace_kind: "sandbox",
+      session_directory: null,
+      linked_workspace_id: null,
+    });
+    appendSessionEvent(
+      row.owner_uuid,
+      row.id,
+      "Returned to the private workspace",
     );
-    return;
+    await releaseWorkspace(row.owner_uuid, current.linked_workspace_id);
   }
-  await workspaceService.provisionRetained(ownerUuid, row.id);
-  const current = getSessionById(ownerUuid, row.id);
-  if (current?.workspace_kind === "sandbox" && !current.linked_workspace_id) {
-    res.json({ workspace: { kind: "sandbox" } });
-    return;
-  }
-  patchSessionRow(ownerUuid, row.id, {
-    workspace_kind: "sandbox",
-    session_directory: null,
-    linked_workspace_id: null,
-  });
-  appendSessionEvent(ownerUuid, row.id, "Returned to the private workspace");
-  await releaseWorkspaces(ownerUuid, [current?.linked_workspace_id ?? null]);
   res.json({ workspace: { kind: "sandbox" } });
 });
 
 router.post("/:id/workspace/link", async (req, res) => {
-  const ownerUuid = requireUserId(req, res);
-  if (!ownerUuid) return;
-  const row = getSessionById(ownerUuid, req.params.id);
-  if (!row) {
-    sendError(res, "NOT_FOUND", "Session not found");
-    return;
-  }
-  if (agentRuntime.busy(ownerUuid, row.id)) {
-    sendError(
-      res,
-      "CONFLICT",
-      "Wait for the current turn to finish before changing workspaces",
-    );
-    return;
-  }
+  const row = idleSession(req, res);
+  if (!row) return;
   const parsed = LinkWorkspaceSchema.safeParse(req.body);
   if (!parsed.success) {
     sendValidationError(res, parsed.error);
     return;
   }
-  const source = getSessionById(ownerUuid, parsed.data.sessionId);
+  const source = getSessionById(row.owner_uuid, parsed.data.sessionId);
   if (!source) {
     sendError(res, "NOT_FOUND", "Chat not found");
     return;
   }
   if (source.id === row.id) {
-    sendError(
-      res,
-      "INVALID_REQUEST",
-      "Choose another chat to link its workspace",
-    );
+    sendError(res, "INVALID_REQUEST", "Choose another chat to link");
     return;
   }
   if (source.workspace_kind === "local") {
@@ -184,31 +155,24 @@ router.post("/:id/workspace/link", async (req, res) => {
   // Join the source's current sandbox so links never form chains.
   const workspaceId = source.linked_workspace_id ?? source.id;
   const linked = workspaceId === row.id ? null : workspaceId;
-  if (row.workspace_kind === "sandbox" && row.linked_workspace_id === linked) {
-    res.json({ workspace: presentWorkspace(row) });
-    return;
-  }
-  // No await separates reading the source from recording the reference.
-  patchSessionRow(ownerUuid, row.id, {
+  const patch = {
     workspace_kind: "sandbox",
     session_directory: null,
     linked_workspace_id: linked,
-  });
-  const updated = getSessionById(ownerUuid, row.id);
-  if (!updated) {
-    sendError(res, "NOT_FOUND", "Session not found");
-    return;
+  } as const;
+  if (row.workspace_kind !== "sandbox" || row.linked_workspace_id !== linked) {
+    // No await separates reading the source from recording the link.
+    patchSessionRow(row.owner_uuid, row.id, patch);
+    appendSessionEvent(
+      row.owner_uuid,
+      row.id,
+      linked
+        ? "Linked to another chat's workspace"
+        : "Returned to the private workspace",
+    );
+    await releaseWorkspace(row.owner_uuid, row.linked_workspace_id);
   }
-  const workspace = presentWorkspace(updated);
-  appendSessionEvent(
-    ownerUuid,
-    row.id,
-    workspace.kind === "sandbox" && workspace.linked
-      ? `Now linked to the workspace of "${workspace.linked.label}"`
-      : "Returned to the private workspace",
-  );
-  await releaseWorkspaces(ownerUuid, [row.linked_workspace_id]);
-  res.json({ workspace });
+  res.json({ workspace: presentWorkspace({ ...row, ...patch }) });
 });
 
 router.get("/:id/workspace/files", async (req, res) => {
@@ -297,6 +261,7 @@ router.get("/", (req, res) => {
       customTitle: r.title,
       preview: r.preview,
       badge: working.has(r.id) ? "working" : r.unread ? "unread" : null,
+      expiresAt: r.expires_at,
     })),
   });
 });
@@ -322,6 +287,7 @@ router.get("/:id", (req, res) => {
     ),
     model: row.model,
     workspace: presentWorkspace(row),
+    expiresAt: row.expires_at,
   });
 });
 
@@ -336,7 +302,8 @@ router.post("/", async (req, res) => {
   const id = crypto.randomUUID();
   const now = Date.now();
   const model = parsed.data.model?.trim() || null;
-  createSessionRow(ownerUuid, id, now, model);
+  const expiresAt = parsed.data.ephemeral ? ephemeralExpiry(now) : null;
+  createSessionRow(ownerUuid, id, now, model, expiresAt);
   try {
     await workspaceService.provisionRetained(ownerUuid, id);
   } catch (error) {
@@ -344,7 +311,7 @@ router.post("/", async (req, res) => {
     throw error;
   }
   agentRuntime.main(ownerUuid, id);
-  res.status(201).json({ id, createdAt: now, updatedAt: now });
+  res.status(201).json({ id, createdAt: now, updatedAt: now, expiresAt });
 });
 
 router.patch("/:id", (req, res) => {
@@ -387,16 +354,7 @@ router.delete("/:id", async (req, res) => {
     sendError(res, "NOT_FOUND", "Session not found");
     return;
   }
-  const ok = await agentRuntime.deleteSession(ownerUuid, row.id, async () => {
-    const current = getSessionById(ownerUuid, row.id);
-    // Delete first so the reference check no longer counts this chat.
-    if (!current || !deleteSessionRow(ownerUuid, row.id)) return false;
-    await releaseWorkspaces(ownerUuid, [
-      current.id,
-      current.linked_workspace_id,
-    ]);
-    return true;
-  });
+  const ok = await deleteSession(row);
   if (!ok) {
     sendError(res, "NOT_FOUND", "Session not found");
     return;

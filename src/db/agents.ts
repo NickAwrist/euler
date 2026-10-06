@@ -102,15 +102,9 @@ const placeholders = (values: readonly unknown[]) =>
  * Keeps one live record per agent while the runtime works in its chat, so
  * every runtime path sees the same state. Only the runtime mutates records.
  * `release` drops a chat's records, so re-read a record after an await.
- * Temporary chats use the same operations but live only in memory.
  */
 export class AgentStore {
   private records = new Map<string, AgentRecord>();
-  private temporary = new Map<string, AgentRecord>();
-  private temporaryInbox: InboxMessage[] = [];
-  /** Steps by agent, keyed by activation and position in insertion order. */
-  private temporarySteps = new Map<string, Map<string, AgentStep>>();
-  private nextTemporaryId = -Number.MAX_SAFE_INTEGER;
   /** The history each record last saved, which `saveHistory` compares against. */
   private savedHistory = new WeakMap<AgentRecord, readonly ModelMessage[]>();
 
@@ -120,7 +114,7 @@ export class AgentStore {
 
   /** Restore existing object identities as active callers may still hold them. */
   checkpoint(sessionId: string): () => void {
-    const records = [...this.records.values(), ...this.temporary.values()]
+    const records = [...this.records.values()]
       .filter((agent) => agent.sessionId === sessionId)
       .map((agent) => ({
         agent,
@@ -129,46 +123,23 @@ export class AgentStore {
           history: agent.history,
         },
         savedHistory: this.savedHistory.get(agent),
-        temporary: this.temporary.has(agent.id),
       }));
-    const sessionAgents = () =>
-      new Set(
-        [...this.temporary.values()]
-          .filter((agent) => agent.sessionId === sessionId)
-          .map((agent) => agent.id),
-      );
-    const agents = sessionAgents();
-    const inbox = structuredClone(
-      this.temporaryInbox.filter((m) => agents.has(m.agentId)),
-    );
-    // Steps are saved outside transactions, which only remove whole agents' steps.
-    const steps = new Map(this.temporarySteps);
-    const nextId = this.nextTemporaryId;
     return () => {
-      // Includes agents created since the checkpoint.
-      const current = sessionAgents();
-      this.temporaryInbox = [
-        ...this.temporaryInbox.filter((m) => !current.has(m.agentId)),
-        ...inbox,
-      ];
+      // Drops records created since the checkpoint.
       this.release(sessionId);
-      for (const [id, agent] of this.temporary)
-        if (agent.sessionId === sessionId) this.temporary.delete(id);
-      for (const { agent, saved, savedHistory, temporary } of records) {
+      for (const { agent, saved, savedHistory } of records) {
         for (const key of ["versions", "interruption"] as const)
           delete agent[key];
         Object.assign(agent, saved);
         if (savedHistory) this.savedHistory.set(agent, savedHistory);
         else this.savedHistory.delete(agent);
-        (temporary ? this.temporary : this.records).set(agent.id, agent);
+        this.records.set(agent.id, agent);
       }
-      this.temporarySteps = steps;
-      this.nextTemporaryId = nextId;
     };
   }
 
   get(id: string): AgentRecord | undefined {
-    const cached = this.temporary.get(id) ?? this.records.get(id);
+    const cached = this.records.get(id);
     if (cached) return cached;
     const row = getDb()
       .query("SELECT status, data FROM agents WHERE id = ?")
@@ -199,33 +170,23 @@ export class AgentStore {
       data: string;
     }[];
   }
-  private temporaryAgents(ownerUuid: string, sessionId: string) {
-    return [...this.temporary.values()].filter(
-      (a) => a.ownerUuid === ownerUuid && a.sessionId === sessionId,
-    );
-  }
   /** A chat's live records, loading any that are not cached. */
   list(ownerUuid: string, sessionId: string): AgentRecord[] {
-    return [
-      ...this.rows(ownerUuid, sessionId).flatMap((row) => {
-        const agent = this.get(row.id);
-        return agent ? [agent] : [];
-      }),
-      ...this.temporaryAgents(ownerUuid, sessionId),
-    ];
+    return this.rows(ownerUuid, sessionId).flatMap((row) => {
+      const agent = this.get(row.id);
+      return agent ? [agent] : [];
+    });
   }
   /** A chat's agents for display, read without caching them or their history. */
   view(ownerUuid: string, sessionId: string): Agent[] {
-    return [
-      ...this.rows(ownerUuid, sessionId).map(
-        (row) =>
-          this.records.get(row.id) ?? {
-            ...JSON.parse(row.data),
-            status: row.status,
-          },
+    return this.rows(ownerUuid, sessionId).map((row) =>
+      this.present(
+        this.records.get(row.id) ?? {
+          ...JSON.parse(row.data),
+          status: row.status,
+        },
       ),
-      ...this.temporaryAgents(ownerUuid, sessionId),
-    ].map((agent) => this.present(agent));
+    );
   }
   /** An agent as clients see it. */
   present(agent: Omit<Agent, "held">): Agent {
@@ -245,12 +206,7 @@ export class AgentStore {
         `SELECT DISTINCT a.session_id FROM agents a JOIN sessions s ON s.id = a.session_id WHERE s.owner_uuid = ? AND a.status IN (${placeholders(statuses)})`,
       )
       .all(ownerUuid, ...statuses) as { session_id: string }[];
-    return new Set([
-      ...rows.map((row) => row.session_id),
-      ...[...this.temporary.values()]
-        .filter((a) => a.ownerUuid === ownerUuid && statuses.includes(a.status))
-        .map((a) => a.sessionId),
-    ]);
+    return new Set(rows.map((row) => row.session_id));
   }
   /**
    * Agents a restart interrupted: working ones, and ready or waiting ones with
@@ -273,11 +229,7 @@ export class AgentStore {
     ).flatMap((row) => this.get(row.id) ?? []);
   }
   /** Saves everything except history, which `saveHistory` writes. */
-  save(agent: AgentRecord, temporary = this.temporary.has(agent.id)) {
-    if (temporary) {
-      this.temporary.set(agent.id, agent);
-      return;
-    }
+  save(agent: AgentRecord) {
     this.records.set(agent.id, agent);
     const { history: _history, status, ...data } = agent;
     getDb().run(
@@ -305,10 +257,7 @@ export class AgentStore {
       )
         changed.add(position);
     });
-    if (
-      !this.temporary.has(agent.id) &&
-      (changed.size || history.length < saved.length)
-    )
+    if (changed.size || history.length < saved.length)
       transaction(() => {
         getDb().run(
           "DELETE FROM agent_history WHERE agent_id = ? AND position >= ?",
@@ -332,8 +281,6 @@ export class AgentStore {
   }
   /** The agent's saved steps across its activations, oldest first. */
   steps(agentId: string): AgentStep[] {
-    const temporary = this.temporarySteps.get(agentId);
-    if (temporary) return [...temporary.values()];
     return (
       getDb()
         .query("SELECT step FROM agent_steps WHERE agent_id = ? ORDER BY rowid")
@@ -347,12 +294,6 @@ export class AgentStore {
     position: number,
     step: AgentStep,
   ) {
-    if (this.temporary.has(agent.id)) {
-      const steps = this.temporarySteps.get(agent.id) ?? new Map();
-      steps.set(`${activationId}:${position}`, step);
-      this.temporarySteps.set(agent.id, steps);
-      return;
-    }
     getDb().run(
       "INSERT INTO agent_steps (agent_id, activation_id, position, step) VALUES (?, ?, ?, ?) ON CONFLICT(agent_id, activation_id, position) DO UPDATE SET step = excluded.step",
       [agent.id, activationId, position, JSON.stringify(step)],
@@ -372,9 +313,8 @@ export class AgentStore {
       .get(agentId) as { content: string } | null;
     return row?.content;
   }
-  /** Keeps the open reply for restart recovery, which temporary chats lack. */
+  /** Keeps the open reply for restart recovery. */
   saveReply(agent: AgentRecord, content: string) {
-    if (this.temporary.has(agent.id)) return;
     getDb().run(
       "INSERT INTO agent_replies (agent_id, content) VALUES (?, ?) ON CONFLICT(agent_id) DO UPDATE SET content = excluded.content",
       [agent.id, content],
@@ -382,17 +322,11 @@ export class AgentStore {
   }
   /** Removes a main agent's open segment once it is in the transcript. */
   clearSegment(agent: AgentRecord) {
-    this.temporarySteps.delete(agent.id);
     getDb().run("DELETE FROM agent_steps WHERE agent_id = ?", [agent.id]);
     getDb().run("DELETE FROM agent_replies WHERE agent_id = ?", [agent.id]);
   }
   remove(agent: AgentRecord) {
     this.records.delete(agent.id);
-    this.temporary.delete(agent.id);
-    this.temporarySteps.delete(agent.id);
-    this.temporaryInbox = this.temporaryInbox.filter(
-      (m) => m.agentId !== agent.id && m.sender !== agent.id,
-    );
     getDb().run("DELETE FROM agent_messages WHERE sender = ?", [agent.id]);
     getDb().run("DELETE FROM agents WHERE id = ?", [agent.id]);
   }
@@ -404,23 +338,14 @@ export class AgentStore {
         .all(...values) as MessageRow[]
     ).map(toMessage);
   }
-  private temporaryMessages(agentId: string) {
-    return this.temporaryInbox.filter((m) => m.agentId === agentId);
-  }
   inbox(agentId: string): InboxMessage[] {
-    return [
-      ...this.messages("agent_id = ? ORDER BY id", agentId),
-      ...this.temporaryMessages(agentId),
-    ];
+    return this.messages("agent_id = ? ORDER BY id", agentId);
   }
   undelivered(agentId: string): InboxMessage[] {
-    return [
-      ...this.messages(
-        "agent_id = ? AND delivered_at IS NULL ORDER BY id",
-        agentId,
-      ),
-      ...this.temporaryMessages(agentId).filter((m) => m.deliveredAt === null),
-    ];
+    return this.messages(
+      "agent_id = ? AND delivered_at IS NULL ORDER BY id",
+      agentId,
+    );
   }
   /** Agents with undelivered messages that wake them, oldest message first. */
   pendingAgentIds(): string[] {
@@ -429,21 +354,10 @@ export class AgentStore {
         "SELECT agent_id FROM agent_messages WHERE delivered_at IS NULL AND held = 0 AND wakes = 1 GROUP BY agent_id ORDER BY MIN(id)",
       )
       .all() as { agent_id: string }[];
-    return [
-      ...new Set([
-        ...rows.map((row) => row.agent_id),
-        ...this.temporaryInbox
-          .filter((m) => m.deliveredAt === null && !m.held && m.wakes)
-          .map((m) => m.agentId),
-      ]),
-    ];
+    return rows.map((row) => row.agent_id);
   }
   /** Whether an undelivered message that wakes the agent is held or not. */
   hasWakingMessage(agentId: string, held: boolean): boolean {
-    if (this.temporary.has(agentId))
-      return this.temporaryMessages(agentId).some(
-        (m) => m.deliveredAt === null && m.wakes && m.held === held,
-      );
     return (
       getDb()
         .query(
@@ -466,54 +380,42 @@ export class AgentStore {
       deliveredAt: null,
       held: false,
     };
-    if (this.temporary.has(message.agentId)) {
-      row.id = this.nextTemporaryId++;
-      this.temporaryInbox.push(row);
-    } else
-      row.id = Number(
-        getDb().run(
-          "INSERT INTO agent_messages (agent_id, sender, kind, content, wakes, attachment_ids, attachments, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-          [
-            row.agentId,
-            row.sender,
-            row.kind,
-            row.content,
-            row.wakes ? 1 : 0,
-            JSON.stringify(row.attachmentIds),
-            JSON.stringify(row.attachments),
-            row.createdAt,
-          ],
-        ).lastInsertRowid,
-      );
+    row.id = Number(
+      getDb().run(
+        "INSERT INTO agent_messages (agent_id, sender, kind, content, wakes, attachment_ids, attachments, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+          row.agentId,
+          row.sender,
+          row.kind,
+          row.content,
+          row.wakes ? 1 : 0,
+          JSON.stringify(row.attachmentIds),
+          JSON.stringify(row.attachments),
+          row.createdAt,
+        ],
+      ).lastInsertRowid,
+    );
     return row;
   }
   deliver(messages: InboxMessage[]) {
     transaction(() => {
       for (const message of messages) {
         message.deliveredAt = Date.now();
-        if (message.id >= 0)
-          getDb().run(
-            "UPDATE agent_messages SET delivered_at = ? WHERE id = ?",
-            [message.deliveredAt, message.id],
-          );
+        getDb().run("UPDATE agent_messages SET delivered_at = ? WHERE id = ?", [
+          message.deliveredAt,
+          message.id,
+        ]);
       }
     });
   }
   /** Holds or releases every undelivered message for the agent. */
   hold(agentId: string, held: boolean) {
-    for (const message of this.temporaryMessages(agentId))
-      if (message.deliveredAt === null) message.held = held;
     getDb().run(
       "UPDATE agent_messages SET held = ? WHERE agent_id = ? AND delivered_at IS NULL",
       [held ? 1 : 0, agentId],
     );
   }
   editQueued(agentId: string, id: number, content: string): boolean {
-    if (id < 0) {
-      const message = this.queuedTemporary(agentId, id);
-      if (message) message.content = content;
-      return Boolean(message);
-    }
     return (
       getDb().run(
         "UPDATE agent_messages SET content = ? WHERE id = ? AND agent_id = ? AND kind = 'user' AND delivered_at IS NULL",
@@ -522,21 +424,11 @@ export class AgentStore {
     );
   }
   removeQueued(agentId: string, id: number): boolean {
-    if (id < 0) {
-      const message = this.queuedTemporary(agentId, id);
-      this.temporaryInbox = this.temporaryInbox.filter((m) => m !== message);
-      return Boolean(message);
-    }
     return (
       getDb().run(
         "DELETE FROM agent_messages WHERE id = ? AND agent_id = ? AND kind = 'user' AND delivered_at IS NULL",
         [id, agentId],
       ).changes > 0
-    );
-  }
-  private queuedTemporary(agentId: string, id: number) {
-    return this.temporaryMessages(agentId).find(
-      (m) => m.id === id && m.kind === "user" && m.deliveredAt === null,
     );
   }
 }

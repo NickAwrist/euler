@@ -20,7 +20,6 @@ import type { Message, ModelOption, SessionWorkspace } from "../../types";
 
 export interface UseSessionPreferencesOptions {
   activeSessionIdRef: MutableRefObject<string | null>;
-  isEphemeralRef: MutableRefObject<boolean>;
   userSettingsRef: MutableRefObject<UserSettings>;
   ollamaModels: ModelOption[];
   userSettingsDefaultModel: string;
@@ -30,7 +29,6 @@ export interface UseSessionPreferencesOptions {
 
 export function useSessionPreferences({
   activeSessionIdRef,
-  isEphemeralRef,
   userSettingsRef,
   ollamaModels,
   userSettingsDefaultModel,
@@ -69,7 +67,6 @@ export function useSessionPreferences({
       setSelectedModel(model);
       setSessionModel(model);
       setThinkingEffort(null);
-      if (isEphemeralRef.current) return;
       const sid = activeSessionIdRef.current;
       if (sid) {
         try {
@@ -80,49 +77,41 @@ export function useSessionPreferences({
         }
       }
     },
-    [activeSessionIdRef, isEphemeralRef, refreshSessions],
+    [activeSessionIdRef, refreshSessions],
   );
 
-  const chooseDirectory = useCallback(
-    async (path: string) => {
-      const sid = activeSessionIdRef.current;
-      if (!sid) return;
-      const temporary = isEphemeralRef.current;
-      const selected = await selectSessionDirectory(sid, path, temporary);
-      if (activeSessionIdRef.current === sid) {
-        setWorkspace(selected);
-        if (temporary) {
-          setMessages((messages) => [
-            ...messages,
-            {
-              role: "event",
-              content: `Working directory changed to ${selected.kind === "local" ? selected.path : "the private workspace"}`,
-            },
-          ]);
-          return;
-        }
-        const refreshed = await fetchSession(sid);
-        if (refreshed && activeSessionIdRef.current === sid) {
-          setMessages(refreshed.history);
-        }
-      }
-    },
-    [activeSessionIdRef, isEphemeralRef, setMessages],
-  );
-
-  const linkWorkspace = useCallback(
-    async (sourceSessionId: string) => {
-      const sid = activeSessionIdRef.current;
-      if (!sid || isEphemeralRef.current) return;
-      const linked = await linkSessionWorkspace(sid, sourceSessionId);
+  /** Shows a changed workspace and the event it recorded, if still active. */
+  const applyWorkspace = useCallback(
+    async (sid: string, next: SessionWorkspace) => {
       if (activeSessionIdRef.current !== sid) return;
-      setWorkspace(linked);
+      setWorkspace(next);
       const refreshed = await fetchSession(sid);
       if (refreshed && activeSessionIdRef.current === sid) {
         setMessages(refreshed.history);
       }
     },
-    [activeSessionIdRef, isEphemeralRef, setMessages],
+    [activeSessionIdRef, setMessages],
+  );
+
+  const chooseDirectory = useCallback(
+    async (path: string) => {
+      const sid = activeSessionIdRef.current;
+      if (sid)
+        await applyWorkspace(sid, await selectSessionDirectory(sid, path));
+    },
+    [activeSessionIdRef, applyWorkspace],
+  );
+
+  const linkWorkspace = useCallback(
+    async (sourceSessionId: string) => {
+      const sid = activeSessionIdRef.current;
+      if (sid)
+        await applyWorkspace(
+          sid,
+          await linkSessionWorkspace(sid, sourceSessionId),
+        );
+    },
+    [activeSessionIdRef, applyWorkspace],
   );
 
   const privateSandbox = workspace.kind === "sandbox" && !workspace.linked;
@@ -131,21 +120,11 @@ export function useSessionPreferences({
     if (!sid || privateSandbox || returningToSandboxRef.current) return;
     returningToSandboxRef.current = true;
     try {
-      const temporary = isEphemeralRef.current;
-      setWorkspace(await useSessionSandbox(sid, temporary));
-      if (temporary) {
-        setMessages((messages) => [
-          ...messages,
-          { role: "event", content: "Returned to the private workspace" },
-        ]);
-        return;
-      }
-      const refreshed = await fetchSession(sid);
-      if (refreshed) setMessages(refreshed.history);
+      await applyWorkspace(sid, await useSessionSandbox(sid));
     } finally {
       returningToSandboxRef.current = false;
     }
-  }, [activeSessionIdRef, isEphemeralRef, setMessages, privateSandbox]);
+  }, [activeSessionIdRef, applyWorkspace, privateSandbox]);
 
   return {
     selectedModel,

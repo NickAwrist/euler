@@ -5,7 +5,13 @@ export const SessionWorkspaceSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("sandbox"),
     /** Present when this chat is linked to another chat's sandbox. */
-    linked: z.object({ workspaceId: z.string(), label: z.string() }).optional(),
+    linked: z
+      .object({
+        workspaceId: z.string(),
+        /** Another chat using the sandbox, preferring the one that created it. */
+        sessionId: z.string().nullable(),
+      })
+      .optional(),
   }),
   z.object({
     kind: z.literal("local"),
@@ -16,6 +22,10 @@ export const SessionWorkspaceSchema = z.discriminatedUnion("kind", [
 
 export type SessionWorkspace = z.infer<typeof SessionWorkspaceSchema>;
 
+export const WorkspaceResponseSchema = z.object({
+  workspace: SessionWorkspaceSchema,
+});
+
 export const SessionSummarySchema = z.object({
   badge: z.enum(["working", "unread"]).nullable().optional(),
   id: z.string(),
@@ -23,6 +33,8 @@ export const SessionSummarySchema = z.object({
   updatedAt: z.number(),
   customTitle: z.string().nullable().optional(),
   preview: z.string(),
+  /** When an ephemeral chat is deleted; null for saved chats. */
+  expiresAt: z.number().nullable(),
 });
 
 export type SessionSummary = z.infer<typeof SessionSummarySchema>;
@@ -43,15 +55,25 @@ export const StoredRunSessionSchema = z.object({
     .optional(),
   model: z.string().nullable().optional(),
   workspace: SessionWorkspaceSchema.default({ kind: "sandbox" }),
+  expiresAt: z.number().nullable(),
 });
 
 export type StoredRunSession = z.infer<typeof StoredRunSessionSchema>;
 
 export const CreateSessionBodySchema = z.object({
   model: z.string().trim().nullable().optional(),
+  /** An ephemeral chat is deleted once its lifetime ends. */
+  ephemeral: z.boolean().optional(),
 });
 
 export type CreateSessionBody = z.infer<typeof CreateSessionBodySchema>;
+
+export const CreatedSessionSchema = z.object({
+  id: z.string(),
+  expiresAt: z.number().nullable(),
+});
+
+export type CreatedSession = z.infer<typeof CreatedSessionSchema>;
 
 export const PatchSessionBodySchema = z.strictObject({
   customTitle: z.string().trim().nullable().optional(),

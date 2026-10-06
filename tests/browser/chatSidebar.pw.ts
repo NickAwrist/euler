@@ -23,6 +23,7 @@ async function mockApp(page: Page) {
                 preview: "Sidebar test chat",
                 createdAt: 1,
                 updatedAt: 1,
+                expiresAt: null,
               },
             ],
           }
@@ -204,7 +205,6 @@ test("chat sidebar desktop workspace changes refresh open artifacts without remo
                 size: 10,
                 sessionId: "sidebar-test",
                 workspaceKind: "sandbox",
-                temporary: false,
               },
             ],
           },
@@ -344,12 +344,14 @@ test("chat sidebar desktop links another chat's workspace", async ({
             preview: "Sidebar test chat",
             createdAt: 1,
             updatedAt: 2,
+            expiresAt: null,
           },
           {
             id: "builder",
             preview: "Builder chat",
             createdAt: 1,
             updatedAt: 1,
+            expiresAt: null,
           },
         ],
       },
@@ -361,7 +363,7 @@ test("chat sidebar desktop links another chat's workspace", async ({
       json: {
         workspace: {
           kind: "sandbox",
-          linked: { workspaceId: "builder", label: "Builder chat" },
+          linked: { workspaceId: "builder", sessionId: "builder" },
         },
       },
     });

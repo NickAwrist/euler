@@ -1,7 +1,9 @@
 import { Download, Loader2, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { sessionLabel } from "../../lib/sessionLabel";
 import { cx } from "../../styles";
 import type { SessionSummary } from "../../types";
+import { ExpiresIn } from "../ExpiresIn";
 import { FloatingOptionsMenu } from "../FloatingOptionsMenu";
 import { formatSessionTime } from "./sessionDates";
 
@@ -61,15 +63,25 @@ export function SessionListItem({
                 aria-label="New reply"
               />
             )}
-            {session.preview || "New chat"}
+            {sessionLabel(session)}
           </div>
-          <time
-            dateTime={new Date(session.updatedAt).toISOString()}
-            title={new Date(session.updatedAt).toLocaleString()}
-            className="mt-0.5 block text-[0.6875rem] text-muted-foreground"
-          >
-            {formatSessionTime(session.updatedAt, now)}
-          </time>
+          <div className="mt-0.5 flex gap-1 text-[0.6875rem] text-muted-foreground">
+            <time
+              dateTime={new Date(session.updatedAt).toISOString()}
+              title={new Date(session.updatedAt).toLocaleString()}
+            >
+              {formatSessionTime(session.updatedAt, now)}
+            </time>
+            {session.expiresAt !== null && (
+              <>
+                <span aria-hidden="true">·</span>
+                <ExpiresIn
+                  expiresAt={session.expiresAt}
+                  className="text-amber-400/80"
+                />
+              </>
+            )}
+          </div>
         </div>
       </button>
       <div className="relative flex items-start justify-center pr-0.5 pt-1.5">

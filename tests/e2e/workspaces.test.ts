@@ -1,5 +1,4 @@
 import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
-import { waitForActivation } from "../helpers/activation";
 import "../setup";
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import fs from "node:fs/promises";
@@ -31,86 +30,77 @@ async function createSession(url: string): Promise<string> {
 }
 
 describe("workspace API", () => {
-  for (const temporary of [false, true]) {
-    test(`selects and switches server directories remotely for a ${temporary ? "temporary" : "saved"} chat`, async () => {
-      const { url, close } = await startTestServer();
-      const directory = await fs.mkdtemp(
-        join(tmpdir(), "orbis-directory-test-"),
-      );
-      temporaryDirectories.push(directory);
-      const secondDirectory = join(directory, "second");
-      await fs.mkdir(secondDirectory);
-      await fs.writeFile(join(directory, "file.txt"), "file");
-      const lease = temporary
-        ? await workspaceService.createTemporary(TEST_USER_ID)
-        : null;
-      const id = lease?.id ?? (await createSession(url));
-      const base = temporary ? "temporary-sessions" : "sessions";
-      const isLoopback = spyOn(loopback, "isLoopbackRequest").mockReturnValue(
-        false,
-      );
-      const select = (body: unknown, owner?: string) =>
-        fetch(`${url}/api/${base}/${id}/workspace/select-directory`, {
-          method: "POST",
-          headers: userHeaders(owner, { "Content-Type": "application/json" }),
-          body: JSON.stringify(body),
-        });
-      try {
-        for (const body of [
-          {},
-          { path: 1 },
-          { path: "" },
-          { path: "relative/path" },
-          { path: join(directory, "missing") },
-          { path: join(directory, "file.txt") },
-        ]) {
-          expect((await select(body)).status).toBe(400);
-        }
-        expect(
-          (
-            await select(
-              { path: directory },
-              "22222222-2222-4222-8222-222222222222",
-            )
-          ).ok,
-        ).toBeFalse();
-        for (const path of [directory, secondDirectory]) {
-          const response = await select({ path });
-          expect(response.status).toBe(200);
-          expect(await response.json()).toMatchObject({
-            workspace: { kind: "local", path: await fs.realpath(path) },
-          });
-        }
-        const active = spyOn(agentRuntime, "busy").mockReturnValue(true);
-        try {
-          expect((await select({ path: directory })).status).toBe(409);
-        } finally {
-          active.mockRestore();
-        }
-        const workspace = temporary
-          ? workspaceService.temporaryPresentation(TEST_USER_ID, id)
-          : workspaceService.presentation(getSessionById(TEST_USER_ID, id)!);
-        expect(workspace).toMatchObject({
-          kind: "local",
-          path: await fs.realpath(secondDirectory),
-        });
-        const returned = await fetch(
-          `${url}/api/${base}/${id}/workspace/use-sandbox`,
-          {
-            method: "POST",
-            headers: userHeaders(),
-          },
-        );
-        expect(await returned.json()).toEqual({
-          workspace: { kind: "sandbox" },
-        });
-      } finally {
-        isLoopback.mockRestore();
-        if (lease) await workspaceService.deleteTemporary(TEST_USER_ID, id);
-        await close();
+  test("selects and switches server directories remotely", async () => {
+    const { url, close } = await startTestServer();
+    const directory = await fs.mkdtemp(join(tmpdir(), "orbis-directory-test-"));
+    temporaryDirectories.push(directory);
+    const secondDirectory = join(directory, "second");
+    await fs.mkdir(secondDirectory);
+    await fs.writeFile(join(directory, "file.txt"), "file");
+    const id = await createSession(url);
+    const isLoopback = spyOn(loopback, "isLoopbackRequest").mockReturnValue(
+      false,
+    );
+    const select = (body: unknown, owner?: string) =>
+      fetch(`${url}/api/sessions/${id}/workspace/select-directory`, {
+        method: "POST",
+        headers: userHeaders(owner, { "Content-Type": "application/json" }),
+        body: JSON.stringify(body),
+      });
+    try {
+      for (const body of [
+        {},
+        { path: 1 },
+        { path: "" },
+        { path: "relative/path" },
+        { path: join(directory, "missing") },
+        { path: join(directory, "file.txt") },
+      ]) {
+        expect((await select(body)).status).toBe(400);
       }
-    });
-  }
+      expect(
+        (
+          await select(
+            { path: directory },
+            "22222222-2222-4222-8222-222222222222",
+          )
+        ).ok,
+      ).toBeFalse();
+      for (const path of [directory, secondDirectory]) {
+        const response = await select({ path });
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+          workspace: { kind: "local", path: await fs.realpath(path) },
+        });
+      }
+      const active = spyOn(agentRuntime, "busy").mockReturnValue(true);
+      try {
+        expect((await select({ path: directory })).status).toBe(409);
+      } finally {
+        active.mockRestore();
+      }
+      const workspace = workspaceService.presentation(
+        getSessionById(TEST_USER_ID, id)!,
+      );
+      expect(workspace).toMatchObject({
+        kind: "local",
+        path: await fs.realpath(secondDirectory),
+      });
+      const returned = await fetch(
+        `${url}/api/sessions/${id}/workspace/use-sandbox`,
+        {
+          method: "POST",
+          headers: userHeaders(),
+        },
+      );
+      expect(await returned.json()).toEqual({
+        workspace: { kind: "sandbox" },
+      });
+    } finally {
+      isLoopback.mockRestore();
+      await close();
+    }
+  });
 
   test("returning to the private workspace records only actual transitions", async () => {
     const { url, close } = await startTestServer();
@@ -250,7 +240,10 @@ describe("workspace API", () => {
       const linkedResponse = await link(b, a);
       expect(linkedResponse.status).toBe(200);
       expect(await linkedResponse.json()).toMatchObject({
-        workspace: { kind: "sandbox", linked: { workspaceId: a } },
+        workspace: {
+          kind: "sandbox",
+          linked: { workspaceId: a, sessionId: a },
+        },
       });
       expect(
         (
@@ -269,7 +262,8 @@ describe("workspace API", () => {
         headers: userHeaders(),
       });
       expect(await stored.json()).toMatchObject({
-        workspace: { linked: { workspaceId: a, label: "a deleted chat" } },
+        // With A gone, B is shown as linked to C, which still uses the sandbox.
+        workspace: { linked: { workspaceId: a, sessionId: c } },
       });
 
       expect((await post(`${b}/workspace/use-sandbox`)).status).toBe(200);
@@ -356,137 +350,58 @@ describe("workspace API", () => {
     }
   });
 
-  for (const temporary of [false, true]) {
-    for (const swap of ["file", "parent"] as const) {
-      test(`download pins the ${swap} during replacement in a ${temporary ? "temporary" : "saved"} workspace`, async () => {
-        const { url, close } = await startTestServer();
-        const outside = await fs.mkdtemp(
-          join(tmpdir(), "orbis-download-race-"),
-        );
-        temporaryDirectories.push(outside);
-        await fs.writeFile(join(outside, "output.txt"), "outside secret");
-        const lease = temporary
-          ? await workspaceService.createTemporary(TEST_USER_ID)
-          : null;
-        const id = lease?.id ?? (await createSession(url));
-        const workspace = temporary
-          ? await workspaceService.resolveTemporary(TEST_USER_ID, id)
-          : await workspaceService.resolveSession(
-              getSessionById(TEST_USER_ID, id)!,
+  for (const swap of ["file", "parent"] as const) {
+    test(`download pins the ${swap} during replacement`, async () => {
+      const { url, close } = await startTestServer();
+      const outside = await fs.mkdtemp(join(tmpdir(), "orbis-download-race-"));
+      temporaryDirectories.push(outside);
+      await fs.writeFile(join(outside, "output.txt"), "outside secret");
+      const id = await createSession(url);
+      const workspace = await workspaceService.resolveSession(
+        getSessionById(TEST_USER_ID, id)!,
+      );
+      const parent = join(workspace.hostPath, "parent");
+      await fs.mkdir(parent);
+      await fs.writeFile(join(parent, "output.txt"), "workspace output");
+      const originalOpen = fs.open.bind(fs);
+      let replaced = false;
+      const open = spyOn(fs, "open").mockImplementation(
+        async (path, flags, mode) => {
+          const handle = await originalOpen(path, flags, mode);
+          if (
+            !replaced &&
+            String(path).endsWith(swap === "parent" ? "/parent" : "/output.txt")
+          ) {
+            replaced = true;
+            const target =
+              swap === "parent" ? parent : join(parent, "output.txt");
+            await fs.rename(target, `${target}.original`);
+            await fs.symlink(
+              swap === "parent" ? outside : join(outside, "output.txt"),
+              target,
             );
-        const parent = join(workspace.hostPath, "parent");
-        await fs.mkdir(parent);
-        await fs.writeFile(join(parent, "output.txt"), "workspace output");
-        const originalOpen = fs.open.bind(fs);
-        let replaced = false;
-        const open = spyOn(fs, "open").mockImplementation(
-          async (path, flags, mode) => {
-            const handle = await originalOpen(path, flags, mode);
-            if (
-              !replaced &&
-              String(path).endsWith(
-                swap === "parent" ? "/parent" : "/output.txt",
-              )
-            ) {
-              replaced = true;
-              const target =
-                swap === "parent" ? parent : join(parent, "output.txt");
-              await fs.rename(target, `${target}.original`);
-              await fs.symlink(
-                swap === "parent" ? outside : join(outside, "output.txt"),
-                target,
-              );
-            }
-            return handle;
-          },
-        );
-        try {
-          const route = temporary
-            ? `temporary-sessions/${id}/file`
-            : `sessions/${id}/workspace/file`;
-          const response = await fetch(
-            `${url}/api/${route}?path=parent/output.txt`,
-            { headers: userHeaders() },
-          );
-          expect(response.status).toBe(200);
-          expect(await response.text()).toBe("workspace output");
-          expect(replaced).toBeTrue();
-          const rejected = await fetch(
-            `${url}/api/${route}?path=parent/output.txt`,
-            { headers: userHeaders() },
-          );
-          expect(rejected.status).toBe(400);
-        } finally {
-          open.mockRestore();
-          if (lease) await workspaceService.deleteTemporary(TEST_USER_ID, id);
-          await close();
-        }
-      });
-    }
-  }
-
-  test("temporary workspace leases are owner scoped", async () => {
-    const { url, close } = await startTestServer();
-    try {
-      const created = await fetch(`${url}/api/temporary-sessions`, {
-        method: "POST",
-        headers: userHeaders(),
-      });
-      expect(created.status).toBe(201);
-      const { id } = (await created.json()) as { id: string };
-
-      const ownFiles = await fetch(
-        `${url}/api/temporary-sessions/${id}/files`,
-        {
-          headers: userHeaders(),
+          }
+          return handle;
         },
       );
-      expect(ownFiles.status).toBe(200);
-      expect(await ownFiles.json()).toEqual({ files: [] });
-
-      const otherFiles = await fetch(
-        `${url}/api/temporary-sessions/${id}/files`,
-        { headers: userHeaders("22222222-2222-4222-8222-222222222222") },
-      );
-      expect(otherFiles.status).toBe(404);
-    } finally {
-      await close();
-    }
-  });
-});
-
-test("temporary chats keep server-owned history for their lease", async () => {
-  const { url, close } = await startTestServer();
-  const lease = await workspaceService.createTemporary(TEST_USER_ID);
-  try {
-    const response = await fetch(
-      `${url}/api/temporary-sessions/${lease.id}/messages`,
-      {
-        method: "POST",
-        headers: userHeaders(undefined, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ content: "Hello", model: "llama3:latest" }),
-      },
-    );
-    expect(response.status).toBe(202);
-    const state = await waitForActivation(lease.id);
-    expect(state.history?.map((m) => m.role)).toEqual(["user", "assistant"]);
-    expect(agentRuntime.busy(TEST_USER_ID, lease.id)).toBeFalse();
-    await fetch(
-      `${url}/api/temporary-sessions/${lease.id}/file?path=missing.txt`,
-      { headers: userHeaders() },
-    );
-    expect(agentRuntime.snapshot(TEST_USER_ID, lease.id).history).toHaveLength(
-      2,
-    );
-    const closed = await fetch(`${url}/api/temporary-sessions/${lease.id}`, {
-      method: "DELETE",
-      headers: userHeaders(),
+      try {
+        const route = `sessions/${id}/workspace/file`;
+        const response = await fetch(
+          `${url}/api/${route}?path=parent/output.txt`,
+          { headers: userHeaders() },
+        );
+        expect(response.status).toBe(200);
+        expect(await response.text()).toBe("workspace output");
+        expect(replaced).toBeTrue();
+        const rejected = await fetch(
+          `${url}/api/${route}?path=parent/output.txt`,
+          { headers: userHeaders() },
+        );
+        expect(rejected.status).toBe(400);
+      } finally {
+        open.mockRestore();
+        await close();
+      }
     });
-    expect(closed.status).toBe(200);
-    expect(agentRuntime.store.list(TEST_USER_ID, lease.id)).toEqual([]);
-  } finally {
-    await agentRuntime.deleteSession(TEST_USER_ID, lease.id);
-    await workspaceService.deleteTemporary(TEST_USER_ID, lease.id);
-    await close();
   }
 });

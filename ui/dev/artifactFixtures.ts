@@ -152,7 +152,6 @@ export function fixtureMessages(alternate: boolean): Message[] {
               size: files["docs/readme.md"]!.length,
               sessionId: "demo",
               workspaceKind: "sandbox",
-              temporary: false,
             },
           ],
           content:

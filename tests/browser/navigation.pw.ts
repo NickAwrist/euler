@@ -40,6 +40,7 @@ async function mockApp(page: Page) {
               preview: `Conversation ${id}`,
               createdAt: 1,
               updatedAt: 1,
+              expiresAt: null,
             })),
           }
         : /^\/api\/sessions\/[ab]$/.test(path)
@@ -297,7 +298,7 @@ test("view navigation desktop stays in Customization when a chat sent from Home 
   await page.route("**/api/sessions", async (route) => {
     if (route.request().method() !== "POST") return route.fallback();
     await created.promise;
-    await route.fulfill({ json: { id: "b" } });
+    await route.fulfill({ json: { id: "b", expiresAt: null } });
   });
   await mockUserPreferences(page);
   await page.goto("/");
@@ -417,150 +418,109 @@ test("view navigation desktop restores the saved chat when loading Home", async 
   await expect(page.getByText("Stored b", { exact: true })).toBeVisible();
 });
 
-async function mockEphemeral(page: Page) {
+test("view navigation desktop keeps an ephemeral chat at its URL and counts down its expiry", async ({
+  page,
+}) => {
+  const now = new Date("2026-01-01T12:00:00Z").getTime();
+  // Just over an hour, so it counts down in minutes once the hour is up.
+  const expiresAt = now + 60 * 60_000 + 30_000;
+  await page.clock.install({ time: now });
+  await mockApp(page);
+  const created: unknown[] = [];
   const deleted: string[] = [];
   let history: { role: string; content: string }[] = [];
-  await page.route("**/api/temporary-sessions**", (route) => {
+  await page.route("**/api/sessions", (route) => {
+    if (route.request().method() === "POST") {
+      created.push(route.request().postDataJSON());
+      return route.fulfill({ json: { id: "e", expiresAt } });
+    }
+    return route.fulfill({
+      json: {
+        sessions: [
+          ...(created.length
+            ? [
+                {
+                  id: "e",
+                  preview: history[0]?.content ?? "",
+                  createdAt: now,
+                  updatedAt: now,
+                  expiresAt,
+                },
+              ]
+            : []),
+          ...["a", "b"].map((id) => ({
+            id,
+            preview: `Conversation ${id}`,
+            createdAt: 1,
+            updatedAt: 1,
+            expiresAt: null,
+          })),
+        ],
+      },
+    });
+  });
+  await page.route(/\/api\/sessions\/e(?:\/\w+)?$/, (route) => {
     const path = new URL(route.request().url()).pathname;
     if (route.request().method() === "DELETE") {
-      deleted.push(route.request().url());
-      history = [];
+      deleted.push(path);
+      return route.fulfill({ json: { ok: true } });
     }
     if (path.endsWith("/messages"))
       history = [
         { role: "user", content: route.request().postDataJSON().content },
         { role: "assistant", content: "Ephemeral reply" },
       ];
-    if (path.endsWith("/runtime"))
-      return route.fulfill({
-        json: {
-          sequence: Date.now(),
-          agents: [],
-          activation: null,
-          queued: [],
-          held: false,
-          history,
-        },
-      });
-    return route.fulfill({ json: { id: "temporary" } });
+    return route.fulfill({
+      json: {
+        id: "e",
+        model: "test",
+        history,
+        expiresAt,
+        sequence: Date.now(),
+        agents: [],
+        activation: null,
+        queued: [],
+        held: false,
+      },
+    });
   });
-  return deleted;
-}
-
-test("view navigation desktop confirms before discarding a nonempty ephemeral chat", async ({
-  page,
-}) => {
-  await mockApp(page);
-  const deleted = await mockEphemeral(page);
-  const startEphemeral = () =>
-    page.getByTitle("Ephemeral chat - not saved").click();
-  const dialog = page.getByRole("dialog", {
-    name: "Discard this ephemeral chat?",
-  });
-  const badge = page.getByText("Ephemeral", { exact: true });
+  const badge = page.getByTitle(
+    "Messages and files are deleted when this chat expires.",
+  );
+  const listedExpiry = page.locator("#app-sidebar").getByText(/^Expires in/);
 
   await mockUserPreferences(page);
   await page.goto("/run/a");
-  await startEphemeral();
-  await expect(badge).toHaveAccessibleDescription(
-    "Not saved. Messages and files are deleted when you leave.",
-  );
-  // An empty ephemeral chat has nothing to lose, so it leaves immediately.
+  await expect(badge).toHaveCount(0);
+  await page.getByTitle("Ephemeral chat - deleted automatically").click();
+  await expect(page).toHaveURL(/\/run\/e$/);
+  expect(created).toEqual([{ ephemeral: true }]);
+  await expect(badge).toContainText("Expires in 1h");
+  // Only the ephemeral chat lists an expiry.
+  await expect(listedExpiry).toHaveText(["Expires in 1h"]);
+  await page.getByPlaceholder("Send a message...").fill("Keep me");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByText("Ephemeral reply")).toBeVisible();
+
+  // Both displays change the moment the hour is up, not a minute after
+  // each one mounted.
+  await page.clock.fastForward("00:31");
+  await expect(badge).toContainText("Expires in 59m");
+  await expect(listedExpiry).toHaveText(["Expires in 59m"]);
+
+  // It is saved until it expires, so leaving neither asks nor deletes it.
   await page.getByRole("button", { name: /Conversation b/ }).click();
   await expect(page.getByText("Stored b", { exact: true })).toBeVisible();
-  await expect(dialog).toHaveCount(0);
-  await expect.poll(() => deleted.length).toBe(1);
-
-  await startEphemeral();
-  await expect(badge).toBeVisible();
-  await page.getByPlaceholder("Send a message...").fill("Keep me");
-  await page.getByRole("button", { name: "Send message" }).click();
-  await expect(page.getByText("Ephemeral reply")).toBeVisible();
-
-  const leaveAttempts = [
-    () => page.getByRole("button", { name: /Conversation a/ }).click(),
-    () => page.getByRole("button", { name: "New chat", exact: true }).click(),
-    startEphemeral,
-    () => page.keyboard.press("Control+Shift+H"),
-    () => page.goBack(),
-  ];
-  for (const leave of leaveAttempts) {
-    await leave();
-    await expect(dialog).toBeVisible();
-    await dialog.getByRole("button", { name: "Cancel", exact: true }).focus();
-    await page.keyboard.press("Enter");
-    await expect(dialog).toHaveCount(0);
-    await expect(page).toHaveURL(/\/$/);
-    await expect(badge).toBeVisible();
-    await expect(page.getByText("Ephemeral reply")).toBeVisible();
-  }
-  expect(deleted).toHaveLength(1);
-
-  // Reload remains protected even after dirty settings remove their guard.
-  const unloadBlocked = () =>
-    page.evaluate(
-      () =>
-        !window.dispatchEvent(new Event("beforeunload", { cancelable: true })),
-    );
-  expect(await unloadBlocked()).toBe(true);
-
-  // Dirty settings add and remove their own guard without dropping this one.
-  await page
-    .getByRole("button", { name: "Customization", exact: true })
-    .click();
-  await page.getByPlaceholder("Enter your name").fill("Unsaved");
-  await page.goBack();
-  await page.getByRole("button", { name: "Discard changes" }).click();
-  await expect(dialog).toHaveCount(0);
-  await expect(page.getByText("Ephemeral reply")).toBeVisible();
-  expect(await unloadBlocked()).toBe(true);
-
-  await page.goBack();
-  await dialog.getByRole("button", { name: "Discard" }).click();
-  await expect(page).toHaveURL(/\/run\/b$/);
-  await expect(page.getByText("Stored b", { exact: true })).toBeVisible();
-  await expect(badge).toHaveCount(0);
-  await expect.poll(() => deleted.length).toBe(2);
-  expect(await unloadBlocked()).toBe(false);
-});
-
-test("view navigation desktop protects ephemeral history after deleting the open saved chat", async ({
-  page,
-}) => {
-  await mockApp(page);
-  const deleted = await mockEphemeral(page);
-  await mockUserPreferences(page);
-  await page.goto("/run/a");
-  await page.getByTitle("Ephemeral chat - not saved").click();
-  await page.getByRole("button", { name: /Conversation a/ }).click();
-  await expect(page.getByText("Stored a", { exact: true })).toBeVisible();
-  await expect.poll(() => deleted.length).toBe(1);
-  await page.getByRole("button", { name: "Chat options" }).first().click();
-  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Delete", exact: true })
-    .click();
-  await expect(page).toHaveURL(/\/$/);
-  await page.getByTitle("Ephemeral chat - not saved").click();
-  await page.getByPlaceholder("Send a message...").fill("Keep me");
-  await page.getByRole("button", { name: "Send message" }).click();
-  await expect(page.getByText("Ephemeral reply")).toBeVisible();
-  // Deleting the saved chat replaced its URL with Home. Back to the preceding
-  // Home entry must not act as a conversation switch and silently delete it.
-  await page.goBack();
-  await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.getByText("Ephemeral reply")).toBeVisible();
-  expect(deleted).toHaveLength(1);
+  await expect(badge).toHaveCount(0);
   await page.goBack();
-  const dialog = page.getByRole("dialog", {
-    name: "Discard this ephemeral chat?",
-  });
-  await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page).toHaveURL(/\/run\/e$/);
   await expect(page.getByText("Ephemeral reply")).toBeVisible();
-  expect(deleted).toHaveLength(1);
+  await expect(badge).toContainText("Expires in 59m");
+  await page.reload();
+  await expect(page.getByText("Ephemeral reply")).toBeVisible();
+  await expect(badge).toBeVisible();
+  expect(deleted).toEqual([]);
 });
 
 test("view navigation desktop expires customization approval when a later guard cancels", async ({

@@ -227,6 +227,12 @@ export function runMigrations(db: Database) {
         `ALTER TABLE sessions ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`,
       );
   }
+  // Ephemeral chats expire; saved chats have no expiry.
+  if (!columns.some((c) => c.name === "expires_at"))
+    db.run("ALTER TABLE sessions ADD COLUMN expires_at INTEGER");
+  db.run(
+    "CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at) WHERE expires_at IS NOT NULL",
+  );
   if (!columns.some((c) => c.name === "linked_workspace_id"))
     db.run("ALTER TABLE sessions ADD COLUMN linked_workspace_id TEXT");
 }

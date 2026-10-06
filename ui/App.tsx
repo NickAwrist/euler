@@ -15,6 +15,7 @@ import { CustomizationPage } from "./components/CustomizationPage";
 import { DebugModal } from "./components/DebugModal";
 import { DirectoryModal } from "./components/DirectoryModal";
 import { shouldShowStepsModal } from "./components/ExecutionTrace";
+import { ExpiresIn } from "./components/ExpiresIn";
 import { JobContext } from "./components/Jobs/JobContext";
 import { JobTraceModal } from "./components/Jobs/JobTraceModal";
 import { JobsList } from "./components/Jobs/JobsList";
@@ -51,6 +52,7 @@ import {
   parseRoute,
   sessionPath,
 } from "./lib/navigation";
+import { linkedChatLabel } from "./lib/sessionLabel";
 import { cancelAgent } from "./persist/agents";
 import { CHAT_MAX_WIDTHS, loadAppearance } from "./persist/appearance";
 import { cancelJob } from "./persist/jobs";
@@ -60,7 +62,7 @@ import { cx } from "./styles";
 
 type ChatViewProps = {
   app: ReturnType<typeof useRunApp>;
-  directoryOpen: boolean;
+  sessionModalOpen: boolean;
   stepsModalOpen: boolean;
   runCommand: (command: RunCommandName) => Promise<void>;
   onCustomization: () => void;
@@ -79,7 +81,7 @@ function loadArtifactState() {
 
 function ChatView({
   app,
-  directoryOpen,
+  sessionModalOpen,
   stepsModalOpen,
   runCommand,
   onCustomization,
@@ -94,7 +96,7 @@ function ChatView({
   const selectedJob = app.jobs.find((job) => job.id === selectedJobId);
   const stopJob = async (id: string) => {
     if (app.activeSessionId) {
-      await cancelJob(app.activeSessionId, id, app.isEphemeral);
+      await cancelJob(app.activeSessionId, id);
       await app.refreshRuntime();
     }
   };
@@ -102,7 +104,7 @@ function ChatView({
   const selectedAgent = app.agents.find((a) => a.id === selectedAgentId);
   const stopAgent = async (id: string) => {
     if (app.activeSessionId) {
-      await cancelAgent(app.activeSessionId, id, app.isEphemeral);
+      await cancelAgent(app.activeSessionId, id);
       await app.refreshRuntime();
     }
   };
@@ -171,8 +173,8 @@ function ChatView({
     if (!app.runPending) setRevision((value) => value + 1);
   }, [app.runPending]);
   const source = useMemo(
-    () => workspaceArtifactSource(app.activeSessionId ?? "", app.isEphemeral),
-    [app.activeSessionId, app.isEphemeral],
+    () => workspaceArtifactSource(app.activeSessionId ?? ""),
+    [app.activeSessionId],
   );
   const hasFiles = useWorkspaceHasFiles(
     source,
@@ -275,8 +277,7 @@ function ChatView({
       Boolean(app.renameSessionId) ||
       app.truncateConfirm != null ||
       Boolean(app.pendingDeleteSessionId) ||
-      app.ephemeralExitPromptOpen ||
-      directoryOpen ||
+      sessionModalOpen ||
       app.debugOpen ||
       stepsModalOpen,
     sessions: app.sessions,
@@ -406,9 +407,9 @@ function ChatView({
                   <Bug size={16} />
                 </button>
               )}
-              {app.isEphemeral && (
+              {app.activeExpiresAt !== null && (
                 <span
-                  title="Not saved. Messages and files are deleted when you leave."
+                  title="Messages and files are deleted when this chat expires."
                   // Keep clear of the chat list, which may overlay the chat.
                   style={{
                     left:
@@ -420,6 +421,10 @@ function ChatView({
                 >
                   <EyeOff size={12} />
                   Ephemeral
+                  <ExpiresIn
+                    expiresAt={app.activeExpiresAt}
+                    className="font-normal normal-case tracking-normal text-muted-foreground"
+                  />
                 </span>
               )}
 
@@ -457,14 +462,11 @@ function ChatView({
                   </div>
                 ) : (
                   <WelcomeHome
-                    key={
-                      app.activeSessionId ??
-                      (app.isEphemeral ? "ephemeral" : "home")
-                    }
+                    key={app.activeSessionId ?? "home"}
                     name={app.userSettings.name}
                     sessions={app.sessions}
                     home={!app.activeSessionId}
-                    ephemeral={app.isEphemeral}
+                    ephemeral={app.activeExpiresAt !== null}
                     composerHeight={runFooterInset}
                     onNewEphemeralRun={app.createEphemeralSession}
                     onOpenSession={app.switchToSession}
@@ -482,7 +484,6 @@ function ChatView({
                       />
                       <QueuedMessages
                         sessionId={app.activeSessionId}
-                        temporary={app.isEphemeral}
                         messages={app.queuedMessages}
                         held={app.heldUpdates}
                         refresh={app.refreshRuntime}
@@ -514,7 +515,7 @@ function ChatView({
                 attachImageDisabledReason={app.attachImageDisabledReason}
                 attachmentsSendReady={app.attachmentsSendReady}
                 workspace={app.workspace}
-                temporary={app.isEphemeral}
+                linkedLabel={linkedChatLabel(app.workspace, app.sessions)}
                 onRunCommand={runCommand}
                 onFooterHeightChange={setRunFooterInset}
               />
@@ -567,7 +568,6 @@ function ChatView({
           {selectedAgent && app.activeSessionId && (
             <AgentTraceModal
               sessionId={app.activeSessionId}
-              temporary={app.isEphemeral}
               agent={selectedAgent}
               onClose={() => setSelectedAgentId(null)}
             />
@@ -576,7 +576,6 @@ function ChatView({
             <JobTraceModal
               key={selectedJob.id}
               sessionId={app.activeSessionId}
-              temporary={app.isEphemeral}
               job={selectedJob}
               onClose={() => setSelectedJobId(null)}
             />
@@ -598,18 +597,17 @@ export default function App() {
     return () => window.removeEventListener(NAVIGATION_EVENT, update);
   }, []);
   const backToChat = () => {
-    void navigate(sessionPath(app.isEphemeral ? null : app.activeSessionId));
+    void navigate(sessionPath(app.activeSessionId));
   };
 
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const [directorySessionId, setDirectorySessionId] = useState<string | null>(
-    null,
-  );
-  const directoryOpen =
-    directorySessionId !== null && directorySessionId === app.activeSessionId;
-  const [linkSessionId, setLinkSessionId] = useState<string | null>(null);
-  const linkOpen =
-    linkSessionId !== null && linkSessionId === app.activeSessionId;
+  // A picker belongs to the chat it was opened in.
+  const [sessionModal, setSessionModal] = useState<{
+    kind: "directory" | "link";
+    sessionId: string;
+  } | null>(null);
+  const openSessionModal =
+    sessionModal?.sessionId === app.activeSessionId ? sessionModal.kind : null;
 
   const openCustomization = () => {
     app.setSidebarOpen(false);
@@ -624,14 +622,8 @@ export default function App() {
   const runCommand = async (command: RunCommandName) => {
     try {
       const sessionId = app.activeSessionId ?? (await app.startSession());
-      if (command === "directory") setDirectorySessionId(sessionId);
-      if (command === "link") {
-        if (app.isEphemeral)
-          throw new Error(
-            "Temporary chats can't link to another chat's workspace",
-          );
-        setLinkSessionId(sessionId);
-      }
+      if (command === "directory" || command === "link")
+        setSessionModal({ kind: command, sessionId });
       if (command === "sandbox") await app.returnToSandbox();
       if (command === "workspace") setWorkspaceOpen(true);
     } catch (error) {
@@ -719,7 +711,7 @@ export default function App() {
         ) : (
           <ChatView
             app={app}
-            directoryOpen={directoryOpen}
+            sessionModalOpen={openSessionModal !== null}
             stepsModalOpen={stepsModalOpen}
             runCommand={runCommand}
             onCustomization={openCustomization}
@@ -779,38 +771,29 @@ export default function App() {
             onConfirm={app.performDeleteSession}
           />
         )}
-        {app.ephemeralExitPromptOpen && (
-          <TruncateConfirmModal
-            title="Discard this ephemeral chat?"
-            description="This chat is not saved. Its messages and files will be permanently deleted. This cannot be undone."
-            confirmLabel="Discard"
-            onClose={() => app.resolveEphemeralExit(false)}
-            onConfirm={() => app.resolveEphemeralExit(true)}
-          />
-        )}
-        {directoryOpen && (
+        {openSessionModal === "directory" && (
           <DirectoryModal
             initialPath={
               app.workspace.kind === "local" ? app.workspace.path : ""
             }
             onSelect={app.chooseDirectory}
-            onClose={() => setDirectorySessionId(null)}
+            onClose={() => setSessionModal(null)}
           />
         )}
-        {linkOpen && (
+        {openSessionModal === "link" && (
           <LinkWorkspaceModal
             sessions={app.sessions.filter(
               (session) => session.id !== app.activeSessionId,
             )}
             onSelect={app.linkWorkspace}
-            onClose={() => setLinkSessionId(null)}
+            onClose={() => setSessionModal(null)}
           />
         )}
         {workspaceOpen && app.activeSessionId && (
           <WorkspaceModal
             sessionId={app.activeSessionId}
             workspace={app.workspace}
-            temporary={app.isEphemeral}
+            linkedLabel={linkedChatLabel(app.workspace, app.sessions)}
             onClose={() => setWorkspaceOpen(false)}
           />
         )}

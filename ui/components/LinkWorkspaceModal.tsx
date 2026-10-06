@@ -1,5 +1,6 @@
 import { MessageSquare } from "lucide-react";
 import { useState } from "react";
+import { sessionLabel } from "../lib/sessionLabel";
 import type { SessionSummary } from "../types";
 import { Modal } from "./Modal";
 
@@ -66,7 +67,7 @@ export function LinkWorkspaceModal({
               size={16}
               className="shrink-0 text-muted-foreground"
             />
-            <span className="truncate">{session.preview || "New chat"}</span>
+            <span className="truncate">{sessionLabel(session)}</span>
           </button>
         ))}
       </div>

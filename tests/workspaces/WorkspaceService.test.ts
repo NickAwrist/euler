@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { migrateSessionsWorkspaceKindColumn } from "../../src/db/migrations";
+import type { SessionRow } from "../../src/db/types";
 import {
   WorkspaceError,
   WorkspaceService,
@@ -23,6 +24,21 @@ async function service(): Promise<WorkspaceService> {
   const root = await fs.mkdtemp(join(tmpdir(), "orbis-workspace-test-"));
   roots.push(root);
   return new WorkspaceService(root);
+}
+
+function sessionRow(directory: string | null): SessionRow {
+  return {
+    id: "chat-a",
+    owner_uuid: "owner-a",
+    created_at: 0,
+    updated_at: 0,
+    title: null,
+    model: null,
+    session_directory: directory,
+    workspace_kind: directory ? "local" : "sandbox",
+    expires_at: Date.now(),
+    linked_workspace_id: null,
+  };
 }
 
 describe("workspace service", () => {
@@ -59,13 +75,10 @@ describe("workspace service", () => {
 
   test("maps shell paths for both local and sandbox workspaces", async () => {
     const workspaces = await service();
-    const lease = await workspaces.createTemporary("owner-a");
     const local = await fs.mkdtemp(join(tmpdir(), "orbis-path-test-"));
     roots.push(local);
-    for (const kind of ["sandbox", "local"] as const) {
-      if (kind === "local")
-        await workspaces.selectTemporaryDirectory("owner-a", lease.id, local);
-      const workspace = await workspaces.resolveTemporary("owner-a", lease.id);
+    for (const directory of [null, local]) {
+      const workspace = await workspaces.resolveSession(sessionRow(directory));
       expect(workspace.displayPath).toBe("/workspace");
       const target = join(workspace.hostPath, "output.txt");
       await workspaces.writeFile(workspace, "/workspace/output.txt", "output");
@@ -82,27 +95,6 @@ describe("workspace service", () => {
         workspaces.resolveExistingPath(workspace, "/workspace/../outside"),
       ).rejects.toThrow();
     }
-  });
-
-  test("expiry removes leases and private files while preserving local directories and active turns", async () => {
-    const workspaces = await service();
-    const lease = await workspaces.createTemporary("owner-a");
-    const local = await fs.mkdtemp(join(tmpdir(), "orbis-expiry-test-"));
-    roots.push(local);
-    await workspaces.selectTemporaryDirectory("owner-a", lease.id, local);
-    lease.expiresAt = Date.now() - 1;
-    let busy = true;
-    workspaces.setAgentLifecycle({
-      isBusy: () => busy,
-      onExpire: (_owner, _session, remove) => remove(),
-    });
-    await workspaces.cleanupExpired();
-    await fs.access(lease.hostPath);
-    busy = false;
-    await workspaces.cleanupExpired();
-    await expect(fs.access(lease.hostPath)).rejects.toThrow();
-    expect(await workspaces.deleteTemporary("owner-a", lease.id)).toBeFalse();
-    await fs.access(local);
   });
 
   test("scans outputs beyond 1,000 dependency files before sorting", async () => {
@@ -123,19 +115,7 @@ describe("workspace service", () => {
     expect(files.slice(0, 200)[0]?.path).toBe("output.txt");
   });
 
-  test("temporary leases are owner-scoped and disappear on delete", async () => {
-    const workspaces = await service();
-    const lease = await workspaces.createTemporary("owner-a");
-    await expect(
-      workspaces.resolveTemporary("owner-b", lease.id),
-    ).rejects.toThrow();
-    expect(await workspaces.deleteTemporary("owner-a", lease.id)).toBeTrue();
-    await expect(
-      workspaces.resolveTemporary("owner-a", lease.id),
-    ).rejects.toThrow();
-  });
-
-  test("deleting a temporary chat never deletes its selected local directory", async () => {
+  test("deleting a chat's sandbox never deletes its selected local directory", async () => {
     const workspaces = await service();
     const localDirectory = await fs.mkdtemp(
       join(tmpdir(), "orbis-local-workspace-test-"),
@@ -143,17 +123,12 @@ describe("workspace service", () => {
     roots.push(localDirectory);
     const localFile = join(localDirectory, "keep.txt");
     await fs.writeFile(localFile, "keep");
-    const lease = await workspaces.createTemporary("owner-a");
+    const sandbox = await workspaces.provisionRetained("owner-a", "chat-a");
+    const row = sessionRow(localDirectory);
 
-    await workspaces.selectTemporaryDirectory(
-      "owner-a",
-      lease.id,
-      localDirectory,
-    );
-    expect((await workspaces.resolveTemporary("owner-a", lease.id)).kind).toBe(
-      "local",
-    );
-    expect(await workspaces.deleteTemporary("owner-a", lease.id)).toBeTrue();
+    expect((await workspaces.resolveSession(row)).kind).toBe("local");
+    await workspaces.deleteRetained(row.owner_uuid, row.id);
+    await expect(fs.access(sandbox.hostPath)).rejects.toThrow();
     expect(await fs.readFile(localFile, "utf8")).toBe("keep");
   });
 });

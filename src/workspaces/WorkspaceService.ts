@@ -31,16 +31,6 @@ export type WorkspaceFile = {
   modifiedAt: number;
 };
 
-type TemporaryWorkspaceLease = {
-  id: string;
-  ownerUuid: string;
-  hostPath: string;
-  workspaceKind: WorkspaceKind;
-  localPath?: string;
-  expiresAt: number;
-};
-
-const TEMPORARY_WORKSPACE_TTL_MS = 24 * 60 * 60 * 1000;
 const TRASH_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const SAFE_SEGMENT = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
 
@@ -54,28 +44,12 @@ export class WorkspaceError extends OperationError {
 
 export class WorkspaceService {
   readonly retainedRoot: string;
-  readonly ephemeralRoot: string;
   readonly trashRoot: string;
-  private readonly temporaryLeases = new Map<string, TemporaryWorkspaceLease>();
-  private agentLifecycle = {
-    isBusy: (_owner: string, _session: string) => false,
-    /** Settles the chat's agents and runs `remove` before anything restarts. */
-    onExpire: (
-      _owner: string,
-      _session: string,
-      remove: () => Promise<unknown>,
-    ): Promise<unknown> => remove(),
-  };
-  setAgentLifecycle(lifecycle: typeof this.agentLifecycle) {
-    this.agentLifecycle = lifecycle;
-  }
 
   constructor(readonly dataRoot = DATA_ROOT) {
     this.retainedRoot = join(dataRoot, "workspaces");
-    this.ephemeralRoot = join(dataRoot, "ephemeral-workspaces");
     this.trashRoot = join(dataRoot, "workspace-trash");
     mkdirSync(this.retainedRoot, { recursive: true });
-    mkdirSync(this.ephemeralRoot, { recursive: true });
     mkdirSync(this.trashRoot, { recursive: true });
   }
 
@@ -97,23 +71,7 @@ export class WorkspaceService {
   }
 
   async cleanupExpired(): Promise<void> {
-    for (const lease of this.temporaryLeases.values()) {
-      if (
-        lease.expiresAt <= Date.now() &&
-        !this.agentLifecycle.isBusy(lease.ownerUuid, lease.id)
-      ) {
-        await this.agentLifecycle.onExpire(lease.ownerUuid, lease.id, () =>
-          this.deleteTemporary(lease.ownerUuid, lease.id),
-        );
-      }
-    }
-    await Promise.all([
-      this.purgeExpiredDirectories(
-        this.ephemeralRoot,
-        TEMPORARY_WORKSPACE_TTL_MS,
-      ),
-      this.purgeExpiredDirectories(this.trashRoot, TRASH_RETENTION_MS),
-    ]);
+    await this.purgeExpiredDirectories(this.trashRoot, TRASH_RETENTION_MS);
   }
 
   private safeSegment(value: string, field: string): string {
@@ -157,8 +115,11 @@ export class WorkspaceService {
     );
   }
 
-  /** `linkedLabel` names the chat whose sandbox `row` is linked to. */
-  presentation(row: SessionRow, linkedLabel?: string | null): SessionWorkspace {
+  /** `linkedSessionId` is another chat using the linked sandbox, if any. */
+  presentation(
+    row: SessionRow,
+    linkedSessionId: string | null = null,
+  ): SessionWorkspace {
     if (row.workspace_kind === "local" && row.session_directory?.trim()) {
       return {
         kind: "local",
@@ -171,7 +132,7 @@ export class WorkspaceService {
         kind: "sandbox",
         linked: {
           workspaceId: row.linked_workspace_id,
-          label: linkedLabel ?? "a deleted chat",
+          sessionId: linkedSessionId,
         },
       };
     }
@@ -199,83 +160,12 @@ export class WorkspaceService {
     return canonical;
   }
 
-  async createTemporary(ownerUuid: string): Promise<TemporaryWorkspaceLease> {
-    this.safeSegment(ownerUuid, "workspace owner");
-    const id = crypto.randomUUID();
-    const requestedPath = join(this.ephemeralRoot, id);
-    await fs.mkdir(requestedPath, { recursive: false });
-    const hostPath = await fs.realpath(requestedPath);
-    const lease = {
-      id,
-      ownerUuid,
-      hostPath,
-      workspaceKind: "sandbox" as const,
-      expiresAt: Date.now() + TEMPORARY_WORKSPACE_TTL_MS,
-    };
-    this.temporaryLeases.set(id, lease);
-    return lease;
-  }
-
-  async resolveTemporary(ownerUuid: string, id: string): Promise<Workspace> {
-    const lease = this.getTemporaryLease(ownerUuid, id);
-    if (lease.workspaceKind === "local") {
-      if (!lease.localPath) {
-        throw new WorkspaceError(
-          "This temporary chat's local directory is no longer configured",
-        );
-      }
-      const hostPath = await this.canonicalDirectory(lease.localPath);
-      return { kind: "local", hostPath, displayPath: "/workspace" };
-    }
-    await fs.access(lease.hostPath, constants.R_OK | constants.W_OK);
-    return {
-      kind: "sandbox",
-      hostPath: lease.hostPath,
-      displayPath: "/workspace",
-    };
-  }
-
-  temporaryPresentation(ownerUuid: string, id: string): SessionWorkspace {
-    const lease = this.getTemporaryLease(ownerUuid, id);
-    if (lease.workspaceKind === "local" && lease.localPath) {
-      return {
-        kind: "local",
-        path: lease.localPath,
-        label: basename(lease.localPath) || lease.localPath,
-      };
-    }
-    return { kind: "sandbox" };
-  }
-
-  async selectTemporaryDirectory(
-    ownerUuid: string,
-    id: string,
-    selectedPath: string,
-  ): Promise<SessionWorkspace> {
-    const lease = this.getTemporaryLease(ownerUuid, id);
-    const path = await this.canonicalDirectory(selectedPath);
-    lease.workspaceKind = "local";
-    lease.localPath = path;
-    return {
-      kind: "local",
-      path,
-      label: basename(path) || path,
-    };
-  }
-
-  useTemporarySandbox(ownerUuid: string, id: string): SessionWorkspace {
-    const lease = this.getTemporaryLease(ownerUuid, id);
-    lease.workspaceKind = "sandbox";
-    lease.localPath = undefined;
-    return { kind: "sandbox" };
-  }
-
-  async deleteTemporary(ownerUuid: string, id: string): Promise<boolean> {
-    const lease = this.temporaryLeases.get(id);
-    if (!lease || lease.ownerUuid !== ownerUuid) return false;
-    await fs.rm(lease.hostPath, { recursive: true, force: true });
-    this.temporaryLeases.delete(id);
-    return true;
+  /** Permanently removes the chat's sandbox, skipping the trash. */
+  async deleteRetained(ownerUuid: string, sessionId: string): Promise<void> {
+    await fs.rm(this.retainedPath(ownerUuid, sessionId), {
+      recursive: true,
+      force: true,
+    });
   }
 
   async trashRetained(ownerUuid: string, sessionId: string): Promise<void> {
@@ -492,22 +382,6 @@ export class WorkspaceService {
     }
   }
 
-  private getTemporaryLease(
-    ownerUuid: string,
-    id: string,
-  ): TemporaryWorkspaceLease {
-    const lease = this.temporaryLeases.get(id);
-    if (
-      !lease ||
-      lease.ownerUuid !== ownerUuid ||
-      (lease.expiresAt <= Date.now() &&
-        !this.agentLifecycle.isBusy(ownerUuid, id))
-    ) {
-      throw new WorkspaceError("Temporary chat expired or was not found");
-    }
-    return lease;
-  }
-
   private async walkFiles(
     workspace: Workspace,
     directory: string,
@@ -537,8 +411,6 @@ export class WorkspaceService {
     const now = Date.now();
     for (const entry of await fs.readdir(root, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
-      if (root === this.ephemeralRoot && this.temporaryLeases.has(entry.name))
-        continue;
       const path = join(root, entry.name);
       try {
         const stat = statSync(path);

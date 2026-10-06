@@ -13,12 +13,13 @@ import { Modal } from "./Modal";
 export function WorkspaceModal({
   sessionId,
   workspace,
-  temporary,
+  linkedLabel,
   onClose,
 }: {
   sessionId: string;
   workspace: SessionWorkspace;
-  temporary: boolean;
+  /** The chat whose sandbox this chat is linked to, if any. */
+  linkedLabel: string | null;
   onClose: () => void;
 }) {
   const [files, setFiles] = useState<WorkspaceFile[] | null>(null);
@@ -26,7 +27,7 @@ export function WorkspaceModal({
 
   useEffect(() => {
     let cancelled = false;
-    fetchWorkspaceFiles(sessionId, temporary)
+    fetchWorkspaceFiles(sessionId)
       .then((incoming) => {
         if (!cancelled) {
           setFiles(incoming);
@@ -43,15 +44,15 @@ export function WorkspaceModal({
     return () => {
       cancelled = true;
     };
-  }, [sessionId, temporary]);
+  }, [sessionId]);
 
   const download = async (file: WorkspaceFile) => {
-    const blob = await downloadWorkspaceFile(sessionId, file.path, temporary);
+    const blob = await downloadWorkspaceFile(sessionId, file.path);
     downloadBlob(blob, file.name);
   };
 
   const reveal = async (file: WorkspaceFile) => {
-    await revealWorkspaceFile(sessionId, file.path, temporary);
+    await revealWorkspaceFile(sessionId, file.path);
   };
 
   return (
@@ -60,8 +61,8 @@ export function WorkspaceModal({
       subtitle={
         workspace.kind === "local"
           ? workspace.path
-          : workspace.linked
-            ? `Linked to ${workspace.linked.label}`
+          : linkedLabel
+            ? `Linked to ${linkedLabel}'s workspace`
             : "Private chat workspace"
       }
       ariaLabel="Workspace files"

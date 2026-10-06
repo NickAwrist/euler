@@ -4,7 +4,7 @@ import {
   buildServerRunPromptContext,
 } from "../agents/agentManager";
 import { INBOX_DIRECTIVES } from "../agents/runtime/agentContext";
-import { type SessionRow, getSessionById } from "../db/index";
+import { getSessionById } from "../db/index";
 import { sendError, sendValidationError } from "../observability/http";
 import { DebugPromptBodySchema } from "../schemas/run";
 import { requireUserId } from "../userIdentity";
@@ -24,23 +24,16 @@ router.post("/debug-prompt", async (req, res) => {
     return;
   }
   const body = parsed.data;
-  const ephemeral = body.ephemeral === true;
   const sessionId = body.sessionId?.trim() || "";
 
   let workspace: Workspace | undefined;
-  let persistedSession: SessionRow | null = null;
-
-  if (!ephemeral && sessionId) {
-    persistedSession = getSessionById(ownerUuid, sessionId);
-    if (!persistedSession) {
+  if (sessionId) {
+    const session = getSessionById(ownerUuid, sessionId);
+    if (!session) {
       sendError(res, "NOT_FOUND", "Session not found");
       return;
     }
-  }
-  if (persistedSession) {
-    workspace = await workspaceService.resolveSession(persistedSession);
-  } else if (ephemeral && sessionId) {
-    workspace = await workspaceService.resolveTemporary(ownerUuid, sessionId);
+    workspace = await workspaceService.resolveSession(session);
   }
 
   const promptContext = buildServerRunPromptContext({

@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { RunContext } from "../../src/RunContext";
 import { BaseAgent } from "../../src/agents/BaseAgent";
+import { createSessionRow } from "../../src/db/sessions";
 import { JobManager } from "../../src/jobs/JobManager";
 import { updateContent } from "../../src/jobs/content";
 import { JobSchema } from "../../src/schemas/jobs";
@@ -56,9 +57,9 @@ class FixtureTool extends BaseTool {
   }
 }
 function fixture() {
+  createSessionRow("owner", "session", Date.now(), "test");
   let notifications = 0;
   const manager = new JobManager({
-    temporary: () => true,
     blocked: () => false,
     changed: () => {},
     position: () => 0,

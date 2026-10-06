@@ -9,10 +9,10 @@ const sandbox: SessionWorkspace = { kind: "sandbox" };
 const local: SessionWorkspace = { kind: "local", path: "/tmp/a", label: "a" };
 const linked: SessionWorkspace = {
   kind: "sandbox",
-  linked: { workspaceId: "chat-a", label: "Chat A" },
+  linked: { workspaceId: "chat-a", sessionId: "chat-a" },
 };
-const names = (workspace: SessionWorkspace, temporary = false) =>
-  matchingRunCommands("/", workspace, temporary).map((command) => command.name);
+const names = (workspace: SessionWorkspace) =>
+  matchingRunCommands("/", workspace).map((command) => command.name);
 
 describe("run commands", () => {
   test("recognizes exact workspace commands for local UI handling", () => {
@@ -30,26 +30,21 @@ describe("run commands", () => {
 
   test("filters the command menu from a leading slash token", () => {
     expect(
-      matchingRunCommands("/dir", sandbox, false).map(
-        (command) => command.name,
-      ),
+      matchingRunCommands("/dir", sandbox).map((command) => command.name),
     ).toEqual(["directory"]);
-    expect(matchingRunCommands("hello /dir", sandbox, false)).toEqual([]);
+    expect(matchingRunCommands("hello /dir", sandbox)).toEqual([]);
   });
 
   test("only offers returning to the private workspace when away from it", () => {
     expect(names(sandbox)).toEqual(["directory", "link", "workspace"]);
-    expect(names(local)).toEqual(["directory", "link", "sandbox", "workspace"]);
-    expect(names(linked)).toEqual([
-      "directory",
-      "link",
-      "sandbox",
-      "workspace",
-    ]);
-    expect(matchingRunCommands("/sandbox", sandbox, false)).toEqual([]);
-  });
-
-  test("temporary chats cannot link to another chat's workspace", () => {
-    expect(names(sandbox, true)).toEqual(["directory", "workspace"]);
+    for (const workspace of [local, linked]) {
+      expect(names(workspace)).toEqual([
+        "directory",
+        "link",
+        "sandbox",
+        "workspace",
+      ]);
+    }
+    expect(matchingRunCommands("/sandbox", sandbox)).toEqual([]);
   });
 });
