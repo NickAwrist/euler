@@ -10,6 +10,7 @@ import {
 import { effectiveDefaultRunModel } from "../../lib/defaultModel";
 import {
   fetchSession,
+  linkSessionWorkspace,
   patchSessionApi,
   selectSessionDirectory,
   useSessionSandbox,
@@ -109,10 +110,25 @@ export function useSessionPreferences({
     [activeSessionIdRef, isEphemeralRef, setMessages],
   );
 
+  const linkWorkspace = useCallback(
+    async (sourceSessionId: string) => {
+      const sid = activeSessionIdRef.current;
+      if (!sid || isEphemeralRef.current) return;
+      const linked = await linkSessionWorkspace(sid, sourceSessionId);
+      if (activeSessionIdRef.current !== sid) return;
+      setWorkspace(linked);
+      const refreshed = await fetchSession(sid);
+      if (refreshed && activeSessionIdRef.current === sid) {
+        setMessages(refreshed.history);
+      }
+    },
+    [activeSessionIdRef, isEphemeralRef, setMessages],
+  );
+
+  const privateSandbox = workspace.kind === "sandbox" && !workspace.linked;
   const returnToSandbox = useCallback(async () => {
     const sid = activeSessionIdRef.current;
-    if (!sid || workspace.kind !== "local" || returningToSandboxRef.current)
-      return;
+    if (!sid || privateSandbox || returningToSandboxRef.current) return;
     returningToSandboxRef.current = true;
     try {
       const temporary = isEphemeralRef.current;
@@ -129,7 +145,7 @@ export function useSessionPreferences({
     } finally {
       returningToSandboxRef.current = false;
     }
-  }, [activeSessionIdRef, isEphemeralRef, setMessages, workspace.kind]);
+  }, [activeSessionIdRef, isEphemeralRef, setMessages, privateSandbox]);
 
   return {
     selectedModel,
@@ -143,6 +159,7 @@ export function useSessionPreferences({
     handleThinkingEffortChange,
     handleModelChange,
     chooseDirectory,
+    linkWorkspace,
     returnToSandbox,
   };
 }

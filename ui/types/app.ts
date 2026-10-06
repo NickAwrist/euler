@@ -1,6 +1,4 @@
-export type SessionWorkspace =
-  | { kind: "sandbox" }
-  | { kind: "local"; path: string; label: string };
+export type { SessionWorkspace } from "../../src/schemas/sessions";
 
 export type WorkspaceFile = {
   path: string;

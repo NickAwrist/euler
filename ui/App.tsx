@@ -18,6 +18,7 @@ import { shouldShowStepsModal } from "./components/ExecutionTrace";
 import { JobContext } from "./components/Jobs/JobContext";
 import { JobTraceModal } from "./components/Jobs/JobTraceModal";
 import { JobsList } from "./components/Jobs/JobsList";
+import { LinkWorkspaceModal } from "./components/LinkWorkspaceModal";
 import { ProviderSetupBanner } from "./components/OllamaDisconnectedBanner";
 import { Onboarding } from "./components/Onboarding";
 import { RenameSessionModal } from "./components/RenameSessionModal";
@@ -85,7 +86,7 @@ function ChatView({
   onSettings,
   onUsage,
 }: ChatViewProps) {
-  const workspaceKey = `${app.activeSessionId}:${app.workspace.kind === "local" ? app.workspace.path : "sandbox"}`;
+  const workspaceKey = `${app.activeSessionId}:${app.workspace.kind === "local" ? app.workspace.path : (app.workspace.linked?.workspaceId ?? "sandbox")}`;
   const [artifactView, setArtifactView] = useState<"files" | "agents" | "jobs">(
     "files",
   );
@@ -513,6 +514,7 @@ function ChatView({
                 attachImageDisabledReason={app.attachImageDisabledReason}
                 attachmentsSendReady={app.attachmentsSendReady}
                 workspace={app.workspace}
+                temporary={app.isEphemeral}
                 onRunCommand={runCommand}
                 onFooterHeightChange={setRunFooterInset}
               />
@@ -605,6 +607,9 @@ export default function App() {
   );
   const directoryOpen =
     directorySessionId !== null && directorySessionId === app.activeSessionId;
+  const [linkSessionId, setLinkSessionId] = useState<string | null>(null);
+  const linkOpen =
+    linkSessionId !== null && linkSessionId === app.activeSessionId;
 
   const openCustomization = () => {
     app.setSidebarOpen(false);
@@ -620,6 +625,13 @@ export default function App() {
     try {
       const sessionId = app.activeSessionId ?? (await app.startSession());
       if (command === "directory") setDirectorySessionId(sessionId);
+      if (command === "link") {
+        if (app.isEphemeral)
+          throw new Error(
+            "Temporary chats can't link to another chat's workspace",
+          );
+        setLinkSessionId(sessionId);
+      }
       if (command === "sandbox") await app.returnToSandbox();
       if (command === "workspace") setWorkspaceOpen(true);
     } catch (error) {
@@ -783,6 +795,15 @@ export default function App() {
             }
             onSelect={app.chooseDirectory}
             onClose={() => setDirectorySessionId(null)}
+          />
+        )}
+        {linkOpen && (
+          <LinkWorkspaceModal
+            sessions={app.sessions.filter(
+              (session) => session.id !== app.activeSessionId,
+            )}
+            onSelect={app.linkWorkspace}
+            onClose={() => setLinkSessionId(null)}
           />
         )}
         {workspaceOpen && app.activeSessionId && (

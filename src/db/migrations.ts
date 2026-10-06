@@ -227,4 +227,6 @@ export function runMigrations(db: Database) {
         `ALTER TABLE sessions ADD COLUMN ${column} INTEGER NOT NULL DEFAULT 0`,
       );
   }
+  if (!columns.some((c) => c.name === "linked_workspace_id"))
+    db.run("ALTER TABLE sessions ADD COLUMN linked_workspace_id TEXT");
 }

@@ -1,4 +1,6 @@
-export type RunCommandName = "directory" | "sandbox" | "workspace";
+import type { SessionWorkspace } from "../types";
+
+export type RunCommandName = "directory" | "link" | "sandbox" | "workspace";
 
 export type RunCommand = {
   name: RunCommandName;
@@ -10,13 +12,15 @@ export const RUN_COMMANDS: readonly RunCommand[] = [
     name: "directory",
     description: "Allow this chat to work in a folder on the server",
   },
+  { name: "link", description: "Work in another chat's workspace" },
   { name: "sandbox", description: "Return this chat to its private workspace" },
   { name: "workspace", description: "Show files in this chat's workspace" },
 ];
 
 export function matchingRunCommands(
   input: string,
-  workspaceKind: "sandbox" | "local",
+  workspace: SessionWorkspace,
+  temporary: boolean,
 ): readonly RunCommand[] {
   const trimmed = input.trimStart();
   if (
@@ -27,10 +31,13 @@ export function matchingRunCommands(
     return [];
   }
   const query = trimmed.slice(1).toLowerCase();
+  const privateSandbox = workspace.kind === "sandbox" && !workspace.linked;
   return RUN_COMMANDS.filter(
     (command) =>
       command.name.startsWith(query) &&
-      (command.name !== "sandbox" || workspaceKind === "local"),
+      (command.name !== "sandbox" || !privateSandbox) &&
+      // Temporary chats are discarded with their workspace, so they never link.
+      (command.name !== "link" || !temporary),
   );
 }
 

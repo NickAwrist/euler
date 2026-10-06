@@ -58,7 +58,11 @@ export function WorkspaceModal({
     <Modal
       title="Workspace files"
       subtitle={
-        workspace.kind === "local" ? workspace.path : "Private chat workspace"
+        workspace.kind === "local"
+          ? workspace.path
+          : workspace.linked
+            ? `Linked to ${workspace.linked.label}`
+            : "Private chat workspace"
       }
       ariaLabel="Workspace files"
       onClose={onClose}

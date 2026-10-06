@@ -329,6 +329,67 @@ test("chat sidebar desktop workspace changes refresh open artifacts without remo
   expect(previews).toBe(2);
 });
 
+test("chat sidebar desktop links another chat's workspace", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockApp(page);
+  const linkRequests: unknown[] = [];
+  await page.route("**/api/sessions", (route) =>
+    route.fulfill({
+      json: {
+        sessions: [
+          {
+            id: "sidebar-test",
+            preview: "Sidebar test chat",
+            createdAt: 1,
+            updatedAt: 2,
+          },
+          {
+            id: "builder",
+            preview: "Builder chat",
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        ],
+      },
+    }),
+  );
+  await page.route("**/workspace/link", (route) => {
+    linkRequests.push(route.request().postDataJSON());
+    return route.fulfill({
+      json: {
+        workspace: {
+          kind: "sandbox",
+          linked: { workspaceId: "builder", label: "Builder chat" },
+        },
+      },
+    });
+  });
+  await mockUserPreferences(page);
+  await page.goto("/run/sidebar-test");
+  const composer = page.getByPlaceholder("Send a message...");
+  await composer.fill("/li");
+  await expect(
+    page.getByRole("button", { name: /Return this chat/ }),
+  ).toHaveCount(0);
+  await composer.press("Enter");
+  const dialog = page.getByRole("dialog", {
+    name: "Link a chat's workspace",
+  });
+  await expect(dialog.getByText("Sidebar test chat")).toHaveCount(0);
+  await dialog.getByRole("button", { name: "Builder chat" }).click();
+  await expect(dialog).toBeHidden();
+  expect(linkRequests).toEqual([{ sessionId: "builder" }]);
+  await expect(
+    page.getByText("Linked to Builder chat's workspace"),
+  ).toBeVisible();
+  await composer.fill("/");
+  await expect(
+    page.getByRole("button", { name: /Return this chat/ }),
+  ).toBeVisible();
+});
+
 test("chat sidebar desktop preserves collapsed state on reload", async ({
   page,
 }) => {

@@ -20,6 +20,8 @@ export type SessionRow = {
   model: string | null;
   session_directory: string | null;
   workspace_kind: "sandbox" | "local";
+  /** Another chat's sandbox this chat works in; null uses its own. */
+  linked_workspace_id: string | null;
 };
 
 export type SessionSummaryRow = {

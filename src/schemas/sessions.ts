@@ -4,6 +4,8 @@ import { WireMessageSchema } from "./run";
 export const SessionWorkspaceSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("sandbox"),
+    /** Present when this chat is linked to another chat's sandbox. */
+    linked: z.object({ workspaceId: z.string(), label: z.string() }).optional(),
   }),
   z.object({
     kind: z.literal("local"),

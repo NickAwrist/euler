@@ -3,6 +3,7 @@ import {
   type SessionSummary,
   SessionSummaryListSchema,
   type SessionWorkspace,
+  SessionWorkspaceSchema,
   StoredRunSessionSchema,
 } from "../../src/schemas/sessions";
 import { apiBlob, apiJson, apiVoid } from "../lib/api";
@@ -132,6 +133,19 @@ export async function selectSessionDirectory(
     },
   );
   return data.workspace;
+}
+
+export async function linkSessionWorkspace(
+  id: string,
+  sourceSessionId: string,
+): Promise<SessionWorkspace> {
+  const data = await apiJson<unknown>(
+    `/api/sessions/${encodeURIComponent(id)}/workspace/link`,
+    { method: "POST", json: { sessionId: sourceSessionId } },
+  );
+  return SessionWorkspaceSchema.parse(
+    (data as { workspace?: unknown } | null)?.workspace,
+  );
 }
 
 export async function useSessionSandbox(
