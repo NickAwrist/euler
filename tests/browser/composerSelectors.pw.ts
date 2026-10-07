@@ -250,8 +250,31 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect(input).toHaveValue("");
       await input.fill("Draft after submission");
       await input.press("Enter");
+      await expect(input).toHaveValue("Draft after submission\n");
+      await input.press("Shift+Enter");
+      await input.press("a");
+      await expect(input).toHaveValue("Draft after submission\n\na");
+      expect(runs).toHaveLength(1);
+      await input.dispatchEvent("keydown", {
+        key: "Enter",
+        ctrlKey: true,
+        isComposing: true,
+      });
+      await input.dispatchEvent("keydown", {
+        key: "Enter",
+        ctrlKey: true,
+        repeat: true,
+      });
+      await expect(input).toHaveValue("Draft after submission\n\na");
+      expect(runs).toHaveLength(1);
+      await input.press("Control+Enter");
       await expect.poll(() => runs.length).toBe(2);
-      expect(runs[1]?.content).toBe("Draft after submission");
+      expect(runs[1]?.content).toBe("Draft after submission\n\na");
+      await expect(input).toHaveValue("");
+      await input.fill("Send with Command");
+      await input.press("Meta+Enter");
+      await expect.poll(() => runs.length).toBe(3);
+      expect(runs[2]?.content).toBe("Send with Command");
       await expect(input).toHaveValue("");
 
       // A refreshed catalog must not silently replace the selected model.
@@ -279,9 +302,10 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect(
         page.getByRole("button", { name: "Send message" }),
       ).toBeDisabled();
-      await input.press("Enter");
+      await input.press("Control+Enter");
+      await input.press("Meta+Enter");
       await expect(input).toHaveValue("Keep this unsent draft");
-      expect(runs).toHaveLength(2);
+      expect(runs).toHaveLength(3);
 
       const readsBeforeSettings = sessionReads;
       await model.click();
