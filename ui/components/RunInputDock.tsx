@@ -377,15 +377,21 @@ export function RunInputDock({
               }
             }}
             onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing) return;
               if (commandPickerOpen && commandNav.onKeyDown(e)) {
                 return;
               }
               if (skillPickerOpen && skillNav.onKeyDown(e)) {
                 return;
               }
-              if (e.key === "Enter" && !e.shiftKey) {
+              if (
+                e.key === "Enter" &&
+                (e.ctrlKey || e.metaKey) &&
+                !e.shiftKey &&
+                !e.altKey
+              ) {
                 e.preventDefault();
-                if (canSend) onSendMessage(e);
+                if (!e.repeat && canSend) onSendMessage(e);
               }
             }}
             placeholder="Send a message..."
@@ -421,6 +427,8 @@ export function RunInputDock({
               variant="primary"
               icon={ArrowUp}
               label="Send message"
+              title="Send message (Ctrl+Enter / Cmd+Enter)"
+              aria-keyshortcuts="Control+Enter Meta+Enter"
               disabled={!input.trim() || !canSend}
               className="mb-0.5"
             />
