@@ -73,6 +73,50 @@ function applyChange(
       ) ?? null,
   };
 }
+async function sendChange(
+  operation: PreferenceChange,
+  load: () => Promise<void>,
+) {
+  const id = encodeURIComponent(operation.publisherId);
+  switch (operation.kind) {
+    case "add-model":
+      await modelSettingsRequest("openrouter/models", "PATCH", {
+        route: operation.route,
+        enabled: true,
+      });
+      await load();
+      break;
+    case "enabled":
+      await modelSettingsRequest("openrouter/models", "PATCH", {
+        route: operation.route,
+        enabled: operation.value,
+      });
+      break;
+    case "favorite":
+      await modelSettingsRequest("models/favorite", "PUT", {
+        provider: "openrouter",
+        modelId: operation.route,
+        favorite: operation.value,
+      });
+      break;
+    case "subscription":
+      await modelSettingsRequest(
+        `openrouter/publishers/${id}/subscription`,
+        "PATCH",
+        { subscribed: operation.value },
+      );
+      break;
+    case "track":
+      await modelSettingsRequest("openrouter/publishers", "POST", {
+        publisherId: operation.publisherId,
+      });
+      break;
+    case "remove":
+      await modelSettingsRequest(`openrouter/publishers/${id}`, "DELETE");
+
+      break;
+  }
+}
 export function useOpenRouterCatalog(onModelsChanged: () => Promise<void>) {
   const [data, setData] = useState<CatalogSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -105,74 +149,38 @@ export function useOpenRouterCatalog(onModelsChanged: () => Promise<void>) {
       setData((current) =>
         current ? applyChange(current, operation) : current,
       );
-    try {
-      const id = encodeURIComponent(operation.publisherId);
-      switch (operation.kind) {
-        case "add-model":
-          await modelSettingsRequest("openrouter/models", "PATCH", {
-            route: operation.route,
-            enabled: true,
-          });
-          await load();
-          break;
-        case "enabled":
-          await modelSettingsRequest("openrouter/models", "PATCH", {
-            route: operation.route,
-            enabled: operation.value,
-          });
-          break;
-        case "favorite":
-          await modelSettingsRequest("models/favorite", "PUT", {
-            provider: "openrouter",
-            modelId: operation.route,
-            favorite: operation.value,
-          });
-          break;
-        case "subscription":
-          await modelSettingsRequest(
-            `openrouter/publishers/${id}/subscription`,
-            "PATCH",
-            { subscribed: operation.value },
+    await sendChange(operation, load).then(
+      () => {
+        if (!optimistic && operation.kind !== "add-model")
+          setData((current) =>
+            current ? applyChange(current, operation) : current,
           );
-          break;
-        case "track":
-          await modelSettingsRequest("openrouter/publishers", "POST", {
-            publisherId: operation.publisherId,
-          });
-          break;
-        case "remove":
-          await modelSettingsRequest(`openrouter/publishers/${id}`, "DELETE");
-
-          break;
-      }
-      if (!optimistic && operation.kind !== "add-model")
-        setData((current) =>
-          current ? applyChange(current, operation) : current,
-        );
-    } catch (cause) {
-      if (operation.kind === "enabled" || operation.kind === "favorite") {
-        const previous =
-          before.modelsByPublisher[operation.publisherId]?.find(
-            (model) => model.route === operation.route,
-          )?.[operation.kind] ?? false;
-        setData((current) =>
-          current
-            ? applyChange(current, { ...operation, value: previous })
-            : current,
-        );
-      } else if (operation.kind === "subscription") {
-        const previous =
-          before.publishers.find(
-            (publisher) => publisher.id === operation.publisherId,
-          )?.subscribed ?? false;
-        setData((current) =>
-          current
-            ? applyChange(current, { ...operation, value: previous })
-            : current,
-        );
-      }
-      throw cause;
-    }
+      },
+      (cause: unknown) => {
+        if (operation.kind === "enabled" || operation.kind === "favorite") {
+          const previous =
+            before.modelsByPublisher[operation.publisherId]?.find(
+              (model) => model.route === operation.route,
+            )?.[operation.kind] ?? false;
+          setData((current) =>
+            current
+              ? applyChange(current, { ...operation, value: previous })
+              : current,
+          );
+        } else if (operation.kind === "subscription") {
+          const previous =
+            before.publishers.find(
+              (publisher) => publisher.id === operation.publisherId,
+            )?.subscribed ?? false;
+          setData((current) =>
+            current
+              ? applyChange(current, { ...operation, value: previous })
+              : current,
+          );
+        }
+        throw cause;
+      },
+    );
     if (
       operation.kind === "enabled" ||
       operation.kind === "favorite" ||

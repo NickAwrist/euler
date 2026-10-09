@@ -1,10 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   type ImageAttachment,
   ImageMimeTypeSchema,
   MAX_IMAGES_PER_MESSAGE,
   MAX_IMAGE_BYTES,
 } from "../../../src/attachments/types";
+import { whileRunning } from "../../lib/whileRunning";
 import { uploadImageAttachment } from "../../persist/attachments";
 import { createBrowserUuid } from "../../persist/userIdentity";
 
@@ -27,7 +34,9 @@ export function usePendingImages({
   const [imageError, setImageError] = useState<string | null>(null);
   const [uploadPending, setUploadPending] = useState(false);
   const pendingImagesRef = useRef<PendingImage[]>([]);
-  pendingImagesRef.current = pendingImages;
+  useLayoutEffect(() => {
+    pendingImagesRef.current = pendingImages;
+  });
 
   const clearPendingImages = useCallback(() => {
     for (const image of pendingImagesRef.current) {
@@ -101,23 +110,21 @@ export function usePendingImages({
   }, []);
 
   const uploadPendingImages = useCallback(
-    async (sessionId: string): Promise<ImageAttachment[] | null> => {
-      setUploadPending(true);
-      try {
-        return await Promise.all(
-          pendingImages.map((image) =>
-            uploadImageAttachment(sessionId, image.file),
-          ),
-        );
-      } catch (error) {
-        setImageError(
-          error instanceof Error ? error.message : "Could not upload image.",
-        );
-        return null;
-      } finally {
-        setUploadPending(false);
-      }
-    },
+    (sessionId: string): Promise<ImageAttachment[] | null> =>
+      whileRunning(setUploadPending, async () => {
+        try {
+          return await Promise.all(
+            pendingImages.map((image) =>
+              uploadImageAttachment(sessionId, image.file),
+            ),
+          );
+        } catch (error) {
+          setImageError(
+            error instanceof Error ? error.message : "Could not upload image.",
+          );
+          return null;
+        }
+      }),
     [pendingImages],
   );
 

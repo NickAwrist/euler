@@ -41,7 +41,6 @@ export function useRunApp() {
 
   const sessions = useSessionsAndNavigation({
     ollamaModels: ollama.ollamaModels,
-    userSettingsRef: settings.userSettingsRef,
     userSettingsDefaultModel: settings.userSettings.defaultModel,
     messages,
     setMessages,

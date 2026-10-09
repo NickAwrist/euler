@@ -92,20 +92,18 @@ export function FilePreview({
     downloadRequest.current = controller;
     setDownloading(true);
     setDownloadError("");
+    const filename = path.split("/").pop() || "file";
     try {
       const blob = await source.download(path, controller.signal);
-      if (!controller.signal.aborted)
-        downloadBlob(blob, path.split("/").pop() || "file");
+      if (!controller.signal.aborted) downloadBlob(blob, filename);
     } catch (cause) {
       if (!controller.signal.aborted)
         setDownloadError(
           cause instanceof Error ? cause.message : "Could not download file",
         );
-    } finally {
-      if (downloadRequest.current === controller)
-        downloadRequest.current = null;
-      if (!controller.signal.aborted) setDownloading(false);
     }
+    if (downloadRequest.current === controller) downloadRequest.current = null;
+    if (!controller.signal.aborted) setDownloading(false);
   };
   useEffect(() => {
     const controller = new AbortController();

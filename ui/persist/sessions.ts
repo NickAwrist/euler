@@ -146,7 +146,9 @@ export async function linkSessionWorkspace(
   ).workspace;
 }
 
-export async function useSessionSandbox(id: string): Promise<SessionWorkspace> {
+export async function switchSessionToSandbox(
+  id: string,
+): Promise<SessionWorkspace> {
   await apiVoid(`${workspacePath(id)}/use-sandbox`, {
     method: "POST",
   });

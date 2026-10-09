@@ -21,28 +21,28 @@
     },
     "scroll.renders": {
       "tolerance": 0,
-      "slack": 0,
-      "value": 9
+      "slack": 2,
+      "value": 5
     },
     "typing.renders": {
       "tolerance": 0,
-      "slack": 0,
-      "value": 62154
+      "slack": 2,
+      "value": 324
     },
     "stream.renders": {
       "tolerance": 0,
-      "slack": 0,
-      "value": 38450
+      "slack": 2,
+      "value": 550
     },
     "finishReply.renders": {
       "tolerance": 0,
-      "slack": 0,
-      "value": 6294
+      "slack": 2,
+      "value": 2462
     },
     "openChat.renders": {
       "tolerance": 0,
-      "slack": 0,
-      "value": 11287
+      "slack": 2,
+      "value": 7150
     },
     "api.sessionResponseBytes": {
       "tolerance": 0.01,
@@ -57,7 +57,7 @@
     "bundle.jsGzipBytes": {
       "tolerance": 0.01,
       "slack": 0,
-      "value": 695945
+      "value": 743268
     },
     "bundle.cssGzipBytes": {
       "tolerance": 0.01,

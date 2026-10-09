@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isWorkingAgent } from "../../../src/schemas/agents";
 import type { AgentEvent } from "../../../src/schemas/events";
 import {
@@ -84,7 +84,6 @@ export function useAgentEvents(
   const [state, setState] = useState<RuntimeSnapshot>(empty);
   const [phases, setPhases] = useState<AgentPhases>({});
   const current = useRef({ sessionId, setMessages, refreshSessions });
-  current.current = { sessionId, setMessages, refreshSessions };
   const views = useRef(new Map<string, RuntimeSnapshot>());
   const recent = useRef<AgentEvent[]>([]);
   const publish = (id: string, value: RuntimeSnapshot) => {
@@ -125,9 +124,12 @@ export function useAgentEvents(
       publish(id, snapshot);
   };
   const refreshRef = useRef(refresh);
-  refreshRef.current = refresh;
   const publishRef = useRef(publish);
-  publishRef.current = publish;
+  useLayoutEffect(() => {
+    current.current = { sessionId, setMessages, refreshSessions };
+    refreshRef.current = refresh;
+    publishRef.current = publish;
+  });
   useEffect(() => {
     setState(sessionId ? (views.current.get(sessionId) ?? empty()) : empty());
     void refreshRef.current().catch(console.error);
