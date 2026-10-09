@@ -1,0 +1,68 @@
+{
+  "workload": {
+    "sessions": 100,
+    "longSessionMessages": 200
+  },
+  "metrics": {
+    "idle.domNodes": {
+      "tolerance": 0,
+      "slack": 0,
+      "value": 15258
+    },
+    "idle.animations": {
+      "tolerance": 0,
+      "slack": 0,
+      "value": 0
+    },
+    "health.rendersPerPoll": {
+      "tolerance": 0,
+      "slack": 0,
+      "value": 0
+    },
+    "scroll.renders": {
+      "tolerance": 0,
+      "slack": 0,
+      "value": 9
+    },
+    "typing.renders": {
+      "tolerance": 0,
+      "slack": 0,
+      "value": 62154
+    },
+    "stream.renders": {
+      "tolerance": 0,
+      "slack": 0,
+      "value": 38450
+    },
+    "finishReply.renders": {
+      "tolerance": 0,
+      "slack": 0,
+      "value": 6294
+    },
+    "openChat.renders": {
+      "tolerance": 0,
+      "slack": 0,
+      "value": 11287
+    },
+    "api.sessionResponseBytes": {
+      "tolerance": 0.01,
+      "slack": 0,
+      "value": 84249
+    },
+    "api.sessionsResponseBytes": {
+      "tolerance": 0.01,
+      "slack": 0,
+      "value": 17794
+    },
+    "bundle.jsGzipBytes": {
+      "tolerance": 0.01,
+      "slack": 0,
+      "value": 695945
+    },
+    "bundle.cssGzipBytes": {
+      "tolerance": 0.01,
+      "slack": 0,
+      "value": 25280
+    }
+  }
+}
