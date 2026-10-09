@@ -1,6 +1,7 @@
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NEW_MODEL_DAYS } from "../../../src/newModels";
+import { whileRunning } from "../../lib/whileRunning";
 import { Button } from "../Button";
 import { NewBadge } from "../ModelPreferenceControls";
 import { ProviderIcon } from "../ModelSelectBar";
@@ -34,26 +35,17 @@ export function OpenRouterSettingsTab({
   useEffect(() => {
     if (!key.loading) onKeyStatusChange?.(key.hasKey);
   }, [key.loading, key.hasKey, onKeyStatusChange]);
-  const mutate = async (action: () => Promise<void>) => {
-    setBusy(true);
-    setError(null);
-    try {
-      await action();
-      await onModelsChanged();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusy(false);
-    }
-  };
-  const refresh = async () => {
-    setRefreshing(true);
-    try {
-      await load(true);
-    } finally {
-      setRefreshing(false);
-    }
-  };
+  const mutate = (action: () => Promise<void>) =>
+    whileRunning(setBusy, async () => {
+      setError(null);
+      try {
+        await action();
+        await onModelsChanged();
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }
+    });
+  const refresh = () => whileRunning(setRefreshing, () => load(true));
   const selectedPublisher =
     dialog === "add"
       ? "add"

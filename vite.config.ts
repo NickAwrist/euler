@@ -1,6 +1,7 @@
 import path from "node:path";
+import babel from "@rolldown/plugin-babel";
 import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { defineConfig, loadEnv } from "vite";
 
 function getFirstEnv(
@@ -48,7 +49,15 @@ export default defineConfig(({ mode }) => {
   const apiTarget = `http://127.0.0.1:${backendPort}`;
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      // React Compiler memoizes every component and hook. A function it cannot
+      // compile fails the build, so no component silently loses memoization.
+      babel({
+        presets: [reactCompilerPreset({ panicThreshold: "all_errors" })],
+      }),
+      tailwindcss(),
+    ],
     resolve: {
       alias: {
         "@": path.resolve(__dirname, "./ui"),

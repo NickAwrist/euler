@@ -4,6 +4,7 @@ import {
   type SetStateAction,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -16,6 +17,7 @@ import {
   sessionPath,
 } from "../../lib/navigation";
 import { safeStorage } from "../../lib/safeStorage";
+import { whileRunning } from "../../lib/whileRunning";
 import {
   createSessionApi,
   deleteSessionApi,
@@ -23,7 +25,6 @@ import {
   fetchSessionSummaries,
   patchSessionApi,
 } from "../../persist/sessions";
-import type { UserSettings } from "../../persist/userSettings";
 import type {
   DebugData,
   Message,
@@ -43,6 +44,25 @@ function initialSessionId() {
   );
 }
 
+/** Reuses unchanged summaries, so their chat list rows skip rendering. */
+function keepUnchangedSummaries(
+  current: SessionSummary[],
+  next: SessionSummary[],
+): SessionSummary[] {
+  const previous = new Map(current.map((session) => [session.id, session]));
+  return next.map((session) => {
+    const old = previous.get(session.id);
+    return old &&
+      old.updatedAt === session.updatedAt &&
+      old.preview === session.preview &&
+      old.customTitle === session.customTitle &&
+      old.badge === session.badge &&
+      old.expiresAt === session.expiresAt
+      ? old
+      : session;
+  });
+}
+
 function pushSessionUrl(id: string | null) {
   // Session actions already update their state; only history needs changing.
   if (isChatPath()) void navigate(sessionPath(id));
@@ -54,7 +74,6 @@ function replaceSessionUrl(id: string | null) {
 
 type Args = {
   ollamaModels: ModelOption[];
-  userSettingsRef: MutableRefObject<UserSettings>;
   userSettingsDefaultModel: string;
   messages: Message[];
   setMessages: Dispatch<SetStateAction<Message[]>>;
@@ -67,7 +86,19 @@ type Args = {
   onNavigate?: () => void;
 };
 
-export function useSessionsAndNavigation(p: Args) {
+export function useSessionsAndNavigation({
+  ollamaModels,
+  userSettingsDefaultModel,
+  messages,
+  setMessages,
+  setEditingUserIndex,
+  setTruncateConfirm,
+  setStepsModalData,
+  setDebugOpen,
+  setDebugData,
+  activeSessionIdRef,
+  onNavigate,
+}: Args) {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(
     initialSessionId,
@@ -87,7 +118,7 @@ export function useSessionsAndNavigation(p: Args) {
   const refreshSessions = useCallback(async () => {
     try {
       const list = await fetchSessionSummaries();
-      setSessions(list);
+      setSessions((current) => keepUnchangedSummaries(current, list));
     } catch (e) {
       console.error(e);
       setSessions([]);
@@ -95,45 +126,48 @@ export function useSessionsAndNavigation(p: Args) {
   }, []);
 
   const preferences = useSessionPreferences({
-    activeSessionIdRef: p.activeSessionIdRef,
-    userSettingsRef: p.userSettingsRef,
-    ollamaModels: p.ollamaModels,
-    userSettingsDefaultModel: p.userSettingsDefaultModel,
+    activeSessionIdRef,
+    ollamaModels: ollamaModels,
+    userSettingsDefaultModel: userSettingsDefaultModel,
     refreshSessions,
-    setMessages: p.setMessages,
+    setMessages: setMessages,
   });
+  const { selectedModel, setSessionModel, setThinkingEffort, setWorkspace } =
+    preferences;
 
   const loadGenRef = useRef(0);
   const restoreDoneRef = useRef(false);
 
-  p.activeSessionIdRef.current = activeSessionId;
+  useLayoutEffect(() => {
+    activeSessionIdRef.current = activeSessionId;
+  });
 
   const resetSessionTransientState = useCallback(() => {
-    p.setMessages([]);
-    p.setEditingUserIndex(null);
-    p.setTruncateConfirm(null);
-    p.setStepsModalData(null);
-    p.setDebugOpen(false);
-    p.setDebugData(null);
-    preferences.setThinkingEffort(null);
-    preferences.setSessionModel(null);
+    setMessages([]);
+    setEditingUserIndex(null);
+    setTruncateConfirm(null);
+    setStepsModalData(null);
+    setDebugOpen(false);
+    setDebugData(null);
+    setThinkingEffort(null);
+    setSessionModel(null);
   }, [
-    p.setMessages,
-    p.setEditingUserIndex,
-    p.setTruncateConfirm,
-    p.setStepsModalData,
-    p.setDebugOpen,
-    p.setDebugData,
-    preferences.setThinkingEffort,
-    preferences.setSessionModel,
+    setMessages,
+    setEditingUserIndex,
+    setTruncateConfirm,
+    setStepsModalData,
+    setDebugOpen,
+    setDebugData,
+    setThinkingEffort,
+    setSessionModel,
   ]);
 
   const canDiscardEmptySession =
-    p.messages.length === 0 && sessionLoadState === "empty";
+    messages.length === 0 && sessionLoadState === "empty";
 
   // Leaving a chat that never received a message deletes it.
   const discardEmptySession = useCallback(async () => {
-    const curId = p.activeSessionIdRef.current;
+    const curId = activeSessionIdRef.current;
     if (!curId || !canDiscardEmptySession) return;
     try {
       await deleteSessionApi(curId);
@@ -141,55 +175,59 @@ export function useSessionsAndNavigation(p: Args) {
       console.error(e);
     }
     await refreshSessions();
-  }, [p.activeSessionIdRef, canDiscardEmptySession, refreshSessions]);
+  }, [activeSessionIdRef, canDiscardEmptySession, refreshSessions]);
 
   const loadSession = useCallback(
     async (id: string) => {
       const gen = ++loadGenRef.current;
-      p.activeSessionIdRef.current = id;
+      activeSessionIdRef.current = id;
       setActiveSessionId(id);
       setActiveExpiresAt(null);
       setSessionLoadState("loading");
       setSessionError(null);
-      preferences.setThinkingEffort(null);
+      setThinkingEffort(null);
       const cleared: Message[] = [];
-      p.setMessages(cleared);
-      p.setEditingUserIndex(null);
-      p.setTruncateConfirm(null);
+      setMessages(cleared);
+      setEditingUserIndex(null);
+      setTruncateConfirm(null);
 
-      try {
-        const stored = await fetchSession(id);
+      const fail = (message: string) => {
         if (gen !== loadGenRef.current) return;
-        if (!stored) throw new Error("Conversation not found.");
-        setActiveExpiresAt(stored.expiresAt);
-        preferences.setSessionModel(stored.model ?? null);
-        preferences.setWorkspace(stored.workspace ?? { kind: "sandbox" });
-        // The runtime snapshot may have set newer history while this
-        // request was in flight. Never replace that newer state.
-        p.setMessages((current) =>
-          gen === loadGenRef.current && current === cleared
-            ? stored.history
-            : current,
-        );
-        setSessionLoadState(stored.history.length > 0 ? "loaded" : "empty");
-      } catch (error) {
-        if (gen !== loadGenRef.current) return;
-        setSessionError(
-          error instanceof Error
-            ? error.message
-            : "Could not load conversation.",
-        );
+        setSessionError(message);
         setSessionLoadState("error");
-      }
+      };
+      await fetchSession(id).then(
+        (stored) => {
+          if (gen !== loadGenRef.current) return;
+          if (!stored) return fail("Conversation not found.");
+          setActiveExpiresAt(stored.expiresAt);
+          setSessionModel(stored.model ?? null);
+          setWorkspace(stored.workspace ?? { kind: "sandbox" });
+          // The runtime snapshot may have set newer history while this
+          // request was in flight. Never replace that newer state.
+          setMessages((current) =>
+            gen === loadGenRef.current && current === cleared
+              ? stored.history
+              : current,
+          );
+          setSessionLoadState(stored.history.length > 0 ? "loaded" : "empty");
+        },
+        (error: unknown) =>
+          fail(
+            error instanceof Error
+              ? error.message
+              : "Could not load conversation.",
+          ),
+      );
     },
     [
-      p.activeSessionIdRef,
-      p.setMessages,
-      p.setEditingUserIndex,
-      p.setTruncateConfirm,
-      preferences.setThinkingEffort,
-      preferences.setSessionModel,
-      preferences.setWorkspace,
+      activeSessionIdRef,
+      setMessages,
+      setEditingUserIndex,
+      setTruncateConfirm,
+      setThinkingEffort,
+      setSessionModel,
+      setWorkspace,
     ],
   );
 
@@ -204,9 +242,9 @@ export function useSessionsAndNavigation(p: Args) {
   }, [refreshSessions, loadSession]);
 
   const retrySessionLoad = useCallback(() => {
-    const id = p.activeSessionIdRef.current;
+    const id = activeSessionIdRef.current;
     if (id) void loadSession(id);
-  }, [loadSession, p.activeSessionIdRef]);
+  }, [loadSession, activeSessionIdRef]);
 
   useEffect(() => {
     if (activeSessionId) {
@@ -221,63 +259,57 @@ export function useSessionsAndNavigation(p: Args) {
 
   const switchToSession = useCallback(
     async (id: string) => {
-      if (p.activeSessionIdRef.current !== id) void discardEmptySession();
+      if (activeSessionIdRef.current !== id) void discardEmptySession();
       pushSessionUrl(id);
       await loadSession(id);
-      p.onNavigate?.();
+      onNavigate?.();
     },
-    [loadSession, p.activeSessionIdRef, p.onNavigate, discardEmptySession],
+    [loadSession, activeSessionIdRef, onNavigate, discardEmptySession],
   );
 
   /** Saves the chat started from Home and opens it without reloading. */
-  const startSession = useCallback(async () => {
-    setStartingSession(true);
-    try {
-      const { id, expiresAt } = await createSessionApi({
-        model: preferences.selectedModel || null,
-      });
-      loadGenRef.current++;
-      p.activeSessionIdRef.current = id;
-      setActiveSessionId(id);
-      setActiveExpiresAt(expiresAt);
-      setSessionLoadState("empty");
-      setSessionError(null);
-      preferences.setSessionModel(preferences.selectedModel || null);
-      pushSessionUrl(id);
-      void refreshSessions();
-      return id;
-    } finally {
-      setStartingSession(false);
-    }
-  }, [
-    p.activeSessionIdRef,
-    preferences.selectedModel,
-    preferences.setSessionModel,
-    refreshSessions,
-  ]);
+  const startSession = useCallback(
+    () =>
+      whileRunning(setStartingSession, async () => {
+        const { id, expiresAt } = await createSessionApi({
+          model: selectedModel || null,
+        });
+        loadGenRef.current++;
+        activeSessionIdRef.current = id;
+        setActiveSessionId(id);
+        setActiveExpiresAt(expiresAt);
+        setSessionLoadState("empty");
+        setSessionError(null);
+        setSessionModel(selectedModel || null);
+        pushSessionUrl(id);
+        void refreshSessions();
+        return id;
+      }),
+    [activeSessionIdRef, selectedModel, setSessionModel, refreshSessions],
+  );
 
   /** Opens a new chat that is deleted once its lifetime ends. */
   const createEphemeralSession = useCallback(async () => {
     await discardEmptySession();
     const { id, expiresAt } = await createSessionApi({ ephemeral: true });
     loadGenRef.current++;
-    p.activeSessionIdRef.current = id;
+    activeSessionIdRef.current = id;
     setActiveSessionId(id);
     setActiveExpiresAt(expiresAt);
     resetSessionTransientState();
     setSessionLoadState("empty");
     setSessionError(null);
-    preferences.setWorkspace({ kind: "sandbox" });
+    setWorkspace({ kind: "sandbox" });
     pushSessionUrl(id);
     void refreshSessions();
-    p.onNavigate?.();
+    onNavigate?.();
   }, [
-    p.activeSessionIdRef,
-    p.onNavigate,
+    activeSessionIdRef,
+    onNavigate,
     discardEmptySession,
     refreshSessions,
     resetSessionTransientState,
-    preferences.setWorkspace,
+    setWorkspace,
   ]);
 
   useEffect(() => {
@@ -289,16 +321,16 @@ export function useSessionsAndNavigation(p: Args) {
       )
         return;
       const urlId = sessionIdFromUrl();
-      if (urlId === p.activeSessionIdRef.current) return;
+      if (urlId === activeSessionIdRef.current) return;
       void discardEmptySession();
       if (urlId) {
         void loadSession(urlId);
       } else {
         loadGenRef.current++;
-        p.activeSessionIdRef.current = null;
+        activeSessionIdRef.current = null;
         setActiveSessionId(null);
         setActiveExpiresAt(null);
-        preferences.setWorkspace({ kind: "sandbox" });
+        setWorkspace({ kind: "sandbox" });
         resetSessionTransientState();
       }
     };
@@ -307,9 +339,9 @@ export function useSessionsAndNavigation(p: Args) {
   }, [
     loadSession,
     discardEmptySession,
-    p.activeSessionIdRef,
+    activeSessionIdRef,
     resetSessionTransientState,
-    preferences.setWorkspace,
+    setWorkspace,
   ]);
 
   const goToHome = useCallback(async () => {
@@ -318,14 +350,14 @@ export function useSessionsAndNavigation(p: Args) {
     setActiveSessionId(null);
     setActiveExpiresAt(null);
     resetSessionTransientState();
-    p.onNavigate?.();
-    preferences.setWorkspace({ kind: "sandbox" });
+    onNavigate?.();
+    setWorkspace({ kind: "sandbox" });
     pushSessionUrl(null);
   }, [
-    p.onNavigate,
+    onNavigate,
     discardEmptySession,
     resetSessionTransientState,
-    preferences.setWorkspace,
+    setWorkspace,
   ]);
 
   const dropSessionFromApp = useCallback(
@@ -337,30 +369,31 @@ export function useSessionsAndNavigation(p: Args) {
       }
       if (activeSessionId === id) {
         loadGenRef.current++;
-        p.activeSessionIdRef.current = null;
+        activeSessionIdRef.current = null;
         setActiveSessionId(null);
         setActiveExpiresAt(null);
-        preferences.setWorkspace({ kind: "sandbox" });
-        preferences.setSessionModel(null);
-        p.setMessages([]);
-        p.setDebugOpen(false);
-        p.setDebugData(null);
-        p.setEditingUserIndex(null);
-        p.setTruncateConfirm(null);
+        setWorkspace({ kind: "sandbox" });
+        setSessionModel(null);
+        setMessages([]);
+        setDebugOpen(false);
+        setDebugData(null);
+        setEditingUserIndex(null);
+        setTruncateConfirm(null);
         replaceSessionUrl(null);
       }
       await refreshSessions();
     },
     [
       activeSessionId,
-      p.setDebugData,
-      p.setDebugOpen,
-      p.setEditingUserIndex,
-      p.setMessages,
-      p.setTruncateConfirm,
+      activeSessionIdRef,
+      setDebugData,
+      setDebugOpen,
+      setEditingUserIndex,
+      setMessages,
+      setTruncateConfirm,
       refreshSessions,
-      preferences.setWorkspace,
-      preferences.setSessionModel,
+      setWorkspace,
+      setSessionModel,
     ],
   );
 
@@ -374,14 +407,13 @@ export function useSessionsAndNavigation(p: Args) {
         setPendingDeleteSessionId(id);
         return;
       }
-      try {
-        const full = await fetchSession(id);
-        if (!full?.history?.length) {
-          await dropSessionFromApp(id);
-          return;
-        }
-      } catch {
-        setPendingDeleteSessionId(id);
+      // A chat that cannot be loaded still asks before deleting.
+      const empty = await fetchSession(id).then(
+        (full) => !full?.history?.length,
+        () => false,
+      );
+      if (empty) {
+        await dropSessionFromApp(id);
         return;
       }
       setPendingDeleteSessionId(id);
@@ -400,10 +432,9 @@ export function useSessionsAndNavigation(p: Args) {
     async (title: string) => {
       if (!renameSessionId) return;
       const id = renameSessionId;
+      const customTitle = title.trim() || null;
       try {
-        await patchSessionApi(id, {
-          customTitle: title.trim().length > 0 ? title.trim() : null,
-        });
+        await patchSessionApi(id, { customTitle });
       } catch (e) {
         console.error(e);
       }

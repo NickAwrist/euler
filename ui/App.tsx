@@ -1,5 +1,12 @@
 import { Bug, EyeOff } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { isWorkingAgent } from "../src/schemas/agents";
 import { AgentContext } from "./components/Agents/AgentContext";
 import { AgentTraceModal } from "./components/Agents/AgentTraceModal";
@@ -87,6 +94,14 @@ function ChatView({
   onSettings,
   onUsage,
 }: ChatViewProps) {
+  // Method calls on `app` would make React Compiler depend on the whole object.
+  const {
+    refreshRuntime,
+    setRenameSessionId,
+    setSidebarCollapsed,
+    setSidebarOpen,
+    switchToSession,
+  } = app;
   const workspaceKey = `${app.activeSessionId}:${app.workspace.kind === "local" ? app.workspace.path : (app.workspace.linked?.workspaceId ?? "sandbox")}`;
   const [artifactView, setArtifactView] = useState<"files" | "agents" | "jobs">(
     "files",
@@ -96,7 +111,7 @@ function ChatView({
   const stopJob = async (id: string) => {
     if (app.activeSessionId) {
       await cancelJob(app.activeSessionId, id);
-      await app.refreshRuntime();
+      await refreshRuntime();
     }
   };
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -104,7 +119,7 @@ function ChatView({
   const stopAgent = async (id: string) => {
     if (app.activeSessionId) {
       await cancelAgent(app.activeSessionId, id);
-      await app.refreshRuntime();
+      await refreshRuntime();
     }
   };
   const [savedArtifacts] = useState(loadArtifactState);
@@ -130,8 +145,8 @@ function ChatView({
   const mobileLayout = useMobileLayout();
   const chatsOpen = mobileLayout ? app.sidebarOpen : !app.sidebarCollapsed;
   const toggleChats = () => {
-    if (mobileLayout) app.setSidebarOpen((value) => !value);
-    else app.setSidebarCollapsed((value) => !value);
+    if (mobileLayout) setSidebarOpen((value) => !value);
+    else setSidebarCollapsed((value) => !value);
   };
   const [fileSelection, setFileSelection] = useState<{
     workspace: string;
@@ -257,9 +272,23 @@ function ChatView({
     },
     [setTruncateConfirm],
   );
+  // Export reads the chat when clicked, so streamed tokens leave the chat list alone.
+  const exportSource = {
+    activeSessionId: app.activeSessionId,
+    sessionLoadState: app.sessionLoadState,
+    sessions: app.sessions,
+    messages: app.messages,
+    streamingContent: app.streamingContent,
+  };
+  const exportSourceRef = useRef(exportSource);
+  useLayoutEffect(() => {
+    exportSourceRef.current = exportSource;
+  });
   // Keep the callback stable so history rows skip rerendering while streaming.
   const requestRegenerateRef = useRef(app.requestRegenerate);
-  requestRegenerateRef.current = app.requestRegenerate;
+  useLayoutEffect(() => {
+    requestRegenerateRef.current = app.requestRegenerate;
+  });
   const requestRegenerate = useCallback(
     (assistantIndex: number) => requestRegenerateRef.current(assistantIndex),
     [],
@@ -340,29 +369,31 @@ function ChatView({
                 sessions={app.sessions}
                 activeSessionId={app.activeSessionId}
                 onSelectSession={(id) => {
-                  app.setSidebarOpen(false);
-                  app.switchToSession(id);
+                  setSidebarOpen(false);
+                  switchToSession(id);
                 }}
                 onNewSession={app.goToHome}
                 onNewEphemeralSession={app.createEphemeralSession}
-                onRenameSession={(id) => app.setRenameSessionId(id)}
+                onRenameSession={(id) => setRenameSessionId(id)}
                 onExportSession={async (id) => {
+                  const current = exportSourceRef.current;
                   const useCurrent =
-                    id === app.activeSessionId &&
-                    (app.sessionLoadState === "loaded" ||
-                      app.sessionLoadState === "empty");
+                    id === current.activeSessionId &&
+                    (current.sessionLoadState === "loaded" ||
+                      current.sessionLoadState === "empty");
                   const stored = await fetchSession(id, { fresh: true });
                   if (!stored) throw new Error("Conversation not found.");
                   const title =
-                    app.sessions.find((s) => s.id === id)?.preview ?? "Chat";
+                    current.sessions.find((s) => s.id === id)?.preview ??
+                    "Chat";
                   const transcript = formatRunTranscript(
-                    useCurrent ? app.messages : stored.history,
+                    useCurrent ? current.messages : stored.history,
                     {
                       title,
                       exportedAt: new Date(),
                       model: stored.model,
                       streamingAssistant: useCurrent
-                        ? app.streamingContent
+                        ? current.streamingContent
                         : undefined,
                     },
                   );
@@ -382,7 +413,7 @@ function ChatView({
 
             <SidebarBackdrop
               open={app.sidebarOpen}
-              onClose={() => app.setSidebarOpen(false)}
+              onClose={() => setSidebarOpen(false)}
             />
 
             <main
@@ -587,6 +618,17 @@ function ChatView({
 
 export default function App() {
   const app = useRunApp();
+  const {
+    refreshModels,
+    returnToSandbox,
+    setDebugOpen,
+    setPendingDeleteSessionId,
+    setRenameSessionId,
+    setSidebarOpen,
+    setStepsModalData,
+    setTruncateConfirm,
+    startSession,
+  } = app;
   const [onboarding, setOnboarding] = useState(needsOnboarding);
   const [path, setPath] = useState(() => window.location.pathname);
   const route = parseRoute(path);
@@ -609,25 +651,26 @@ export default function App() {
     sessionModal?.sessionId === app.activeSessionId ? sessionModal.kind : null;
 
   const openCustomization = () => {
-    app.setSidebarOpen(false);
+    setSidebarOpen(false);
     void navigate("/customization");
   };
 
   const openSettings = () => {
-    app.setSidebarOpen(false);
+    setSidebarOpen(false);
     void navigate("/settings/general");
   };
 
-  const runCommand = async (command: RunCommandName) => {
-    try {
-      const sessionId = app.activeSessionId ?? (await app.startSession());
+  const runCommand = (command: RunCommandName) => {
+    const run = async () => {
+      const sessionId = app.activeSessionId ?? (await startSession());
       if (command === "directory" || command === "link")
         setSessionModal({ kind: command, sessionId });
-      if (command === "sandbox") await app.returnToSandbox();
+      if (command === "sandbox") await returnToSandbox();
       if (command === "workspace") setWorkspaceOpen(true);
-    } catch (error) {
+    };
+    return run().catch((error: unknown) => {
       window.alert(error instanceof Error ? error.message : "Command failed");
-    }
+    });
   };
 
   const stepsModalOpen = shouldShowStepsModal(
@@ -638,7 +681,7 @@ export default function App() {
 
   useEffect(() => {
     if (!stepsModalOpen && app.stepsModalData != null) {
-      app.setStepsModalData(null);
+      setStepsModalData(null);
     }
   }, [app.stepsModalData, app.setStepsModalData, stepsModalOpen]);
 
@@ -660,7 +703,7 @@ export default function App() {
         onSavePreferences={app.savePreferences}
         onSaveOllamaHost={app.saveOllamaHost}
         onSaveComfyUI={app.saveComfyUISettings}
-        onModelsChanged={() => app.refreshModels(true)}
+        onModelsChanged={() => refreshModels(true)}
         onComplete={() => setOnboarding(false)}
       />
     );
@@ -703,7 +746,7 @@ export default function App() {
               comfyuiDefaultHeight={app.comfyuiDefaultHeight}
               comfyuiNegativePrompt={app.comfyuiNegativePrompt}
               onSave={app.saveUserSettings}
-              onModelsChanged={() => app.refreshModels(true)}
+              onModelsChanged={() => refreshModels(true)}
               onBack={backToChat}
             />
           </main>
@@ -722,7 +765,7 @@ export default function App() {
         {app.debugOpen && (
           <DebugModal
             data={app.debugData}
-            onClose={() => app.setDebugOpen(false)}
+            onClose={() => setDebugOpen(false)}
           />
         )}
         {stepsModalOpen && (
@@ -731,7 +774,7 @@ export default function App() {
             streamingThinking={
               app.stepsModalData === "live" ? app.streamingThinking : undefined
             }
-            onClose={() => app.setStepsModalData(null)}
+            onClose={() => setStepsModalData(null)}
           />
         )}
         {app.renameSessionId && (
@@ -743,7 +786,7 @@ export default function App() {
                 : app.renameTarget?.preview
             }
             onSave={app.saveSessionTitle}
-            onClose={() => app.setRenameSessionId(null)}
+            onClose={() => setRenameSessionId(null)}
           />
         )}
         {app.truncateConfirm && (
@@ -757,7 +800,7 @@ export default function App() {
                 ? ` These agents will be deleted: ${app.rewindAgentNames.join(", ")}.`
                 : "")
             }
-            onClose={() => app.setTruncateConfirm(null)}
+            onClose={() => setTruncateConfirm(null)}
             onConfirm={app.confirmTruncate}
           />
         )}
@@ -766,7 +809,7 @@ export default function App() {
             title="Delete this chat?"
             description="This chat and all of its messages will be permanently deleted. This cannot be undone."
             confirmLabel="Delete"
-            onClose={() => app.setPendingDeleteSessionId(null)}
+            onClose={() => setPendingDeleteSessionId(null)}
             onConfirm={app.performDeleteSession}
           />
         )}

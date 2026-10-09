@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { ComfyUIConfigResponse } from "../../../src/schemas/comfyui";
 import { saveComfyUIConfig } from "../../persist/comfyui";
 import { saveOllamaConfig } from "../../persist/services";
@@ -20,7 +20,9 @@ export function useSettings(
     loadUserSettings(),
   );
   const userSettingsRef = useRef(userSettings);
-  userSettingsRef.current = userSettings;
+  useLayoutEffect(() => {
+    userSettingsRef.current = userSettings;
+  });
 
   const savePreferences = useCallback(
     async (updates: Partial<UserSettings>) => {

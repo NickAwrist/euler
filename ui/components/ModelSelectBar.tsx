@@ -3,6 +3,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { compareModels } from "../../src/modelSort";
 import { modelSettingsRequest } from "../lib/modelSettingsRequest";
 import { navigate } from "../lib/navigation";
+import { setKeyPending, whileRunning } from "../lib/whileRunning";
 import { cx } from "../styles";
 import type { ModelOption } from "../types";
 import { AnchoredPopover } from "./AnchoredPopover";
@@ -199,7 +200,7 @@ export function ModelSelectBar({
         </button>
       )}
     >
-      {({ close, panelRef }) => (
+      {({ close }) => (
         <div className="flex h-full min-h-0">
           <div
             role="tablist"
@@ -296,7 +297,8 @@ export function ModelSelectBar({
                   }
                   if (event.key === "ArrowDown") {
                     event.preventDefault();
-                    panelRef.current
+                    event.currentTarget
+                      .closest("dialog")
                       ?.querySelector<HTMLButtonElement>(
                         "[data-model-option]:not(:disabled)",
                       )
@@ -337,9 +339,11 @@ export function ModelSelectBar({
                         return;
                       event.preventDefault();
                       const options = Array.from(
-                        panelRef.current?.querySelectorAll<HTMLButtonElement>(
-                          "[data-model-option]:not(:disabled)",
-                        ) ?? [],
+                        event.currentTarget
+                          .closest("dialog")
+                          ?.querySelectorAll<HTMLButtonElement>(
+                            "[data-model-option]:not(:disabled)",
+                          ) ?? [],
                       );
                       const index = options.indexOf(event.currentTarget);
                       options[
@@ -373,41 +377,41 @@ export function ModelSelectBar({
                     name={model.name}
                     favorite={model.favorite === true}
                     disabled={favoritePending.has(model.id)}
-                    onClick={async () => {
-                      setFavoritePending((current) =>
-                        new Set(current).add(model.id),
-                      );
+                    onClick={() => {
                       setFavoriteError(null);
                       setFavoriteOverrides((current) => ({
                         ...current,
                         [model.id]: !model.favorite,
                       }));
-                      try {
-                        await modelSettingsRequest("models/favorite", "PUT", {
-                          provider: model.provider,
-                          modelId:
-                            model.provider === "openrouter"
-                              ? (model.route ??
-                                model.id.replace(/^openrouter:/, ""))
-                              : model.id,
-                          favorite: !model.favorite,
-                        });
-                        window.dispatchEvent(
-                          new Event("model-preferences-changed"),
-                        );
-                      } catch {
-                        setFavoriteOverrides((current) => ({
-                          ...current,
-                          [model.id]: model.favorite === true,
-                        }));
-                        setFavoriteError("Couldn't save favorite. Try again.");
-                      } finally {
-                        setFavoritePending((current) => {
-                          const next = new Set(current);
-                          next.delete(model.id);
-                          return next;
-                        });
-                      }
+                      const modelId =
+                        model.provider === "openrouter"
+                          ? (model.route ??
+                            model.id.replace(/^openrouter:/, ""))
+                          : model.id;
+                      const favorite = !model.favorite;
+                      void whileRunning(
+                        setKeyPending(setFavoritePending, model.id),
+                        async () => {
+                          try {
+                            await modelSettingsRequest(
+                              "models/favorite",
+                              "PUT",
+                              { provider: model.provider, modelId, favorite },
+                            );
+                            window.dispatchEvent(
+                              new Event("model-preferences-changed"),
+                            );
+                          } catch {
+                            setFavoriteOverrides((current) => ({
+                              ...current,
+                              [model.id]: !favorite,
+                            }));
+                            setFavoriteError(
+                              "Couldn't save favorite. Try again.",
+                            );
+                          }
+                        },
+                      );
                     }}
                   />
                 </div>

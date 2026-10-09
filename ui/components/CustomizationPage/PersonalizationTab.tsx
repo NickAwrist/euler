@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useSavedDraft } from "../../hooks/useSavedDraft";
 import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
 import { changedFields } from "../../lib/changedFields";
+import { whileRunning } from "../../lib/whileRunning";
 import { cx } from "../../styles";
 import type { Personalization } from "../../types";
 import { Button } from "../Button";
@@ -37,40 +38,38 @@ export function PersonalizationTab({
   ).map(({ label }) => ({ label }));
   const isDirty = changes.length > 0;
   const { prompt, setPrompt, resolveLeave } = useUnsavedChanges(isDirty);
-  const save = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      const {
-        systemPrompt,
-        includeCurrentDate,
-        name,
-        location,
-        preferredFormats,
-      } = settings;
-      await onSave(
-        changedFields(
-          {
-            systemPrompt,
-            includeCurrentDate,
-            name,
-            location,
-            preferredFormats,
-          },
-          currentSettings,
-        ),
-      );
-      draft.accept();
-      return true;
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to save customization",
-      );
-      return false;
-    } finally {
-      setSaving(false);
-    }
-  };
+  const save = () =>
+    whileRunning(setSaving, async () => {
+      setError(null);
+      try {
+        const {
+          systemPrompt,
+          includeCurrentDate,
+          name,
+          location,
+          preferredFormats,
+        } = settings;
+        await onSave(
+          changedFields(
+            {
+              systemPrompt,
+              includeCurrentDate,
+              name,
+              location,
+              preferredFormats,
+            },
+            currentSettings,
+          ),
+        );
+        draft.accept();
+        return true;
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Failed to save customization",
+        );
+        return false;
+      }
+    });
   useEffect(() => onDirtyChange(isDirty), [isDirty, onDirtyChange]);
 
   const update = <K extends keyof Personalization>(

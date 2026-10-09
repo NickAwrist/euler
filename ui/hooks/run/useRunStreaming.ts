@@ -7,6 +7,7 @@ import {
   useState,
 } from "react";
 import type { ImageAttachment } from "../../../src/attachments/types";
+import { whileRunning } from "../../lib/whileRunning";
 import { agentAction } from "../../persist/agents";
 import { buildRunMetadata } from "../../persist/userSettings";
 import type { UserSettings } from "../../persist/userSettings";
@@ -111,8 +112,7 @@ export function useRunStreaming(p: Args) {
       images.setImageError("The selected model does not accept images.");
       return;
     }
-    sending.current = true;
-    try {
+    const send = async () => {
       const sessionId = p.activeSessionId ?? (await p.startSession());
       const attachments = await images.uploadPendingImages(sessionId);
       if (!attachments) return;
@@ -125,13 +125,18 @@ export function useRunStreaming(p: Args) {
         setInput((current) => (current === input ? "" : current));
         images.clearPendingImages();
       }
-    } catch (error) {
-      images.setImageError(
-        error instanceof Error ? error.message : "Could not send message",
-      );
-    } finally {
-      sending.current = false;
-    }
+    };
+    await whileRunning(
+      (running) => {
+        sending.current = running;
+      },
+      () =>
+        send().catch((error: unknown) =>
+          images.setImageError(
+            error instanceof Error ? error.message : "Could not send message",
+          ),
+        ),
+    );
   };
 
   const rerunFrom = (
