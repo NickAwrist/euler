@@ -1,5 +1,5 @@
 import { ArrowDown } from "lucide-react";
-import { memo, useLayoutEffect, useRef } from "react";
+import { memo, useLayoutEffect, useState } from "react";
 import { useStickToBottom } from "use-stick-to-bottom";
 import { MAIN_AGENT_NAME } from "../../../src/agents/agentNames";
 import { AgentRows } from "../Agents/AgentTaskCard";
@@ -40,10 +40,12 @@ export const RunArea = memo(function RunArea({
     runPending ||
     streamingStep !== null ||
     streamingSteps.length > 0;
-  const initialRenderedCountRef = useRef<number | null>(null);
-
-  if (initialRenderedCountRef.current === null && messages.length > 0) {
-    initialRenderedCountRef.current = messages.length;
+  // Messages present when the chat first renders history skip the entry animation.
+  const [initialRenderedCount, setInitialRenderedCount] = useState<
+    number | null
+  >(null);
+  if (initialRenderedCount === null && messages.length > 0) {
+    setInitialRenderedCount(messages.length);
   }
 
   useLayoutEffect(() => {
@@ -63,7 +65,7 @@ export const RunArea = memo(function RunArea({
     }
   }, [footerInset, isAtBottom, scrollToBottom]);
 
-  const initialCount = initialRenderedCountRef.current ?? 0;
+  const initialCount = initialRenderedCount ?? messages.length;
 
   return (
     <div className="relative h-full min-h-0 flex-1 overflow-x-hidden">

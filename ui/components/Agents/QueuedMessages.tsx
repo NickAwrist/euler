@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { InboxMessage } from "../../../src/schemas/agents";
+import { whileRunning } from "../../lib/whileRunning";
 import {
   agentAction,
   editQueuedMessage,
@@ -21,20 +22,18 @@ export function QueuedMessages({
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-  const act = async (action: () => Promise<void>) => {
-    setPending(true);
-    setError("");
-    try {
-      await action();
-      await refresh();
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Could not update queued messages",
-      );
-    } finally {
-      setPending(false);
-    }
-  };
+  const act = (action: () => Promise<void>) =>
+    whileRunning(setPending, async () => {
+      setError("");
+      try {
+        await action();
+        await refresh();
+      } catch (e) {
+        setError(
+          e instanceof Error ? e.message : "Could not update queued messages",
+        );
+      }
+    });
   return (
     <div className="space-y-2">
       {messages.map((message) => (

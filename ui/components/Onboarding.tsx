@@ -3,6 +3,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useSavedDraft } from "../hooks/useSavedDraft";
 import { changedFields } from "../lib/changedFields";
 import { effectiveDefaultRunModel } from "../lib/defaultModel";
+import { whileRunning } from "../lib/whileRunning";
 import { completeOnboarding } from "../persist/onboarding";
 import type { UserSettings } from "../persist/userSettings";
 import type { ComfyUIConfigPayload, ModelOption } from "../types";
@@ -300,24 +301,23 @@ export function Onboarding({
   };
   const advance = async (skip: boolean) => {
     if (!current) return;
-    setBusy(true);
-    setError(null);
-    try {
-      if (skip) current.discard();
-      else if (!(await current.save())) return;
-      if (step === lastStep) {
-        completeOnboarding();
-        onComplete();
-      } else setStep(step + 1);
-    } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : "Could not save setup. Try again.",
-      );
-    } finally {
-      setBusy(false);
-    }
+    await whileRunning(setBusy, async () => {
+      setError(null);
+      try {
+        if (skip) current.discard();
+        else if (!(await current.save())) return;
+        if (step === lastStep) {
+          completeOnboarding();
+          onComplete();
+        } else setStep(step + 1);
+      } catch (cause) {
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : "Could not save setup. Try again.",
+        );
+      }
+    });
   };
 
   return (

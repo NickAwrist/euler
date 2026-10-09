@@ -10,47 +10,52 @@ type Args = {
   setDebugData: (data: DebugData | null) => void;
 };
 
+async function loadDebugData(
+  sessionId: string,
+  settings: UserSettings,
+  message: string,
+): Promise<DebugData> {
+  const metadata = buildRunMetadata(settings);
+
+  const [promptRes, stored] = await Promise.all([
+    userScopedFetch("/api/sessions/debug-prompt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, metadata, message }),
+    }),
+    fetchSession(sessionId),
+  ]);
+
+  if (!promptRes.ok) {
+    throw new Error("Failed to load the system prompt preview. Try again.");
+  }
+  const promptData = (await promptRes.json()) as { systemPrompt: string };
+  const systemPrompt = promptData.systemPrompt;
+
+  return {
+    systemPrompt,
+    history: stored?.history ?? [],
+    customTitle: stored?.customTitle ?? null,
+    modelMessages: stored?.modelMessages,
+  };
+}
+
 export function useRunDebug({ userSettingsRef, setDebugData }: Args) {
   return useCallback(
-    async (sessionId: string, message = "") => {
-      try {
-        const settings = userSettingsRef.current;
-        const metadata = buildRunMetadata(settings);
-
-        const [promptRes, stored] = await Promise.all([
-          userScopedFetch("/api/sessions/debug-prompt", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sessionId, metadata, message }),
-          }),
-          fetchSession(sessionId),
-        ]);
-
-        if (!promptRes.ok) {
-          throw new Error(
-            "Failed to load the system prompt preview. Try again.",
-          );
-        }
-        const promptData = (await promptRes.json()) as { systemPrompt: string };
-        const systemPrompt = promptData.systemPrompt;
-
-        setDebugData({
-          systemPrompt,
-          history: stored?.history ?? [],
-          customTitle: stored?.customTitle ?? null,
-          modelMessages: stored?.modelMessages,
-        });
-      } catch (error) {
-        console.error("Failed to load debug data", error);
-        setDebugData({
-          systemPrompt: "",
-          history: [],
-          customTitle: null,
-          error:
-            "Failed to load the debug preview. Close and reopen it to retry.",
-        });
-      }
-    },
+    (sessionId: string, message = "") =>
+      loadDebugData(sessionId, userSettingsRef.current, message).then(
+        setDebugData,
+        (error: unknown) => {
+          console.error("Failed to load debug data", error);
+          setDebugData({
+            systemPrompt: "",
+            history: [],
+            customTitle: null,
+            error:
+              "Failed to load the debug preview. Close and reopen it to retry.",
+          });
+        },
+      ),
     [setDebugData, userSettingsRef],
   );
 }

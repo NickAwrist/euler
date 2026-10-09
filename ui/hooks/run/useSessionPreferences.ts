@@ -8,19 +8,18 @@ import {
   useState,
 } from "react";
 import { effectiveDefaultRunModel } from "../../lib/defaultModel";
+import { whileRunning } from "../../lib/whileRunning";
 import {
   fetchSession,
   linkSessionWorkspace,
   patchSessionApi,
   selectSessionDirectory,
-  useSessionSandbox,
+  switchSessionToSandbox,
 } from "../../persist/sessions";
-import type { UserSettings } from "../../persist/userSettings";
 import type { Message, ModelOption, SessionWorkspace } from "../../types";
 
 export interface UseSessionPreferencesOptions {
   activeSessionIdRef: MutableRefObject<string | null>;
-  userSettingsRef: MutableRefObject<UserSettings>;
   ollamaModels: ModelOption[];
   userSettingsDefaultModel: string;
   refreshSessions: () => Promise<void>;
@@ -29,17 +28,13 @@ export interface UseSessionPreferencesOptions {
 
 export function useSessionPreferences({
   activeSessionIdRef,
-  userSettingsRef,
   ollamaModels,
   userSettingsDefaultModel,
   refreshSessions,
   setMessages,
 }: UseSessionPreferencesOptions) {
   const [selectedModel, setSelectedModel] = useState(() =>
-    effectiveDefaultRunModel(
-      userSettingsRef.current.defaultModel,
-      ollamaModels,
-    ),
+    effectiveDefaultRunModel(userSettingsDefaultModel, ollamaModels),
   );
   const [sessionModel, setSessionModel] = useState<string | null>(null);
   const [thinkingEffort, setThinkingEffort] = useState<string | null>(null);
@@ -51,12 +46,9 @@ export function useSessionPreferences({
   useEffect(() => {
     setSelectedModel(
       sessionModel?.trim() ||
-        effectiveDefaultRunModel(
-          userSettingsRef.current.defaultModel,
-          ollamaModels,
-        ),
+        effectiveDefaultRunModel(userSettingsDefaultModel, ollamaModels),
     );
-  }, [sessionModel, ollamaModels, userSettingsRef, userSettingsDefaultModel]);
+  }, [sessionModel, ollamaModels, userSettingsDefaultModel]);
 
   const handleThinkingEffortChange = useCallback((effort: string) => {
     setThinkingEffort(effort);
@@ -117,12 +109,12 @@ export function useSessionPreferences({
   const returnToSandbox = useCallback(async () => {
     const sid = activeSessionIdRef.current;
     if (!sid || returningToSandboxRef.current) return;
-    returningToSandboxRef.current = true;
-    try {
-      await applyWorkspace(sid, await useSessionSandbox(sid));
-    } finally {
-      returningToSandboxRef.current = false;
-    }
+    await whileRunning(
+      (running) => {
+        returningToSandboxRef.current = running;
+      },
+      async () => applyWorkspace(sid, await switchSessionToSandbox(sid)),
+    );
   }, [activeSessionIdRef, applyWorkspace]);
 
   return {

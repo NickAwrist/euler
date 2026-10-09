@@ -9,7 +9,7 @@ import { useState } from "react";
 import { eyebrowText } from "../../styles";
 import { Button } from "../Button";
 import { SessionListItem } from "./SessionListItem";
-import { groupSessionsByDate } from "./sessionDates";
+import { formatSessionTime, groupSessionsByDate } from "./sessionDates";
 import type { SidebarProps } from "./types";
 
 export function Sidebar({
@@ -77,7 +77,7 @@ export function Sidebar({
                   <SessionListItem
                     key={session.id}
                     session={session}
-                    now={now}
+                    time={formatSessionTime(session.updatedAt, now)}
                     active={session.id === activeSessionId}
                     openMenu={openMenu}
                     setOpenMenu={setOpenMenu}

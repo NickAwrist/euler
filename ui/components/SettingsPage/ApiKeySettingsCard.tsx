@@ -1,5 +1,6 @@
 import { KeyRound } from "lucide-react";
 import { useState } from "react";
+import { whileRunning } from "../../lib/whileRunning";
 import { Button } from "../Button";
 import { EnvironmentSettingHint } from "./EnvironmentSettingHint";
 import { inputClass, labelClass } from "./constants";
@@ -27,20 +28,18 @@ export function ApiKeySettingsCard({
   const [error, setError] = useState<string | null>(null);
   const environmentId = `${inputId}-environment`;
 
-  const save = async (value: string) => {
-    setBusy(true);
-    setError(null);
-    try {
-      await setting.save(value);
-      setApiKey("");
-      setEditing(false);
-      await onSaved?.();
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const save = (value: string) =>
+    whileRunning(setBusy, async () => {
+      setError(null);
+      try {
+        await setting.save(value);
+        setApiKey("");
+        setEditing(false);
+        if (onSaved) await onSaved();
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }
+    });
 
   return (
     <>

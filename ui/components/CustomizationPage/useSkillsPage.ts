@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { whileRunning } from "../../lib/whileRunning";
 import {
   type SkillData,
   type SkillWriteBody,
@@ -86,49 +87,50 @@ export function useSkillsPage() {
       setShowFieldErrors(true);
       return;
     }
-    setSaving(true);
-    setError(null);
-    try {
-      const saved = isNew
-        ? await createSkillApi(editor)
-        : selectedId
-          ? await updateSkillApi(selectedId, editor)
-          : null;
-      if (!saved) return;
-      const next = editorFromSkill(saved);
-      await load();
-      setSelectedId(saved.id);
-      setIsNew(false);
-      setEditor(next);
-      setBaseline(next);
-      setShowFieldErrors(false);
-    } catch (saveError: unknown) {
-      setError(
-        saveError instanceof Error ? saveError.message : "Failed to save skill",
-      );
-    } finally {
-      setSaving(false);
-    }
+    const request = isNew
+      ? () => createSkillApi(editor)
+      : selectedId
+        ? () => updateSkillApi(selectedId, editor)
+        : null;
+    if (!request) return;
+    await whileRunning(setSaving, async () => {
+      setError(null);
+      try {
+        const saved = await request();
+        const next = editorFromSkill(saved);
+        await load();
+        setSelectedId(saved.id);
+        setIsNew(false);
+        setEditor(next);
+        setBaseline(next);
+        setShowFieldErrors(false);
+      } catch (saveError: unknown) {
+        setError(
+          saveError instanceof Error
+            ? saveError.message
+            : "Failed to save skill",
+        );
+      }
+    });
   };
 
   const performDelete = async () => {
     if (!pendingDelete) return;
-    setDeleting(true);
-    setError(null);
-    try {
-      await deleteSkillApi(pendingDelete.id);
-      if (selectedId === pendingDelete.id) cancelEdit();
-      setPendingDelete(null);
-      await load();
-    } catch (deleteError: unknown) {
-      setError(
-        deleteError instanceof Error
-          ? deleteError.message
-          : "Failed to delete skill",
-      );
-    } finally {
-      setDeleting(false);
-    }
+    await whileRunning(setDeleting, async () => {
+      setError(null);
+      try {
+        await deleteSkillApi(pendingDelete.id);
+        if (selectedId === pendingDelete.id) cancelEdit();
+        setPendingDelete(null);
+        await load();
+      } catch (deleteError: unknown) {
+        setError(
+          deleteError instanceof Error
+            ? deleteError.message
+            : "Failed to delete skill",
+        );
+      }
+    });
   };
 
   return {

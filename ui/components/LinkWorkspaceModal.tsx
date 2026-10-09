@@ -1,6 +1,7 @@
 import { MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { sessionLabel } from "../lib/sessionLabel";
+import { whileRunning } from "../lib/whileRunning";
 import type { SessionSummary } from "../types";
 import { Modal } from "./Modal";
 
@@ -17,20 +18,18 @@ export function LinkWorkspaceModal({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const select = async (sessionId: string) => {
-    setPending(true);
-    setError(null);
-    try {
-      await onSelect(sessionId);
-      onClose();
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Could not link workspace",
-      );
-    } finally {
-      setPending(false);
-    }
-  };
+  const select = (sessionId: string) =>
+    whileRunning(setPending, async () => {
+      setError(null);
+      try {
+        await onSelect(sessionId);
+        onClose();
+      } catch (cause) {
+        setError(
+          cause instanceof Error ? cause.message : "Could not link workspace",
+        );
+      }
+    });
 
   return (
     <Modal

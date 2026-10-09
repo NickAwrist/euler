@@ -1,15 +1,16 @@
 import { Download, Loader2, MoreVertical, Pencil, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { memo, useState } from "react";
 import { sessionLabel } from "../../lib/sessionLabel";
+import { whileRunning } from "../../lib/whileRunning";
 import { cx } from "../../styles";
 import type { SessionSummary } from "../../types";
 import { ExpiresIn } from "../ExpiresIn";
 import { FloatingOptionsMenu } from "../FloatingOptionsMenu";
-import { formatSessionTime } from "./sessionDates";
 
 type Props = {
   session: SessionSummary;
-  now: number;
+  /** Relative update time; a label, so the row renders only when it changes. */
+  time: string;
   active: boolean;
   openMenu: { id: string; anchorRect: DOMRect } | null;
   setOpenMenu: (menu: { id: string; anchorRect: DOMRect } | null) => void;
@@ -19,9 +20,10 @@ type Props = {
   onDeleteSession: (id: string) => void;
 };
 
-export function SessionListItem({
+// Memoized so a list refresh renders only the rows whose summary changed.
+export const SessionListItem = memo(function SessionListItem({
   session,
-  now,
+  time,
   active,
   openMenu,
   setOpenMenu,
@@ -70,7 +72,7 @@ export function SessionListItem({
               dateTime={new Date(session.updatedAt).toISOString()}
               title={new Date(session.updatedAt).toLocaleString()}
             >
-              {formatSessionTime(session.updatedAt, now)}
+              {time}
             </time>
             {session.expiresAt !== null && (
               <>
@@ -133,21 +135,20 @@ export function SessionListItem({
               className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-[0.8125rem] text-foreground transition-colors hover:bg-muted disabled:opacity-45"
               role="menuitem"
               disabled={exporting}
-              onClick={async () => {
+              onClick={() => {
                 setExportError("");
-                setExporting(true);
-                try {
-                  await onExportSession(session.id);
-                  setOpenMenu(null);
-                } catch (error) {
-                  setExportError(
-                    error instanceof Error
-                      ? error.message
-                      : "Could not export chat.",
-                  );
-                } finally {
-                  setExporting(false);
-                }
+                void whileRunning(setExporting, async () => {
+                  try {
+                    await onExportSession(session.id);
+                    setOpenMenu(null);
+                  } catch (error) {
+                    setExportError(
+                      error instanceof Error
+                        ? error.message
+                        : "Could not export chat.",
+                    );
+                  }
+                });
               }}
             >
               <Download size={14} />
@@ -175,4 +176,4 @@ export function SessionListItem({
       </div>
     </div>
   );
-}
+});

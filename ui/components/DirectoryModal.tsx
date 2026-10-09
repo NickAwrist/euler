@@ -1,5 +1,6 @@
 import { ArrowUp, Folder } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { whileRunning } from "../lib/whileRunning";
 import {
   type DirectoryListing,
   fetchDirectories,
@@ -97,20 +98,20 @@ export function DirectoryModal({
         onSubmit={async (event) => {
           event.preventDefault();
           if (pending || !path.trim()) return;
-          setPending(true);
           setError(null);
-          try {
-            await onSelect(listing?.exact ? listing.path : path.trim());
-            onClose();
-          } catch (error) {
-            setError(
-              error instanceof Error
-                ? error.message
-                : "Could not select directory",
-            );
-          } finally {
-            setPending(false);
-          }
+          const selected = listing?.exact ? listing.path : path.trim();
+          await whileRunning(setPending, async () => {
+            try {
+              await onSelect(selected);
+              onClose();
+            } catch (error) {
+              setError(
+                error instanceof Error
+                  ? error.message
+                  : "Could not select directory",
+              );
+            }
+          });
         }}
       >
         <div className="flex items-center gap-2 border-b border-border-subtle px-3 py-2">
