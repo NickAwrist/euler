@@ -14,6 +14,8 @@ test("long thread skips history work during typing and streaming", async ({
   await page.goto("/dev/long-thread");
   const reply = page.getByText("Streaming reply", { exact: true });
   await expect(reply).toBeVisible();
+  // Only messages near the viewport are mounted.
+  await expect(page.getByText("Question 0", { exact: true })).toHaveCount(0);
   const clearReads = () =>
     page.evaluate(() => performance.clearMarks("history-read"));
   const readCount = () =>
@@ -58,6 +60,14 @@ test("long thread skips history work during typing and streaming", async ({
   await expect(editor).toHaveValue("Question 0");
   await editor.fill("Draft edit");
   await page.getByRole("button", { name: "Stream token" }).click();
+  await expect(editor).toHaveValue("Draft edit");
+  // The open editor stays mounted while it is scrolled out of the window.
+  await page.mouse.move(600, 300);
+  await page.mouse.wheel(0, 1_000_000);
+  await expect(reply).toBeInViewport();
+  await expect(editor).toHaveValue("Draft edit");
+  await page.mouse.wheel(0, -1_000_000);
+  await expect(editor).toBeInViewport();
   await expect(editor).toHaveValue("Draft edit");
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByText("Question 0", { exact: true })).toBeInViewport();

@@ -18,7 +18,7 @@ not. Every metric is "lower is better":
 | `idle.domNodes` | The open chat or sidebar mounts more elements |
 | `idle.animations` | Something animates while nothing happens |
 | `health.rendersPerPoll` | An unchanged Ollama health report re-renders its consumers |
-| `scroll.renders` | Scrolling the conversation renders components |
+| `scroll.renders` | Scrolling the whole conversation renders more than the messages it mounts |
 | `typing.renders` | Typing in the composer renders more than the composer |
 | `stream.renders` | A streamed token renders more than the live reply (50 tokens) |
 | `finishReply.renders` | Completing a reply re-renders the existing history |
