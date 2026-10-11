@@ -105,7 +105,13 @@ test("tools desktop: built-in capabilities save per user", async ({ page }) => {
   await expect(imageGeneration).toHaveAttribute("aria-checked", "false");
   await expect
     .poll(() => [...store.values()][0]?.capabilities)
-    .toEqual({ web: true, imageGeneration: false, shell: true, files: true });
+    .toEqual({
+      web: true,
+      imageGeneration: false,
+      shell: true,
+      files: true,
+      skills: true,
+    });
 
   await page.reload();
   await page.getByRole("button", { name: "Tools" }).click();

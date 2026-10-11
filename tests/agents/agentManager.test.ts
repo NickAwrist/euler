@@ -50,6 +50,11 @@ describe("agent runtime", () => {
       expect(agent.TOOL_MAP[tool]).toBeDefined();
     }
     expect(agent.TOOL_MAP.run_subagent).toBeUndefined();
+    expect(agent.TOOL_MAP.manage_skills).toBeDefined();
+    expect(
+      agentManager.createGeneralAgent({ ownerUuid: RUNTIME_USER_ID }).TOOL_MAP
+        .manage_skills,
+    ).toBeUndefined();
     expect(agent.systemPrompt).toContain(releaseSkill.instructions);
     expect(agent.systemPrompt).not.toContain(otherUserSkill.description);
     expect(
@@ -60,7 +65,7 @@ describe("agent runtime", () => {
 
   test("leaves out the tools of capabilities the owner turned off", () => {
     updateUserPreferences(RUNTIME_USER_ID, {
-      capabilities: { web: false, imageGeneration: false },
+      capabilities: { web: false, imageGeneration: false, skills: false },
     });
     const tools = (ownerUuid: string) =>
       Object.keys(agentManager.createGeneralAgent({ ownerUuid }).TOOL_MAP);
@@ -71,6 +76,10 @@ describe("agent runtime", () => {
     expect(owned).toContain("bash");
     expect(owned).toContain("modify_plan");
     expect(tools(OTHER_USER_ID)).toContain("generate_image");
+    expect(
+      agentManager.createAgent({ ownerUuid: RUNTIME_USER_ID }).TOOL_MAP
+        .manage_skills,
+    ).toBeUndefined();
   });
 
   test("seeds the subagent skill once for the main agent only", () => {

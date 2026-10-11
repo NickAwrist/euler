@@ -23,6 +23,7 @@ import { GenerateImageTool } from "../tools/generate_image";
 import { GrepTool } from "../tools/grep";
 import { ListFilesTool } from "../tools/list_files";
 import { LoadSkillTool } from "../tools/load_skill";
+import { ManageSkillsTool } from "../tools/manage_skills";
 import { ModifyPlan } from "../tools/modify_plan";
 import { ReadFileTool } from "../tools/read_file";
 import { WebSearchTool } from "../tools/web_search";
@@ -154,6 +155,10 @@ function buildAgent(
   agent.addTools(enabledBuiltinTools(capabilities).map(createBuiltinTool));
   if (loadableSkills.length > 0) {
     agent.addTool(new LoadSkillTool(loadableSkills));
+  }
+  // Skills persist into later chats, so only the user's own agent edits them.
+  if (!isSubagent && capabilities.skills) {
+    agent.addTool(new ManageSkillsTool(opts.ownerUuid));
   }
   if (opts.reasoningEffort) {
     agent.reasoningEffort = opts.reasoningEffort;

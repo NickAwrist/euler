@@ -13,11 +13,13 @@ metadata until they load a matching skill. Type `$skill-name` in a message to
 invoke one directly. **Import** reads a pasted `SKILL.md`, including the
 `user-invocable` and `disable-model-invocation` frontmatter fields. Turn off
 **Users can invoke** to hide a skill from `$skill-name`, or **Agents can load
-automatically** to keep it out of the agent's skill list.
+automatically** to keep it out of the agent's skill list. You can also ask the
+agent to create, edit, or delete a skill, for example "update my storytelling
+skill to open with dialogue". Subagents can't change skills.
 
 Agent tools live under **Customization > Tools**, per user. **Built-in
-capabilities** turns web search, image generation, the shell, or file tools off
-for that user's agents, for example to use an MCP server's image generation
+capabilities** turns web search, image generation, the shell, file tools, or
+skill management off for that user's agents, for example to use an MCP server's image generation
 instead.
 
 Remote [MCP](https://modelcontextprotocol.io/) servers are listed on the same tab. **Add** reads a pasted `mcpServers`
