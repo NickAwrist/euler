@@ -419,16 +419,6 @@ test("Stop holds input already queued until Deliver, and invalid rewind is rejec
     expect(
       (await post(`/api/sessions/${id}/rewind`, { position: 99 })).status,
     ).toBe(400);
-    const queuedId = agentRuntime.snapshot(TEST_USER_ID, id).queued[0]!.id;
-    expect(
-      (
-        await fetch(`${url}/api/sessions/${id}/messages/${queuedId}`, {
-          method: "PATCH",
-          headers,
-          body: JSON.stringify({ content: "Edited" }),
-        })
-      ).status,
-    ).toBe(200);
     await post(`/api/sessions/${id}/deliver`);
     await until(
       () =>
@@ -439,7 +429,7 @@ test("Stop holds input already queued until Deliver, and invalid rewind is rejec
       getMessagesForSession(TEST_USER_ID, id)
         .filter((m) => m.role === "user")
         .map((m) => m.content),
-    ).toEqual(["First", "Edited"]);
+    ).toEqual(["First", "Queued"]);
   } finally {
     await agentRuntime.deleteSession(TEST_USER_ID, id);
     await close();

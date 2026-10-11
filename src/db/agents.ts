@@ -415,14 +415,6 @@ export class AgentStore {
       [held ? 1 : 0, agentId],
     );
   }
-  editQueued(agentId: string, id: number, content: string): boolean {
-    return (
-      getDb().run(
-        "UPDATE agent_messages SET content = ? WHERE id = ? AND agent_id = ? AND kind = 'user' AND delivered_at IS NULL",
-        [content, id, agentId],
-      ).changes > 0
-    );
-  }
   removeQueued(agentId: string, id: number): boolean {
     return (
       getDb().run(

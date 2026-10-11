@@ -46,14 +46,3 @@ export function removeQueuedMessage(id: string, messageId: number) {
     method: "DELETE",
   });
 }
-
-export function editQueuedMessage(
-  id: string,
-  messageId: number,
-  content: string,
-) {
-  return apiVoid(`${runtimePath(id)}/messages/${messageId}`, {
-    method: "PATCH",
-    json: { content },
-  });
-}

@@ -66,9 +66,6 @@ export const SendMessageSchema = TurnSettingsSchema.extend({
   attachmentIds: z.array(z.uuid()).max(MAX_IMAGES_PER_MESSAGE).default([]),
 }).strict();
 export type SendMessageRequest = z.infer<typeof SendMessageSchema>;
-export const EditQueuedMessageSchema = z
-  .object({ content: z.string().trim().min(1) })
-  .strict();
 export const RewindSchema = TurnSettingsSchema.extend({
   position: z.number().int().nonnegative(),
   content: z.string().trim().min(1).optional(),
