@@ -4,6 +4,8 @@ import {
   type ComponentPropsWithoutRef,
   isValidElement,
   memo,
+  useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -245,19 +247,35 @@ export function comfyUIImageKey(url: string): string {
   ].join("\n");
 }
 
-export function ComfyUIImageCard({ src, alt }: { src: string; alt?: string }) {
+export function MarkdownImageCard({
+  src,
+  alt,
+  linkPreview = false,
+}: { src: string; alt?: string; linkPreview?: boolean }) {
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
   const [errorDetails, setErrorDetails] = useState<string>("");
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    console.error("ComfyUI image failed to load:", src, e);
+    if (!linkPreview) console.error("Image failed to load:", src, e);
     setErrored(true);
     setErrorDetails(`URL: ${src}`);
   };
 
+  if (linkPreview && errored) return null;
+  const Container = linkPreview ? "a" : "div";
+
   return (
-    <div className="my-3 inline-block max-w-full">
+    <Container
+      href={linkPreview ? src : undefined}
+      target={linkPreview ? "_blank" : undefined}
+      rel={linkPreview ? "noopener noreferrer" : undefined}
+      aria-label={linkPreview ? "Open image in new tab" : undefined}
+      className={cx(
+        "my-3 inline-block max-w-full",
+        linkPreview && (!loaded || errored) && "hidden",
+      )}
+    >
       <div className="overflow-hidden rounded-lg border border-border-subtle bg-background shadow-sm">
         {errored ? (
           <div className="flex h-48 w-80 max-w-full flex-col items-center justify-center p-4 text-center text-[0.8125rem] text-muted-foreground">
@@ -275,8 +293,9 @@ export function ComfyUIImageCard({ src, alt }: { src: string; alt?: string }) {
             )}
             <img
               src={src}
-              loading="lazy"
+              loading={linkPreview ? "eager" : "lazy"}
               decoding="async"
+              referrerPolicy="no-referrer"
               alt={alt || "Generated image"}
               onLoad={() => setLoaded(true)}
               onError={handleError}
@@ -288,7 +307,7 @@ export function ComfyUIImageCard({ src, alt }: { src: string; alt?: string }) {
           </div>
         )}
       </div>
-    </div>
+    </Container>
   );
 }
 
@@ -298,7 +317,7 @@ function MarkdownImg({
   ...rest
 }: ComponentPropsWithoutRef<"img"> & ExtraProps) {
   if (isComfyUIImage(src)) {
-    return <ComfyUIImageCard src={src!} alt={alt} />;
+    return <MarkdownImageCard src={src!} alt={alt} />;
   }
   return (
     <img {...rest} src={src} alt={alt ?? ""} loading="lazy" decoding="async" />
@@ -377,6 +396,65 @@ const markdownComponents: Components = {
   img: MarkdownImg,
 };
 
+/** Find rendered HTTP links, excluding code and images already embedded in the reply. */
+export function extractImagePreviewLinks(markdown: string): string[] {
+  const tree = markdownParser.parse(markdown);
+  const definitions = new Map<string, string>();
+  const links: string[] = [];
+  const images = new Set<string>();
+  function collectDefinitions(node: Root | RootContent): void {
+    if (node.type === "definition" && !definitions.has(node.identifier)) {
+      definitions.set(node.identifier, node.url);
+    }
+    if ("children" in node) node.children.forEach(collectDefinitions);
+  }
+  function collect(node: Root | RootContent): void {
+    if (node.type === "link" || node.type === "linkReference") {
+      const url =
+        node.type === "link" ? node.url : definitions.get(node.identifier);
+      if (url && /^https?:\/\//i.test(url)) links.push(url);
+    } else if (node.type === "image" || node.type === "imageReference") {
+      const url =
+        node.type === "image" ? node.url : definitions.get(node.identifier);
+      if (url) images.add(url);
+    }
+    if ("children" in node) node.children.forEach(collect);
+  }
+  collectDefinitions(tree);
+  collect(tree);
+  return [...new Set(links)].filter((url) => !images.has(url));
+}
+
+function ImageLinkPreviews({ urls }: { urls: string[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setVisible(true);
+        observer.disconnect();
+      }
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className="flex flex-wrap gap-x-3">
+      {visible &&
+        urls.map((src) => (
+          <MarkdownImageCard
+            key={src}
+            src={src}
+            alt="Linked image"
+            linkPreview
+          />
+        ))}
+    </div>
+  );
+}
+
 const markdownProseClass =
   "min-w-0 break-words text-[0.9375rem] leading-[1.65] [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_a]:text-accent [&_a:hover]:underline [&_blockquote]:my-2 [&_blockquote]:border-l-[3px] [&_blockquote]:border-border [&_blockquote]:pl-[0.9em] [&_blockquote]:text-muted-foreground [&_code]:rounded-[4px] [&_code]:border [&_code]:border-border-subtle [&_code]:bg-muted [&_code]:px-[0.35em] [&_code]:py-[0.12em] [&_code]:text-[0.85em] [&_h1]:my-[0.75em] [&_h1]:mb-[0.4em] [&_h1]:text-[1.125rem] [&_h1]:font-semibold [&_h1]:leading-[1.3] [&_h1]:tracking-[-0.02em] [&_h2]:my-[0.75em] [&_h2]:mb-[0.4em] [&_h2]:text-[1.05rem] [&_h2]:font-semibold [&_h2]:leading-[1.3] [&_h2]:tracking-[-0.02em] [&_h3]:my-[0.75em] [&_h3]:mb-[0.4em] [&_h3]:text-[1rem] [&_h3]:font-semibold [&_h3]:leading-[1.3] [&_h3]:tracking-[-0.02em] [&_.katex-display]:overflow-x-auto [&_.katex-display]:overflow-y-hidden [&_hr]:my-[0.85em] [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-border-subtle [&_li]:my-[0.2em] [&_ol]:list-decimal [&_ol]:my-2 [&_ol]:pl-[1.35em] [&_p]:my-2 [&_pre]:my-[0.65em] [&_pre]:overflow-x-auto [&_pre]:whitespace-pre [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-border-subtle [&_pre]:bg-background [&_pre]:px-3 [&_pre]:py-2.5 [&_pre]:text-[0.8125rem] [&_pre_code]:rounded-none [&_pre_code]:border-0 [&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:text-[0.8125rem] [&_table]:my-[0.65em] [&_table]:border-collapse [&_table]:text-[0.875rem] [&_td]:border [&_td]:border-border-subtle [&_td]:px-[10px] [&_td]:py-[6px] [&_th]:border [&_th]:border-border-subtle [&_th]:bg-muted [&_th]:px-[10px] [&_th]:py-[6px] [&_th]:text-left [&_th]:font-semibold [&_ul]:list-disc [&_ul]:my-2 [&_ul]:pl-[1.35em]";
 
@@ -387,6 +465,7 @@ export const MarkdownMessage = memo(function MarkdownMessage({
   const source = normalizeMathDelimiters(
     convertComfyUIUrls(normalizeFlattenedPipeTables(children)),
   );
+  const imageLinks = useMemo(() => extractImagePreviewLinks(source), [source]);
 
   return (
     <div className={cx(markdownProseClass, className)}>
@@ -397,6 +476,7 @@ export const MarkdownMessage = memo(function MarkdownMessage({
       >
         {source}
       </ReactMarkdown>
+      {imageLinks.length > 0 && <ImageLinkPreviews urls={imageLinks} />}
     </div>
   );
 });

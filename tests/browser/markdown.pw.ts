@@ -1,6 +1,51 @@
 import { expect, test } from "@playwright/test";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
+test("markdown rendering previews image links including extensionless URLs", async ({
+  page,
+}) => {
+  const requests: string[] = [];
+  await page.route("https://images.example.com/**", (route) => {
+    const url = route.request().url();
+    requests.push(url);
+    if (url.endsWith("/docs"))
+      return route.fulfill({ contentType: "text/html", body: "Documentation" });
+    if (url.endsWith("/broken.png"))
+      return route.fulfill({ status: 404, body: "Missing" });
+    return route.fulfill({
+      contentType: "image/png",
+      body: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    });
+  });
+  await mockUserPreferences(page);
+  await page.goto("/dev/messages?image-links");
+  const reply = page.getByRole("region", { name: "Message 1", exact: true });
+  const previews = reply.getByAltText("Linked image", { exact: true });
+  await expect(previews.filter({ visible: true })).toHaveCount(2);
+  await expect(reply.getByAltText("Embedded", { exact: true })).toBeVisible();
+  await expect(
+    reply.getByRole("link", { name: "Documentation", exact: true }),
+  ).toBeVisible();
+  await expect(reply.getByText("Failed to load image")).toHaveCount(0);
+  await expect(
+    reply.getByRole("link", { name: "Open image in new tab" }),
+  ).toHaveCount(2);
+  expect(requests.filter((url) => url.includes("first.png"))).toHaveLength(1);
+  expect(requests.some((url) => url.includes("code.png"))).toBe(false);
+  const link = reply
+    .getByRole("link", { name: "Open image in new tab" })
+    .nth(1);
+  await expect(link).toHaveAttribute(
+    "href",
+    "https://images.example.com/render?id=2",
+  );
+  await expect(link).toHaveAttribute("target", "_blank");
+  await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+});
+
 test("markdown rendering preserves lists, lines, code, tables, and link navigation", async ({
   page,
 }) => {
