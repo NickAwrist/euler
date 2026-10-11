@@ -15,7 +15,7 @@ export default defineConfig({
   projects: [
     {
       name: "mobile",
-      grep: /onboarding mobile|welcome mobile|environment settings mobile|usage mobile|chat sidebar mobile|artifacts mobile|mobile message actions and code layout$|sheet dismissal, busy actions, and regenerate confirmation$|composer selectors mobile|model preferences mobile|settings save mobile/,
+      grep: /onboarding mobile|welcome mobile|environment settings mobile|usage mobile|chat sidebar mobile|artifacts mobile|mobile message actions and code layout$|sheet dismissal, busy actions, and regenerate confirmation$|composer selectors mobile|model preferences mobile|settings save mobile|skills mobile/,
       use: {
         // Keep touch media queries stable while Chromium captures screenshots.
         launchOptions: {

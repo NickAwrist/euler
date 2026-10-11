@@ -1,4 +1,4 @@
-import { Save, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { normalizeSkillName } from "../../../src/schemas/skills";
 import type { SkillData, SkillWriteBody } from "../../persist/skills";
@@ -19,6 +19,8 @@ type Props = {
   onSave: () => void;
   onCancel: () => void;
   onDelete: (skill: SkillData) => void;
+  /** Shown on mobile, where the editor replaces the skill list. */
+  onBack?: () => void;
 };
 
 export function SkillEditor({
@@ -33,11 +35,23 @@ export function SkillEditor({
   onSave,
   onCancel,
   onDelete,
+  onBack,
 }: Props) {
   return (
-    <div className="ui-animate-fade-in mx-auto max-w-2xl px-6 py-6">
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-[1.125rem] font-semibold text-foreground">
+    <div className="ui-animate-fade-in mx-auto max-w-2xl px-4 pt-4 sm:px-6 sm:pt-6">
+      {onBack && (
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={ArrowLeft}
+          onClick={onBack}
+          className="-ml-2.5 mb-2"
+        >
+          Skills
+        </Button>
+      )}
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h2 className="min-w-0 truncate text-[1.125rem] font-semibold text-foreground">
           {isNew ? "New skill" : `Edit: $${skill?.name ?? ""}`}
         </h2>
         {skill && (
@@ -47,7 +61,7 @@ export function SkillEditor({
             icon={Trash2}
             loading={deleting}
             onClick={() => onDelete(skill)}
-            className="text-red-400 hover:bg-red-400/10 hover:text-red-300"
+            className="shrink-0 text-red-400 hover:bg-red-400/10 hover:text-red-300"
           >
             Delete
           </Button>
@@ -171,7 +185,7 @@ export function SkillEditor({
           />
         </div>
 
-        <div className="flex items-center gap-3 pt-2">
+        <div className="sticky bottom-0 -mx-4 flex items-center gap-3 border-t border-border-subtle bg-background px-4 py-3 sm:-mx-6 sm:px-6">
           <Button
             variant="primary"
             icon={Save}

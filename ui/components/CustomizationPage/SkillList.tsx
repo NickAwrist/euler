@@ -20,14 +20,14 @@ export function SkillList({
   onImport,
 }: Props) {
   return (
-    <div className="flex min-h-0 flex-col border-r border-border-subtle max-[700px]:border-b max-[700px]:border-r-0">
+    <div className="flex min-h-0 flex-1 flex-col border-r border-border-subtle">
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
         <span className={eyebrowText}>Skills</span>
         <div className="flex items-center">
           <button
             type="button"
             onClick={onImport}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[0.75rem] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[0.75rem] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <FileInput size={14} />
             Import
@@ -35,7 +35,7 @@ export function SkillList({
           <button
             type="button"
             onClick={onStartNew}
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[0.75rem] font-medium text-accent transition-colors hover:bg-muted"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-[0.75rem] font-medium text-accent transition-colors hover:bg-muted"
           >
             <Plus size={14} />
             New
