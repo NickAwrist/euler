@@ -20,7 +20,10 @@ const BASELINE_PATH = fileURLToPath(
 const OUTPUT = "/tmp/euler-performance-check";
 const PORT = 5305;
 const WORKLOAD = { sessions: 100, longSessionMessages: 200 };
-const SCROLL_STEPS = 40;
+// Four local count runs with smaller jumps had no repeated row mounts.
+// Large-jump timings retain the original traversal.
+const COUNT_SCROLL_STEPS = 200;
+const TIMING_SCROLL_STEPS = 40;
 const TYPED_TEXT =
   "<prompt>A mountain lake at sunrise</prompt> <prompt>A cabin in the snow</prompt>";
 const STREAM_CHUNKS = 50;
@@ -404,8 +407,8 @@ async function measureCounts(page, fixture) {
 
   metrics["scroll.renders"] = await holdPolls(page, ["health"], () =>
     countRenders(page, async () => {
-      for (let step = 0; step <= SCROLL_STEPS; step++) {
-        await scrollToFraction(page, 1 - step / SCROLL_STEPS);
+      for (let step = 0; step <= COUNT_SCROLL_STEPS; step++) {
+        await scrollToFraction(page, 1 - step / COUNT_SCROLL_STEPS);
         await settle(page);
         scrollSamples.push(
           await page.evaluate((step) => {
@@ -554,8 +557,8 @@ async function measureTimings(page, cdp, fixture) {
     await scrollToFraction(page, 1);
     const idle = await measureWindow(() => page.waitForTimeout(5000));
     const scroll = await measureWindow(async () => {
-      for (let step = 0; step <= SCROLL_STEPS; step++)
-        await scrollToFraction(page, 1 - step / SCROLL_STEPS);
+      for (let step = 0; step <= TIMING_SCROLL_STEPS; step++)
+        await scrollToFraction(page, 1 - step / TIMING_SCROLL_STEPS);
     });
     await scrollToFraction(page, 1);
     const composer = page.getByPlaceholder(COMPOSER);

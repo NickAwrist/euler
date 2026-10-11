@@ -26,8 +26,9 @@ see those mounted messages, and Tab reaches the composer after the last
 mounted row rather than traversing the entire history.
 
 It gates on **counts, not milliseconds.** Wall-clock timings on shared CI
-runners vary by more than the regressions worth catching; counts of work do
-not. Every metric is "lower is better":
+runners vary by more than the regressions worth catching. Counts are more
+repeatable when inputs, typography, and interaction steps are controlled.
+Every metric is "lower is better":
 
 | Metric | What a regression means |
 | --- | --- |
@@ -53,7 +54,9 @@ finite CSS animations finished, and renders and scroll geometry unchanged
 across three two-frame samples. This lets image load, intersection, and resize
 callbacks finish before the next action. Streaming waits for each token to
 render before sending the next, so a slower machine cannot batch tokens into
-fewer commits.
+fewer commits. The scroll count traverses the thread from bottom to top in
+200 settled steps. Timing samples keep the original 40-step traversal
+without those settling waits.
 
 `bundle.jsGzipBytes` counts only scripts the app loaded during the check.
 Shiki ships a lazy chunk per language, and summing all of them would measure
@@ -63,12 +66,8 @@ Each baseline entry has a `value` plus an optional relative `tolerance` and
 absolute `slack`, set only where runs of one build differ. Interaction render
 counts allow 2 renders: one-second display timers, such as live elapsed times,
 can tick inside a window, which moved single counts by one render on GitHub's
-runner. Scrolling allows 60 renders: a transient extra render of one
-user/assistant pair, a measured 58-render burst, can occur even when the final
-mounted rows and geometry match. Callback ordering is the suspected cause.
-The other 2 renders cover timer noise. This budget cannot distinguish smaller
-scrolling changes from that variation. Bundle and payload bytes allow 1% for
-build hosts and generated IDs. The gate reports:
+runner. Scrolling uses the same 2-render allowance. Bundle and payload bytes
+allow 1% for build hosts and generated IDs. The gate reports:
 
 - `regressed` — the PR fails. Fix it, or accept it deliberately with
   `bun run perf:check --update` and explain the baseline change in review.
@@ -107,7 +106,7 @@ the same expanded fixture, bundled Geist fonts, and production Chromium runner:
 | Streaming renders | 38,450 | 550 or 551 |
 | Finish-reply renders | 6,294 | 123 |
 | Open-chat renders | 11,399 | 723 |
-| Full-thread scrolling renders | 168 | 5,728 or 5,786 |
+| Full-thread scrolling renders, 200 steps | 303 | 5,981 |
 | Loaded JavaScript gzip bytes | 700,481 | 759,707 |
 
 Scrolling mounts messages as they enter the virtual window, so it does more
@@ -123,14 +122,25 @@ runner. Assistant rows were 99 px taller in CI, changing the virtual scroll
 path. CI measured 5,769 renders against a local baseline of 5,755. Selecting
 bundled fonts makes both hosts measure the same typography.
 
-Font pinning alone did not make scroll work constant: repeated runs differed
-by a 58-render burst with identical final geometry. Component traces showed
-an extra user and assistant message rendering during preview/virtualizer
-updates. Longer settling waits still allow that variation, so the scroll
-baseline uses the lower observed 5,728 with 60 renders of slack.
-Both observed modes stay within the band and do not alternate baseline
-updates. The stronger settling check also includes work that the earlier
-windows missed: finish-reply rises from 120 to 123 and opening from 718 to 723.
+Font pinning alone did not make the original 40-step scroll count constant:
+local runs measured 5,728 or 5,786 renders, and CI measured 5,826. The final
+geometry matched, but mount traces identified transient extra mounts of rows
+92, 93, and 69 in CI. Waiting longer after each jump cannot remove work that
+already happened during it. A 60-render allowance proved insufficient.
+
+The count traversal now uses 200 smaller steps, keeping the actual app,
+observers, and image previews. Three local count runs and a diagnostic run
+at 4× CPU throttling produced 5,981 renders with each newly encountered row
+mounted once. The finer traversal also runs more scroll updates and encounters
+more previews, so its total is not comparable to the previous 40-step count. Main is remeasured with the same
+200-step traversal. The scroll budget returns to 2 renders of timer slack.
+This count gate covers small scroll steps; it no longer covers remount work
+during large jumps. The 40-step timing pass reports `scroll.worstFrameMs`
+without gating it. Per-step artifacts retain row mount counts and geometry
+for checking the result in CI.
+
+The stronger settling check also includes work that the earlier windows
+missed: finish-reply rises from 120 to 123 and opening from 718 to 723.
 These are measurement changes, with no change to app rendering. Mocked image
 responses keep preview loading independent of external sites.
 

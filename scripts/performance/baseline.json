@@ -21,8 +21,8 @@
     },
     "scroll.renders": {
       "tolerance": 0,
-      "slack": 60,
-      "value": 5728
+      "slack": 2,
+      "value": 5981
     },
     "typing.renders": {
       "tolerance": 0,
