@@ -23,6 +23,7 @@ import { envConfig, getEnvironmentSettings } from "../env";
 import { asyncRoute } from "../http/asyncRoute";
 import { canEditEnvironmentSetting } from "../http/environmentSettings";
 import { sendError, sendValidationError } from "../observability/http";
+import { fetchOpenRouterBalance } from "../openRouterBalance";
 import { catalogFreshness, isInteractiveModel } from "../openRouterModels";
 import {
   catalogSettings,
@@ -95,6 +96,21 @@ apiKeyRoutes(
   () => envConfig.braveSearchApiKey,
   getBraveSearchApiKey,
   setBraveSearchApiKey,
+);
+
+settingsRoutes.get(
+  "/openrouter/balance",
+  asyncRoute(async (_req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    const apiKey = getOpenRouterApiKey();
+    if (!apiKey)
+      return sendError(
+        res,
+        "INVALID_REQUEST",
+        "Configure an OpenRouter API key first",
+      );
+    res.json(await fetchOpenRouterBalance(apiKey));
+  }),
 );
 
 const routeSchema = z
