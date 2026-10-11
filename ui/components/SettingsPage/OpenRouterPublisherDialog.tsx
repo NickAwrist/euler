@@ -2,6 +2,7 @@ import { Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { comparePublisherModels } from "../../../src/modelSort";
 import type { CatalogFreshness } from "../../../src/openRouterModels";
+import { setKeyPending, whileRunning } from "../../lib/whileRunning";
 import { Button } from "../Button";
 import { Modal } from "../Modal";
 import {
@@ -81,27 +82,22 @@ export function PublisherDialog({
         : change.kind === "track"
           ? `track:${change.publisherId}`
           : change.kind;
-    setPending((current) => new Set(current).add(key));
     setNotice(null);
-    try {
-      await onChange(change);
-      if (change.kind === "remove") onClose();
-      if (change.kind === "add-model") setSlug("");
-    } catch (cause) {
-      setNotice(
-        change.kind === "add-model" && cause instanceof Error
-          ? cause.message
-          : change.kind === "remove"
-            ? "Couldn't remove publisher. Try again."
-            : "Couldn't save change. Try again.",
-      );
-    } finally {
-      setPending((current) => {
-        const next = new Set(current);
-        next.delete(key);
-        return next;
-      });
-    }
+    await whileRunning(setKeyPending(setPending, key), async () => {
+      try {
+        await onChange(change);
+        if (change.kind === "remove") onClose();
+        if (change.kind === "add-model") setSlug("");
+      } catch (cause) {
+        setNotice(
+          change.kind === "add-model" && cause instanceof Error
+            ? cause.message
+            : change.kind === "remove"
+              ? "Couldn't remove publisher. Try again."
+              : "Couldn't save change. Try again.",
+        );
+      }
+    });
   };
   const search = query.trim().toLowerCase();
   const models =

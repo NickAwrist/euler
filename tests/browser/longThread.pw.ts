@@ -14,6 +14,8 @@ test("long thread skips history work during typing and streaming", async ({
   await page.goto("/dev/long-thread");
   const reply = page.getByText("Streaming reply", { exact: true });
   await expect(reply).toBeVisible();
+  // Only messages near the viewport are mounted.
+  await expect(page.getByText("Question 0", { exact: true })).toHaveCount(0);
   const clearReads = () =>
     page.evaluate(() => performance.clearMarks("history-read"));
   const readCount = () =>
@@ -37,7 +39,23 @@ test("long thread skips history work during typing and streaming", async ({
 
   await page.getByRole("button", { name: "Toggle busy" }).click();
   await clearReads();
+  await page.evaluate(() => {
+    document.addEventListener("animationstart", (event) => {
+      if (
+        event.animationName === "ui-slide-fade-up" &&
+        event.target instanceof Element &&
+        event.target.closest("[data-index]")?.getAttribute("data-index") ===
+          "300"
+      )
+        performance.mark("new-message-entry");
+    });
+  });
   await page.getByRole("button", { name: "Finish" }).click();
+  const entryAnimations = () =>
+    page.evaluate(
+      () => performance.getEntriesByName("new-message-entry").length,
+    );
+  await expect.poll(entryAnimations).toBe(1);
   await expect(
     page.getByText("More streamed text.", { exact: true }),
   ).toHaveCount(10);
@@ -59,6 +77,36 @@ test("long thread skips history work during typing and streaming", async ({
   await editor.fill("Draft edit");
   await page.getByRole("button", { name: "Stream token" }).click();
   await expect(editor).toHaveValue("Draft edit");
+  // The open editor stays mounted while it is scrolled out of the window.
+  await page.mouse.move(600, 300);
+  await page.mouse.wheel(0, 1_000_000);
+  await expect(reply).toBeInViewport();
+  await expect(editor).toHaveValue("Draft edit");
+  await page.mouse.wheel(0, -1_000_000);
+  await expect(editor).toBeInViewport();
+  await expect(editor).toHaveValue("Draft edit");
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByText("Question 0", { exact: true })).toBeInViewport();
+
+  await page.getByRole("button", { name: "Previous version" }).click();
+  const earlierReply = page.getByText("Earlier reply version", { exact: true });
+  await expect(earlierReply).toBeVisible();
+  const message = earlierReply.locator(
+    "xpath=ancestor::div[contains(@class, 'group/msg')]",
+  );
+  await message.getByRole("button", { name: "Thoughts", exact: true }).click();
+  await expect(
+    message.getByRole("button", { name: "Thoughts", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
+  await page.getByRole("button", { name: "Refresh history" }).click();
+  await page.mouse.move(600, 300);
+  await page.mouse.wheel(0, 1_000_000);
+  await expect(reply).toBeInViewport();
+  await expect(earlierReply).toHaveCount(0);
+  await page.mouse.wheel(0, -1_000_000);
+  await expect(earlierReply).toBeVisible();
+  await expect(
+    message.getByRole("button", { name: "Thoughts", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
+  expect(await entryAnimations()).toBe(1);
 });

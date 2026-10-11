@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useSavedDraft } from "../../hooks/useSavedDraft";
 import { changedFields } from "../../lib/changedFields";
+import { whileRunning } from "../../lib/whileRunning";
 import type { UserSettings } from "../../persist/userSettings";
 import type { SettingsTab } from "../../types";
 import type { SettingChange, SettingsPageProps } from "./types";
@@ -49,12 +50,12 @@ export function useSettingsPageState({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleChange = useCallback(
-    <K extends keyof UserSettings>(field: K, value: UserSettings[K]) => {
-      settings.setValue((prev) => ({ ...prev, [field]: value }));
-    },
-    [settings.setValue],
-  );
+  const handleChange = <K extends keyof UserSettings>(
+    field: K,
+    value: UserSettings[K],
+  ) => {
+    settings.setValue((prev) => ({ ...prev, [field]: value }));
+  };
 
   const tabChanges = (tab: SettingsTab, labels: readonly string[]) =>
     labels.map((label): SettingChange => ({ tab, label }));
@@ -83,9 +84,7 @@ export function useSettingsPageState({
 
   const handleSubmit = async (): Promise<boolean> => {
     if (!isDirty) return true;
-    setIsSaving(true);
-    setError(null);
-    try {
+    const save = async () => {
       if (changes.some((change) => change.tab !== "appearance")) {
         await onSave(
           changedFields(settings.value, currentSettings),
@@ -97,13 +96,19 @@ export function useSettingsPageState({
         comfy.accept();
       }
       if (appearance.changes.length > 0) await appearance.save();
-      return true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save settings");
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
+    };
+    setError(null);
+    return whileRunning(setIsSaving, () =>
+      save().then(
+        () => true,
+        (err: unknown) => {
+          setError(
+            err instanceof Error ? err.message : "Failed to save settings",
+          );
+          return false;
+        },
+      ),
+    );
   };
 
   return {

@@ -23,7 +23,6 @@ export interface AnchoredPopoverPanelHelpers {
   close: (restoreFocus?: boolean) => void;
   open: () => void;
   isOpen: boolean;
-  panelRef: RefObject<HTMLDialogElement | null>;
 }
 
 export interface AnchoredPopoverProps {
@@ -51,6 +50,20 @@ export interface AnchoredPopoverProps {
   renderTrigger: (props: AnchoredPopoverTriggerProps) => ReactNode;
   /** Children rendered inside the popover dialog, or a render function receiving helper actions. */
   children?: ReactNode | ((helpers: AnchoredPopoverPanelHelpers) => ReactNode);
+}
+
+/**
+ * Calls a render-prop panel as a component, so its helpers, which reach the
+ * panel element, are never handed to a function during the popover's render.
+ */
+function PanelContent({
+  render,
+  helpers,
+}: {
+  render: (helpers: AnchoredPopoverPanelHelpers) => ReactNode;
+  helpers: AnchoredPopoverPanelHelpers;
+}) {
+  return render(helpers);
 }
 
 export function AnchoredPopover({
@@ -91,7 +104,9 @@ export function AnchoredPopover({
   }, [disabled, open]);
 
   const onOpenRef = useRef(onOpen);
-  onOpenRef.current = onOpen;
+  useLayoutEffect(() => {
+    onOpenRef.current = onOpen;
+  });
   const wasOpenRef = useRef(false);
 
   useLayoutEffect(() => {
@@ -159,7 +174,6 @@ export function AnchoredPopover({
     close,
     open: openPanel,
     isOpen: open,
-    panelRef,
   };
 
   return (
@@ -201,7 +215,11 @@ export function AnchoredPopover({
           onPanelKeyDown?.(event);
         }}
       >
-        {typeof children === "function" ? children(panelHelpers) : children}
+        {typeof children === "function" ? (
+          <PanelContent render={children} helpers={panelHelpers} />
+        ) : (
+          children
+        )}
       </dialog>
     </div>
   );

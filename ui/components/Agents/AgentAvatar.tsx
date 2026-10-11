@@ -1,4 +1,11 @@
-import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type RefObject,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { Agent } from "../../../src/schemas/agents";
 import type { AgentPhase } from "../../types";
 import { useAgents } from "./AgentContext";
@@ -156,7 +163,9 @@ function usePhaseMotion(
   phase: AgentPhase | null,
 ) {
   const latest = useRef(phase);
-  latest.current = phase;
+  useLayoutEffect(() => {
+    latest.current = phase;
+  });
   const [looping, setLooping] = useState(false);
   useEffect(() => {
     if (phase) setLooping(true);

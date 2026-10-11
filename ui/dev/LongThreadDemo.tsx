@@ -3,7 +3,12 @@ import { RunArea } from "../components/RunArea";
 import type { Message, MessageStep } from "../types";
 
 const steps: MessageStep[] = [
-  { kind: "llm_call", status: "completed", result: "Finished" },
+  {
+    kind: "llm_call",
+    status: "completed",
+    result: "Finished",
+    thinking: "Reasoning for this reply",
+  },
 ];
 const history: Message[] = Array.from({ length: 300 }, (_, index) => ({
   role: index % 2 === 0 ? "user" : "assistant",
@@ -15,6 +20,8 @@ const history: Message[] = Array.from({ length: 300 }, (_, index) => ({
       : `Reply ${index}\n\n${"A paragraph with **bold**, [a link](https://example.com), and `inline code`.\n\n".repeat(6)}\n| Name | Value |\n| --- | --- |\n| Example | 42 |`;
   },
   steps: index % 2 === 0 ? undefined : steps,
+  versions:
+    index === 1 ? [{ content: "Earlier reply version", steps }] : undefined,
 }));
 const noOp = () => {};
 const noSteps: MessageStep[] = [];
@@ -65,6 +72,14 @@ export default function LongThreadDemo() {
           }
         >
           Stream token
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            setMessages((value) => value.map((message) => ({ ...message })))
+          }
+        >
+          Refresh history
         </button>
         <button type="button" onClick={() => setBusy((value) => !value)}>
           Toggle busy

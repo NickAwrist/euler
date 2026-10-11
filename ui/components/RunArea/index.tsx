@@ -1,5 +1,5 @@
 import { ArrowDown } from "lucide-react";
-import { memo, useLayoutEffect, useRef } from "react";
+import { memo, useLayoutEffect, useState } from "react";
 import { useStickToBottom } from "use-stick-to-bottom";
 import { MAIN_AGENT_NAME } from "../../../src/agents/agentNames";
 import { AgentRows } from "../Agents/AgentTaskCard";
@@ -40,10 +40,12 @@ export const RunArea = memo(function RunArea({
     runPending ||
     streamingStep !== null ||
     streamingSteps.length > 0;
-  const initialRenderedCountRef = useRef<number | null>(null);
-
-  if (initialRenderedCountRef.current === null && messages.length > 0) {
-    initialRenderedCountRef.current = messages.length;
+  // Messages present when the chat first renders history skip the entry animation.
+  const [initialRenderedCount, setInitialRenderedCount] = useState<
+    number | null
+  >(null);
+  if (initialRenderedCount === null && messages.length > 0) {
+    setInitialRenderedCount(messages.length);
   }
 
   useLayoutEffect(() => {
@@ -63,20 +65,22 @@ export const RunArea = memo(function RunArea({
     }
   }, [footerInset, isAtBottom, scrollToBottom]);
 
-  const initialCount = initialRenderedCountRef.current ?? 0;
+  const initialCount = initialRenderedCount ?? messages.length;
 
   return (
     <div className="relative h-full min-h-0 flex-1 overflow-x-hidden">
       {/* Narrow layouts float the panel toggles over messages, so back them with a bar. */}
       <div className="absolute inset-x-0 top-0 z-[5] h-[var(--workspace-header-height)] border-b border-border-subtle bg-background min-[901px]:hidden" />
+      {/* use-stick-to-bottom only lets a wheel escape the bottom lock when the
+          scroller's computed `overflow` is `auto`, so clip x on the content. */}
       <div
         ref={scrollRef}
-        className="absolute inset-0 z-0 overflow-x-hidden overflow-y-auto px-5 pt-[calc(var(--workspace-header-height)+1.25rem)] max-[640px]:px-3.5 max-[640px]:pt-[calc(var(--workspace-header-height)+1rem)]"
+        className="absolute inset-0 z-0 overflow-y-auto px-5 pt-[calc(var(--workspace-header-height)+1.25rem)] max-[640px]:px-3.5 max-[640px]:pt-[calc(var(--workspace-header-height)+1rem)]"
         style={{ paddingBottom: footerInset + 12 }}
       >
         <div
           ref={contentRef}
-          className="mx-auto flex min-h-min w-full max-w-[var(--chat-width)] flex-col"
+          className="mx-auto flex min-h-min w-full max-w-[var(--chat-width)] flex-col overflow-x-clip"
         >
           {sessionError && (
             <div
@@ -113,6 +117,7 @@ export const RunArea = memo(function RunArea({
             onRequestEditConfirm={onRequestEditConfirm}
             onRegenerate={onRegenerate}
             regenerateLabel={regenerateLabel}
+            scrollRef={scrollRef}
           />
 
           <AgentRows position={messages.length} />

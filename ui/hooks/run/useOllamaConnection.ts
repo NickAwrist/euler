@@ -106,10 +106,9 @@ export function useOllamaConnection() {
   const modelRequestId = useRef(0);
   const refreshOllamaModels = useCallback(async (cached = false) => {
     const requestId = ++modelRequestId.current;
+    const path = cached ? "/api/models?catalog=cached" : "/api/models";
     try {
-      const res = await userScopedFetch(
-        cached ? "/api/models?catalog=cached" : "/api/models",
-      );
+      const res = await userScopedFetch(path);
       if (requestId !== modelRequestId.current) return;
       if (!res.ok) {
         setModelsLoadError((await createApiError(res)).message);

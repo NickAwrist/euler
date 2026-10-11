@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { whileRunning } from "../../lib/whileRunning";
 import {
   type McpServerData,
   addMcpServersApi,
@@ -51,17 +52,18 @@ export function useMcpServers() {
 
   const performDelete = async () => {
     if (!pendingDelete) return;
-    setDeleting(true);
-    setError(null);
-    try {
-      await deleteMcpServerApi(pendingDelete.id);
-      setServers((current) => current.filter((s) => s.id !== pendingDelete.id));
-      setPendingDelete(null);
-    } catch (deleteError: unknown) {
-      setError(message(deleteError, "Failed to delete MCP server"));
-    } finally {
-      setDeleting(false);
-    }
+    await whileRunning(setDeleting, async () => {
+      setError(null);
+      try {
+        await deleteMcpServerApi(pendingDelete.id);
+        setServers((current) =>
+          current.filter((s) => s.id !== pendingDelete.id),
+        );
+        setPendingDelete(null);
+      } catch (deleteError: unknown) {
+        setError(message(deleteError, "Failed to delete MCP server"));
+      }
+    });
   };
 
   return {
