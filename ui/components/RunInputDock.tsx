@@ -14,6 +14,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from "react";
 import { useListNavigation } from "../hooks/useListNavigation";
 import { useWorkspaceFileSuggestions } from "../hooks/useWorkspaceFileSuggestions";
@@ -34,6 +35,15 @@ import {
   matchingRunCommands,
 } from "./runCommands";
 import { completeSkillToken, findActiveSkillToken } from "./skillPicker";
+
+const touchKeyboardQuery = "(pointer: coarse)";
+const getTouchKeyboardSnapshot = () =>
+  window.matchMedia(touchKeyboardQuery).matches;
+function subscribeTouchKeyboard(onChange: () => void) {
+  const media = window.matchMedia(touchKeyboardQuery);
+  media.addEventListener("change", onChange);
+  return () => media.removeEventListener("change", onChange);
+}
 
 export function RunInputDock({
   sessionId = null,
@@ -106,6 +116,11 @@ export function RunInputDock({
   const [caretIndex, setCaretIndex] = useState(input.length);
   const [filePickerDismissed, setFilePickerDismissed] = useState(false);
   const [skillPickerDismissed, setSkillPickerDismissed] = useState(false);
+  const usesTouchKeyboard = useSyncExternalStore(
+    subscribeTouchKeyboard,
+    getTouchKeyboardSnapshot,
+    () => false,
+  );
   const isBusy =
     runPending || streamingStep !== null || streamingSteps.length > 0;
   const currentModelOption = ollamaModels.find(
@@ -437,7 +452,7 @@ export function RunInputDock({
               }
               if (
                 e.key === "Enter" &&
-                (e.ctrlKey || e.metaKey) &&
+                (!usesTouchKeyboard || e.ctrlKey || e.metaKey) &&
                 !e.shiftKey &&
                 !e.altKey
               ) {
@@ -482,8 +497,16 @@ export function RunInputDock({
               variant="primary"
               icon={ArrowUp}
               label="Send message"
-              title="Send message (Ctrl+Enter / Cmd+Enter)"
-              aria-keyshortcuts="Control+Enter Meta+Enter"
+              title={
+                usesTouchKeyboard
+                  ? "Send message (Ctrl+Enter / Cmd+Enter)"
+                  : "Send message (Enter; Shift+Enter for a new line)"
+              }
+              aria-keyshortcuts={
+                usesTouchKeyboard
+                  ? "Control+Enter Meta+Enter"
+                  : "Enter Control+Enter Meta+Enter"
+              }
               disabled={!input.trim() || !canSend}
               className="mb-0.5"
             />
