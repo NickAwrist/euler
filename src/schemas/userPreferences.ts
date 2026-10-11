@@ -54,6 +54,7 @@ export const capabilitiesSchema = z.object({
   imageGeneration: z.boolean().default(true),
   shell: z.boolean().default(true),
   files: z.boolean().default(true),
+  skills: z.boolean().default(true),
 });
 export type Capabilities = z.infer<typeof capabilitiesSchema>;
 export const DEFAULT_COMFYUI_NEGATIVE_PROMPT =
@@ -150,6 +151,7 @@ export const userPreferencesPatchSchema = z
           .optional(),
         shell: capabilitiesSchema.shape.shell.removeDefault().optional(),
         files: capabilitiesSchema.shape.files.removeDefault().optional(),
+        skills: capabilitiesSchema.shape.skills.removeDefault().optional(),
       })
       .strict()
       .optional(),

@@ -29,6 +29,11 @@ const CAPABILITIES: { id: keyof Capabilities; label: string; hint: string }[] =
       label: "Files",
       hint: "Read, search, create, edit, and delete workspace files.",
     },
+    {
+      id: "skills",
+      label: "Skill management",
+      hint: "Create, edit, and delete your skills when you ask.",
+    },
   ];
 
 /** Built-in tools agents may use. Turn one off to prefer an MCP server's tool. */
