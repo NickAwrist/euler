@@ -18,7 +18,7 @@ import { useArtifacts } from "../Artifacts/ArtifactContext";
 import { FileIcon } from "../Artifacts/FileIcon";
 import { traceStepsForDisplay } from "../ExecutionTrace";
 import {
-  ComfyUIImageCard,
+  MarkdownImageCard,
   MarkdownMessage,
   comfyUIImageKey,
   extractComfyUIImageUrls,
@@ -118,7 +118,7 @@ export function AssistantMessageBubble({
           {generatedImageUrls.length > 0 && (
             <div className="flex flex-wrap gap-x-3">
               {generatedImageUrls.map((src) => (
-                <ComfyUIImageCard key={src} src={src} />
+                <MarkdownImageCard key={src} src={src} />
               ))}
             </div>
           )}

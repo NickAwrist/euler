@@ -83,11 +83,30 @@ const markdownMessages: Message[] = [
   },
 ];
 
+const imageLinkMessages: Message[] = [
+  {
+    role: "assistant",
+    content: [
+      "Here are your images:",
+      "Image 1: https://images.example.com/first.png?token=signed",
+      "Image 2: [Second image](https://images.example.com/render?id=2)",
+      "Repeated: https://images.example.com/first.png?token=signed",
+      "[Documentation](https://images.example.com/docs)",
+      "[Broken image](https://images.example.com/broken.png)",
+      "`https://images.example.com/code.png`",
+      "![Embedded](https://images.example.com/embedded.png)",
+      "[Embedded link](https://images.example.com/embedded.png)",
+    ].join("\n\n"),
+  },
+];
+
 export default function MessageDemo() {
   const [messages, setMessages] = useState(
-    new URLSearchParams(window.location.search).has("markdown")
-      ? markdownMessages
-      : initialMessages,
+    new URLSearchParams(window.location.search).has("image-links")
+      ? imageLinkMessages
+      : new URLSearchParams(window.location.search).has("markdown")
+        ? markdownMessages
+        : initialMessages,
   );
   const [editing, setEditing] = useState<number | null>(null);
   const [trace, setTrace] = useState<MessageStep[] | null>(null);
