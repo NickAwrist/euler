@@ -39,7 +39,23 @@ test("long thread skips history work during typing and streaming", async ({
 
   await page.getByRole("button", { name: "Toggle busy" }).click();
   await clearReads();
+  await page.evaluate(() => {
+    document.addEventListener("animationstart", (event) => {
+      if (
+        event.animationName === "ui-slide-fade-up" &&
+        event.target instanceof Element &&
+        event.target.closest("[data-index]")?.getAttribute("data-index") ===
+          "300"
+      )
+        performance.mark("new-message-entry");
+    });
+  });
   await page.getByRole("button", { name: "Finish" }).click();
+  const entryAnimations = () =>
+    page.evaluate(
+      () => performance.getEntriesByName("new-message-entry").length,
+    );
+  await expect.poll(entryAnimations).toBe(1);
   await expect(
     page.getByText("More streamed text.", { exact: true }),
   ).toHaveCount(10);
@@ -92,4 +108,5 @@ test("long thread skips history work during typing and streaming", async ({
   await expect(
     message.getByRole("button", { name: "Thoughts", exact: true }),
   ).toHaveAttribute("aria-expanded", "true");
+  expect(await entryAnimations()).toBe(1);
 });

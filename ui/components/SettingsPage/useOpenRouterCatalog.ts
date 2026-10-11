@@ -113,7 +113,6 @@ async function sendChange(
       break;
     case "remove":
       await modelSettingsRequest(`openrouter/publishers/${id}`, "DELETE");
-
       break;
   }
 }

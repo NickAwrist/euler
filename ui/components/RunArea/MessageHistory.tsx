@@ -40,18 +40,28 @@ type Props = Pick<
 const HistoryMessage = memo(function HistoryMessage({
   onViewSteps,
   viewStates,
+  enteredMessages,
   messageKey,
+  animateEntry,
   ...props
 }: Omit<MessageItemProps, "onViewSteps"> &
   Pick<Props, "onViewSteps"> & {
     viewStates: Map<string, MessageViewState>;
+    enteredMessages: Set<string>;
     messageKey: string;
   }) {
+  const [animateOnMount] = useState(
+    () => animateEntry && !enteredMessages.has(messageKey),
+  );
+  useEffect(() => {
+    if (animateOnMount) enteredMessages.add(messageKey);
+  }, [animateOnMount, enteredMessages, messageKey]);
   const steps = props.message.steps;
   return (
     <>
       <MessageItem
         {...props}
+        animateEntry={animateOnMount}
         initialViewState={viewStates.get(messageKey)}
         onViewStateChange={(state) => viewStates.set(messageKey, state)}
         onViewSteps={
@@ -82,6 +92,7 @@ export const MessageHistory = memo(function MessageHistory({
   const listRef = useRef<HTMLDivElement>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
   const [viewStates] = useState(() => new Map<string, MessageViewState>());
+  const [enteredMessages] = useState(() => new Set<string>());
   useLayoutEffect(() => {
     setScrollMargin(listRef.current?.offsetTop ?? 0);
   });
@@ -98,12 +109,14 @@ export const MessageHistory = memo(function MessageHistory({
   // Runtime refreshes replace message objects but keep these row identities.
   // Remove choices for messages discarded by editing or regeneration.
   useEffect(() => {
-    if (viewStates.size === 0) return;
-    const keys = new Set(messages.map((_, index) => getItemKey(index)));
-    for (const key of viewStates.keys()) {
-      if (!keys.has(key)) viewStates.delete(key);
+    for (const cache of [viewStates, enteredMessages]) {
+      for (const key of cache.keys()) {
+        const index = Number.parseInt(key, 10);
+        if (index >= messages.length || getItemKey(index) !== key)
+          cache.delete(key);
+      }
     }
-  }, [messages, getItemKey, viewStates]);
+  }, [messages, getItemKey, viewStates, enteredMessages]);
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => scrollRef.current,
@@ -151,6 +164,7 @@ export const MessageHistory = memo(function MessageHistory({
               messageIndex={item.index}
               message={message}
               viewStates={viewStates}
+              enteredMessages={enteredMessages}
               messageKey={String(item.key)}
               animateEntry={item.index >= initialCount}
               editingUserIndex={

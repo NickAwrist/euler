@@ -16,6 +16,10 @@ into one request. Links to `example.com` receive a local PNG response through
 Playwright routing, so scrolling exercises image previews without external
 network timing or failures.
 
+Virtualization mounts only nearby messages. Browser find and screen readers
+see those mounted messages, and Tab reaches the composer after the last
+mounted row rather than traversing the entire history.
+
 It gates on **counts, not milliseconds.** Wall-clock timings on shared CI
 runners vary by more than the regressions worth catching; counts of work do
 not. Every metric is "lower is better":

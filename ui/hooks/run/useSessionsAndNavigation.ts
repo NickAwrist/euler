@@ -127,10 +127,10 @@ export function useSessionsAndNavigation({
 
   const preferences = useSessionPreferences({
     activeSessionIdRef,
-    ollamaModels: ollamaModels,
-    userSettingsDefaultModel: userSettingsDefaultModel,
+    ollamaModels,
+    userSettingsDefaultModel,
     refreshSessions,
-    setMessages: setMessages,
+    setMessages,
   });
   const { selectedModel, setSessionModel, setThinkingEffort, setWorkspace } =
     preferences;
