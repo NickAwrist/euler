@@ -10,6 +10,20 @@ describe("Settings E2E Tests", () => {
     db.run("DELETE FROM app_settings");
   });
 
+  test("balance requires a configured key and is never cached", async () => {
+    const { url, close } = await startTestServer();
+    try {
+      const response = await fetch(`${url}/api/settings/openrouter/balance`);
+      expect(response.status).toBe(400);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(await response.json()).toMatchObject({
+        error: { code: "INVALID_REQUEST" },
+      });
+    } finally {
+      await close();
+    }
+  });
+
   test("save, retrieve presence/absence, overwrite, clear, whitespace trim, empty payload, SQL injection, and database locks", async () => {
     const { url, close } = await startTestServer();
     try {

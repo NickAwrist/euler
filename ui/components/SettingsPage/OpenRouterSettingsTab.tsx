@@ -7,6 +7,7 @@ import { ProviderIcon } from "../ModelSelectBar";
 import { RefreshButton } from "../RefreshButton";
 import { providerIcons } from "../modelProviders";
 import { ApiKeySettingsCard } from "./ApiKeySettingsCard";
+import { OpenRouterBalanceCard } from "./OpenRouterBalanceCard";
 import { CatalogStatus, PublisherDialog } from "./OpenRouterPublisherDialog";
 import { useApiKeySetting } from "./useApiKeySetting";
 import { useOpenRouterCatalog } from "./useOpenRouterCatalog";
@@ -20,6 +21,7 @@ export function OpenRouterSettingsTab({
   onKeyStatusChange?: (hasKey: boolean) => void;
 }) {
   const key = useApiKeySetting("openrouter");
+  const [keyRevision, setKeyRevision] = useState(0);
   const {
     data: overview,
     loading,
@@ -65,8 +67,12 @@ export function OpenRouterSettingsTab({
         title="OpenRouter API key"
         inputId="openrouter-key"
         placeholder="sk-or-..."
-        onSaved={onModelsChanged}
+        onSaved={async () => {
+          setKeyRevision((value) => value + 1);
+          await onModelsChanged();
+        }}
       />
+      {key.hasKey && <OpenRouterBalanceCard key={keyRevision} />}
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
