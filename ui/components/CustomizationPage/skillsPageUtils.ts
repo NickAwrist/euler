@@ -27,13 +27,22 @@ export function editorFromSkill(skill: SkillData): SkillWriteBody {
   };
 }
 
-export function skillEditorsEqual(
+const SKILL_FIELD_LABELS: Record<keyof SkillWriteBody, string> = {
+  name: "Name",
+  description: "Description",
+  instructions: "Instructions",
+  user_invocable: "Users can invoke",
+  disable_model_invocation: "Agents can load automatically",
+};
+
+/** Labels of the fields that differ between two editor states. */
+export function changedSkillFields(
   a: SkillWriteBody,
   b: SkillWriteBody,
-): boolean {
-  return (Object.keys(a) as Array<keyof SkillWriteBody>).every(
-    (key) => a[key] === b[key],
-  );
+): { label: string }[] {
+  return (Object.keys(SKILL_FIELD_LABELS) as Array<keyof SkillWriteBody>)
+    .filter((key) => a[key] !== b[key])
+    .map((key) => ({ label: SKILL_FIELD_LABELS[key] }));
 }
 
 /** First schema error per field, or null when the editor is valid. */
