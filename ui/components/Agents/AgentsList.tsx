@@ -91,7 +91,7 @@ export function AgentsList() {
           />
         </>
       ) : (
-        <p className="px-1 py-2 text-sm text-muted-foreground">
+        <p className="pt-3 text-sm text-muted-foreground">
           No background agents in this chat.
         </p>
       )}
