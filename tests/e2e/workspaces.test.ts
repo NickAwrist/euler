@@ -45,6 +45,51 @@ function deleteChat(url: string, id: string) {
 }
 
 describe("workspace API", () => {
+  test("file search includes matches beyond the default result cap", async () => {
+    const { url, close } = await startTestServer();
+    const directory = await fs.mkdtemp(join(tmpdir(), "orbis-file-search-"));
+    temporaryDirectories.push(directory);
+    const id = await createSession(url);
+    patchSessionRow(TEST_USER_ID, id, {
+      workspace_kind: "local",
+      session_directory: directory,
+    });
+    try {
+      await fs.writeFile(join(directory, "OldTarget.ts"), "target");
+      await fs.utimes(join(directory, "OldTarget.ts"), 1, 1);
+      await Promise.all(
+        Array.from({ length: 201 }, (_, index) =>
+          fs.writeFile(join(directory, `${index}.txt`), "newer"),
+        ),
+      );
+      const endpoint = `${url}/api/sessions/${id}/workspace/files`;
+      const initial = await fetch(endpoint, { headers: userHeaders() });
+      const initialBody = (await initial.json()) as {
+        files: { path: string }[];
+      };
+      expect(initialBody.files).toHaveLength(200);
+      expect(
+        initialBody.files.some((file) => file.path === "OldTarget.ts"),
+      ).toBeFalse();
+      const filtered = await fetch(`${endpoint}?q=oldtarget`, {
+        headers: userHeaders(),
+      });
+      expect(await filtered.json()).toMatchObject({
+        files: [{ path: "OldTarget.ts" }],
+      });
+      const missing = await fetch(`${endpoint}?q=missing`, {
+        headers: userHeaders(),
+      });
+      expect(await missing.json()).toEqual({ files: [] });
+      const otherUser = await fetch(`${endpoint}?q=oldtarget`, {
+        headers: userHeaders("22222222-2222-4222-8222-222222222222"),
+      });
+      expect(otherUser.status).toBe(404);
+    } finally {
+      await close();
+    }
+  });
+
   test("selects and switches server directories remotely", async () => {
     const { url, close } = await startTestServer();
     const directory = await fs.mkdtemp(join(tmpdir(), "orbis-directory-test-"));

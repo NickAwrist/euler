@@ -14,6 +14,7 @@ import type { SessionRow } from "../db/types";
 import { OperationError } from "../observability/errors";
 import { logEvent } from "../observability/logger";
 import type { SessionWorkspace } from "../schemas/sessions";
+import type { WorkspaceFile } from "../schemas/workspace";
 import { loadWorkspaceIgnore } from "./WorkspaceIgnore";
 
 export type WorkspaceKind = "sandbox" | "local";
@@ -22,13 +23,6 @@ export type Workspace = {
   kind: WorkspaceKind;
   hostPath: string;
   displayPath: string;
-};
-
-export type WorkspaceFile = {
-  path: string;
-  name: string;
-  size: number;
-  modifiedAt: number;
 };
 
 const TRASH_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;

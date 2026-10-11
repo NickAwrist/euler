@@ -186,7 +186,12 @@ router.get("/:id/workspace/files", async (req, res) => {
   }
   const workspace = await workspaceService.resolveSession(row);
   const files = await workspaceService.listFiles(workspace);
-  res.json({ files: files.slice(0, 200) });
+  const query =
+    typeof req.query.q === "string" ? req.query.q.toLowerCase() : "";
+  const matchingFiles = query
+    ? files.filter((file) => file.path.toLowerCase().includes(query))
+    : files;
+  res.json({ files: matchingFiles.slice(0, 200) });
 });
 
 router.get("/:id/workspace/file", async (req, res) => {
