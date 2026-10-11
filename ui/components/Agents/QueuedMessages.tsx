@@ -1,25 +1,21 @@
-import { useState } from "react";
+import { type Dispatch, type SetStateAction, useState } from "react";
 import type { InboxMessage } from "../../../src/schemas/agents";
 import { whileRunning } from "../../lib/whileRunning";
-import {
-  agentAction,
-  editQueuedMessage,
-  removeQueuedMessage,
-} from "../../persist/agents";
+import { agentAction, removeQueuedMessage } from "../../persist/agents";
 import { Button } from "../Button";
 export function QueuedMessages({
   sessionId,
   messages,
   held,
   refresh,
+  setInput,
 }: {
   sessionId: string;
   messages: InboxMessage[];
   held: boolean;
   refresh: () => Promise<void>;
+  setInput: Dispatch<SetStateAction<string>>;
 }) {
-  const [editing, setEditing] = useState<number | null>(null);
-  const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
   const act = (action: () => Promise<void>) =>
@@ -41,53 +37,26 @@ export function QueuedMessages({
           key={message.id}
           className="flex items-center justify-between gap-2 rounded-lg bg-muted p-2 text-sm"
         >
-          {editing === message.id ? (
-            <>
-              <textarea
-                aria-label="Edit queued message"
-                className="min-w-0 flex-1 rounded bg-background p-2"
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={pending || !draft.trim()}
-                onClick={() =>
-                  void act(async () => {
-                    await editQueuedMessage(sessionId, message.id, draft);
-                    setEditing(null);
-                  })
-                }
-              >
-                Save
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={pending}
-                onClick={() => setEditing(null)}
-              >
-                Cancel
-              </Button>
-            </>
-          ) : (
-            <>
-              <span className="min-w-0 flex-1 truncate">
-                Queued: {message.content}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={pending}
-                onClick={() => {
-                  setDraft(message.content);
-                  setEditing(message.id);
-                }}
-              >
-                Edit
-              </Button>
-            </>
+          <span className="min-w-0 flex-1 truncate">
+            Queued: {message.content}
+          </span>
+          {/* The composer cannot restore uploaded images, so those messages can only be removed. */}
+          {message.attachmentIds.length === 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={pending}
+              onClick={() =>
+                void act(async () => {
+                  await removeQueuedMessage(sessionId, message.id);
+                  setInput((draft) =>
+                    draft ? `${message.content}\n${draft}` : message.content,
+                  );
+                })
+              }
+            >
+              Edit
+            </Button>
           )}
           <Button
             variant="ghost"
