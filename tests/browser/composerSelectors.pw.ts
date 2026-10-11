@@ -248,13 +248,26 @@ for (const device of ["desktop", "mobile"] as const) {
         content: "Keep this draft",
       });
       await expect(input).toHaveValue("");
+      // Keyboard behavior follows the device's pointer, not the layout width.
+      await page.setViewportSize({
+        width: device === "desktop" ? 600 : 1024,
+        height: 800,
+      });
       await input.fill("Draft after submission");
-      await input.press("Enter");
+      await input.press(device === "mobile" ? "Enter" : "Shift+Enter");
       await expect(input).toHaveValue("Draft after submission\n");
       await input.press("Shift+Enter");
       await input.press("a");
       await expect(input).toHaveValue("Draft after submission\n\na");
       expect(runs).toHaveLength(1);
+      await input.dispatchEvent("keydown", {
+        key: "Enter",
+        isComposing: true,
+      });
+      await input.dispatchEvent("keydown", {
+        key: "Enter",
+        repeat: true,
+      });
       await input.dispatchEvent("keydown", {
         key: "Enter",
         ctrlKey: true,
@@ -267,10 +280,14 @@ for (const device of ["desktop", "mobile"] as const) {
       });
       await expect(input).toHaveValue("Draft after submission\n\na");
       expect(runs).toHaveLength(1);
-      await input.press("Control+Enter");
+      await input.press(device === "mobile" ? "Control+Enter" : "Enter");
       await expect.poll(() => runs.length).toBe(2);
       expect(runs[1]?.content).toBe("Draft after submission\n\na");
       await expect(input).toHaveValue("");
+      await page.setViewportSize({
+        width: device === "desktop" ? 1280 : 390,
+        height: device === "desktop" ? 800 : 844,
+      });
       await input.fill("Send with Command");
       await input.press("Meta+Enter");
       await expect.poll(() => runs.length).toBe(3);
@@ -302,6 +319,7 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect(
         page.getByRole("button", { name: "Send message" }),
       ).toBeDisabled();
+      if (device === "desktop") await input.press("Enter");
       await input.press("Control+Enter");
       await input.press("Meta+Enter");
       await expect(input).toHaveValue("Keep this unsent draft");
