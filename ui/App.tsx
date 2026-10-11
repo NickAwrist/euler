@@ -474,6 +474,7 @@ function ChatView({
               </section>
 
               <RunInputDock
+                sessionId={app.activeSessionId}
                 notices={
                   app.activeSessionId ? (
                     <>

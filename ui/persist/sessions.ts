@@ -9,6 +9,7 @@ import {
   StoredRunSessionSchema,
   WorkspaceResponseSchema,
 } from "../../src/schemas/sessions";
+import { WorkspaceFilesResponseSchema } from "../../src/schemas/workspace";
 import { apiBlob, apiJson, apiVoid } from "../lib/api";
 import type { Message, WorkspaceFile } from "../types";
 
@@ -154,11 +155,15 @@ export async function useSessionSandbox(id: string): Promise<SessionWorkspace> {
 
 export async function fetchWorkspaceFiles(
   id: string,
+  query?: string,
+  signal?: AbortSignal,
 ): Promise<WorkspaceFile[]> {
-  const data = await apiJson<{ files?: WorkspaceFile[] }>(
-    `${workspacePath(id)}/files`,
-  );
-  return Array.isArray(data.files) ? data.files : [];
+  return WorkspaceFilesResponseSchema.parse(
+    await apiJson(
+      `${workspacePath(id)}/files${query === undefined ? "" : `?q=${encodeURIComponent(query)}`}`,
+      { signal },
+    ),
+  ).files;
 }
 
 export async function downloadWorkspaceFile(

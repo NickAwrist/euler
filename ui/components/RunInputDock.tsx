@@ -16,6 +16,7 @@ import {
   useState,
 } from "react";
 import { useListNavigation } from "../hooks/useListNavigation";
+import { useWorkspaceFileSuggestions } from "../hooks/useWorkspaceFileSuggestions";
 import { hasConfigurableThinking } from "../lib/thinkingLevel";
 import { type SkillData, fetchSkills } from "../persist/skills";
 import { cx } from "../styles";
@@ -23,8 +24,10 @@ import type { MessageStep, ModelOption, SessionWorkspace } from "../types";
 import { IconButton } from "./IconButton";
 import { ModelSelectBar } from "./ModelSelectBar";
 import { CommandPicker } from "./RunArea/CommandPicker";
+import { FilePicker } from "./RunArea/FilePicker";
 import { SkillPicker } from "./RunArea/SkillPicker";
 import { ThinkingLevelBar } from "./ThinkingLevelBar";
+import { completeFileToken, findActiveFileToken } from "./filePicker";
 import {
   type RunCommandName,
   exactRunCommand,
@@ -33,6 +36,7 @@ import {
 import { completeSkillToken, findActiveSkillToken } from "./skillPicker";
 
 export function RunInputDock({
+  sessionId = null,
   notices,
   centered,
   ollamaModels,
@@ -62,6 +66,7 @@ export function RunInputDock({
   onRunCommand,
   onFooterHeightChange,
 }: {
+  sessionId?: string | null;
   notices?: ReactNode;
   centered: boolean;
   ollamaModels: ModelOption[];
@@ -99,6 +104,7 @@ export function RunInputDock({
   const [isFileDragActive, setIsFileDragActive] = useState(false);
   const [skills, setSkills] = useState<SkillData[]>([]);
   const [caretIndex, setCaretIndex] = useState(input.length);
+  const [filePickerDismissed, setFilePickerDismissed] = useState(false);
   const [skillPickerDismissed, setSkillPickerDismissed] = useState(false);
   const isBusy =
     runPending || streamingStep !== null || streamingSteps.length > 0;
@@ -119,6 +125,15 @@ export function RunInputDock({
         .slice(0, 8)
     : [];
   const skillPickerOpen = matchingSkills.length > 0;
+  const activeFileToken = filePickerDismissed
+    ? null
+    : findActiveFileToken(input, caretIndex);
+  const fileSuggestions = useWorkspaceFileSuggestions(
+    sessionId,
+    workspace,
+    activeFileToken?.query,
+  );
+  const filePickerOpen = sessionId !== null && activeFileToken !== null;
   const matchingCommands = matchingRunCommands(input, workspace);
   const commandPickerOpen = !isBusy && matchingCommands.length > 0;
 
@@ -136,9 +151,13 @@ export function RunInputDock({
   const selectSkill = (skill: SkillData) => {
     if (!activeSkillToken) return;
     const completed = completeSkillToken(input, activeSkillToken, skill.name);
+    setSkillPickerDismissed(true);
+    applyCompletion(completed);
+  };
+
+  const applyCompletion = (completed: { value: string; caret: number }) => {
     setInput(completed.value);
     setCaretIndex(completed.caret);
-    setSkillPickerDismissed(true);
     queueMicrotask(() => {
       const textarea = inputRef.current;
       if (!textarea) return;
@@ -152,6 +171,19 @@ export function RunInputDock({
     onSelect: selectSkill,
     onDismiss: () => setSkillPickerDismissed(true),
     resetKey: activeSkillToken?.query,
+  });
+
+  const selectFile = (file: { path: string }) => {
+    if (!activeFileToken) return;
+    setFilePickerDismissed(true);
+    applyCompletion(completeFileToken(input, activeFileToken, file.path));
+  };
+
+  const fileNav = useListNavigation({
+    items: fileSuggestions.files,
+    onSelect: selectFile,
+    onDismiss: () => setFilePickerDismissed(true),
+    resetKey: activeFileToken?.query,
   });
 
   useEffect(() => {
@@ -284,6 +316,15 @@ export function RunInputDock({
             onSelectCommand={runCommand}
           />
         )}
+        {filePickerOpen && (
+          <FilePicker
+            files={fileSuggestions.files}
+            status={fileSuggestions.status}
+            selectedIndex={fileNav.selectedIndex}
+            onSelectIndex={fileNav.setSelectedIndex}
+            onSelectFile={selectFile}
+          />
+        )}
         {skillPickerOpen && (
           <SkillPicker
             skills={matchingSkills}
@@ -363,10 +404,12 @@ export function RunInputDock({
               setInput(e.target.value);
               setCaretIndex(e.currentTarget.selectionStart);
               setSkillPickerDismissed(false);
+              setFilePickerDismissed(false);
             }}
             onClick={(e) => {
               setCaretIndex(e.currentTarget.selectionStart);
               setSkillPickerDismissed(false);
+              setFilePickerDismissed(false);
             }}
             onSelect={(e) => setCaretIndex(e.currentTarget.selectionStart)}
             onPaste={(e) => {
@@ -383,6 +426,14 @@ export function RunInputDock({
               }
               if (skillPickerOpen && skillNav.onKeyDown(e)) {
                 return;
+              }
+              if (filePickerOpen) {
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setFilePickerDismissed(true);
+                  return;
+                }
+                if (fileNav.onKeyDown(e)) return;
               }
               if (
                 e.key === "Enter" &&
@@ -401,9 +452,13 @@ export function RunInputDock({
                 ? "command-picker"
                 : skillPickerOpen
                   ? "skill-picker"
-                  : undefined
+                  : filePickerOpen
+                    ? "file-picker"
+                    : undefined
             }
-            aria-expanded={skillPickerOpen || commandPickerOpen}
+            aria-expanded={
+              skillPickerOpen || commandPickerOpen || filePickerOpen
+            }
             className="min-h-10 max-h-[30vh] w-full flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-[0.9375rem] leading-[1.5] text-foreground outline-none placeholder:text-muted-foreground"
             rows={1}
           />
