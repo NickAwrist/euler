@@ -5,6 +5,15 @@ import type { Personalization } from "../../types";
 import { BackToChatButton } from "../BackToChatButton";
 import { PersonalizationTab } from "./PersonalizationTab";
 import { SkillsTab } from "./SkillsTab";
+import { ToolsTab } from "./ToolsTab";
+
+const TABS = [
+  { id: "personalization", label: "Personalization" },
+  { id: "skills", label: "Skills" },
+  { id: "tools", label: "Tools" },
+] as const;
+
+type Tab = (typeof TABS)[number]["id"];
 
 export function CustomizationPage({
   onBack,
@@ -15,10 +24,11 @@ export function CustomizationPage({
   currentSettings: UserSettings;
   onSave: (settings: Partial<Personalization>) => Promise<void>;
 }) {
-  const [tab, setTab] = useState<"personalization" | "skills">(
-    "personalization",
+  const [tab, setTab] = useState<Tab>("personalization");
+  // Tabs mount on first visit and stay mounted to keep their state.
+  const [visited, setVisited] = useState<ReadonlySet<Tab>>(
+    () => new Set(["personalization"]),
   );
-  const [skillsVisited, setSkillsVisited] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   return (
     <div className="flex h-full min-h-0 flex-col bg-background">
@@ -30,13 +40,13 @@ export function CustomizationPage({
         </h1>
       </header>
       <div className="flex shrink-0 gap-1 border-b border-border-subtle px-3 sm:px-5">
-        {(["personalization", "skills"] as const).map((id) => (
+        {TABS.map(({ id, label }) => (
           <button
             key={id}
             type="button"
             onClick={() => {
               setTab(id);
-              if (id === "skills") setSkillsVisited(true);
+              setVisited((current) => new Set(current).add(id));
             }}
             className={cx(
               "flex items-center gap-1.5 rounded-t-md border-b-2 px-3 py-2 text-[0.8125rem] font-medium transition-colors sm:px-4",
@@ -45,20 +55,29 @@ export function CustomizationPage({
                 : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
-            {id === "personalization" ? "Personalization" : "Skills"}
+            {label}
             {id === "personalization" && isDirty && (
               <span aria-hidden className="size-1.5 rounded-full bg-accent" />
             )}
           </button>
         ))}
       </div>
-      {skillsVisited && (
+      {visited.has("skills") && (
         <div
           className={
             tab === "skills" ? "flex min-h-0 flex-1 flex-col" : "hidden"
           }
         >
           <SkillsTab />
+        </div>
+      )}
+      {visited.has("tools") && (
+        <div
+          className={
+            tab === "tools" ? "flex min-h-0 flex-1 flex-col" : "hidden"
+          }
+        >
+          <ToolsTab />
         </div>
       )}
       <PersonalizationTab

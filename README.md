@@ -15,6 +15,20 @@ invoke one directly. **Import** reads a pasted `SKILL.md`, including the
 **Users can invoke** to hide a skill from `$skill-name`, or **Agents can load
 automatically** to keep it out of the agent's skill list.
 
+Agent tools live under **Customization > Tools**, per user. **Built-in
+capabilities** turns web search, image generation, the shell, or file tools off
+for that user's agents, for example to use an MCP server's image generation
+instead.
+
+Remote [MCP](https://modelcontextprotocol.io/) servers are listed on the same tab. **Add** reads a pasted `mcpServers`
+config with a `url` and optional `headers` for each server, such as an
+`Authorization` token. Header values are stored but never returned by the API.
+Local servers configured with `command` are rejected because they would run
+outside the shell sandbox. Each agent activation connects to the enabled servers
+over Streamable HTTP and offers their tools as `mcp__<server>__<tool>`. A server
+that fails to connect is skipped and logged. The tab connects to each server
+to list its tools, or shows why it could not connect.
+
 ## Requirements
 
 - [Bun](https://bun.sh/)

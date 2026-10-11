@@ -4,7 +4,7 @@ import { normalizeSkillName } from "../../../src/schemas/skills";
 import type { SkillData, SkillWriteBody } from "../../persist/skills";
 import { cx, textareaClass } from "../../styles";
 import { Button } from "../Button";
-import { EnableSwitch } from "../ModelPreferenceControls";
+import { SwitchField } from "./SwitchField";
 import type { SkillEditorErrors } from "./skillsPageUtils";
 
 type Props = {
@@ -148,7 +148,7 @@ export function SkillEditor({
         </label>
 
         <div className="flex flex-col gap-3">
-          <InvocationSwitch
+          <SwitchField
             id="skill-user-invocable"
             label="Users can invoke"
             hint={`Offer $${editor.name || "skill-name"} in the message box.`}
@@ -157,7 +157,7 @@ export function SkillEditor({
               setEditor((current) => ({ ...current, user_invocable: checked }))
             }
           />
-          <InvocationSwitch
+          <SwitchField
             id="skill-model-invocable"
             label="Agents can load automatically"
             hint="List the skill for agents to load when a task matches. When off, it runs only when a user invokes it."
@@ -188,37 +188,6 @@ export function SkillEditor({
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function InvocationSwitch({
-  id,
-  label,
-  hint,
-  checked,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  hint: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <div className="flex items-start gap-3 text-[0.8125rem] text-foreground">
-      <EnableSwitch
-        id={id}
-        label={label}
-        checked={checked}
-        onChange={onChange}
-      />
-      <label htmlFor={id}>
-        {label}
-        <span className="mt-0.5 block text-[0.6875rem] text-muted-foreground">
-          {hint}
-        </span>
-      </label>
     </div>
   );
 }

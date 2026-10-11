@@ -26,6 +26,7 @@ export async function mockUserPreferences(
           appearance: { ...current.appearance, ...patch.appearance },
           layout: { ...current.layout, ...patch.layout },
           image: { ...current.image, ...patch.image },
+          capabilities: { ...current.capabilities, ...patch.capabilities },
         });
       }
     }

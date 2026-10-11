@@ -1,5 +1,6 @@
 import os from "node:os";
 import { listSkills } from "../db/index";
+import { effectiveUserPreferences } from "../db/userPreferences";
 import {
   type PersonalizationFields,
   type PromptContext,
@@ -14,7 +15,7 @@ import { modelInvocableSkills, renderSkillsPrompt } from "../skills/runtime";
 import type { BaseTool } from "../tools/BaseTool";
 import { ApplyPatchTool } from "../tools/apply_patch";
 import { BashTool } from "../tools/bash";
-import { BUILTIN_TOOLS } from "../tools/builtinTools";
+import { enabledBuiltinTools } from "../tools/builtinTools";
 import { CreateFileTool } from "../tools/create_file";
 import { DeleteFileTool } from "../tools/delete_file";
 import { FetchWebPageTool } from "../tools/fetch_web_page";
@@ -149,7 +150,8 @@ function buildAgent(
     undefined,
     finalPrompt,
   );
-  agent.addTools(BUILTIN_TOOLS.map((tool) => createBuiltinTool(tool)));
+  const { capabilities } = effectiveUserPreferences(opts.ownerUuid);
+  agent.addTools(enabledBuiltinTools(capabilities).map(createBuiltinTool));
   if (loadableSkills.length > 0) {
     agent.addTool(new LoadSkillTool(loadableSkills));
   }
