@@ -1,13 +1,22 @@
 import { useState } from "react";
+import { useMobileLayout } from "../../hooks/useMobileLayout";
 import { TruncateConfirmModal } from "../TruncateConfirmModal";
+import { UnsavedChangesModal } from "../UnsavedChangesModal";
 import { ImportSkillModal } from "./ImportSkillModal";
 import { SkillEditor } from "./SkillEditor";
 import { SkillList } from "./SkillList";
-import { useSkillsPage } from "./useSkillsPage";
+import type { SkillsPage } from "./useSkillsPage";
 
-export function SkillsTab() {
-  const p = useSkillsPage();
+export function SkillsTab({ page: p }: { page: SkillsPage }) {
   const [importOpen, setImportOpen] = useState(false);
+  // Mobile shows the list or the open skill, not both.
+  const mobile = useMobileLayout();
+  // Runs once the user discards the edits it would replace.
+  const [discardThen, setDiscardThen] = useState<(() => void) | null>(null);
+  const confirmDiscard = (action: () => void) => {
+    if (p.editorDirty) setDiscardThen(() => action);
+    else action();
+  };
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -16,38 +25,51 @@ export function SkillsTab() {
           {p.error}
         </div>
       )}
-      <div className="grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)] max-[700px]:grid-cols-1">
-        <SkillList
-          skills={p.skills}
-          selectedId={p.selectedId}
-          isNew={p.isNew}
-          onSelectSkill={p.selectSkill}
-          onStartNew={p.startNew}
-          onImport={() => setImportOpen(true)}
-        />
-        <div className="min-h-0 overflow-y-auto">
-          {p.showEditor ? (
-            <SkillEditor
-              isNew={p.isNew}
-              skill={p.selectedSkill}
-              editor={p.editor}
-              setEditor={p.setEditor}
-              errors={p.fieldErrors}
-              saving={p.saving}
-              deleting={p.deleting}
-              saveDisabled={!p.editorDirty || p.saving}
-              onSave={() => void p.save()}
-              onCancel={p.cancelEdit}
-              onDelete={p.setPendingDelete}
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center px-6 text-center">
-              <p className="text-[0.875rem] text-muted-foreground">
-                Select a skill or create a new one
-              </p>
-            </div>
-          )}
-        </div>
+      <div
+        className={
+          mobile
+            ? "flex min-h-0 flex-1 flex-col"
+            : "grid min-h-0 flex-1 grid-cols-[280px_minmax(0,1fr)]"
+        }
+      >
+        {!(mobile && p.showEditor) && (
+          <SkillList
+            skills={p.skills}
+            selectedId={p.selectedId}
+            isNew={p.isNew}
+            onSelectSkill={(skill) =>
+              confirmDiscard(() => p.selectSkill(skill))
+            }
+            onStartNew={() => confirmDiscard(p.startNew)}
+            onImport={() => confirmDiscard(() => setImportOpen(true))}
+          />
+        )}
+        {!(mobile && !p.showEditor) && (
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {p.showEditor ? (
+              <SkillEditor
+                isNew={p.isNew}
+                skill={p.selectedSkill}
+                editor={p.editor}
+                setEditor={p.setEditor}
+                errors={p.fieldErrors}
+                saving={p.saving}
+                deleting={p.deleting}
+                saveDisabled={!p.editorDirty || p.saving}
+                onSave={() => void p.save()}
+                onCancel={() => confirmDiscard(p.cancelEdit)}
+                onDelete={p.setPendingDelete}
+                onBack={mobile ? () => confirmDiscard(p.cancelEdit) : undefined}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center px-6 text-center">
+                <p className="text-[0.875rem] text-muted-foreground">
+                  Select a skill or create a new one
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {importOpen && (
@@ -57,6 +79,19 @@ export function SkillsTab() {
             setImportOpen(false);
           }}
           onClose={() => setImportOpen(false)}
+        />
+      )}
+
+      {discardThen && (
+        <UnsavedChangesModal
+          title="Discard changes?"
+          changes={p.changes}
+          saving={false}
+          onStay={() => setDiscardThen(null)}
+          onDiscard={() => {
+            setDiscardThen(null);
+            discardThen();
+          }}
         />
       )}
 

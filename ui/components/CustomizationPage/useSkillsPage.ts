@@ -8,10 +8,10 @@ import {
   updateSkillApi,
 } from "../../persist/skills";
 import {
+  changedSkillFields,
   editorFromSkill,
   emptySkillEditor,
   skillEditorErrors,
-  skillEditorsEqual,
 } from "./skillsPageUtils";
 
 export function useSkillsPage() {
@@ -79,12 +79,14 @@ export function useSkillsPage() {
   };
 
   const fieldErrors = skillEditorErrors(editor);
+  const changes = changedSkillFields(editor, baseline);
 
-  const save = async () => {
-    if (skillEditorsEqual(editor, baseline)) return;
+  /** Resolves to whether the editor has no unsaved changes afterward. */
+  const save = async (): Promise<boolean> => {
+    if (changes.length === 0) return true;
     if (fieldErrors) {
       setShowFieldErrors(true);
-      return;
+      return false;
     }
     setSaving(true);
     setError(null);
@@ -94,7 +96,7 @@ export function useSkillsPage() {
         : selectedId
           ? await updateSkillApi(selectedId, editor)
           : null;
-      if (!saved) return;
+      if (!saved) return false;
       const next = editorFromSkill(saved);
       await load();
       setSelectedId(saved.id);
@@ -102,10 +104,12 @@ export function useSkillsPage() {
       setEditor(next);
       setBaseline(next);
       setShowFieldErrors(false);
+      return true;
     } catch (saveError: unknown) {
       setError(
         saveError instanceof Error ? saveError.message : "Failed to save skill",
       );
+      return false;
     } finally {
       setSaving(false);
     }
@@ -151,6 +155,9 @@ export function useSkillsPage() {
     performDelete,
     selectedSkill: skills.find((skill) => skill.id === selectedId) ?? null,
     showEditor: isNew || selectedId !== null,
-    editorDirty: !skillEditorsEqual(editor, baseline),
+    changes,
+    editorDirty: changes.length > 0,
   };
 }
+
+export type SkillsPage = ReturnType<typeof useSkillsPage>;
