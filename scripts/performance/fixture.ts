@@ -117,7 +117,10 @@ const steps = [
 ];
 
 ensureUserData(USER_ID);
-updateUserPreferences(USER_ID, { settings: { defaultModel: MODEL } });
+updateUserPreferences(USER_ID, {
+  settings: { defaultModel: MODEL },
+  appearance: { font: "geist", codeFont: "geist-mono" },
+});
 const sessionIds: string[] = [];
 // Seconds apart, so every chat falls in the same sidebar date group.
 const base = Date.now() - SESSIONS * 1000;

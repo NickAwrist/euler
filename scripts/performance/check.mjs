@@ -86,6 +86,7 @@ function installRenderCounter(userId) {
   const COMPONENT_TAGS = new Set([0, 1, 11, 15]);
   const PERFORMED_WORK = 1;
   window.reactRenders = 0;
+  window.reactRowMounts = {};
   window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
     supportsFiber: true,
     isDisabled: false,
@@ -101,6 +102,16 @@ function installRenderCounter(userId) {
         const fiber = stack.pop();
         const rendered =
           fiber.alternate === null || (fiber.flags & PERFORMED_WORK) !== 0;
+        if (
+          window.reactRowMounts &&
+          fiber.alternate === null &&
+          fiber.tag === 5 &&
+          fiber.stateNode?.hasAttribute("data-index")
+        ) {
+          const index = fiber.stateNode.getAttribute("data-index");
+          window.reactRowMounts[index] =
+            (window.reactRowMounts[index] ?? 0) + 1;
+        }
         if (rendered && COMPONENT_TAGS.has(fiber.tag)) window.reactRenders++;
         if (fiber.sibling) stack.push(fiber.sibling);
         // A bailed-out subtree keeps its previous children and did no work this commit.
@@ -183,20 +194,46 @@ async function settle(page) {
     if (attempt === 500) throw new Error("An API request did not finish");
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
-  await page.waitForFunction(
-    () =>
-      [...document.querySelectorAll("img")].every((image) => image.complete) &&
-      document
-        .getAnimations()
-        .every(
-          (animation) =>
-            animation.playState !== "running" ||
-            animation.effect?.getComputedTiming().endTime ===
-              Number.POSITIVE_INFINITY,
-        ),
-  );
-  await nextFrames(page);
-  if (requestsInFlight.size > 0) await settle(page);
+  // Image onLoad, IntersectionObserver, and ResizeObserver callbacks can queue
+  // more layout work after two frames. Do not start another scroll step until
+  // renders and scroll geometry have stayed unchanged across three samples.
+  let previous;
+  let stable = 0;
+  for (let attempt = 0; attempt < 500; attempt++) {
+    await page.waitForFunction(
+      () =>
+        document.fonts.status === "loaded" &&
+        [...document.querySelectorAll("img")].every(
+          (image) => image.complete,
+        ) &&
+        document
+          .getAnimations()
+          .every(
+            (animation) =>
+              animation.playState !== "running" ||
+              animation.effect?.getComputedTiming().endTime ===
+                Number.POSITIVE_INFINITY,
+          ),
+    );
+    await nextFrames(page);
+    const current = await page.evaluate(() =>
+      JSON.stringify([
+        window.reactRenders,
+        document.fonts.status,
+        [...document.querySelectorAll("main .overflow-y-auto")].map((node) => [
+          node.scrollTop,
+          node.scrollHeight,
+          node.clientHeight,
+        ]),
+        [...document.querySelectorAll("img")].every((image) => image.complete),
+      ]),
+    );
+    stable =
+      current === previous && requestsInFlight.size === 0 ? stable + 1 : 0;
+    if (stable === 3) return;
+    previous = current;
+  }
+  throw new Error("The page did not settle");
 }
 
 /** Runs `action` between two quiescent points and returns the components rendered. */
@@ -204,6 +241,7 @@ async function countRenders(page, action) {
   await settle(page);
   await page.evaluate(() => {
     window.reactRenders = 0;
+    window.reactRowMounts = {};
   });
   await action();
   await settle(page);
@@ -343,7 +381,7 @@ async function responseBytes(fixture, path) {
   return (await response.arrayBuffer()).byteLength;
 }
 
-/** Deterministic counts of work the app does for scripted interactions at the stress workload. */
+/** Counts of work the app does for scripted interactions at the stress workload. */
 async function measureCounts(page, fixture) {
   const metrics = {};
   const scrollSamples = [];
@@ -377,6 +415,7 @@ async function measureCounts(page, fixture) {
             return {
               step,
               renders: window.reactRenders,
+              mounts: window.reactRowMounts,
               scrollTop: scroller?.scrollTop,
               scrollHeight: scroller?.scrollHeight,
               rows: rows.map((row) => ({
@@ -459,22 +498,37 @@ async function measureCounts(page, fixture) {
   return { metrics, scrollSamples };
 }
 
-/** Resolved fonts, rather than CSS fallback lists, explain cross-host layout changes. */
+/** Verify the fixture's bundled fonts and record what Chromium actually used. */
 async function resolvedFonts(cdp) {
   await cdp.send("DOM.enable");
   await cdp.send("CSS.enable");
   const { root } = await cdp.send("DOM.getDocument");
   const fonts = {};
-  for (const selector of ["main p", "main p code", "main pre code"]) {
+  for (const [selector, family] of [
+    ["main p", "Geist"],
+    ["main p code", "Geist Mono"],
+    ["main pre code span span", "Geist Mono"],
+  ]) {
     const { nodeId } = await cdp.send("DOM.querySelector", {
       nodeId: root.nodeId,
       selector,
     });
-    if (nodeId)
-      fonts[selector] = (
-        await cdp.send("CSS.getPlatformFontsForNode", { nodeId })
-      ).fonts;
+    if (!nodeId) throw new Error(`The font sample ${selector} is missing`);
+    fonts[selector] = (
+      await cdp.send("CSS.getPlatformFontsForNode", { nodeId })
+    ).fonts;
+    if (
+      fonts[selector].length === 0 ||
+      fonts[selector].some(
+        (font) => !font.isCustomFont || font.familyName !== family,
+      )
+    )
+      throw new Error(
+        `The font sample ${selector} did not use bundled ${family}`,
+      );
   }
+  await cdp.send("CSS.disable");
+  await cdp.send("DOM.disable");
   return fonts;
 }
 
@@ -607,10 +661,22 @@ try {
   trackRequests(page);
   await page.goto(`${fixture.url}/run/${fixture.longSessions[0]}`);
   await waitForText(page, `Reply ${WORKLOAD.longSessionMessages - 1}`);
+  // Inline code and other font-mono elements also use the bundled font.
+  await page.evaluate(async () => {
+    document.documentElement.style.setProperty(
+      "--font-mono",
+      '"Geist Mono", monospace',
+    );
+    await document.fonts.ready;
+  });
   await installProbe(page);
   await waitForPolls(page, 2);
   const fonts = await resolvedFonts(cdp);
   const { metrics, scrollSamples } = await measureCounts(page, fixture);
+  // Mount diagnostics belong to count windows, not the throttled timing pass.
+  await page.evaluate(() => {
+    window.reactRowMounts = null;
+  });
   const bundle = await bundleSizes(loadedScripts);
   metrics["bundle.jsGzipBytes"] = bundle.js;
   metrics["bundle.cssGzipBytes"] = bundle.css;

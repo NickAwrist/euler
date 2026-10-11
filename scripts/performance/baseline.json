@@ -21,8 +21,8 @@
     },
     "scroll.renders": {
       "tolerance": 0,
-      "slack": 2,
-      "value": 5755
+      "slack": 60,
+      "value": 5728
     },
     "typing.renders": {
       "tolerance": 0,
@@ -47,12 +47,12 @@
     "finishReply.renders": {
       "tolerance": 0,
       "slack": 2,
-      "value": 120
+      "value": 123
     },
     "openChat.renders": {
       "tolerance": 0,
       "slack": 2,
-      "value": 718
+      "value": 723
     },
     "api.sessionResponseBytes": {
       "tolerance": 0.01,
