@@ -71,4 +71,25 @@ test("long thread skips history work during typing and streaming", async ({
   await expect(editor).toHaveValue("Draft edit");
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByText("Question 0", { exact: true })).toBeInViewport();
+
+  await page.getByRole("button", { name: "Previous version" }).click();
+  const earlierReply = page.getByText("Earlier reply version", { exact: true });
+  await expect(earlierReply).toBeVisible();
+  const message = earlierReply.locator(
+    "xpath=ancestor::div[contains(@class, 'group/msg')]",
+  );
+  await message.getByRole("button", { name: "Thoughts", exact: true }).click();
+  await expect(
+    message.getByRole("button", { name: "Thoughts", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
+  await page.getByRole("button", { name: "Refresh history" }).click();
+  await page.mouse.move(600, 300);
+  await page.mouse.wheel(0, 1_000_000);
+  await expect(reply).toBeInViewport();
+  await expect(earlierReply).toHaveCount(0);
+  await page.mouse.wheel(0, -1_000_000);
+  await expect(earlierReply).toBeVisible();
+  await expect(
+    message.getByRole("button", { name: "Thoughts", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
 });

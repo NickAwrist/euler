@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { whileRunning } from "../../lib/whileRunning";
 import { cx, textareaClass } from "../../styles";
 import { Button } from "../Button";
 import { Modal } from "../Modal";
@@ -32,18 +33,19 @@ export function AddMcpServersModal({
       setError("Config is not valid JSON");
       return;
     }
-    setSaving(true);
-    setError(null);
-    try {
-      await onAdd(config);
-      onClose();
-    } catch (addError: unknown) {
-      setError(
-        addError instanceof Error ? addError.message : "Failed to add servers",
-      );
-    } finally {
-      setSaving(false);
-    }
+    await whileRunning(setSaving, async () => {
+      setError(null);
+      try {
+        await onAdd(config);
+        onClose();
+      } catch (addError: unknown) {
+        setError(
+          addError instanceof Error
+            ? addError.message
+            : "Failed to add servers",
+        );
+      }
+    });
   };
 
   return (

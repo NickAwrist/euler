@@ -7,7 +7,7 @@ import {
   RefreshCw,
   Waypoints,
 } from "lucide-react";
-import { type CSSProperties, useMemo } from "react";
+import { type CSSProperties, type ComponentProps, useMemo } from "react";
 import type {
   WebSourceAttachment,
   WorkspaceFileAttachment,
@@ -46,6 +46,7 @@ type Props = {
   regenerateLabel: string;
   /** Present when earlier replies were kept by Regenerate. */
   version?: { index: number; count: number; onChange: (index: number) => void };
+  thinkingExpansion: ComponentProps<typeof ThinkingBlock>["expansion"];
 };
 
 export function AssistantMessageBubble({
@@ -59,6 +60,7 @@ export function AssistantMessageBubble({
   onRegenerate,
   regenerateLabel,
   version,
+  thinkingExpansion,
 }: Props) {
   const artifacts = useArtifacts();
   const attachments = message.attachments ?? [];
@@ -109,6 +111,7 @@ export function AssistantMessageBubble({
               <ThinkingBlock
                 thinking={thinking.text}
                 durationMs={thinking.durationMs}
+                expansion={thinkingExpansion}
               />
             </div>
           )}

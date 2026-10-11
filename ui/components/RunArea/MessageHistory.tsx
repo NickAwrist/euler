@@ -7,6 +7,7 @@ import {
   type RefObject,
   memo,
   useCallback,
+  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -15,7 +16,7 @@ import { AgentRows } from "../Agents/AgentTaskCard";
 import { traceStepsForDisplay } from "../ExecutionTrace";
 import { JobRows } from "../Jobs/JobTaskCard";
 import { MessageItem } from "../MessageItem";
-import type { MessageItemProps } from "../MessageItem/types";
+import type { MessageItemProps, MessageViewState } from "../MessageItem/types";
 import type { RunAreaProps } from "./types";
 
 type Props = Pick<
@@ -38,13 +39,21 @@ type Props = Pick<
 // message or moving the virtual window does not render existing rows again.
 const HistoryMessage = memo(function HistoryMessage({
   onViewSteps,
+  viewStates,
+  messageKey,
   ...props
-}: Omit<MessageItemProps, "onViewSteps"> & Pick<Props, "onViewSteps">) {
+}: Omit<MessageItemProps, "onViewSteps"> &
+  Pick<Props, "onViewSteps"> & {
+    viewStates: Map<string, MessageViewState>;
+    messageKey: string;
+  }) {
   const steps = props.message.steps;
   return (
     <>
       <MessageItem
         {...props}
+        initialViewState={viewStates.get(messageKey)}
+        onViewStateChange={(state) => viewStates.set(messageKey, state)}
         onViewSteps={
           steps && traceStepsForDisplay(steps).length > 0
             ? () => onViewSteps(steps)
@@ -72,6 +81,7 @@ export const MessageHistory = memo(function MessageHistory({
   "use no memo"; // React Compiler cannot memoize around the mutable virtualizer.
   const listRef = useRef<HTMLDivElement>(null);
   const [scrollMargin, setScrollMargin] = useState(0);
+  const [viewStates] = useState(() => new Map<string, MessageViewState>());
   useLayoutEffect(() => {
     setScrollMargin(listRef.current?.offsetTop ?? 0);
   });
@@ -80,11 +90,20 @@ export const MessageHistory = memo(function MessageHistory({
     (index: number) => {
       const message = messages[index];
       return message
-        ? `${index}:${message.role}:${message.content.slice(0, 80)}`
-        : index;
+        ? `${index}:${message.role}:${message.content.slice(0, 80)}:${message.versions?.length ?? 0}`
+        : String(index);
     },
     [messages],
   );
+  // Runtime refreshes replace message objects but keep these row identities.
+  // Remove choices for messages discarded by editing or regeneration.
+  useEffect(() => {
+    if (viewStates.size === 0) return;
+    const keys = new Set(messages.map((_, index) => getItemKey(index)));
+    for (const key of viewStates.keys()) {
+      if (!keys.has(key)) viewStates.delete(key);
+    }
+  }, [messages, getItemKey, viewStates]);
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => scrollRef.current,
@@ -131,6 +150,8 @@ export const MessageHistory = memo(function MessageHistory({
               {...props}
               messageIndex={item.index}
               message={message}
+              viewStates={viewStates}
+              messageKey={String(item.key)}
               animateEntry={item.index >= initialCount}
               editingUserIndex={
                 editingUserIndex === item.index ? item.index : null

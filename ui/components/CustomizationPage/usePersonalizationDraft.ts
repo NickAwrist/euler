@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSavedDraft } from "../../hooks/useSavedDraft";
-import { whileRunning } from "../../lib/whileRunning";
 import { changedFields } from "../../lib/changedFields";
+import { whileRunning } from "../../lib/whileRunning";
 import type { Personalization } from "../../types";
 
 const PERSONALIZATION_FIELDS = [

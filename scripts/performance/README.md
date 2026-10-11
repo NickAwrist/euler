@@ -9,6 +9,13 @@ The fixture seeds 100 chats, two of them 200 messages long with Markdown, code
 blocks, and tool steps. The check opens a long chat in a phone-sized Chromium
 and compares what it measures with `baseline.json`.
 
+The long chats also have eight files in their real sandbox workspaces.
+Autocomplete types `@src/perf`, waits for those eight suggestions, and counts
+renders and requests. The 150 ms debounce should combine that typing burst
+into one request. Links to `example.com` receive a local PNG response through
+Playwright routing, so scrolling exercises image previews without external
+network timing or failures.
+
 It gates on **counts, not milliseconds.** Wall-clock timings on shared CI
 runners vary by more than the regressions worth catching; counts of work do
 not. Every metric is "lower is better":
@@ -20,6 +27,8 @@ not. Every metric is "lower is better":
 | `health.rendersPerPoll` | An unchanged Ollama health report re-renders its consumers |
 | `scroll.renders` | Scrolling the whole conversation renders more than the messages it mounts |
 | `typing.renders` | Typing in the composer renders more than the composer |
+| `autocomplete.renders` | File-reference typing and loading suggestions render more components |
+| `autocomplete.requests` | A burst of file-reference typing sends more workspace requests |
 | `stream.renders` | A streamed token renders more than the live reply (50 tokens) |
 | `finishReply.renders` | Completing a reply re-renders the existing history |
 | `openChat.renders` | Switching to another long chat renders more components |
@@ -65,3 +74,34 @@ bunx playwright install chromium
 bun run build
 bun run perf:check
 ```
+
+## Rebase measurement, 2026-10-11
+
+Measured main at `3170cde` and the rebased compiler/virtualization branch with
+the same expanded fixture and production Chromium runner:
+
+| Metric | Main | Optimized |
+| --- | ---: | ---: |
+| Open-chat DOM nodes | 15,366 | 1,768 |
+| Typing renders | 62,154 | 325 or 326 |
+| File autocomplete renders | 6,879 | 50 |
+| File autocomplete requests | 1 | 1 |
+| Streaming renders | 38,450 | 550 or 551 |
+| Finish-reply renders | 6,294 | 120 |
+| Open-chat renders | 11,396 | 718 |
+| Full-thread scrolling renders | 168 | 5,755 |
+| Loaded JavaScript gzip bytes | 700,481 | 759,675 |
+
+Scrolling mounts messages as they enter the virtual window, so it does more
+React work while initial mounting and reply completion do less. Compared with
+the earlier optimized baseline, scroll renders rise from 5,445 to 5,755 and
+open-chat renders from 701 to 718 with main's image-preview behavior. Loaded
+JavaScript rises from 751,699 to 759,675 bytes with the new features and fixes.
+The baseline accepts those changes and the new autocomplete metrics. Mocked
+image responses make these preview counts repeatable.
+
+These scenarios cover chat interactions, not settings-page performance or
+searching a large workspace. The autocomplete endpoint still walks the entire
+workspace per query and returns up to 200 files, while suggestions use eight.
+A large-workspace measurement would establish whether traversal or payload
+size warrants another optimization.

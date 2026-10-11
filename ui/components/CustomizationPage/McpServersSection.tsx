@@ -1,5 +1,6 @@
 import { Plug, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { whileRunning } from "../../lib/whileRunning";
 import {
   type McpServerCheck,
   type McpServerData,
@@ -84,17 +85,16 @@ function McpServerItem({
   const [checking, setChecking] = useState(true);
 
   const runCheck = useCallback(async () => {
-    setChecking(true);
-    try {
-      setCheck(await checkMcpServerApi(server.id));
-    } catch (error: unknown) {
-      setCheck({
-        ok: false,
-        error: error instanceof Error ? error.message : "Check failed",
-      });
-    } finally {
-      setChecking(false);
-    }
+    await whileRunning(setChecking, async () => {
+      try {
+        setCheck(await checkMcpServerApi(server.id));
+      } catch (error: unknown) {
+        setCheck({
+          ok: false,
+          error: error instanceof Error ? error.message : "Check failed",
+        });
+      }
+    });
   }, [server.id]);
 
   useEffect(() => {

@@ -379,6 +379,35 @@ async function measureCounts(page, fixture) {
     countRenders(page, () => composer.pressSequentially(TYPED_TEXT)),
   );
 
+  await composer.fill("");
+  let fileRequests = 0;
+  const countFileRequest = (request) => {
+    if (new URL(request.url()).pathname.endsWith("/workspace/files"))
+      fileRequests++;
+  };
+  page.on("request", countFileRequest);
+  try {
+    metrics["autocomplete.renders"] = await holdPolls(page, ["health"], () =>
+      countRenders(page, async () => {
+        await composer.pressSequentially("@src/perf", { delay: 30 });
+        await page
+          .locator("#file-picker")
+          .getByRole("button")
+          .first()
+          .waitFor();
+        if (
+          (await page.locator("#file-picker").getByRole("button").count()) !== 8
+        )
+          throw new Error(
+            "The fixture's eight workspace files were not suggested",
+          );
+      }),
+    );
+    metrics["autocomplete.requests"] = fileRequests;
+  } finally {
+    page.off("request", countFileRequest);
+  }
+
   await startReply(page, fixture, "Stream a reply");
   // The first token mounts the live reply; measure steady-state streaming.
   await streamTokens(page, fixture, 1, "warmup");
@@ -517,6 +546,16 @@ try {
     hasTouch: true,
   });
   await context.addInitScript(installRenderCounter, fixture.userId);
+  // Exercise link previews without depending on an external site's response.
+  await context.route("https://example.com/**", (route) =>
+    route.fulfill({
+      contentType: "image/png",
+      body: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    }),
+  );
   const page = await context.newPage();
   const cdp = await context.newCDPSession(page);
   await cdp.send("Performance.enable");

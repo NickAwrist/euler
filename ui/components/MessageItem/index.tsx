@@ -18,13 +18,25 @@ export function MessageItem({
   onRequestEditConfirm,
   onRegenerate,
   regenerateLabel,
+  initialViewState,
+  onViewStateChange,
 }: MessageItemProps) {
   const bubbleRef = useRef<HTMLDivElement>(null);
   const [draft, setDraft] = useState(message.content);
   const [copied, setCopied] = useState(false);
   const versions = message.versions ?? [];
   // A new reply remounts this row, so viewing restarts at the latest version.
-  const [versionIndex, setVersionIndex] = useState(versions.length);
+  const [viewState, setViewState] = useState(
+    initialViewState ?? {
+      versionIndex: versions.length,
+      thinkingExpanded: null,
+    },
+  );
+  const updateViewState = (next: typeof viewState) => {
+    setViewState(next);
+    onViewStateChange?.(next);
+  };
+  const versionIndex = viewState.versionIndex;
   const viewed = versions[versionIndex];
   const shown: Message = viewed ? { role: message.role, ...viewed } : message;
 
@@ -95,12 +107,18 @@ export function MessageItem({
       isBusy={isBusy}
       onRegenerate={() => onRegenerate(messageIndex)}
       regenerateLabel={regenerateLabel}
+      thinkingExpansion={{
+        expanded: viewState.thinkingExpanded,
+        onChange: (thinkingExpanded) =>
+          updateViewState({ ...viewState, thinkingExpanded }),
+      }}
       version={
         versions.length > 0
           ? {
               index: versionIndex,
               count: versions.length + 1,
-              onChange: setVersionIndex,
+              onChange: (versionIndex) =>
+                updateViewState({ ...viewState, versionIndex }),
             }
           : undefined
       }

@@ -1,4 +1,4 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -92,6 +92,9 @@ const { app } = await import("../../src/app");
 const sessions = await import("../../src/db/sessions");
 const { ensureUserData } = await import("../../src/db/users");
 const { updateUserPreferences } = await import("../../src/db/userPreferences");
+const { workspaceService } = await import(
+  "../../src/workspaces/WorkspaceService"
+);
 
 const REPLY_BODY = [
   "A paragraph with **bold**, [a link](https://example.com), and `inline code`.\n\n".repeat(
@@ -137,6 +140,16 @@ for (let index = 0; index < SESSIONS; index++) {
   });
   sessions.markSessionViewed(USER_ID, id);
   sessionIds.push(id);
+  if (count === LONG_MESSAGES) {
+    const sandbox = await workspaceService.provisionRetained(USER_ID, id);
+    await mkdir(join(sandbox.hostPath, "src"), { recursive: true });
+    for (let file = 0; file < 8; file++) {
+      await writeFile(
+        join(sandbox.hostPath, `src/perf-${file}.ts`),
+        "export {};\n",
+      );
+    }
+  }
 }
 
 const server = app.listen(Number(process.env.PERF_PORT), "127.0.0.1");
