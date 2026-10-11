@@ -48,6 +48,14 @@ export const layoutSchema = z.object({
     })
     .default({ open: false, workspace: "", path: null }),
 });
+/** Built-in agent capabilities a user can turn off, e.g. in favor of an MCP server. */
+export const capabilitiesSchema = z.object({
+  web: z.boolean().default(true),
+  imageGeneration: z.boolean().default(true),
+  shell: z.boolean().default(true),
+  files: z.boolean().default(true),
+});
+export type Capabilities = z.infer<typeof capabilitiesSchema>;
 export const DEFAULT_COMFYUI_NEGATIVE_PROMPT =
   "low quality, worst quality, blurry, watermark, signature, text, bad anatomy, deformed, ugly, duplicate, extra fingers, poorly drawn hands, poorly drawn face, mutation, cropped";
 export const imagePreferencesSchema = z.object({
@@ -64,6 +72,7 @@ export const userPreferencesSchema = z.object({
   settings: userSettingsSchema.default(() => userSettingsSchema.parse({})),
   appearance: appearanceSchema.default(() => appearanceSchema.parse({})),
   layout: layoutSchema.default(() => layoutSchema.parse({})),
+  capabilities: capabilitiesSchema.default(() => capabilitiesSchema.parse({})),
 });
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
 const strictAppearanceSchema = z
@@ -130,6 +139,17 @@ export const userPreferencesPatchSchema = z
         artifactState: layoutSchema.shape.artifactState
           .removeDefault()
           .optional(),
+      })
+      .strict()
+      .optional(),
+    capabilities: z
+      .object({
+        web: capabilitiesSchema.shape.web.removeDefault().optional(),
+        imageGeneration: capabilitiesSchema.shape.imageGeneration
+          .removeDefault()
+          .optional(),
+        shell: capabilitiesSchema.shape.shell.removeDefault().optional(),
+        files: capabilitiesSchema.shape.files.removeDefault().optional(),
       })
       .strict()
       .optional(),

@@ -12,6 +12,7 @@ import {
   ensureUserData,
   getSkillByName,
 } from "../../src/db";
+import { updateUserPreferences } from "../../src/db/userPreferences";
 import {
   DEFAULT_SYSTEM_PROMPT,
   SUBAGENT_DIRECTIVES,
@@ -55,6 +56,21 @@ describe("agent runtime", () => {
       (await agent.TOOL_MAP.load_skill!.execute({ name: otherUserSkill.name }))
         .text,
     ).toBe(`Error: skill '${otherUserSkill.name}' not found`);
+  });
+
+  test("leaves out the tools of capabilities the owner turned off", () => {
+    updateUserPreferences(RUNTIME_USER_ID, {
+      capabilities: { web: false, imageGeneration: false },
+    });
+    const tools = (ownerUuid: string) =>
+      Object.keys(agentManager.createGeneralAgent({ ownerUuid }).TOOL_MAP);
+
+    const owned = tools(RUNTIME_USER_ID);
+    for (const tool of ["web_search", "fetch_web_page", "generate_image"])
+      expect(owned).not.toContain(tool);
+    expect(owned).toContain("bash");
+    expect(owned).toContain("modify_plan");
+    expect(tools(OTHER_USER_ID)).toContain("generate_image");
   });
 
   test("seeds the subagent skill once for the main agent only", () => {

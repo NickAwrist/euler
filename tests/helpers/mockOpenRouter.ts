@@ -10,6 +10,7 @@ export type OpenRouterScenario =
   | "endless-tools"
   | "tool-loop"
   | "tool-outputs"
+  | "mcp-tool"
   | "child-outputs"
   | "delayed-stream"
   | "unauthorized"
@@ -378,6 +379,29 @@ export async function handleOpenRouterRequest(
   }
   if (scenario === "tool-loop") {
     return sse([chunk({ content: "Finished after tool." }, "stop"), "[DONE]"]);
+  }
+  if (scenario === "mcp-tool") {
+    return sse([
+      requests.length === 1
+        ? chunk(
+            {
+              tool_calls: [
+                {
+                  index: 0,
+                  id: "call_mcp_0",
+                  type: "function",
+                  function: {
+                    name: "mcp__test__echo",
+                    arguments: JSON.stringify({ text: "hello" }),
+                  },
+                },
+              ],
+            },
+            "tool_calls",
+          )
+        : chunk({ content: "Echoed." }, "stop"),
+      "[DONE]",
+    ]);
   }
   if (
     (scenario === "tool-outputs" || scenario === "child-outputs") &&

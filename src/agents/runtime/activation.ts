@@ -8,6 +8,7 @@ import { getAttachment } from "../../db/attachments";
 import { getSessionById } from "../../db/sessions";
 import type { Unsequenced } from "../../events/eventHub";
 import type { LlmMessage } from "../../llm";
+import { type McpToolSet, openUserMcpTools } from "../../mcp/userTools";
 import { logEvent } from "../../observability/logger";
 import { isFinalAgent } from "../../schemas/agents";
 import type { Activation } from "../../schemas/events";
@@ -94,6 +95,7 @@ export async function runActivation(
   let segmentStart = 0;
   const summarySince = agent.lastSummaryAt;
   let ctx: RunContext | undefined;
+  let mcpTools: McpToolSet | undefined;
   let changedFiles: WorkspaceFileAttachment[] = [];
   let attachmentStart = 0;
   let savedReply = "";
@@ -163,6 +165,8 @@ export async function runActivation(
         () => model.model,
       ),
     );
+    mcpTools = await openUserMcpTools(agent.ownerUuid, signal);
+    model.addTools(mcpTools.tools);
     ctx = new RunContext(
       model,
       (context, step) => {
@@ -392,5 +396,6 @@ export async function runActivation(
       activationId: partial.id,
       outcome,
     });
+    await mcpTools?.close();
   }
 }

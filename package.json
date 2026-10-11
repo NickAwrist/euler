@@ -33,6 +33,7 @@
     "vite": "^8.0.8"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "ignore": "^7.0.5",

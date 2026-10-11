@@ -32,6 +32,7 @@ export function updateUserPreferences(
       settings: { ...current.settings, ...patch.settings },
       appearance: { ...current.appearance, ...patch.appearance },
       layout: { ...current.layout, ...patch.layout },
+      capabilities: { ...current.capabilities, ...patch.capabilities },
     });
     getDb().run(
       "INSERT INTO user_preferences (owner_uuid, value) VALUES (?, ?) ON CONFLICT(owner_uuid) DO UPDATE SET value = excluded.value",

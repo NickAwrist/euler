@@ -78,6 +78,20 @@ export function getDb(): Database {
   `);
 
   db.run(`
+    CREATE TABLE IF NOT EXISTS mcp_servers (
+      id TEXT PRIMARY KEY,
+      owner_uuid TEXT NOT NULL,
+      name TEXT NOT NULL,
+      url TEXT NOT NULL,
+      headers TEXT NOT NULL,
+      enabled INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      UNIQUE(owner_uuid, name)
+    );
+  `);
+
+  db.run(`
     CREATE TABLE IF NOT EXISTS app_settings (
       key TEXT PRIMARY KEY NOT NULL,
       value TEXT NOT NULL

@@ -1,5 +1,5 @@
-import { SQLiteError } from "bun:sqlite";
 import { Router } from "express";
+import { isUniqueViolation } from "../db/errors";
 import {
   createSkillRow,
   deleteSkillRow,
@@ -12,12 +12,6 @@ import { SkillWriteSchema } from "../schemas/skills";
 import { requireUserId } from "../userIdentity";
 
 const skillsRoutes = Router();
-
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    error instanceof SQLiteError && error.code === "SQLITE_CONSTRAINT_UNIQUE"
-  );
-}
 
 skillsRoutes.get("/", (req, res) => {
   const ownerUuid = requireUserId(req, res);
