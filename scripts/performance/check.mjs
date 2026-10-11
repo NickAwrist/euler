@@ -346,6 +346,7 @@ async function responseBytes(fixture, path) {
 /** Deterministic counts of work the app does for scripted interactions at the stress workload. */
 async function measureCounts(page, fixture) {
   const metrics = {};
+  const scrollSamples = [];
   const snapshot = () =>
     page.evaluate(() => ({
       domNodes: document.querySelectorAll("*").length,
@@ -368,6 +369,23 @@ async function measureCounts(page, fixture) {
       for (let step = 0; step <= SCROLL_STEPS; step++) {
         await scrollToFraction(page, 1 - step / SCROLL_STEPS);
         await settle(page);
+        scrollSamples.push(
+          await page.evaluate((step) => {
+            const rows = [...document.querySelectorAll("main [data-index]")];
+            const scroller =
+              rows[0]?.parentElement?.closest(".overflow-y-auto");
+            return {
+              step,
+              renders: window.reactRenders,
+              scrollTop: scroller?.scrollTop,
+              scrollHeight: scroller?.scrollHeight,
+              rows: rows.map((row) => ({
+                index: Number(row.getAttribute("data-index")),
+                height: row.getBoundingClientRect().height,
+              })),
+            };
+          }, step),
+        );
       }
     }),
   );
@@ -438,7 +456,26 @@ async function measureCounts(page, fixture) {
     fixture,
     "/api/sessions",
   );
-  return metrics;
+  return { metrics, scrollSamples };
+}
+
+/** Resolved fonts, rather than CSS fallback lists, explain cross-host layout changes. */
+async function resolvedFonts(cdp) {
+  await cdp.send("DOM.enable");
+  await cdp.send("CSS.enable");
+  const { root } = await cdp.send("DOM.getDocument");
+  const fonts = {};
+  for (const selector of ["main p", "main p code", "main pre code"]) {
+    const { nodeId } = await cdp.send("DOM.querySelector", {
+      nodeId: root.nodeId,
+      selector,
+    });
+    if (nodeId)
+      fonts[selector] = (
+        await cdp.send("CSS.getPlatformFontsForNode", { nodeId })
+      ).fonts;
+  }
+  return fonts;
 }
 
 /** Wall-clock samples under CPU throttling. Reported for trends; too noisy to gate on. */
@@ -572,7 +609,8 @@ try {
   await waitForText(page, `Reply ${WORKLOAD.longSessionMessages - 1}`);
   await installProbe(page);
   await waitForPolls(page, 2);
-  const metrics = await measureCounts(page, fixture);
+  const fonts = await resolvedFonts(cdp);
+  const { metrics, scrollSamples } = await measureCounts(page, fixture);
   const bundle = await bundleSizes(loadedScripts);
   metrics["bundle.jsGzipBytes"] = bundle.js;
   metrics["bundle.cssGzipBytes"] = bundle.css;
@@ -589,7 +627,11 @@ try {
   await mkdir(OUTPUT, { recursive: true });
   await writeFile(
     join(OUTPUT, "check.json"),
-    JSON.stringify({ browser: browser.version(), metrics, timings }, null, 2),
+    JSON.stringify(
+      { browser: browser.version(), metrics, timings, fonts, scrollSamples },
+      null,
+      2,
+    ),
   );
   if (process.env.GITHUB_STEP_SUMMARY)
     await appendFile(

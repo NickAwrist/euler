@@ -69,7 +69,9 @@ and leave the baseline unchanged.
 Wall-clock medians under 4× CPU throttling (idle main-thread time, typing and
 streaming main-thread time, worst frame, worst typing interaction) go to the CI
 job summary for trend reading and are never gated. Raw results are uploaded as
-a CI artifact.
+a CI artifact. The artifact also records resolved text/code fonts and each
+scroll step's cumulative render count, mounted rows, row heights, and scroll
+geometry to diagnose differences between hosts.
 
 ## Running locally
 
