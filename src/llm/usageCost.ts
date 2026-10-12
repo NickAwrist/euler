@@ -13,10 +13,12 @@ export const validMetric = (value: number | undefined): number | undefined =>
  * cached input, uncached input and output by list price, and values the cache
  * hit against the uncached input price.
  */
-export function priceLlmUsage(
+export async function priceLlmUsage(
   model: string,
   metrics: LlmMetrics,
-): Pick<LlmMetrics, "cachedTokens" | "costBreakdown" | "cacheSavings"> {
+): Promise<
+  Pick<LlmMetrics, "cachedTokens" | "costBreakdown" | "cacheSavings">
+> {
   const input = validMetric(metrics.promptTokens);
   const output = validMetric(metrics.outputTokens);
   const cost = validMetric(metrics.cost);
@@ -26,15 +28,15 @@ export function priceLlmUsage(
   const cached = cachedTokens ?? 0;
   const resolved = resolveModelSelection(model);
   const pricing =
-    resolved.provider === "openrouter"
-      ? openRouterCatalog
-          .peek()
-          .models?.find((item) => item.route === resolved.model)
+    resolved.provider === "openrouter" && (cost || cached)
+      ? (await openRouterCatalog.get()).models?.find(
+          (item) => item.route === resolved.model,
+        )
       : undefined;
   const prompt = pricing?.promptPricePerMillion;
   const completion = pricing?.completionPricePerMillion;
   const cacheRead = cached ? pricing?.cacheReadPricePerMillion : 0;
-  const priced: ReturnType<typeof priceLlmUsage> = {};
+  const priced: Awaited<ReturnType<typeof priceLlmUsage>> = {};
 
   if (cachedTokens !== undefined) {
     priced.cachedTokens = cachedTokens;
