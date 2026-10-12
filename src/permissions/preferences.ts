@@ -5,7 +5,10 @@ import {
   updateUserPreferences,
 } from "../db/userPreferences";
 import { OperationError } from "../observability/errors";
-import type { ToolPermissionRule } from "../schemas/toolPermissions";
+import {
+  MAX_TOOL_PERMISSION_RULES,
+  type ToolPermissionRule,
+} from "../schemas/toolPermissions";
 
 export function saveToolPermissionRule(
   owner: string,
@@ -17,10 +20,9 @@ export function saveToolPermissionRule(
       ...toolPermissions.rules.filter((saved) => saved.id !== rule.id),
       rule,
     ];
-    if (rules.length > 100)
+    if (rules.length > MAX_TOOL_PERMISSION_RULES)
       throw new OperationError("INVALID_REQUEST", {
-        message:
-          "Remove a tool permission rule before adding another; the limit is 100",
+        message: `Remove a tool permission rule before adding another; the limit is ${MAX_TOOL_PERMISSION_RULES}`,
       });
     return updateUserPreferences(owner, { toolPermissions: { rules } });
   });

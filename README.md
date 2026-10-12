@@ -156,12 +156,16 @@ deployctl restart euler
 
 ## Tool permissions
 
-Customization's Tools tab controls the default tool decision, Allow or Ask,
-and rules for individual tools. A rule can match any arguments, a string
+Customization's Tools tab has one rule list with Allow, Ask, and Deny actions.
+The tool picker lists currently enabled built-in, agent, skill, and connected
+MCP tools. Select All tools and Ask to require approval, then add individual
+Allow exceptions. A rule can match any arguments, a string
 argument by exact value or prefix, or the complete arguments saved from an
 approval. Nested string arguments use dotted field paths. Deny rules always
-win; otherwise chat/workspace scope takes precedence, then more specific
-argument conditions, then the most recently saved matching rule.
+win; otherwise chat/workspace scope takes precedence, then a specific tool
+over All tools, then argument conditions, then the most recently saved rule.
+Calls with no matching rule are allowed. Saved approval defaults are converted
+to All tools rules.
 
 Approval requests appear above the chat input for both main agents and
 subagents. Allow once resumes just that call. Allow matching calls immediately

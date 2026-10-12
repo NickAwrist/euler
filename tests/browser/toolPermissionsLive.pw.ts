@@ -6,7 +6,10 @@ import {
   expect,
   test,
 } from "@playwright/test";
-import type { ToolApproval } from "../../src/schemas/toolPermissions";
+import type {
+  ToolApproval,
+  ToolPermissionRule,
+} from "../../src/schemas/toolPermissions";
 import type { UserPreferences } from "../../src/schemas/userPreferences";
 
 // Real Express/SQLite/runtime/Bash backend; only the model catalog is mocked.
@@ -14,6 +17,12 @@ const USER = "12345678-1234-4234-9234-123456789abc";
 const MODEL = "openrouter:openai/gpt-5.6-terra";
 const COMMAND = "echo approved >> marker.txt";
 const REPLY = "The script is running in the background. You can keep chatting.";
+const ASK_ALL: ToolPermissionRule = {
+  id: "66666666-6666-4666-8666-666666666666",
+  tool: "*",
+  action: "ask",
+  condition: { kind: "any" },
+};
 let server: ChildProcess;
 let backend: string;
 
@@ -80,7 +89,7 @@ test.beforeEach(async ({ page, request }) => {
   });
   await api(request, "PATCH", "/api/settings/user", {
     settings: { defaultModel: MODEL },
-    toolPermissions: { defaultAction: "ask" },
+    toolPermissions: { rules: [ASK_ALL] },
   });
 });
 
@@ -165,8 +174,8 @@ test.describe("wide", () => {
       "GET",
       "/api/settings/user",
     );
-    expect(toolPermissions.defaultAction).toBe("ask");
     expect(toolPermissions.rules).toEqual([
+      ASK_ALL,
       expect.objectContaining({
         tool: "bash",
         action: "allow",
@@ -191,7 +200,7 @@ test.describe("wide", () => {
           (await api<UserPreferences>(request, "GET", "/api/settings/user"))
             .toolPermissions.rules,
       )
-      .toEqual([]);
+      .toEqual([ASK_ALL]);
 
     // Without the rule the identical call asks again; stopping cancels it.
     await sendCommand(page);

@@ -14,6 +14,7 @@ import { AgentsList } from "./components/Agents/AgentsList";
 import { QueuedMessages } from "./components/Agents/QueuedMessages";
 import { SubagentModelNotice } from "./components/Agents/SubagentModelNotice";
 import { ToolApprovals } from "./components/Agents/ToolApprovals";
+import { useSavedRuleNotice } from "./components/Agents/useSavedRuleNotice";
 import { ArtifactContext } from "./components/Artifacts/ArtifactContext";
 import { initialArtifactWidth } from "./components/Artifacts/ArtifactSidebar";
 import { WorkspaceArtifacts } from "./components/Artifacts/WorkspaceArtifacts";
@@ -108,6 +109,7 @@ function ChatView({
     "files",
   );
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+  const savedRuleNotice = useSavedRuleNotice(app.activeSessionId);
   const selectedJob = app.jobs.find((job) => job.id === selectedJobId);
   const stopJob = async (id: string) => {
     if (app.activeSessionId) {
@@ -521,12 +523,16 @@ function ChatView({
                         refresh={app.refreshRuntime}
                         setInput={app.setInput}
                       />
-                      <ToolApprovals
-                        key={app.activeSessionId}
-                        sessionId={app.activeSessionId}
-                        approvals={app.toolApprovals}
-                        refresh={app.refreshRuntime}
-                      />
+                      {(app.toolApprovals.length > 0 ||
+                        savedRuleNotice.saved) && (
+                        <ToolApprovals
+                          key={app.activeSessionId}
+                          sessionId={app.activeSessionId}
+                          approvals={app.toolApprovals}
+                          refresh={app.refreshRuntime}
+                          notice={savedRuleNotice}
+                        />
+                      )}
                     </>
                   ) : undefined
                 }

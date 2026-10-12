@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type ToolPermissionRule,
   ToolPermissionRuleSchema,
@@ -7,16 +7,15 @@ import {
 } from "../../../src/schemas/toolPermissions";
 import { createBrowserUuid } from "../../persist/userIdentity";
 import {
+  type ToolPermissionTool,
   deleteToolPermissionRule,
+  fetchToolPermissionTools,
   getUserPreferences,
   saveToolPermissionRule,
-  updateUserPreferences,
 } from "../../persist/userPreferences";
 import { cx, eyebrowText } from "../../styles";
 import { Button } from "../Button";
 import { IconButton } from "../IconButton";
-import { SegmentedControl } from "../SegmentedControl";
-import { ShellRuleNote } from "../ShellRuleNote";
 
 type Action = ToolPermissionRule["action"];
 type Condition = ToolPermissionRule["condition"];
@@ -29,33 +28,41 @@ const ACTIONS: { value: Action; label: string }[] = [
   { value: "deny", label: "Deny" },
 ];
 
+/** Rule tool that matches every tool. */
+const ALL_TOOLS = "*";
+
 const errorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback;
+const toolLabel = (tool: string) =>
+  tool === ALL_TOOLS ? "All tools" : tool.trim() || "new rule";
 
-/** Default tool access plus per-tool rules that allow, ask, or deny calls. */
+/** Per-tool rules that allow, ask, or deny calls. */
 export function ToolPermissionsSection() {
   const [permissions, setPermissions] = useState<ToolPermissions>(
     () => getUserPreferences().toolPermissions,
   );
   const [drafts, setDrafts] = useState<ToolPermissionRule[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [tools, setTools] = useState<ToolPermissionTool[] | null>(null);
+  const [toolsError, setToolsError] = useState<string | null>(null);
 
-  const setDefaultAction = (
-    defaultAction: ToolPermissions["defaultAction"],
-  ) => {
-    const previous = permissions.defaultAction;
-    setError(null);
-    setPermissions((current) => ({ ...current, defaultAction }));
-    updateUserPreferences({ toolPermissions: { defaultAction } })
-      .then((saved) => setPermissions(saved.toolPermissions))
-      .catch((saveError: unknown) => {
-        setPermissions((current) => ({
-          ...current,
-          defaultAction: previous,
-        }));
-        setError(errorMessage(saveError, "Failed to save default"));
+  const toolsRequest = useRef(0);
+
+  // Capabilities and MCP servers change the catalogue, so Add rule reloads it.
+  // Only the latest request applies, so a slow older response cannot win.
+  const loadTools = useCallback(() => {
+    const request = ++toolsRequest.current;
+    fetchToolPermissionTools()
+      .then((loaded) => {
+        if (request !== toolsRequest.current) return;
+        setTools(loaded);
+        setToolsError(null);
+      })
+      .catch((loadError: unknown) => {
+        if (request !== toolsRequest.current) return;
+        setToolsError(errorMessage(loadError, "Failed to load tools"));
       });
-  };
+  }, []);
+  useEffect(loadTools, [loadTools]);
 
   const save = async (rule: ToolPermissionRule) => {
     const saved = await saveToolPermissionRule(rule);
@@ -83,7 +90,8 @@ export function ToolPermissionsSection() {
           size="sm"
           variant="secondary"
           icon={Plus}
-          onClick={() =>
+          onClick={() => {
+            loadTools();
             setDrafts((current) => [
               ...current,
               {
@@ -92,41 +100,25 @@ export function ToolPermissionsSection() {
                 action: "ask",
                 condition: { kind: "any" },
               },
-            ])
-          }
+            ]);
+          }}
         >
           Add rule
         </Button>
       </div>
-      <SegmentedControl
-        label="Default tool access"
-        value={permissions.defaultAction}
-        onChange={setDefaultAction}
-        options={[
-          { value: "allow", label: "Allow" },
-          { value: "ask", label: "Ask before every tool call" },
-        ]}
-      />
-      <p className="text-[0.75rem] leading-[1.5] text-muted-foreground">
-        Deny rules always win. Otherwise the most specific matching rule
-        applies, with chat and workspace rules before global ones and newer
-        rules breaking ties.
-      </p>
-      <ShellRuleNote />
-      {error && (
+      {toolsError && (
         <p role="alert" className="text-[0.75rem] text-red-400">
-          {error}
+          {toolsError}
         </p>
       )}
       {rules.length === 0 && (
-        <p className="text-[0.8125rem] text-muted-foreground">
-          No rules yet. Every tool call uses the default.
-        </p>
+        <p className="text-[0.8125rem] text-muted-foreground">No rules.</p>
       )}
       {rules.map((rule) => (
         <RuleRow
           key={rule.id}
           rule={rule}
+          tools={tools}
           isNew={drafts.some((draft) => draft.id === rule.id)}
           onSave={save}
           onDelete={() => remove(rule.id)}
@@ -138,11 +130,13 @@ export function ToolPermissionsSection() {
 
 function RuleRow({
   rule,
+  tools,
   isNew,
   onSave,
   onDelete,
 }: {
   rule: ToolPermissionRule;
+  tools: ToolPermissionTool[] | null;
   isNew: boolean;
   onSave: (rule: ToolPermissionRule) => Promise<void>;
   onDelete: () => Promise<void>;
@@ -156,8 +150,13 @@ function RuleRow({
     isNew ||
     !parsed.success ||
     JSON.stringify(parsed.data) !== JSON.stringify(rule);
-  const label = draft.tool.trim() || "new rule";
+  const label = toolLabel(draft.tool);
   const { condition } = draft;
+  // Keep a saved tool that is no longer offered instead of switching it.
+  const missing =
+    draft.tool !== "" &&
+    draft.tool !== ALL_TOOLS &&
+    !tools?.some((tool) => tool.name === draft.tool);
 
   const run = async (kind: "save" | "delete", action: () => Promise<void>) => {
     setBusy(kind);
@@ -188,15 +187,36 @@ function RuleRow({
             {draft.tool}
           </code>
         ) : (
-          <input
-            aria-label="Tool name"
-            placeholder="Tool name, such as bash"
+          <select
+            aria-label="Tool"
             className={cx(fieldClass, "w-40 flex-1")}
             value={draft.tool}
-            onChange={(event) =>
-              setDraft((current) => ({ ...current, tool: event.target.value }))
-            }
-          />
+            onChange={(event) => {
+              const tool = event.target.value;
+              setDraft((current) => ({ ...current, tool }));
+            }}
+          >
+            {draft.tool === "" && (
+              <option value="" disabled>
+                Tool
+              </option>
+            )}
+            <option value={ALL_TOOLS}>All tools</option>
+            {tools?.map((tool) => (
+              <option
+                key={tool.name}
+                value={tool.name}
+                title={tool.description}
+              >
+                {tool.name}
+              </option>
+            ))}
+            {missing && (
+              <option value={draft.tool}>
+                {tools ? `${draft.tool} (unavailable)` : draft.tool}
+              </option>
+            )}
+          </select>
         )}
         {condition.kind !== "arguments" && (
           <select
@@ -212,7 +232,7 @@ function RuleRow({
             }
           >
             <option value="any">Any arguments</option>
-            <option value="argument">Argument field</option>
+            <option value="argument">Field match</option>
           </select>
         )}
         <select
@@ -245,8 +265,8 @@ function RuleRow({
       {condition.kind === "argument" && (
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <input
-            aria-label="Argument field"
-            placeholder="Field, such as command"
+            aria-label="Field"
+            placeholder="Field"
             className={cx(fieldClass, "w-36")}
             value={condition.field}
             onChange={(event) =>
@@ -268,7 +288,7 @@ function RuleRow({
             <option value="prefix">Starts with</option>
           </select>
           <input
-            aria-label="Argument value"
+            aria-label="Value"
             placeholder="Value"
             className={cx(fieldClass, "min-w-40 flex-1 font-mono")}
             value={condition.value}

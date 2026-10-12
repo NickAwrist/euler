@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+// One extra rule accommodates conversion of the former approval default.
+export const MAX_TOOL_PERMISSION_RULES = 101;
 export const ToolArgumentsSchema = z.record(z.string(), z.json());
 export const ToolPermissionConditionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("any") }).strict(),
@@ -28,11 +30,16 @@ export const ToolPermissionRuleSchema = z
 export type ToolPermissionRule = z.infer<typeof ToolPermissionRuleSchema>;
 export const ToolPermissionsSchema = z
   .object({
-    defaultAction: z.enum(["allow", "ask"]).default("allow"),
-    rules: z.array(ToolPermissionRuleSchema).max(100).default([]),
+    rules: z
+      .array(ToolPermissionRuleSchema)
+      .max(MAX_TOOL_PERMISSION_RULES)
+      .default([]),
   })
   .strict();
 export type ToolPermissions = z.infer<typeof ToolPermissionsSchema>;
+export const ToolPermissionToolsSchema = z.object({
+  tools: z.array(z.object({ name: z.string(), description: z.string() })),
+});
 export const ToolApprovalSchema = z.object({
   id: z.uuid(),
   sessionId: z.string(),

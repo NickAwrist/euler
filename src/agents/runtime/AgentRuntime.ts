@@ -574,6 +574,30 @@ export class AgentRuntime {
       if (current.action === "deny") throw new Error(current.reason);
     }
   }
+  /** Metadata from the same tools used by main agents and subagents; no run is saved. */
+  toolCatalog(ownerUuid: string): Pick<BaseTool, "name" | "description">[] {
+    const signal = new AbortController().signal;
+    return (["main", "general"] as const).flatMap((kind) => {
+      const agent = createAgentRecord({
+        ownerUuid,
+        sessionId: "",
+        parentId: null,
+        kind,
+        title: "",
+        status: "idle",
+        model: DEFAULT_RUN_MODEL,
+        spawnPosition: 0,
+        activity: "",
+        config: {},
+      });
+      return this.tools(
+        agent,
+        signal,
+        () => {},
+        () => agent.model,
+      ).map(({ name, description }) => ({ name, description }));
+    });
+  }
   private tools(
     agent: AgentRecord,
     signal: AbortSignal,

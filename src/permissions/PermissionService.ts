@@ -115,14 +115,12 @@ export class PermissionService {
           : selected,
       undefined,
     );
-    const action = rule?.action ?? permissions.toolPermissions.defaultAction;
+    const action = rule?.action ?? "allow";
     return action === "allow"
       ? { action }
       : {
           action: "ask",
-          reason: rule
-            ? `A tool permission rule requires approval for this ${tool} call`
-            : "Your default tool policy requires approval",
+          reason: `A tool permission rule requires approval for this ${tool} call`,
         };
   }
 }

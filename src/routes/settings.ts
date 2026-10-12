@@ -37,11 +37,29 @@ import {
   removeToolPermissionRule,
   saveToolPermissionRule,
 } from "../permissions/preferences";
+import { toolCatalog } from "../permissions/toolCatalog";
 import { ToolPermissionRuleSchema } from "../schemas/toolPermissions";
 import { userPreferencesPatchSchema } from "../schemas/userPreferences";
 import { requireUserId } from "../userIdentity";
 
 const settingsRoutes = Router();
+settingsRoutes.get(
+  "/user/tools",
+  asyncRoute(async (req, res) => {
+    const owner = requireUserId(req, res);
+    if (!owner) return;
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    res.once("close", abort);
+    try {
+      const tools = await toolCatalog(owner, controller.signal);
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ tools });
+    } finally {
+      res.off("close", abort);
+    }
+  }),
+);
 settingsRoutes.put("/user/tool-permission-rules/:ruleId", (req, res) => {
   const owner = requireUserId(req, res);
   if (!owner) return;

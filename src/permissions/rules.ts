@@ -30,7 +30,7 @@ export function matchesRule(
   scope: PermissionScope,
 ): boolean {
   if (
-    rule.tool !== tool ||
+    (rule.tool !== "*" && rule.tool !== tool) ||
     (rule.sessionId !== undefined && rule.sessionId !== scope.sessionId) ||
     (rule.workspacePath !== undefined &&
       rule.workspacePath !== scope.workspacePath)
@@ -56,8 +56,9 @@ export function matchesRule(
 
 export function ruleSpecificity(rule: ToolPermissionRule): number {
   return (
-    (rule.sessionId ? 8 : 0) +
-    (rule.workspacePath ? 4 : 0) +
+    (rule.sessionId ? 16 : 0) +
+    (rule.workspacePath ? 8 : 0) +
+    (rule.tool === "*" ? 0 : 4) +
     (rule.condition.kind === "arguments"
       ? 3
       : rule.condition.kind === "argument"

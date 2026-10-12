@@ -8,6 +8,7 @@ import { permissionService } from "../../src/permissions/PermissionService";
 import { ToolApprovalCoordinator } from "../../src/permissions/ToolApprovalCoordinator";
 import { removeToolPermissionRule } from "../../src/permissions/preferences";
 import { workspaceService } from "../../src/workspaces/WorkspaceService";
+import { allToolsRule } from "../helpers/toolPermissions";
 
 async function fixture() {
   const owner = "11111111-1111-4111-8111-111111111111";
@@ -15,7 +16,9 @@ async function fixture() {
   createSessionRow(owner, id, Date.now(), "test");
   const workspace = await workspaceService.provisionRetained(owner, id);
   const controller = new AbortController();
-  updateUserPreferences(owner, { toolPermissions: { defaultAction: "ask" } });
+  updateUserPreferences(owner, {
+    toolPermissions: { rules: [allToolsRule()] },
+  });
   const coordinator = new ToolApprovalCoordinator(() => {});
   const context = {
     owner,
@@ -62,7 +65,9 @@ test("allow matching saves narrow rules, duplicate/foreign responses cannot gran
   ).toBe("allow");
   await coordinator.authorize(context, "bash", args);
   removeToolPermissionRule(owner, saved.rule!.id);
-  expect(effectiveUserPreferences(owner).toolPermissions.rules).toEqual([]);
+  expect(effectiveUserPreferences(owner).toolPermissions.rules).toEqual([
+    allToolsRule(),
+  ]);
 });
 test("allow once does not save a rule and denying returns an error to the agent", async () => {
   const { owner, id, coordinator, context } = await fixture();
@@ -71,7 +76,9 @@ test("allow once does not save a rule and denying returns an error to the agent"
     decision: "allow_once",
   });
   await pending;
-  expect(effectiveUserPreferences(owner).toolPermissions.rules).toEqual([]);
+  expect(effectiveUserPreferences(owner).toolPermissions.rules).toEqual([
+    allToolsRule(),
+  ]);
   pending = coordinator.authorize(context, "bash", { command: "build" });
   void pending.catch(() => {});
   await coordinator.respond(owner, id, coordinator.list(owner, id)[0]!.id, {
@@ -90,7 +97,9 @@ test("cancellation removes pending requests and cannot persist a matching grant"
     coordinator.respond(owner, id, approval.id, { decision: "allow_matching" }),
   ).rejects.toThrow();
   expect(coordinator.list(owner, id)).toEqual([]);
-  expect(effectiveUserPreferences(owner).toolPermissions.rules).toEqual([]);
+  expect(effectiveUserPreferences(owner).toolPermissions.rules).toEqual([
+    allToolsRule(),
+  ]);
 });
 test("capabilities and workspace are rechecked while a user is considering approval", async () => {
   const { owner, id, coordinator, context, controller } = await fixture();
@@ -101,7 +110,9 @@ test("capabilities and workspace are rechecked while a user is considering appro
   await expect(
     coordinator.respond(owner, id, approval.id, { decision: "allow_matching" }),
   ).rejects.toThrow("disabled");
-  expect(effectiveUserPreferences(owner).toolPermissions.rules).toEqual([]);
+  expect(effectiveUserPreferences(owner).toolPermissions.rules).toEqual([
+    allToolsRule(),
+  ]);
   updateUserPreferences(owner, { capabilities: { shell: true } });
   patchSessionRow(owner, id, {
     workspace_kind: "local",

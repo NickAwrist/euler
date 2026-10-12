@@ -1,5 +1,5 @@
 import { ShieldQuestion } from "lucide-react";
-import { memo, useEffect, useState } from "react";
+import { memo, useState } from "react";
 import type {
   ToolApproval,
   ToolApprovalResponse,
@@ -7,52 +7,24 @@ import type {
 } from "../../../src/schemas/toolPermissions";
 import { whileRunning } from "../../lib/whileRunning";
 import { respondToToolApproval } from "../../persist/agents";
-import {
-  deleteToolPermissionRule,
-  rememberToolPermissionRule,
-} from "../../persist/userPreferences";
 import { Button } from "../Button";
-import { ShellRuleNote } from "../ShellRuleNote";
+import type { SavedRuleNotice } from "./useSavedRuleNotice";
 
 type Decision = ToolApprovalResponse["decision"];
-type Saved = { rule: ToolPermissionRule; scope: string; undone: boolean };
-
-const SAVED_NOTICE_MS = 10_000;
 
 /** Pending tool calls from this chat's agents, answered above the composer. */
 export const ToolApprovals = memo(function ToolApprovals({
   sessionId,
   approvals,
   refresh,
+  notice,
 }: {
   sessionId: string;
   approvals: ToolApproval[];
   refresh: () => Promise<void>;
+  notice: SavedRuleNotice;
 }) {
-  const [saved, setSaved] = useState<Saved | null>(null);
-  const [undoError, setUndoError] = useState("");
-  const [undoing, setUndoing] = useState(false);
-
-  useEffect(() => {
-    if (!saved || undoing || undoError) return;
-    const timer = setTimeout(() => setSaved(null), SAVED_NOTICE_MS);
-    return () => clearTimeout(timer);
-  }, [saved, undoing, undoError]);
-
-  const undo = (rule: ToolPermissionRule) =>
-    whileRunning(setUndoing, async () => {
-      setUndoError("");
-      try {
-        await deleteToolPermissionRule(rule.id);
-        setSaved((current) => current && { ...current, undone: true });
-      } catch (error) {
-        setUndoError(
-          error instanceof Error ? error.message : "Could not remove the rule",
-        );
-      }
-    });
-
-  if (approvals.length === 0 && !saved) return null;
+  const { saved, undoing, save, undo } = notice;
   return (
     <section
       aria-label="Tool approvals"
@@ -64,11 +36,7 @@ export const ToolApprovals = memo(function ToolApprovals({
           sessionId={sessionId}
           approval={approval}
           refresh={refresh}
-          onSavedRule={(rule) => {
-            rememberToolPermissionRule(rule);
-            setUndoError("");
-            setSaved({ rule, scope: approval.matchingScope, undone: false });
-          }}
+          onSavedRule={(rule) => save(sessionId, rule, approval.matchingScope)}
         />
       ))}
       {saved && (
@@ -78,9 +46,9 @@ export const ToolApprovals = memo(function ToolApprovals({
               ? `Removed the rule for ${saved.rule.tool}.`
               : `Saved: allow matching ${saved.rule.tool} calls (${saved.scope}).`}
           </span>
-          {undoError && (
+          {saved.undoError && (
             <span role="alert" className="text-red-400">
-              {undoError}
+              {saved.undoError}
             </span>
           )}
           {!saved.undone && (
@@ -90,7 +58,7 @@ export const ToolApprovals = memo(function ToolApprovals({
               loading={undoing}
               onClick={() => void undo(saved.rule)}
             >
-              {undoError ? "Retry undo" : "Undo"}
+              {saved.undoError ? "Retry undo" : "Undo"}
             </Button>
           )}
         </output>
@@ -188,7 +156,11 @@ function ApprovalRequest({
           >
             {JSON.stringify(approval.arguments, null, 2)}
           </pre>
-          {approval.tool === "bash" && <ShellRuleNote />}
+          {approval.tool === "bash" && (
+            <p className="text-[0.6875rem] text-muted-foreground">
+              Rules match command text. The OS sandbox still applies.
+            </p>
+          )}
         </div>
       </div>
       {answered && (

@@ -17,6 +17,7 @@ import { workspaceService } from "../../src/workspaces/WorkspaceService";
 import { getOpenRouterRequests } from "../helpers/mockOpenRouter";
 import { setOpenRouterScenario } from "../helpers/mockOpenRouter";
 import { TEST_USER_ID, startTestServer, userHeaders } from "../helpers/server";
+import { allToolsRule } from "../helpers/toolPermissions";
 
 const model = "openrouter:openai/gpt-5.6-terra";
 async function until(check: () => boolean) {
@@ -31,7 +32,7 @@ test("approval API gates real execution, survives browser reload, and saves matc
   setOpenRouterApiKey("test");
   setOpenRouterScenario("tool-permissions");
   updateUserPreferences(TEST_USER_ID, {
-    toolPermissions: { defaultAction: "ask" },
+    toolPermissions: { rules: [allToolsRule()] },
   });
   const { url, close } = await startTestServer();
   const headers = userHeaders(undefined, {
@@ -92,7 +93,7 @@ test("approval API gates real execution, survives browser reload, and saves matc
     expect(await fs.readFile(`${root}/marker.txt`, "utf8")).toBe("approved\n");
     expect((await post(endpoint, { decision: "allow_once" })).status).toBe(404);
     const saved =
-      effectiveUserPreferences(TEST_USER_ID).toolPermissions.rules[0]!;
+      effectiveUserPreferences(TEST_USER_ID).toolPermissions.rules.at(-1)!;
     expect(saved.sessionId).toBe(session.id);
     await post(`/api/sessions/${session.id}/messages`, {
       content: `command:${command}`,
@@ -113,7 +114,7 @@ test("approval API gates real execution, survives browser reload, and saves matc
     ).toBe(200);
     expect(
       effectiveUserPreferences(TEST_USER_ID).toolPermissions.rules,
-    ).toEqual([]);
+    ).toEqual([allToolsRule()]);
   } finally {
     await agentRuntime.deleteSession(TEST_USER_ID, session.id);
     await close();
@@ -125,7 +126,7 @@ for (const action of ["stop", "rewind", "delete"] as const) {
     setOpenRouterApiKey("test");
     setOpenRouterScenario("tool-permissions");
     updateUserPreferences(TEST_USER_ID, {
-      toolPermissions: { defaultAction: "ask" },
+      toolPermissions: { rules: [allToolsRule()] },
     });
     const runtime = new AgentRuntime();
     const id = crypto.randomUUID();
@@ -158,7 +159,7 @@ for (const action of ["stop", "rewind", "delete"] as const) {
     ).rejects.toThrow();
     expect(
       effectiveUserPreferences(TEST_USER_ID).toolPermissions.rules,
-    ).toEqual([]);
+    ).toEqual([allToolsRule()]);
     await runtime.deleteSession(TEST_USER_ID, id);
   });
 }
@@ -167,7 +168,7 @@ test("waiting for approval releases scheduler slots and background jobs are admi
   setOpenRouterApiKey("test");
   setOpenRouterScenario("background-jobs");
   updateUserPreferences(TEST_USER_ID, {
-    toolPermissions: { defaultAction: "ask" },
+    toolPermissions: { rules: [allToolsRule()] },
   });
   const runtime = new AgentRuntime(1);
   const ids = [crypto.randomUUID(), crypto.randomUUID()];
@@ -243,13 +244,12 @@ test("permission preferences persist and rule CRUD merges current rules with use
     await fetch(`${url}/api/settings/user`, {
       method: "PATCH",
       headers,
-      body: JSON.stringify({ toolPermissions: { defaultAction: "ask" } }),
+      body: JSON.stringify({ toolPermissions: {} }),
     });
     const saved = (await (
       await fetch(`${url}/api/settings/user`, { headers })
     ).json()) as { toolPermissions: unknown };
     expect(ToolPermissionsSchema.parse(saved.toolPermissions)).toMatchObject({
-      defaultAction: "ask",
       rules: [{ id: ids[0] }, { id: ids[1] }],
     });
     expect(
@@ -272,7 +272,7 @@ test("a deny added while an approved call waits for a scheduler slot still preve
   setOpenRouterApiKey("test");
   setOpenRouterScenario("tool-permissions");
   updateUserPreferences(TEST_USER_ID, {
-    toolPermissions: { defaultAction: "ask" },
+    toolPermissions: { rules: [allToolsRule()] },
   });
   const runtime = new AgentRuntime(1);
   const firstId = crypto.randomUUID();
@@ -406,8 +406,8 @@ test("a blocking parent keeps waiting while its child needs user approval", asyn
   setOpenRouterScenario("blocking-permission");
   updateUserPreferences(TEST_USER_ID, {
     toolPermissions: {
-      defaultAction: "ask",
       rules: [
+        allToolsRule(),
         {
           id: crypto.randomUUID(),
           tool: "spawn_agent",
@@ -471,8 +471,8 @@ test("deleting a chat removes only its scoped permission rules", async () => {
   };
   updateUserPreferences(TEST_USER_ID, {
     toolPermissions: {
-      defaultAction: "ask",
       rules: [
+        allToolsRule(),
         global,
         other,
         { ...global, id: crypto.randomUUID(), sessionId: id },
@@ -486,8 +486,7 @@ test("deleting a chat removes only its scoped permission rules", async () => {
     });
     expect(response.status).toBe(200);
     expect(effectiveUserPreferences(TEST_USER_ID).toolPermissions).toEqual({
-      defaultAction: "ask",
-      rules: [global, other],
+      rules: [allToolsRule(), global, other],
     });
   } finally {
     await close();

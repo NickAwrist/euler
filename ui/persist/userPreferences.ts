@@ -1,7 +1,9 @@
+import type { z } from "zod";
 import { legacyUserPreferencesSchema } from "../../src/schemas/legacyUserPreferences";
 import {
   type ToolPermissionRule,
   ToolPermissionRuleSchema,
+  ToolPermissionToolsSchema,
 } from "../../src/schemas/toolPermissions";
 import {
   type UserPreferences,
@@ -93,6 +95,21 @@ export function saveToolPermissionRule(
 
 export function deleteToolPermissionRule(id: string): Promise<UserPreferences> {
   return savePreferences(toolPermissionRulePath(id), { method: "DELETE" });
+}
+
+export type ToolPermissionTool = z.infer<
+  typeof ToolPermissionToolsSchema
+>["tools"][number];
+
+/** Lists the tools currently available to agents, for rule pickers. */
+export async function fetchToolPermissionTools(): Promise<
+  ToolPermissionTool[]
+> {
+  return ToolPermissionToolsSchema.parse(
+    await userApiJson<unknown>("/api/settings/user/tools", {
+      errorMessage: "Failed to load tools",
+    }),
+  ).tools;
 }
 
 /** Caches a rule the server saved elsewhere, such as from an approval. */

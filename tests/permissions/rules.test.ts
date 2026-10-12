@@ -5,6 +5,7 @@ import {
   ToolPermissionsSchema,
 } from "../../src/schemas/toolPermissions";
 import { capabilitiesSchema } from "../../src/schemas/userPreferences";
+import { allToolsRule } from "../helpers/toolPermissions";
 
 const rule = (
   action: ToolPermissionRule["action"],
@@ -18,14 +19,13 @@ const rule = (
 const evaluate = (rules: ToolPermissionRule[], command: string) =>
   permissionService.callDecision(
     permissionService.resolve({ kind: "local" }, capabilitiesSchema.parse({}), {
-      defaultAction: "ask",
-      rules,
+      rules: [allToolsRule(), ...rules],
     }),
     "bash",
     { command },
     { sessionId: "chat", workspacePath: "/project" },
   );
-test("deny wins over allows; specific allows override a general ask, otherwise ask is the default", () => {
+test("deny wins over allows; specific allows override general Ask rules", () => {
   const ask = rule("ask", { kind: "any" });
   const allow = rule("allow", {
     kind: "argument",
@@ -49,6 +49,54 @@ test("deny wins over allows; specific allows override a general ask, otherwise a
     evaluate([allow, rule("ask", allow.condition)], "bun run build").action,
   ).toBe("ask");
 });
+test("All tools rules match builtin and MCP calls, with specific tool exceptions and deny precedence", () => {
+  const ask = { ...rule("ask", { kind: "any" }), tool: "*" };
+  const allow = rule("allow", { kind: "any" });
+  expect(evaluate([allow, ask], "bun test").action).toBe("allow");
+  expect(evaluate([ask, allow], "bun test").action).toBe("allow");
+  const policy = permissionService.resolve(
+    undefined,
+    capabilitiesSchema.parse({}),
+    {
+      rules: [ask],
+    },
+  );
+  expect(
+    permissionService.callDecision(policy, "read_file", { path: "README.md" })
+      .action,
+  ).toBe("ask");
+  expect(
+    permissionService.callDecision(policy, "mcp__files__read", {}).action,
+  ).toBe("ask");
+  expect(evaluate([{ ...ask, action: "deny" }, allow], "bun test").action).toBe(
+    "deny",
+  );
+  const scopedPolicy = permissionService.resolve(
+    undefined,
+    capabilitiesSchema.parse({}),
+    {
+      rules: [{ ...ask, sessionId: "chat" }],
+    },
+  );
+  expect(
+    permissionService.callDecision(
+      scopedPolicy,
+      "bash",
+      {},
+      { sessionId: "another-chat" },
+    ).action,
+  ).toBe("allow");
+  expect(
+    permissionService.callDecision(
+      scopedPolicy,
+      "bash",
+      {},
+      { sessionId: "chat" },
+    ).action,
+  ).toBe("ask");
+  const scoped = { ...ask, sessionId: "chat", action: "ask" as const };
+  expect(evaluate([allow, scoped], "bun test").action).toBe("ask");
+});
 test("matching calls bind all arguments and their chat/workspace; object key order is irrelevant", () => {
   const allow = {
     ...rule("allow", {
@@ -65,7 +113,7 @@ test("matching calls bind all arguments and their chat/workspace; object key ord
   const policy = permissionService.resolve(
     undefined,
     capabilitiesSchema.parse({}),
-    { defaultAction: "ask", rules: [allow] },
+    { rules: [allToolsRule(), allow] },
   );
   const args = {
     options: { second: true, first: 1 },
@@ -97,7 +145,7 @@ test("argument rules read only own fields, and capability denials cannot be appr
   const policy = permissionService.resolve(
     undefined,
     capabilitiesSchema.parse({}),
-    { defaultAction: "ask", rules: [allow] },
+    { rules: [allToolsRule(), allow] },
   );
   expect(
     permissionService.callDecision(policy, "bash", {
@@ -112,10 +160,10 @@ test("argument rules read only own fields, and capability denials cannot be appr
   const disabled = permissionService.resolve(
     undefined,
     capabilitiesSchema.parse({ shell: false }),
-    { defaultAction: "allow", rules: [rule("allow", { kind: "any" })] },
+    { rules: [rule("allow", { kind: "any" })] },
   );
   expect(permissionService.callDecision(disabled, "bash", {}).action).toBe(
     "deny",
   );
-  expect(ToolPermissionsSchema.parse({}).defaultAction).toBe("allow");
+  expect(ToolPermissionsSchema.parse({}).rules).toEqual([]);
 });

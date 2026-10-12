@@ -95,9 +95,6 @@ export const userPreferencesPatchSchema = z
   .object({
     toolPermissions: z
       .object({
-        defaultAction: ToolPermissionsSchema.shape.defaultAction
-          .removeDefault()
-          .optional(),
         rules: ToolPermissionsSchema.shape.rules.removeDefault().optional(),
       })
       .strict()
