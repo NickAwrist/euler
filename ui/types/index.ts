@@ -3,6 +3,7 @@ export type {
   WorkspaceFile,
 } from "./app";
 export type {
+  CostBreakdown,
   DebugData,
   Message,
   MessageStep,

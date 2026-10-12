@@ -18,6 +18,16 @@ export type LlmMetrics = {
   tokensPerSecond?: number;
   /** Time from the model request to its last reasoning token. */
   thinkingDurationMs?: number;
+  /** Billed cost split by token class. */
+  costBreakdown?: CostBreakdown;
+  /** What the cached input would have cost at the uncached input price. */
+  cacheSavings?: number;
+};
+
+export type CostBreakdown = {
+  cachedInput: number;
+  uncachedInput: number;
+  output: number;
 };
 
 export type Step = {
