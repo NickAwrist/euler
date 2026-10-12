@@ -519,6 +519,7 @@ function ChatView({
                         messages={app.queuedMessages}
                         held={app.heldUpdates}
                         refresh={app.refreshRuntime}
+                        setInput={app.setInput}
                       />
                       <ToolApprovals
                         key={app.activeSessionId}

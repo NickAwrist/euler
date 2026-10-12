@@ -6,11 +6,7 @@ import { getSessionById, markSessionViewed } from "../db/sessions";
 import { asyncRoute } from "../http/asyncRoute";
 import { resolveModelSelection } from "../llm";
 import { sendError, sendValidationError } from "../observability/http";
-import {
-  EditQueuedMessageSchema,
-  RewindSchema,
-  SendMessageSchema,
-} from "../schemas/agents";
+import { RewindSchema, SendMessageSchema } from "../schemas/agents";
 import { ToolApprovalResponseSchema } from "../schemas/toolPermissions";
 import { requireUserId } from "../userIdentity";
 
@@ -87,28 +83,6 @@ export function agentActions() {
     const owner = requireUserId(req, res);
     if (!owner) return;
     agentRuntime.deliver(agentRuntime.main(owner, req.params.id));
-    res.json({ ok: true });
-  });
-  router.patch("/:id/messages/:messageId", (req, res) => {
-    const owner = requireUserId(req, res);
-    if (!owner) return;
-    const parsed = EditQueuedMessageSchema.safeParse(req.body);
-    if (!parsed.success) {
-      sendValidationError(res, parsed.error);
-      return;
-    }
-    const main = agentRuntime.main(owner, req.params.id);
-    if (
-      !agentRuntime.store.editQueued(
-        main.id,
-        Number(req.params.messageId),
-        parsed.data.content,
-      )
-    ) {
-      sendError(res, "CONFLICT", "Message was already delivered");
-      return;
-    }
-    agentRuntime.resync(owner, req.params.id);
     res.json({ ok: true });
   });
   router.delete("/:id/messages/:messageId", (req, res) => {

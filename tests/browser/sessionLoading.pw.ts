@@ -129,19 +129,15 @@ test("session loading: async agents continue across chat messages and browser re
     page.getByText("Queued: Queued original", { exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Stop generation" }).click();
+  await input.fill("Draft");
   await page.getByRole("button", { name: "Edit", exact: true }).click();
-  await page
-    .getByRole("textbox", { name: "Edit queued message" })
-    .fill("Queued edited");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect(
-    page.getByText("Queued: Queued edited", { exact: true }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Deliver", exact: true }).click();
-  await expect(page.getByText("Queued edited", { exact: true })).toBeVisible();
-  await expect(
-    page.getByText("Queued: Queued edited", { exact: true }),
+    page.getByText("Queued: Queued original", { exact: true }),
   ).toHaveCount(0);
+  await expect(input).toHaveValue("Queued original\nDraft");
+  await input.fill("Queued edited");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByText("Queued edited", { exact: true })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await listRow.click();
   await expect(trace).toBeVisible();

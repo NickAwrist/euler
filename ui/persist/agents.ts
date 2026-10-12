@@ -53,17 +53,6 @@ export function removeQueuedMessage(id: string, messageId: number) {
   });
 }
 
-export function editQueuedMessage(
-  id: string,
-  messageId: number,
-  content: string,
-) {
-  return apiVoid(`${runtimePath(id)}/messages/${messageId}`, {
-    method: "PATCH",
-    json: { content },
-  });
-}
-
 export async function respondToToolApproval(
   id: string,
   approvalId: string,
