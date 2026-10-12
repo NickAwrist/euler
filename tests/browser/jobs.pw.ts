@@ -2,6 +2,7 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
 import { startAsyncBackend } from "./asyncBackend";
+import { mockUserPreferences } from "./userPreferencesFixture";
 test.use({
   isMobile: false,
   hasTouch: false,
@@ -54,12 +55,9 @@ test("session loading: background Bash jobs complete after ten seconds and remai
     url.port = "5197";
     return route.continue({ url: url.toString() });
   });
-  await page.addInitScript(() =>
-    localStorage.setItem(
-      "euler:userSettings",
-      JSON.stringify({ defaultModel: "openrouter:openai/gpt-5.6-terra" }),
-    ),
-  );
+  await mockUserPreferences(page, undefined, {
+    settings: { defaultModel: "openrouter:openai/gpt-5.6-terra" },
+  });
   await page.goto("/");
   const input = page.getByPlaceholder("Send a message...");
   await input.fill(

@@ -1,9 +1,9 @@
 import WebSocket from "ws";
 import { getComfyUIHost } from "../db/index";
 import { DEFAULT_COMFYUI_HOST } from "../env";
+import { providerHostConfig } from "../models/providerHostConfig";
 import { OperationError } from "../observability/errors";
 import { observe } from "../observability/logger";
-import { providerHostConfig } from "../providerHostConfig";
 import { errorMessage } from "../utils/errors";
 
 export type ComfyUIPromptResponse = {

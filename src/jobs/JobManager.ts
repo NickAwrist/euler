@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { RunContext, Step } from "../RunContext";
 import { changedWorkspaceFiles } from "../agents/runtime/workspaceOutputs";
 import { getDb, transaction } from "../db/connection";
+import { envConfig } from "../env";
 import { logEvent, withBackgroundLogContext } from "../observability/logger";
 import { permissionService } from "../permissions/PermissionService";
 import { type Job, JobSchema, activeJob } from "../schemas/jobs";
@@ -38,16 +39,8 @@ export class JobManager {
       changed(job: Job): void;
       position(sessionId: string): number;
     },
-    private sessionLimit = z.coerce
-      .number()
-      .int()
-      .positive()
-      .parse(process.env.EULER_MAX_SESSION_JOBS ?? 4),
-    private ownerLimit = z.coerce
-      .number()
-      .int()
-      .positive()
-      .parse(process.env.EULER_MAX_OWNER_JOBS ?? 16),
+    private sessionLimit = envConfig.maxSessionJobs,
+    private ownerLimit = envConfig.maxOwnerJobs,
   ) {}
   private save(job: Job) {
     getDb().run(

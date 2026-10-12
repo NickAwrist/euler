@@ -239,13 +239,17 @@ test("settings save desktop: invalid preferences fall back and failed saves reta
   await page.route("**/api/**", (route) =>
     route.fulfill({ json: apiFixture(route.request().url()) }),
   );
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      "euler:appearance",
-      JSON.stringify({ font: "invalid", theme: {}, codeFont: false }),
-    );
-  });
   await mockUserPreferences(page);
+  // Saved values that are no longer valid choices fall back to defaults.
+  await page.route("**/api/settings/user", (route) =>
+    route.request().method() === "GET"
+      ? route.fulfill({
+          json: {
+            appearance: { font: "invalid", theme: {}, codeFont: false },
+          },
+        })
+      : route.fallback(),
+  );
   await page.goto("/dev/settings");
   await page.getByRole("button", { name: "Appearance", exact: true }).click();
   await page.getByLabel("Font style", { exact: true }).selectOption("serif");

@@ -15,6 +15,7 @@ import {
 } from "../db/index";
 import { downloadWorkspaceFile } from "../http/downloadWorkspaceFile";
 import { isLoopbackRequest } from "../http/isLoopbackRequest";
+import { loadSession, requestSession } from "../http/sessionRoute";
 import { stripReasoningFromModelMessages } from "../llm/reasoningDetails";
 import { revealFileNative } from "../nativeFolderPicker";
 import { sendError, sendValidationError } from "../observability/http";
@@ -37,19 +38,15 @@ import { workspaceService } from "../workspaces/WorkspaceService";
 import { agentActions } from "./agentActions";
 import { artifactRoutes } from "./artifacts";
 
-/** The chat when it exists and is idle; otherwise responds with the error. */
-function idleSession(
-  req: Request<{ id: string }>,
-  res: Response,
-): SessionRow | null {
-  const ownerUuid = requireUserId(req, res);
-  if (!ownerUuid) return null;
-  const row = getSessionById(ownerUuid, req.params.id);
+/** The chat's current row when it still exists and is idle; otherwise responds with the error. */
+function idleSession(req: Request, res: Response): SessionRow | null {
+  const loaded = requestSession(req);
+  const row = getSessionById(loaded.owner_uuid, loaded.id);
   if (!row) {
     sendError(res, "NOT_FOUND", "Session not found");
     return null;
   }
-  if (agentRuntime.busy(ownerUuid, row.id)) {
+  if (agentRuntime.busy(row.owner_uuid, row.id)) {
     sendError(
       res,
       "CONFLICT",
@@ -69,6 +66,7 @@ function presentWorkspace(row: SessionRow) {
 }
 
 const router = Router();
+router.use("/:id", loadSession);
 router.use(agentActions());
 router.use("/:id/workspace/artifacts", artifactRoutes());
 
@@ -177,14 +175,7 @@ router.post("/:id/workspace/link", async (req, res) => {
 });
 
 router.get("/:id/workspace/files", async (req, res) => {
-  const ownerUuid = requireUserId(req, res);
-  if (!ownerUuid) return;
-  const row = getSessionById(ownerUuid, req.params.id);
-  if (!row) {
-    sendError(res, "NOT_FOUND", "Session not found");
-    return;
-  }
-  const workspace = await workspaceService.resolveSession(row);
+  const workspace = await workspaceService.resolveSession(requestSession(req));
   const files = await workspaceService.listFiles(workspace);
   const query =
     typeof req.query.q === "string" ? req.query.q.toLowerCase() : "";
@@ -195,13 +186,7 @@ router.get("/:id/workspace/files", async (req, res) => {
 });
 
 router.get("/:id/workspace/file", async (req, res) => {
-  const ownerUuid = requireUserId(req, res);
-  if (!ownerUuid) return;
-  const row = getSessionById(ownerUuid, req.params.id);
-  if (!row) {
-    sendError(res, "NOT_FOUND", "Session not found");
-    return;
-  }
+  const row = requestSession(req);
   if (row.workspace_kind !== "sandbox") {
     sendError(
       res,
@@ -217,8 +202,6 @@ router.get("/:id/workspace/file", async (req, res) => {
 });
 
 router.post("/:id/workspace/reveal", async (req, res) => {
-  const ownerUuid = requireUserId(req, res);
-  if (!ownerUuid) return;
   if (!isLoopbackRequest(req)) {
     sendError(
       res,
@@ -227,11 +210,7 @@ router.post("/:id/workspace/reveal", async (req, res) => {
     );
     return;
   }
-  const row = getSessionById(ownerUuid, req.params.id);
-  if (!row) {
-    sendError(res, "NOT_FOUND", "Session not found");
-    return;
-  }
+  const row = requestSession(req);
   if (row.workspace_kind !== "local") {
     sendError(res, "FORBIDDEN", "Only local workspace files can be revealed");
     return;
@@ -273,14 +252,8 @@ router.get("/", (req, res) => {
 });
 
 router.get("/:id", (req, res) => {
-  const ownerUuid = requireUserId(req, res);
-  if (!ownerUuid) return;
-  const id = req.params.id;
-  const row = getSessionById(ownerUuid, id);
-  if (!row) {
-    sendError(res, "NOT_FOUND", "Session not found");
-    return;
-  }
+  const row = requestSession(req);
+  const { owner_uuid: ownerUuid, id } = row;
   const history = getMessagesForSession(ownerUuid, id);
   res.json({
     id: row.id,
@@ -321,14 +294,7 @@ router.post("/", async (req, res) => {
 });
 
 router.patch("/:id", (req, res) => {
-  const ownerUuid = requireUserId(req, res);
-  if (!ownerUuid) return;
-  const id = req.params.id;
-  const row = getSessionById(ownerUuid, id);
-  if (!row) {
-    sendError(res, "NOT_FOUND", "Session not found");
-    return;
-  }
+  const { owner_uuid: ownerUuid, id } = requestSession(req);
   const parsed = PatchSessionBodySchema.safeParse(req.body);
   if (!parsed.success) {
     sendValidationError(res, parsed.error);
@@ -353,14 +319,7 @@ router.patch("/:id", (req, res) => {
 });
 
 router.delete("/:id", async (req, res) => {
-  const ownerUuid = requireUserId(req, res);
-  if (!ownerUuid) return;
-  const row = getSessionById(ownerUuid, req.params.id);
-  if (!row) {
-    sendError(res, "NOT_FOUND", "Session not found");
-    return;
-  }
-  const ok = await deleteSession(row);
+  const ok = await deleteSession(requestSession(req));
   if (!ok) {
     sendError(res, "NOT_FOUND", "Session not found");
     return;

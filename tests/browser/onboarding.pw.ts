@@ -1,5 +1,8 @@
 import { type Page, expect, test } from "@playwright/test";
-import type { UserPreferences } from "../../src/schemas/userPreferences";
+import type {
+  UserPreferences,
+  UserPreferencesPatch,
+} from "../../src/schemas/userPreferences";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 type Fulfill = { status?: number; json: unknown };
@@ -35,13 +38,15 @@ function defaultApi(path: string, body: unknown): unknown {
 }
 
 /**
- * Serves a fresh server with per-user preferences in `preferences`, and records
+ * Serves a fresh server with per-user preferences in `preferences`, starting
+ * from `initial`, and records
  * every other write the setup makes.
  */
 async function routeApi(
   page: Page,
   respond: Respond = () => null,
   preferences = new Map<string, UserPreferences>(),
+  initial: UserPreferencesPatch = {},
 ) {
   const writes: { path: string; body: unknown }[] = [];
   await page.route("**/api/**", (route) => {
@@ -49,7 +54,7 @@ async function routeApi(
     const path = new URL(request.url()).pathname;
     return route.fulfill({ json: defaultApi(path, request.postDataJSON()) });
   });
-  await mockUserPreferences(page, preferences);
+  await mockUserPreferences(page, preferences, initial);
   // Registered last, so it sees each request before the handlers above.
   await page.route("**/api/**", (route) => {
     const request = route.request();
@@ -223,23 +228,16 @@ test("onboarding desktop: a failed save keeps the step and its draft", async ({
   );
   await expect(page.getByRole("heading", { name: "About you" })).toBeVisible();
   await expect(page.getByLabel("Name (optional)")).toHaveValue("Unsaved");
-  expect(savedSettings(preferences)).toEqual([
-    expect.objectContaining({ name: "" }),
-  ]);
+  expect(savedSettings(preferences)).toEqual([]);
 });
 
 test("onboarding desktop: skipped drafts are discarded and never reach later saves", async ({
   page,
 }) => {
-  await page.addInitScript(() => {
-    if (!localStorage.getItem("euler:userSettings"))
-      localStorage.setItem(
-        "euler:userSettings",
-        JSON.stringify({ defaultModel: "qwen3:8b" }),
-      );
-  });
   const preferences = new Map<string, UserPreferences>();
-  const writes = await routeApi(page, undefined, preferences);
+  const writes = await routeApi(page, undefined, preferences, {
+    settings: { defaultModel: "qwen3:8b" },
+  });
   await page.goto("/dev/onboarding");
   await page.getByLabel("Name (optional)").fill("Leaked");
   await button(page, "Skip").click();

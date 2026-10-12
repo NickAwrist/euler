@@ -79,10 +79,6 @@ export function serializeError(
   };
 }
 
-export function currentRequestId(): string | undefined {
-  return context.getStore()?.requestId;
-}
-
 /** Adds identifiers to every event logged while `run` executes. */
 export function withLogContext<T>(fields: LogContext, run: () => T): T {
   return context.run({ ...context.getStore(), ...fields }, run);

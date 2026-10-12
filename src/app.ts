@@ -19,6 +19,7 @@ import faviconsRoutes from "./routes/favicons";
 import mcpServersRoutes from "./routes/mcpServers";
 import modelsRoutes from "./routes/models";
 import ollamaRoutes from "./routes/ollama";
+import openRouterRoutes from "./routes/openrouter";
 import sessionRoutes from "./routes/sessions";
 import settingsRoutes from "./routes/settings";
 import skillsRoutes from "./routes/skills";
@@ -53,6 +54,7 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use("/api/usage", usageRoutes);
 app.use("/api/directories", directoriesRoutes);
+app.use("/api/settings/openrouter", openRouterRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/skills", skillsRoutes);
 app.use("/api/mcp-servers", mcpServersRoutes);

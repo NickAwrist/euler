@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   parseInputCapabilities,
   parseModelReasoning,
-} from "../../../src/modelCapabilities";
+} from "../../../src/models/modelCapabilities";
 import { createApiError } from "../../lib/apiError";
 import { userScopedFetch } from "../../persist/userIdentity";
 import type { ModelOption, ModelReasoning } from "../../types";

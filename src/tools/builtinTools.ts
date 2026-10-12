@@ -8,7 +8,6 @@ import { FetchWebPageTool } from "./fetch_web_page";
 import { GenerateImageTool } from "./generate_image";
 import { GrepTool } from "./grep";
 import { ListFilesTool } from "./list_files";
-import { ModifyPlan } from "./modify_plan";
 import { ReadFileTool } from "./read_file";
 import { WebSearchTool } from "./web_search";
 
@@ -29,7 +28,6 @@ export const BUILTIN_TOOL_REGISTRY = [
     capability: "files",
     create: () => new ListFilesTool(),
   },
-  { name: "modify_plan", capability: null, create: () => new ModifyPlan() },
   { name: "read_file", capability: "files", create: () => new ReadFileTool() },
   {
     name: "apply_patch",
@@ -50,7 +48,7 @@ export const BUILTIN_TOOL_REGISTRY = [
   },
 ] as const satisfies readonly {
   name: string;
-  capability: keyof Capabilities | null;
+  capability: keyof Capabilities;
   create(): BaseTool;
 }[];
 

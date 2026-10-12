@@ -4,10 +4,7 @@ import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { permissionService } from "../../src/permissions/PermissionService";
-import {
-  BubblewrapSandboxRunner,
-  type SandboxRunner,
-} from "../../src/sandbox/SandboxRunner";
+import { BubblewrapSandboxRunner } from "../../src/sandbox/SandboxRunner";
 import { discoverToolchains } from "../../src/sandbox/toolchains";
 import type { Workspace } from "../../src/workspaces/WorkspaceService";
 
@@ -58,11 +55,13 @@ describe("bubblewrap sandbox runner", () => {
           hostPath,
           displayPath: "/workspace",
         };
-        const result = await new BubblewrapSandboxRunner().run({
-          workspace,
-          permissions: permissionService.resolve(workspace),
-          command: "touch created.txt; id -u",
-        });
+        const result = await new BubblewrapSandboxRunner()
+          .spawn({
+            workspace,
+            permissions: permissionService.resolve(workspace),
+            command: "touch created.txt; id -u",
+          })
+          .then(({ completion }) => completion);
         expect(result.exitCode).toBe(0);
         expect(result.stdout.trim()).toBe("1000");
         expect((await fs.stat(join(hostPath, "created.txt"))).uid).toBe(1000);
@@ -83,11 +82,13 @@ describe("bubblewrap sandbox runner", () => {
       await fs.chown(parent, 1000, 1000);
       await fs.chown(hostPath, 1000, 1000);
 
-      const result = await new BubblewrapSandboxRunner().run({
-        permissions: permissionService.resolve({ kind: "local" }),
-        command: "touch created.txt; id -u",
-        workspace: { kind: "local", hostPath, displayPath: "/workspace" },
-      });
+      const result = await new BubblewrapSandboxRunner()
+        .spawn({
+          permissions: permissionService.resolve({ kind: "local" }),
+          command: "touch created.txt; id -u",
+          workspace: { kind: "local", hostPath, displayPath: "/workspace" },
+        })
+        .then(({ completion }) => completion);
 
       expect(result.exitCode).toBe(0);
       expect(result.stdout.trim()).toBe("1000");
@@ -98,14 +99,16 @@ describe("bubblewrap sandbox runner", () => {
   test.skipIf(capability.available)(
     "fails closed when containment is unavailable",
     async () => {
-      const runner: SandboxRunner = new BubblewrapSandboxRunner();
+      const runner = new BubblewrapSandboxRunner();
 
       await expect(
-        runner.run({
-          permissions: permissionService.resolve({ kind: "sandbox" }),
-          command: "pwd",
-          workspace: await workspace(),
-        }),
+        runner
+          .spawn({
+            permissions: permissionService.resolve({ kind: "sandbox" }),
+            command: "pwd",
+            workspace: await workspace(),
+          })
+          .then(({ completion }) => completion),
       ).rejects.toThrow("Shell tools are disabled");
     },
   );
@@ -116,12 +119,14 @@ describe("bubblewrap sandbox runner", () => {
       const runner = new BubblewrapSandboxRunner();
       const activeWorkspace = await workspace();
 
-      const result = await runner.run({
-        permissions: permissionService.resolve(activeWorkspace),
-        command:
-          "touch /workspace/inside.txt; touch /usr/orbis-sandbox-escape-test",
-        workspace: activeWorkspace,
-      });
+      const result = await runner
+        .spawn({
+          permissions: permissionService.resolve(activeWorkspace),
+          command:
+            "touch /workspace/inside.txt; touch /usr/orbis-sandbox-escape-test",
+          workspace: activeWorkspace,
+        })
+        .then(({ completion }) => completion);
 
       expect(
         await fs.readFile(join(activeWorkspace.hostPath, "inside.txt")),
@@ -138,12 +143,14 @@ describe("bubblewrap sandbox runner", () => {
     async () => {
       const runner = new BubblewrapSandboxRunner();
 
-      const result = await runner.run({
-        permissions: permissionService.resolve({ kind: "sandbox" }),
-        command:
-          "python3 -c \"import socket; socket.create_connection(('1.1.1.1', 53), 0.2)\"",
-        workspace: await workspace(),
-      });
+      const result = await runner
+        .spawn({
+          permissions: permissionService.resolve({ kind: "sandbox" }),
+          command:
+            "python3 -c \"import socket; socket.create_connection(('1.1.1.1', 53), 0.2)\"",
+          workspace: await workspace(),
+        })
+        .then(({ completion }) => completion);
       expect(result.exitCode).not.toBe(0);
     },
   );
@@ -152,11 +159,13 @@ describe("bubblewrap sandbox runner", () => {
 test.skipIf(!capability.available || !existsSync("/etc/alternatives/awk"))(
   "runs alternatives-backed executables inside the sandbox",
   async () => {
-    const result = await new BubblewrapSandboxRunner().run({
-      permissions: permissionService.resolve({ kind: "sandbox" }),
-      command: "awk 'BEGIN { print 42 }'",
-      workspace: await workspace(),
-    });
+    const result = await new BubblewrapSandboxRunner()
+      .spawn({
+        permissions: permissionService.resolve({ kind: "sandbox" }),
+        command: "awk 'BEGIN { print 42 }'",
+        workspace: await workspace(),
+      })
+      .then(({ completion }) => completion);
     expect(result.exitCode).toBe(0);
     expect(result.stdout.trim()).toBe("42");
   },

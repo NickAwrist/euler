@@ -33,3 +33,23 @@ export function createAgentRecord(
     automaticTurns: 0,
   };
 }
+
+/** A chat's main agent, idle until the user sends a message. */
+export function createMainAgentRecord(
+  ownerUuid: string,
+  sessionId: string,
+  model: string,
+): AgentRecord {
+  return createAgentRecord({
+    ownerUuid,
+    sessionId,
+    parentId: null,
+    kind: "main",
+    title: MAIN_AGENT_TITLE,
+    status: "idle",
+    model,
+    spawnPosition: 0,
+    activity: "",
+    config: {},
+  });
+}

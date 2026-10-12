@@ -1,6 +1,6 @@
 import type { OutputAttachment } from "../../attachments/types";
 import { DEFAULT_RUN_MODEL } from "../../constants";
-import { MAIN_AGENT_TITLE, createAgentRecord } from "../../db/agentRecord";
+import { createAgentRecord, createMainAgentRecord } from "../../db/agentRecord";
 import { type AgentRecord, AgentStore } from "../../db/agents";
 import {
   appendRuntimeMessage,
@@ -202,18 +202,11 @@ export class AgentRuntime {
     if (existing) return existing;
     const session = getSessionById(owner, sessionId);
     if (!session) throw new Error("Session not found");
-    const agent = createAgentRecord({
-      ownerUuid: owner,
+    const agent = createMainAgentRecord(
+      owner,
       sessionId,
-      parentId: null,
-      kind: "main",
-      title: MAIN_AGENT_TITLE,
-      status: "idle",
-      model: session.model ?? DEFAULT_RUN_MODEL,
-      spawnPosition: 0,
-      activity: "",
-      config: {},
-    });
+      session.model ?? DEFAULT_RUN_MODEL,
+    );
     this.store.save(agent);
     return agent;
   }
@@ -584,18 +577,10 @@ export class AgentRuntime {
   toolCatalog(ownerUuid: string): BaseTool[] {
     const signal = new AbortController().signal;
     return (["main", "general"] as const).flatMap((kind) => {
-      const agent = createAgentRecord({
-        ownerUuid,
-        sessionId: "",
-        parentId: null,
+      const agent: AgentRecord = {
+        ...createMainAgentRecord(ownerUuid, "", DEFAULT_RUN_MODEL),
         kind,
-        title: "",
-        status: "idle",
-        model: DEFAULT_RUN_MODEL,
-        spawnPosition: 0,
-        activity: "",
-        config: {},
-      });
+      };
       return this.tools(
         agent,
         signal,

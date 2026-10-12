@@ -1,4 +1,8 @@
 import { type Page, expect, test } from "@playwright/test";
+import {
+  type Appearance,
+  userPreferencesSchema,
+} from "../../src/schemas/userPreferences";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 // These checks exercise returning users; first-visit setup has its own suite.
@@ -581,14 +585,10 @@ test("chat sidebar desktop keeps a remembered files panel closed for an empty wo
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockApp(page);
-  await page.addInitScript(() =>
-    localStorage.setItem(
-      "euler:artifactSidebarState",
-      JSON.stringify({ open: true, workspace: "", path: null }),
-    ),
-  );
   const tree = page.waitForResponse("**/artifacts/tree?*");
-  await mockUserPreferences(page);
+  await mockUserPreferences(page, undefined, {
+    layout: { artifactState: { open: true, workspace: "", path: null } },
+  });
   await page.goto("/run/sidebar-test");
   await tree;
   await expect(page).toHaveTitle("Sidebar test chat · Euler");
@@ -645,17 +645,10 @@ test("chat sidebar desktop jumps to the latest message after scrolling up", asyn
 async function openLayoutChat(
   page: Page,
   width: number,
-  appearance: Record<string, unknown>,
+  appearance: Partial<Appearance>,
 ) {
   await page.setViewportSize({ width, height: 900 });
   await mockApp(page);
-  await page.addInitScript((appearance) => {
-    localStorage.setItem(
-      "euler:appearance",
-      JSON.stringify({ sidebarAnimationMs: 0, ...appearance }),
-    );
-    localStorage.setItem("euler:artifactSidebarWidth", "560");
-  }, appearance);
   await page.route("**/artifacts/tree?*", (route) =>
     route.fulfill({
       json: {
@@ -663,7 +656,10 @@ async function openLayoutChat(
       },
     }),
   );
-  await mockUserPreferences(page);
+  await mockUserPreferences(page, undefined, {
+    appearance: { sidebarAnimationMs: 0, ...appearance },
+    layout: { artifactWidth: 560 },
+  });
   await page.goto("/run/sidebar-test");
   await expect(page.getByText("Check the sidebar controls.")).toBeVisible();
   const chats = page.getByRole("button", { name: "Toggle chats", exact: true });
@@ -738,15 +734,14 @@ test("chat sidebar mobile chat uses the full width with any setting", async ({
 test("chat sidebar desktop: narrow windows do not overwrite the shared artifact width", async ({
   page,
 }) => {
-  const store = new Map<
-    string,
-    import("../../src/schemas/userPreferences").UserPreferences
-  >();
   const user = "11111111-1111-4111-8111-111111111111";
-  await page.addInitScript((user) => {
-    localStorage.setItem("euler:userUuid", user);
-    localStorage.setItem("euler:artifactSidebarWidth", "800");
-  }, user);
+  const store = new Map([
+    [user, userPreferencesSchema.parse({ layout: { artifactWidth: 800 } })],
+  ]);
+  await page.addInitScript(
+    (user) => localStorage.setItem("euler:userUuid", user),
+    user,
+  );
   await page.setViewportSize({ width: 1000, height: 900 });
   await mockApp(page);
   await mockUserPreferences(page, store);
@@ -754,7 +749,6 @@ test("chat sidebar desktop: narrow windows do not overwrite the shared artifact 
   await expect(
     page.getByRole("button", { name: "Toggle artifacts" }),
   ).toBeVisible();
-  await expect.poll(() => store.get(user)?.layout.artifactWidth).toBe(800);
   await expect(page.locator("#artifact-sidebar")).toHaveCSS("width", "400px");
   await page.setViewportSize({ width: 1600, height: 900 });
   await page.getByRole("button", { name: "Toggle artifacts" }).click();

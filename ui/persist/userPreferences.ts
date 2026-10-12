@@ -1,5 +1,4 @@
 import type { z } from "zod";
-import { legacyUserPreferencesSchema } from "../../src/schemas/legacyUserPreferences";
 import {
   type ToolPermissionRule,
   ToolPermissionRuleSchema,
@@ -12,7 +11,6 @@ import {
   userPreferencesSchema,
 } from "../../src/schemas/userPreferences";
 import { type ApiRequestOptions, userApiJson } from "../lib/api";
-import { safeStorage } from "../lib/safeStorage";
 
 let preferences = userPreferencesSchema.parse({});
 export function getUserPreferences(): UserPreferences {
@@ -20,39 +18,9 @@ export function getUserPreferences(): UserPreferences {
 }
 
 export async function initializeUserPreferences(): Promise<void> {
-  const saved: unknown = await userApiJson("/api/settings/user");
-  if (saved !== null) {
-    preferences = userPreferencesSchema.parse(saved);
-  } else {
-    const legacy = legacyUserPreferencesSchema.parse({
-      settings: safeStorage.getJSON<unknown>("euler:userSettings", {}),
-      appearance: safeStorage.getJSON<unknown>("euler:appearance", {}),
-      layout: {
-        sidebarCollapsed:
-          safeStorage.getItem("euler:sidebarCollapsed") === "true",
-        artifactWidth:
-          Number(safeStorage.getItem("euler:artifactSidebarWidth")) || null,
-        artifactState: safeStorage.getJSON<unknown>(
-          "euler:artifactSidebarState",
-          {},
-        ),
-      },
-    });
-    preferences = userPreferencesSchema.parse(
-      await userApiJson("/api/settings/user", {
-        method: "PUT",
-        json: legacy,
-      }),
-    );
-  }
-  for (const key of [
-    "euler:userSettings",
-    "euler:appearance",
-    "euler:sidebarCollapsed",
-    "euler:artifactSidebarWidth",
-    "euler:artifactSidebarState",
-  ])
-    safeStorage.removeItem(key);
+  preferences = userPreferencesSchema.parse(
+    await userApiJson("/api/settings/user"),
+  );
 }
 
 let pending: Promise<unknown> = Promise.resolve();

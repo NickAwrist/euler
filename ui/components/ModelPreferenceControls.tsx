@@ -1,6 +1,6 @@
 import { Star, X } from "lucide-react";
 import { useEffect } from "react";
-import { NEW_MODEL_DAYS } from "../../src/newModels";
+import { NEW_MODEL_DAYS } from "../../src/models/newModels";
 import { cx } from "../styles";
 
 export function FavoriteButton({

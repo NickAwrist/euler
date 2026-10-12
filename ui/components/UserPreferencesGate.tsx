@@ -8,6 +8,8 @@ export function UserPreferencesGate({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    // Effects can re-run after loading, such as when Suspense reveals content.
+    if (ready) return;
     let cancelled = false;
     setError(null);
     void initializeUserPreferences()
@@ -25,7 +27,7 @@ export function UserPreferencesGate({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [attempt]);
+  }, [attempt, ready]);
   if (!ready)
     return (
       <output>

@@ -7,17 +7,17 @@ import {
   setOpenRouterModelEnabled,
   setPublisherSubscription,
 } from "../src/db/openrouter";
-import { isNewModel } from "../src/newModels";
+import { isNewModel } from "../src/models/newModels";
 import {
   OpenRouterCatalog,
   isInteractiveModel,
   normalizeCatalog,
-} from "../src/openRouterModels";
+} from "../src/models/openRouterModels";
 import {
   publisherModels,
   publisherOverview,
-} from "../src/openRouterPreferences";
-import { getCatalogPreferences } from "../src/openRouterPreferences";
+} from "../src/models/openRouterPreferences";
+import { getCatalogPreferences } from "../src/models/openRouterPreferences";
 
 const remoteModel = {
   id: "openai/test",

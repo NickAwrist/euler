@@ -1,41 +1,18 @@
-import { getDb } from "./connection";
-import { LEGACY_USER_DATA_CLAIMED_BY_KEY } from "./constants";
+import type { Database } from "bun:sqlite";
+import { getDb, transaction } from "./connection";
 import { seedDefaultSkills } from "./skills/queries";
+
+/** Owners already set up, per connection, so requests skip the transaction. */
+const readyOwners = new WeakMap<Database, Set<string>>();
 
 export function ensureUserData(ownerUuid: string): void {
   const db = getDb();
-  const tx = db.transaction(() => {
-    const legacyOwner = db
-      .query("SELECT value FROM app_settings WHERE key = ?")
-      .get(LEGACY_USER_DATA_CLAIMED_BY_KEY) as { value: string } | null;
-    const hasLegacyData =
-      db
-        .query("SELECT 1 FROM sessions WHERE owner_uuid IS NULL LIMIT 1")
-        .get() != null;
-
-    if (!legacyOwner && hasLegacyData) {
-      db.run("UPDATE sessions SET owner_uuid = ? WHERE owner_uuid IS NULL", [
-        ownerUuid,
-      ]);
-      db.run("INSERT INTO app_settings (key, value) VALUES (?, ?)", [
-        LEGACY_USER_DATA_CLAIMED_BY_KEY,
-        ownerUuid,
-      ]);
-    }
-    if (
-      db
-        .query(
-          "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'legacy_model_favorites'",
-        )
-        .get()
-    ) {
-      db.run(
-        "INSERT OR IGNORE INTO model_favorites (owner_uuid, provider, model_id) SELECT ?, provider, model_id FROM legacy_model_favorites",
-        [legacyOwner?.value ?? ownerUuid],
-      );
-      db.run("DROP TABLE legacy_model_favorites");
-    }
-    seedDefaultSkills(ownerUuid);
-  });
-  tx();
+  let owners = readyOwners.get(db);
+  if (!owners) {
+    owners = new Set();
+    readyOwners.set(db, owners);
+  }
+  if (owners.has(ownerUuid)) return;
+  transaction(() => seedDefaultSkills(ownerUuid));
+  owners.add(ownerUuid);
 }

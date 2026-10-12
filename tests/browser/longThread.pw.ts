@@ -20,6 +20,15 @@ test("long thread skips history work during typing and streaming", async ({
     page.evaluate(() => performance.clearMarks("history-read"));
   const readCount = () =>
     page.evaluate(() => performance.getEntriesByName("history-read").length);
+  // Rows keep measuring for a few hundred milliseconds after the thread first
+  // appears. Count history work only once a 200ms window passes without any.
+  await expect
+    .poll(async () => {
+      await clearReads();
+      await page.waitForTimeout(200);
+      return readCount();
+    })
+    .toBe(0);
 
   await clearReads();
   await page

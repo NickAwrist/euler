@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   InputCapability,
   parseInputCapabilities,
-} from "../src/modelCapabilities";
+} from "../src/models/modelCapabilities";
 
 describe("input capabilities", () => {
   test("accepts known provider values and rejects unknown values", () => {

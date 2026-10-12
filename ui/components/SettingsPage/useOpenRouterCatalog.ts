@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { catalogSettings } from "../../../src/openRouterPreferences";
+import type { catalogSettings } from "../../../src/models/openRouterPreferences";
 import { modelSettingsRequest } from "../../lib/modelSettingsRequest";
 
 export type CatalogSettings = ReturnType<typeof catalogSettings>;

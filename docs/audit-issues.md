@@ -64,8 +64,9 @@ works. An e2e test covers the rejection.
 ### SEC-2. No authentication on filesystem and settings routes (High, M)
 
 **Where:** `src/userIdentity.ts`, `src/routes/directories.ts`,
-`src/routes/sessions.ts` (`select-directory`), `src/routes/settings.ts` (API keys
-and OpenRouter publisher routes have no owner check).
+`src/routes/sessions.ts` (`select-directory`), `src/routes/settings.ts` and
+`src/routes/openrouter.ts` (API keys and OpenRouter publisher routes have no
+owner check).
 
 **Problem:** Identity comes from the client. `/api/directories` lists any
 directory on the host. `select-directory` binds any readable and writable
@@ -202,19 +203,17 @@ the truncation note.
 ### TOOL-3. Tool arguments are validated two different ways (Medium, M)
 
 **Where:** `parseToolArgs` with Zod in `bash.ts`, `spawn_agent.ts`,
-`send_message.ts`, `ask_parent.ts`, `cancel_agent.ts`, and `jobs.ts`, compared
-with hand-written `typeof` checks in `read_file.ts`, `grep.ts`,
-`list_files.ts`, `web_search.ts`, `fetch_web_page.ts`, `generate_image.ts`,
-`create_file.ts`, and `delete_file.ts`. Each tool also hand-writes its JSON
-schema in `toTool()`.
+`send_message.ts`, `ask_parent.ts`, `cancel_agent.ts`, `jobs.ts`,
+`read_file.ts`, `create_file.ts`, and `delete_file.ts`, compared with
+hand-written `typeof` checks in `grep.ts`, `list_files.ts`, `web_search.ts`,
+`fetch_web_page.ts`, and `generate_image.ts`. Each tool also hand-writes its
+JSON schema in `toTool()`.
 
 **Problem:** There are two validation styles, and the JSON schemas can drift
-from the actual checks. `read_file` silently accepts an undocumented `filename`
-alias.
+from the actual checks.
 
 **Fix:** Give each tool a Zod schema. Generate `toTool()` parameters with
-`z.toJSONSchema(schema)` and validate with `parseToolArgs`. Remove the
-`filename` alias.
+`z.toJSONSchema(schema)` and validate with `parseToolArgs`.
 
 ### TOOL-4. Every activation re-encodes all history images (Medium, S)
 
@@ -382,74 +381,17 @@ current requirement. Before deleting a migration, confirm the production
 database has already run it, for example by checking that the old column or
 table no longer exists.
 
-### LEG-1. Column-adding migrations run on every startup (Medium, S)
+### LEG-4. Retired ComfyUI image default rows remain (Low, S)
 
-**Where:** `src/db/migrations.ts`: `migrateSessionsDirectoryColumn`,
-`migrateSessionsWorkspaceKindColumn`, `migrateSessionsOwnerColumn`,
-`migrateMessagesAttachmentsColumn`, `migrateSkillInvocationColumns`,
-`migrateMessagesVersionsColumn`, the `activation_id` and
-`last_activity_at`/`last_viewed_at` additions in `runMigrations`,
-`migrateRemoveAgents`, the `searxng_host` delete, the
-`openrouter_models_seeded_v*` deletes, and the `legacy_model_favorites` rename
-inside `migrateOpenRouterCatalog`.
+**Where:** `app_settings` rows `comfyui_default_model`, `comfyui_default_width`,
+`comfyui_default_height`, and `comfyui_negative_prompt`. No code reads them
+since defaults come from `userPreferencesSchema.parse({})`.
 
-**Fix:** Put the current columns directly in the `CREATE TABLE` statements in
-`src/db/connection.ts`. Keep only `CREATE TABLE/INDEX IF NOT EXISTS` and the
-publisher seeding. Delete the migration functions.
-
-### LEG-2. One-shot data migrations are still present (Medium, S)
-
-**Where:**
-- `src/db/agentTables.ts`: `moveHistory` (its own comment says to delete it
-  once it has run)
-- `src/db/attachmentMetadataMigration.ts`
-- `src/db/jobErrorMigration.ts` (landed October 2; confirm it has been deployed)
-- `src/db/users.ts`: legacy owner claim (`LEGACY_USER_DATA_CLAIMED_BY_KEY`) and
-  the `legacy_model_favorites` copy
-- Tests: `tests/db/agentHistory.test.ts` (only the migration part, if any),
-  `tests/db/attachmentMetadata.test.ts`, `tests/db/jobErrorMigration.test.ts`,
-  `tests/db/userOwnershipMigration.test.ts`
-
-**Fix:** Delete the code, the tests, and the unused constants in
-`src/db/constants.ts`. `ensureUserData` then only seeds default skills, so see
-`API-3`.
-
-### LEG-3. Browser preference migration and its schema (Low, S)
-
-**Where:** `ui/persist/userPreferences.ts` (the localStorage branch of
-`initializeUserPreferences`), `src/schemas/legacyUserPreferences.ts`,
-`tests/ui/legacyUserPreferences.test.ts`.
-
-**Problem:** Each browser migrates its own localStorage. Once every browser you
-use has loaded the app since PR #67, this branch is dead.
-
-**Fix:** After confirming, treat a `null` response from `GET /api/settings/user`
-as "use defaults" and delete the legacy schema, branch, and test.
-
-### LEG-4. Global ComfyUI image defaults seed user preferences (Low, S)
-
-**Where:** `src/db/userPreferences.ts` (`defaultUserPreferences`),
-`src/db/settings.ts` (`getComfyUIDefaultModel`, `getComfyUIImageSize`,
-`getComfyUINegativePrompt`), and the `COMFYUI_DEFAULT_*` keys in
-`src/db/constants.ts`.
-
-**Fix:** Defaults come from `userPreferencesSchema.parse({})`. Delete the global
-keys and getters, and delete the rows from `app_settings` once.
-
-### LEG-5. Compatibility branch for raw OpenRouter model routes (Low, S)
-
-**Where:** `src/llm/modelSelection.ts` ("Accept the raw route for compatibility
-with early OpenRouter builds").
-
-**Problem:** It runs a DB lookup on every model resolution, which happens on
-every message, every usage record, and every model call.
-
-**Fix:** Delete the branch. Run a one-shot update for any `sessions.model` or
-agent `model` values stored without the `openrouter:` prefix.
+**Fix:** Delete the rows once from the production database.
 
 ### LEG-6. Docker networking hints after Docker was removed (Low, S)
 
-**Where:** `src/containerNetworkHint.ts`, used in `src/routes/ollama.ts` and
+**Where:** `src/models/containerNetworkHint.ts`, used in `src/routes/ollama.ts` and
 `src/routes/comfyui.ts`. Docker deployment was removed in `2fe581b`.
 
 **Fix:** Delete the module and its two call sites.
@@ -485,7 +427,6 @@ state with a clear message.
   (only ever called as `run("", ctx)`), the `userMessage`/`userImages` path, and
   the unused `name`/`description` fields if nothing reads them after
   `RunContext.agentName` (check before removing)
-- `src/agents/agentManager.ts`: `getToolInstance`
 - `src/http/asyncRoute.ts`: Express 5 already forwards rejected promises (see
   `CONS-3`)
 - The `/api/runs` 404 assertion in `tests/e2e/asyncAgents.test.ts`, which tests
@@ -611,7 +552,7 @@ callers. AGENTS.md already says type annotations do not validate data.
 
 ### TYPE-4. Ollama SDK private fields read through double casts (Low, S)
 
-**Where:** `src/ollamaClient.ts` (two places), `src/routes/ollama.ts`
+**Where:** `normalizeOllamaHost` in `src/models/ollamaClient.ts`
 (`as unknown as { config: { host: string } }`).
 
 **Fix:** Normalize the host URL in project code (default
@@ -725,16 +666,6 @@ session for the first user message).
 
 **Fix:** Use one query with a correlated subquery for the first user message
 per session.
-
-### API-3. Every request runs a user-setup transaction, often twice (Low, S)
-
-**Where:** `src/userIdentity.ts` (`requireUserId` calls `ensureUserData` every
-time), `src/routes/agentActions.ts` (called in middleware and again in each
-handler).
-
-**Fix:** After `LEG-2`, `ensureUserData` only seeds skills. Cache seeded owners
-in memory and skip the transaction for them. In `agentActions`, have the
-middleware store the owner on `res.locals` and read it in handlers.
 
 ### API-4. Title patch logic is convoluted (Low, S)
 
@@ -999,7 +930,7 @@ Add these with the related fixes:
 
 ### TEST-4. Tests for removed behavior (Low, S)
 
-Delete them with the code they cover: see `LEG-2`, `LEG-3`, and `LEG-9`.
+Delete them with the code they cover: see `LEG-9`.
 
 ### TEST-5. Fixed polling deadlines can be flaky (Low, S)
 
@@ -1062,9 +993,7 @@ then checking the applied release's source SHA in `deployctl status`.
 
 ### DX-2. Configuration is read outside `envConfig` (Low, S)
 
-**Where:** `src/jobs/JobManager.ts` reads `EULER_MAX_SESSION_JOBS` and
-`EULER_MAX_OWNER_JOBS` from `process.env` (both undocumented),
-`src/db/constants.ts` reads `EULER_DB_PATH`, `EULER_DATA_ROOT`, and
+**Where:** `src/db/constants.ts` reads `EULER_DB_PATH`, `EULER_DATA_ROOT`, and
 `DEPLOYCTL_DATA_DIR`, and `src/observability/logger.ts` reads `LOG_LEVEL`.
 
 **Fix:** Read all configuration through `src/env.ts` and document each variable
@@ -1103,8 +1032,7 @@ the request with a clear "choose a model" error.
 **Problem:** `Number.parseInt` accepts values such as `3000junk` as port 3000.
 Other malformed ports, booleans, and limits silently use defaults. A typo can
 therefore change deployment behavior without telling the operator which setting
-was invalid. Job limits use stricter Zod parsing, so configuration behavior is
-also inconsistent.
+was invalid.
 
 **Fix:** Validate nonempty values exactly, name the invalid environment variable
 in startup errors, and share the same parsing rules between server and Vite.
@@ -1119,7 +1047,7 @@ invalid configured values cannot silently select a different port or limit.
 
 1. **Security day:** `SEC-1`, `SEC-3`, `SEC-4` (with `API-1`), then `SEC-2`.
 2. **Agent quality:** `TOOL-1`, `TOOL-2`, `LLM-1`, `LLM-2`, `OBS-2`.
-3. **Cleanup:** `LEG-1` through `LEG-9`, `TEST-4`, `DX-5`.
+3. **Cleanup:** `LEG-4`, `LEG-6` through `LEG-11`, `TEST-4`, `DX-5`.
 4. **Safety net:** `TEST-1`, `TEST-2`.
 5. **Contracts:** `TYPE-1`, `TYPE-2`, `TYPE-3`.
 6. **Structural:** `ARCH-2` with `FE-1`.

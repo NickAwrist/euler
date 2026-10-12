@@ -4,7 +4,7 @@ import { AgentRuntime } from "../../src/agents/runtime/AgentRuntime";
 import { setOpenRouterApiKey } from "../../src/db";
 import { AgentStore } from "../../src/db/agents";
 import { getDb } from "../../src/db/connection";
-import { runMigrations } from "../../src/db/migrations";
+import { createSchema } from "../../src/db/schema";
 import { createSessionRow, getMessagesForSession } from "../../src/db/sessions";
 import { workspaceService } from "../../src/workspaces/WorkspaceService";
 import {
@@ -53,7 +53,7 @@ test("restart preserves an interrupted main reply without retrying and repairs c
   };
   first.store.save(child);
   first.store.saveHistory(child, child.history);
-  runMigrations(getDb());
+  createSchema(getDb());
   const recovered = new AgentRuntime();
   recovered.recover();
   expect(getMessagesForSession(owner, id)[0]?.content).toContain(

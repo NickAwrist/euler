@@ -33,13 +33,15 @@ test("background cancellation tears down descendants and output overflow does no
     expect(
       await readFile(`${root}/leaked.txt`, "utf8").catch(() => null),
     ).toBeNull();
-    const overflow = await runner.run({
-      permissions: permissionService.resolve(workspace),
-      workspace,
-      background: true,
-      command: "yes X | head -c 3000000; echo DONE",
-      maxOutputBytes: 100,
-    });
+    const overflow = await runner
+      .spawn({
+        permissions: permissionService.resolve(workspace),
+        workspace,
+        background: true,
+        command: "yes X | head -c 3000000; echo DONE",
+        maxOutputBytes: 100,
+      })
+      .then(({ completion }) => completion);
     expect(overflow.exitCode).toBe(0);
     expect(overflow.stdout.endsWith("DONE\n")).toBe(true);
     expect(Buffer.byteLength(overflow.stdout)).toBeLessThanOrEqual(65536);
