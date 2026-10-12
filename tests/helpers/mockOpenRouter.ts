@@ -1,4 +1,6 @@
 export type OpenRouterScenario =
+  | "blocking-permission"
+  | "tool-permissions"
   | "background-jobs"
   | "async-agents"
   | "agent-question"
@@ -81,7 +83,7 @@ export async function handleOpenRouterRequest(
   const body = (await request.json()) as Record<string, unknown>;
   requests.push({ headers: request.headers, body });
 
-  if (scenario === "background-jobs") {
+  if (scenario === "background-jobs" || scenario === "tool-permissions") {
     const messages = body.messages as Array<{ role: string; content: string }>;
     const lastUser = messages.findLast(
       (m) => m.role === "user" && !m.content.startsWith("<"),
@@ -129,7 +131,7 @@ export async function handleOpenRouterRequest(
                 name: "bash",
                 arguments: JSON.stringify({
                   command,
-                  background: true,
+                  background: scenario === "background-jobs",
                   outputFiles: ["result.txt"],
                 }),
               },
@@ -166,7 +168,8 @@ export async function handleOpenRouterRequest(
     scenario === "async-agents" ||
     scenario === "agent-question" ||
     scenario === "blocking-agent" ||
-    scenario === "blocking-question"
+    scenario === "blocking-question" ||
+    scenario === "blocking-permission"
   ) {
     const messages = body.messages as Array<{
       role: string;
@@ -226,6 +229,8 @@ export async function handleOpenRouterRequest(
     }
     if (scenario.endsWith("question") && !called("ask_parent"))
       return call("ask_parent", { question: "May I proceed?" });
+    if (scenario === "blocking-permission" && !called("bash"))
+      return call("bash", { command: "echo child approved" });
     await new Promise((resolve) => setTimeout(resolve, asyncAgentDelay));
     return sse([chunk({ content: "42" }, "stop"), "[DONE]"]);
   }

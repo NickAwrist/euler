@@ -1,5 +1,6 @@
 import type { BaseAgent } from "./agents/BaseAgent";
 import type { ToolOutputAttachment } from "./attachments/types";
+import type { RunPermissions } from "./permissions/PermissionService";
 import type { PromptContext } from "./prompts/render";
 import type { Workspace } from "./workspaces/WorkspaceService";
 
@@ -42,6 +43,11 @@ export type OnStreamDelta = (
 ) => void;
 
 export class RunContext {
+  /** Server runs use live rules and approvals; standalone runs use the supplied policy and fail closed on Ask. */
+  authorizeToolCall?: (
+    tool: string,
+    args: Record<string, unknown>,
+  ) => Promise<void>;
   jobs?: import("./tools/background").JobExecutor;
   agentInstance: BaseAgent;
   readonly agentName: string;
@@ -52,6 +58,7 @@ export class RunContext {
   readonly promptContext?: PromptContext;
   readonly ownerUuid: string;
   readonly workspace?: Workspace;
+  readonly permissions: RunPermissions;
   private _steps: Step[] = [];
   /** Files explicitly written by tools in this activation. */
   readonly writtenFiles = new Set<string>();
@@ -62,6 +69,7 @@ export class RunContext {
 
   constructor(
     agentInstance: BaseAgent,
+    permissions: RunPermissions,
     onChange?: OnStepChange,
     onStreamDelta?: OnStreamDelta,
     signal?: AbortSignal,
@@ -79,6 +87,7 @@ export class RunContext {
     this.promptContext = promptContext;
     this.ownerUuid = ownerUuid;
     this.workspace = workspace;
+    this.permissions = permissions;
   }
 
   /** Emit a streaming token delta for content and/or thinking. */

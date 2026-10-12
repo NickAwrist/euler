@@ -15,6 +15,7 @@ import { type Unsequenced, eventHub } from "../../events/eventHub";
 import { JobManager } from "../../jobs/JobManager";
 import { OperationError } from "../../observability/errors";
 import { logEvent, withBackgroundLogContext } from "../../observability/logger";
+import { ToolApprovalCoordinator } from "../../permissions/ToolApprovalCoordinator";
 import {
   type InboxMessage,
   type RewindRequest,
@@ -39,6 +40,7 @@ import {
   type SpawnRequest,
   type SpawnResult,
 } from "../../tools/spawn_agent";
+import type { Workspace } from "../../workspaces/WorkspaceService";
 import { RuntimeTransaction } from "./RuntimeTransaction";
 import { runActivation } from "./activation";
 import { recoverInterrupted } from "./recovery";
@@ -61,6 +63,9 @@ export class AgentRuntime {
     private readonly maxRunningPerOwner = envConfig.maxRunningAgents,
   ) {}
   readonly store = new AgentStore();
+  readonly approvals = new ToolApprovalCoordinator((owner, sessionId) =>
+    this.resync(owner, sessionId),
+  );
   readonly jobs = new JobManager({
     position: (id) => this.transcriptLength(id),
     blocked: (id) => this.isChanging(id),
@@ -114,7 +119,7 @@ export class AgentRuntime {
   private stopping = new Set<string>();
   private transactions = new RuntimeTransaction();
   private scheduled = false;
-  private waitingForChild = new Set<string>();
+  private releasedSlots = new Set<string>();
   private waiters = new Set<() => void>();
   resync(owner: string, sessionId: string) {
     this.emit(owner, { type: "resync", sessionId, agentId: "" });
@@ -130,9 +135,22 @@ export class AgentRuntime {
   private runningCount(owner: string) {
     return [...this.active.keys()].filter(
       (id) =>
-        !this.waitingForChild.has(id) &&
-        this.store.get(id)?.ownerUuid === owner,
+        !this.releasedSlots.has(id) && this.store.get(id)?.ownerUuid === owner,
     ).length;
+  }
+  private releaseSlot(agent: AgentRecord) {
+    this.releasedSlots.add(agent.id);
+    this.schedule();
+  }
+  private async reclaimSlot(agent: AgentRecord, signal: AbortSignal) {
+    await this.until(() => {
+      if (this.runningCount(agent.ownerUuid) >= this.maxRunningPerOwner)
+        return false;
+      // Claim the slot before another waiter checks availability.
+      this.releasedSlots.delete(agent.id);
+      return true;
+    }, signal);
+    this.releasedSlots.delete(agent.id);
   }
   /** Resolves once `ready` holds or `signal` aborts, re-checked on agent changes. */
   private until(ready: () => boolean, signal: AbortSignal) {
@@ -205,6 +223,7 @@ export class AgentRuntime {
       sequence: eventHub.sequence(owner),
       agents,
       jobs: this.jobs.list(owner, sessionId),
+      approvals: this.approvals.list(owner, sessionId),
       activation: main ? (this.active.get(main.id)?.partial ?? null) : null,
       queued: main
         ? this.store.undelivered(main.id).filter((m) => m.kind === "user")
@@ -492,6 +511,8 @@ export class AgentRuntime {
       {
         store: this.store,
         jobs: this.jobs,
+        authorizeToolCall: (record, workspace, abort, tool, args) =>
+          this.authorizeToolCall(record, workspace, abort, tool, args),
         status: (record) => this.status(record),
         emit: (owner, event) => this.emit(owner, event),
         append: (record, message) => this.append(record, message),
@@ -508,6 +529,77 @@ export class AgentRuntime {
       signal,
       partial,
     );
+  }
+  private async authorizeToolCall(
+    agent: AgentRecord,
+    workspace: Workspace,
+    signal: AbortSignal,
+    tool: string,
+    args: Record<string, unknown>,
+  ) {
+    const activity = agent.activity;
+    let waited = false;
+    try {
+      await this.approvals.authorize(
+        {
+          owner: agent.ownerUuid,
+          sessionId: agent.sessionId,
+          agentId: agent.id,
+          agentTitle: agent.title,
+          workspace,
+          signal,
+          waiting: () => {
+            waited = true;
+            this.releaseSlot(agent);
+            agent.activity = `Waiting for approval to call ${tool}`;
+            this.status(agent);
+          },
+        },
+        tool,
+        args,
+      );
+    } finally {
+      if (waited) {
+        await this.reclaimSlot(agent, signal);
+        if (!signal.aborted) {
+          agent.activity = activity;
+          this.status(agent);
+        }
+      }
+    }
+    if (waited) {
+      // Settings may have changed while this approved call waited for a slot.
+      const current = this.approvals.checkCall(
+        { owner: agent.ownerUuid, sessionId: agent.sessionId, workspace },
+        tool,
+        args,
+      );
+      if (current.action === "deny") throw new Error(current.reason);
+    }
+  }
+  /** Metadata from the same tools used by main agents and subagents; no run is saved. */
+  toolCatalog(ownerUuid: string): BaseTool[] {
+    const signal = new AbortController().signal;
+    return (["main", "general"] as const).flatMap((kind) => {
+      const agent = createAgentRecord({
+        ownerUuid,
+        sessionId: "",
+        parentId: null,
+        kind,
+        title: "",
+        status: "idle",
+        model: DEFAULT_RUN_MODEL,
+        spawnPosition: 0,
+        activity: "",
+        config: {},
+      });
+      return this.tools(
+        agent,
+        signal,
+        () => {},
+        () => agent.model,
+      );
+    });
   }
   private tools(
     agent: AgentRecord,
@@ -602,8 +694,7 @@ export class AgentRuntime {
     });
     if (!request.wait) return { agentId: child.id };
     // A blocking caller releases its scheduler slot so the child can start.
-    this.waitingForChild.add(parent.id);
-    this.schedule();
+    this.releaseSlot(parent);
     try {
       // Return for incoming input or a child waiting on the parent, including
       // other children that occupy the slots this new child needs.
@@ -640,14 +731,7 @@ export class AgentRuntime {
           : { result: current.activity }),
       };
     } finally {
-      await this.until(() => {
-        if (this.runningCount(parent.ownerUuid) >= this.maxRunningPerOwner)
-          return false;
-        // Claim the slot before another waiter checks availability.
-        this.waitingForChild.delete(parent.id);
-        return true;
-      }, signal);
-      this.waitingForChild.delete(parent.id);
+      await this.reclaimSlot(parent, signal);
     }
   }
   /** A blocking spawn returns the child's report, so it is not delivered again. */

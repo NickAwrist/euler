@@ -1,7 +1,8 @@
 # Background tools and shared session networking
 
-Background tool execution is implemented. Shared session networking and browser
-service exposure below remain proposals.
+Background tool execution is implemented. Directory workspaces use host
+networking through the development permission policy. Shared private session
+networking and browser service exposure for sandbox workspaces remain proposals.
 
 ## Feature 1: background tool execution
 
@@ -51,8 +52,11 @@ finished. Requests live in `ui/persist/jobs.ts`; reload restores runtime state.
 Background Bash drains output even after old logs are discarded, keeps filesystem
 and PID isolation, and cancels descendants. It removes the foreground wall/CPU
 timeouts so a service can keep running. Foreground limits are unchanged. Commands
-still use separate isolated networks; a service started in one command is not
-reachable from another command or a host browser through this feature.
+in private sandbox workspaces still use separate isolated networks; a service
+started in one command is not reachable from another command or a host browser.
+Directory workspaces instead share host networking, so background services are
+reachable from other directory commands and the host. They also have internet
+and local-network access and share host ports across chats.
 
 Verification lives in `tests/e2e/backgroundJobs.test.ts`, `tests/jobs/`,
 `tests/sandbox/background.test.ts`, and `tests/browser/jobs.pw.ts`. It covers real
@@ -62,7 +66,7 @@ reload/cancellation. The browser fixture uses deterministic model replies with
 the actual HTTP server, SQLite, and Bash runner. Screenshots and recordings are
 under `.cache/jobs-evidence` and `.cache/browser-results`.
 
-## Feature 2: shared networking per session/workspace
+## Feature 2: shared private networking per sandbox session/workspace
 
 ### Scope and architecture
 

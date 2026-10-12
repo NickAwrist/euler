@@ -1,7 +1,7 @@
-import { type ChildProcess, spawn } from "node:child_process";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
+import { startAsyncBackend } from "./asyncBackend";
 test.use({
   isMobile: false,
   hasTouch: false,
@@ -9,41 +9,16 @@ test.use({
   video: "on",
 });
 const evidence = resolve(".cache/jobs-evidence");
-let server: ChildProcess;
+let server: Awaited<ReturnType<typeof startAsyncBackend>>;
 test.beforeAll(async () => {
   mkdirSync(evidence, { recursive: true });
-  server = spawn("bun", ["tests/helpers/asyncFixture.ts"], {
-    stdio: "pipe",
-    env: {
-      ...process.env,
-      JOB_FIXTURE: "1",
-      JOB_FIXTURE_PORT: "5197",
-    },
-  });
-  server.stdout?.on("data", (chunk) =>
-    appendFileSync(`${evidence}/backend.log`, chunk),
-  );
-  server.stderr?.on("data", (chunk) =>
-    appendFileSync(`${evidence}/backend.log`, chunk),
-  );
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error("Fixture failed to start")),
-      10000,
-    );
-    server.stdout?.on("data", (chunk) => {
-      if (String(chunk).includes("async fixture ready")) {
-        clearTimeout(timer);
-        resolve();
-      }
-    });
-    server.on("exit", (code) => {
-      clearTimeout(timer);
-      reject(new Error(`Fixture exited ${code}`));
-    });
+  server = await startAsyncBackend({
+    port: 5197,
+    mode: "jobs",
+    log: (chunk) => appendFileSync(`${evidence}/backend.log`, chunk),
   });
 });
-test.afterAll(() => server?.kill());
+test.afterAll(async () => server?.stop());
 // These checks exercise returning users; first-visit setup has its own suite.
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {

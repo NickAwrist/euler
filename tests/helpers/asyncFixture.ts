@@ -31,7 +31,11 @@ const { app } = await import("../../src/app");
 const { setOpenRouterApiKey } = await import("../../src/db");
 setOpenRouterApiKey("fixture");
 setOpenRouterScenario(
-  process.env.JOB_FIXTURE ? "background-jobs" : "async-agents",
+  process.env.TOOL_PERMISSION_FIXTURE
+    ? "tool-permissions"
+    : process.env.JOB_FIXTURE
+      ? "background-jobs"
+      : "async-agents",
 );
 setAsyncAgentDelay(1800);
 app.listen(Number(process.env.JOB_FIXTURE_PORT ?? 5198), "127.0.0.1", () =>

@@ -6,14 +6,17 @@ import type {
 import type { AgentRecord, AgentStore } from "../../db/agents";
 import { getAttachment } from "../../db/attachments";
 import { getSessionById } from "../../db/sessions";
+import { effectiveUserPreferences } from "../../db/userPreferences";
 import type { Unsequenced } from "../../events/eventHub";
 import type { LlmMessage } from "../../llm";
 import { type McpToolSet, openUserMcpTools } from "../../mcp/userTools";
 import { logEvent } from "../../observability/logger";
+import { permissionService } from "../../permissions/PermissionService";
 import { isFinalAgent } from "../../schemas/agents";
 import type { Activation } from "../../schemas/events";
 import type { WireMessageInput } from "../../schemas/run";
 import type { BaseTool } from "../../tools/BaseTool";
+import type { Workspace } from "../../workspaces/WorkspaceService";
 import { workspaceService } from "../../workspaces/WorkspaceService";
 import { agentManager, buildServerRunPromptContext } from "../agentManager";
 import {
@@ -24,6 +27,13 @@ import {
 import { changedWorkspaceFiles } from "./workspaceOutputs";
 
 export interface ActivationHost {
+  authorizeToolCall(
+    agent: AgentRecord,
+    workspace: Workspace,
+    signal: AbortSignal,
+    tool: string,
+    args: Record<string, unknown>,
+  ): Promise<void>;
   jobs: import("../../jobs/JobManager").JobManager;
   store: AgentStore;
   status(agent: AgentRecord): void;
@@ -169,6 +179,11 @@ export async function runActivation(
     model.addTools(mcpTools.tools);
     ctx = new RunContext(
       model,
+      permissionService.resolve(
+        workspace,
+        effectiveUserPreferences(agent.ownerUuid).capabilities,
+        effectiveUserPreferences(agent.ownerUuid).toolPermissions,
+      ),
       (context, step) => {
         const position = context.steps.indexOf(step) - segmentStart;
         if (position < 0) return;
@@ -213,6 +228,8 @@ export async function runActivation(
       workspace,
     );
     ctx.jobs = host.jobs.executor(agent.id, agent.sessionId, partial.id);
+    ctx.authorizeToolCall = (tool, args) =>
+      host.authorizeToolCall(agent, workspace, signal, tool, args);
     model.checkpoint = () => host.store.saveHistory(agent, model.history);
     model.hasPendingInput = () =>
       !waiting && host.store.hasWakingMessage(agent.id, false);

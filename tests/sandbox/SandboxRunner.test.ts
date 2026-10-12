@@ -3,10 +3,12 @@ import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { permissionService } from "../../src/permissions/PermissionService";
 import {
   BubblewrapSandboxRunner,
   type SandboxRunner,
 } from "../../src/sandbox/SandboxRunner";
+import { discoverToolchains } from "../../src/sandbox/toolchains";
 import type { Workspace } from "../../src/workspaces/WorkspaceService";
 
 const directories: string[] = [];
@@ -28,6 +30,50 @@ async function workspace(): Promise<Workspace> {
 
 describe("bubblewrap sandbox runner", () => {
   test.skipIf(!capability.available || process.getuid?.() !== 0)(
+    "skips a root-private toolchain when launching as the local directory owner",
+    async () => {
+      const root = await fs.mkdtemp(join(tmpdir(), "euler-root-toolchain-"));
+      directories.push(root);
+      await fs.chmod(root, 0o755);
+      const privateBin = join(root, "private");
+      const hostPath = join(root, "project");
+      await fs.mkdir(privateBin, { mode: 0o700 });
+      await fs.copyFile(process.execPath, join(privateBin, "node"));
+      await fs.chmod(join(privateBin, "node"), 0o755);
+      await fs.mkdir(hostPath, { mode: 0o700 });
+      await fs.chown(hostPath, 1000, 1000);
+      const previousPath = process.env.PATH;
+      try {
+        process.env.PATH = `${privateBin}:/usr/bin:/bin`;
+        expect(
+          discoverToolchains().find((tool) => tool.name === "node")?.path,
+        ).toBe(join(privateBin, "node"));
+        expect(
+          discoverToolchains({ uid: 1000, gid: 1000 }).some(
+            (tool) => tool.path === join(privateBin, "node"),
+          ),
+        ).toBe(false);
+        const workspace = {
+          kind: "local" as const,
+          hostPath,
+          displayPath: "/workspace",
+        };
+        const result = await new BubblewrapSandboxRunner().run({
+          workspace,
+          permissions: permissionService.resolve(workspace),
+          command: "touch created.txt; id -u",
+        });
+        expect(result.exitCode).toBe(0);
+        expect(result.stdout.trim()).toBe("1000");
+        expect((await fs.stat(join(hostPath, "created.txt"))).uid).toBe(1000);
+      } finally {
+        if (previousPath === undefined)
+          Reflect.deleteProperty(process.env, "PATH");
+        else process.env.PATH = previousPath;
+      }
+    },
+  );
+  test.skipIf(!capability.available || process.getuid?.() !== 0)(
     "runs a local workspace as its owner beneath a private home directory",
     async () => {
       const parent = await fs.mkdtemp(join(tmpdir(), "orbis-private-home-"));
@@ -38,6 +84,7 @@ describe("bubblewrap sandbox runner", () => {
       await fs.chown(hostPath, 1000, 1000);
 
       const result = await new BubblewrapSandboxRunner().run({
+        permissions: permissionService.resolve({ kind: "local" }),
         command: "touch created.txt; id -u",
         workspace: { kind: "local", hostPath, displayPath: "/workspace" },
       });
@@ -54,7 +101,11 @@ describe("bubblewrap sandbox runner", () => {
       const runner: SandboxRunner = new BubblewrapSandboxRunner();
 
       await expect(
-        runner.run({ command: "pwd", workspace: await workspace() }),
+        runner.run({
+          permissions: permissionService.resolve({ kind: "sandbox" }),
+          command: "pwd",
+          workspace: await workspace(),
+        }),
       ).rejects.toThrow("Shell tools are disabled");
     },
   );
@@ -66,6 +117,7 @@ describe("bubblewrap sandbox runner", () => {
       const activeWorkspace = await workspace();
 
       const result = await runner.run({
+        permissions: permissionService.resolve(activeWorkspace),
         command:
           "touch /workspace/inside.txt; touch /usr/orbis-sandbox-escape-test",
         workspace: activeWorkspace,
@@ -87,6 +139,7 @@ describe("bubblewrap sandbox runner", () => {
       const runner = new BubblewrapSandboxRunner();
 
       const result = await runner.run({
+        permissions: permissionService.resolve({ kind: "sandbox" }),
         command:
           "python3 -c \"import socket; socket.create_connection(('1.1.1.1', 53), 0.2)\"",
         workspace: await workspace(),
@@ -100,6 +153,7 @@ test.skipIf(!capability.available || !existsSync("/etc/alternatives/awk"))(
   "runs alternatives-backed executables inside the sandbox",
   async () => {
     const result = await new BubblewrapSandboxRunner().run({
+      permissions: permissionService.resolve({ kind: "sandbox" }),
       command: "awk 'BEGIN { print 42 }'",
       workspace: await workspace(),
     });

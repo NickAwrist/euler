@@ -1,5 +1,5 @@
-import { type ChildProcess, spawn } from "node:child_process";
 import { expect, test } from "@playwright/test";
+import { startAsyncBackend } from "./asyncBackend";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 // These checks exercise returning users; first-visit setup has its own suite.
@@ -12,27 +12,11 @@ test.beforeEach(async ({ page }) => {
   });
 });
 test.use({ isMobile: false, hasTouch: false, deviceScaleFactor: 1 });
-let server: ChildProcess;
+let server: Awaited<ReturnType<typeof startAsyncBackend>>;
 test.beforeAll(async () => {
-  server = spawn("bun", ["tests/helpers/asyncFixture.ts"], { stdio: "pipe" });
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error("Fixture failed to start")),
-      10000,
-    );
-    server.stdout?.on("data", (chunk) => {
-      if (String(chunk).includes("async fixture ready")) {
-        clearTimeout(timer);
-        resolve();
-      }
-    });
-    server.on("exit", (code) => {
-      clearTimeout(timer);
-      reject(new Error(`Fixture exited ${code}`));
-    });
-  });
+  server = await startAsyncBackend({ port: 5198 });
 });
-test.afterAll(() => server?.kill());
+test.afterAll(async () => server?.stop());
 
 test("session loading: async agents continue across chat messages and browser reload", async ({
   page,

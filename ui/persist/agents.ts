@@ -3,6 +3,11 @@ import { AgentSchema, InboxMessageSchema } from "../../src/schemas/agents";
 import { ActivationSchema } from "../../src/schemas/events";
 import { JobSchema } from "../../src/schemas/jobs";
 import { WireMessageSchema, WireStepSchema } from "../../src/schemas/run";
+import {
+  type ToolApprovalResponse,
+  ToolApprovalResultSchema,
+  ToolApprovalSchema,
+} from "../../src/schemas/toolPermissions";
 import { apiJson, apiVoid } from "../lib/api";
 export const runtimePath = (id: string) =>
   `/api/sessions/${encodeURIComponent(id)}`;
@@ -14,6 +19,7 @@ export const RuntimeSnapshotSchema = z.object({
   queued: z.array(InboxMessageSchema),
   held: z.boolean(),
   history: z.array(WireMessageSchema).optional(),
+  approvals: z.array(ToolApprovalSchema).default([]),
 });
 export type RuntimeSnapshot = z.infer<typeof RuntimeSnapshotSchema>;
 export async function fetchRuntime(id: string) {
@@ -45,4 +51,17 @@ export function removeQueuedMessage(id: string, messageId: number) {
   return apiVoid(`${runtimePath(id)}/messages/${messageId}`, {
     method: "DELETE",
   });
+}
+
+export async function respondToToolApproval(
+  id: string,
+  approvalId: string,
+  decision: ToolApprovalResponse["decision"],
+) {
+  return ToolApprovalResultSchema.parse(
+    await apiJson(
+      `${runtimePath(id)}/approvals/${encodeURIComponent(approvalId)}`,
+      { method: "POST", json: { decision } },
+    ),
+  );
 }

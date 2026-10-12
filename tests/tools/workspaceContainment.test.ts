@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RunContext } from "../../src/RunContext";
 import { BaseAgent } from "../../src/agents/BaseAgent";
+import { permissionService } from "../../src/permissions/PermissionService";
 import { sandboxRunner } from "../../src/sandbox/SandboxRunner";
 import { ApplyPatchTool } from "../../src/tools/apply_patch";
 import { BashTool } from "../../src/tools/bash";
@@ -38,6 +39,7 @@ async function fixture() {
   await fs.writeFile(join(outside, "file.txt"), "outside secret");
   const ctx = new RunContext(
     new BaseAgent("test", "test"),
+    permissionService.resolve(workspace),
     undefined,
     undefined,
     undefined,

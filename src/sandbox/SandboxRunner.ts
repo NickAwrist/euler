@@ -1,11 +1,17 @@
 import { spawn } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
+import {
+  type RunPermissions,
+  permissionService,
+} from "../permissions/PermissionService";
 import { errorMessage } from "../utils/errors";
 import type { Workspace } from "../workspaces/WorkspaceService";
+import { type ExecutionUser, discoverToolchains } from "./toolchains";
 
 export type SandboxRunOptions = {
   command: string;
   workspace: Workspace;
+  permissions: RunPermissions;
   signal?: AbortSignal;
   maxOutputBytes?: number;
   timeoutMs?: number;
@@ -32,7 +38,6 @@ export interface SandboxExecution {
 }
 
 const DEFAULT_MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
-const DEFAULT_TIMEOUT_MS = 120_000;
 
 export class BubblewrapSandboxRunner implements SandboxRunner {
   private capabilityPromise?: Promise<{
@@ -50,6 +55,8 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
   }
 
   async spawn(options: SandboxRunOptions): Promise<SandboxExecution> {
+    const permissions = options.permissions;
+    permissionService.assertTool(permissions, "bash");
     const capability = await this.capability();
     if (!capability.available) {
       throw new Error(
@@ -57,13 +64,26 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
           "Shell containment is unavailable on this host",
       );
     }
+    // A user namespace cannot use root's DAC override for a private directory.
+    // Resolve the execution identity once for discovery and the actual launch.
+    const owner =
+      process.getuid?.() === 0 && options.workspace.kind === "local"
+        ? statSync(options.workspace.hostPath)
+        : undefined;
     const controller = new AbortController();
     const abort = () => controller.abort();
     if (options.signal?.aborted) abort();
     else options.signal?.addEventListener("abort", abort, { once: true });
     const completion = this.spawnSandbox(
-      this.argumentsFor(options.workspace, options.command, options.background),
-      { ...options, signal: controller.signal },
+      this.argumentsFor(
+        options.workspace,
+        options.command,
+        permissions,
+        options.background,
+        owner,
+      ),
+      { ...options, permissions, signal: controller.signal },
+      owner,
     ).finally(() => options.signal?.removeEventListener("abort", abort));
     // The caller receives the handle asynchronously. Observe immediate failures.
     void completion.catch(() => {});
@@ -79,6 +99,7 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
   private spawnSandbox(
     args: string[],
     options: SandboxRunOptions,
+    owner?: ExecutionUser,
   ): Promise<SandboxRunResult> {
     return new Promise((resolve, reject) => {
       const executable = this.executable();
@@ -86,13 +107,7 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
         reject(new Error("bubblewrap is not installed"));
         return;
       }
-      // A user namespace cannot use container root's DAC override to access
-      // another user's private directory. Use the local workspace's owner.
       // Bun does not apply child_process.spawn's uid/gid options.
-      const owner =
-        process.getuid?.() === 0 && options.workspace.kind === "local"
-          ? statSync(options.workspace.hostPath)
-          : undefined;
       const child = spawn(
         owner ? "/usr/bin/setpriv" : executable,
         owner
@@ -159,7 +174,8 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
         : setTimeout(() => {
             stop();
             stoppedError = new Error("Command timed out");
-          }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
+          }, options.timeoutMs ??
+            options.permissions.shell.foregroundTimeoutMs);
 
       child.stdout.on("data", (chunk: Buffer) => {
         options.emitOutput?.({ channel: "stdout", text: chunk.toString() });
@@ -207,12 +223,14 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
       hostPath: "/tmp",
       displayPath: "/workspace",
     };
+    const permissions = permissionService.resolve(probeWorkspace);
     try {
       const result = await this.spawnSandbox(
-        this.argumentsFor(probeWorkspace, "true"),
+        this.argumentsFor(probeWorkspace, "true", permissions),
         {
           command: "true",
           workspace: probeWorkspace,
+          permissions,
           timeoutMs: 5_000,
           maxOutputBytes: 1_000,
         },
@@ -234,7 +252,9 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
   private argumentsFor(
     workspace: Workspace,
     command: string,
+    permissions: RunPermissions,
     background = false,
+    owner?: ExecutionUser,
   ): string[] {
     const args = [
       "--die-with-parent",
@@ -244,12 +264,49 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
       "/usr",
       "/usr",
     ];
+    if (permissions.shell.network === "host") {
+      args.push("--share-net");
+      // DNS and TLS configuration are required by package downloads.
+      for (const path of [
+        "/etc/resolv.conf",
+        "/etc/hosts",
+        "/etc/nsswitch.conf",
+        "/etc/ssl/certs",
+        "/etc/ssl/openssl.cnf",
+        "/etc/ca-certificates/extracted",
+        "/etc/pki/tls/certs",
+        "/etc/pki/tls/openssl.cnf",
+        "/etc/pki/ca-trust/extracted",
+      ]) {
+        if (existsSync(path)) args.push("--ro-bind", path, path);
+      }
+    }
     if (existsSync("/usr/local"))
       args.push("--ro-bind", "/usr/local", "/usr/local");
     if (existsSync("/etc/alternatives"))
       args.push("--ro-bind", "/etc/alternatives", "/etc/alternatives");
     args.push("--symlink", "usr/bin", "/bin", "--symlink", "usr/lib", "/lib");
     if (existsSync("/usr/lib64")) args.push("--symlink", "usr/lib64", "/lib64");
+    let path = "/usr/local/bin:/usr/bin:/bin";
+    if (permissions.shell.hostToolchains) {
+      for (const tool of discoverToolchains(owner)) {
+        args.push("--ro-bind", tool.path, `/opt/euler/bin/${tool.name}`);
+        if (tool.name === "bun")
+          args.push("--symlink", "bun", "/opt/euler/bin/bunx");
+      }
+      path = `/opt/euler/bin:${path}`;
+    }
+    const limits = [
+      ...(background
+        ? []
+        : [`ulimit -t ${permissions.shell.foregroundCpuSeconds}`]),
+      `ulimit -n ${permissions.shell.openFiles}`,
+      ...(permissions.shell.virtualMemoryKb === null
+        ? []
+        : [
+            `ulimit -v ${permissions.shell.virtualMemoryKb} 2>/dev/null || true`,
+          ]),
+    ];
     args.push(
       "--proc",
       "/proc",
@@ -257,6 +314,7 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
       "/dev",
       "--tmpfs",
       "/tmp",
+      ...(permissions.shell.hostToolchains ? ["--dir", "/tmp/home"] : []),
       "--bind",
       workspace.hostPath,
       "/workspace",
@@ -265,17 +323,17 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
       "--clearenv",
       "--setenv",
       "HOME",
-      "/workspace",
+      permissions.shell.hostToolchains ? "/tmp/home" : "/workspace",
       "--setenv",
       "TMPDIR",
       "/tmp",
       "--setenv",
       "PATH",
-      "/usr/local/bin:/usr/bin:/bin",
+      path,
       "--",
       "/bin/sh",
       "-c",
-      `${background ? "" : "ulimit -t 60; "}ulimit -n 256; ulimit -v 2097152 2>/dev/null || true; exec /bin/sh -c "$1"`,
+      `${limits.join("; ")}; exec /bin/sh -c "$1"`,
       "euler-shell",
       command,
     );

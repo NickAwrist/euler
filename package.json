@@ -46,6 +46,7 @@
     "lucide-react": "^1.8.0",
     "node-html-parser": "^7.1.0",
     "ollama": "^0.6.3",
+    "re2js": "^2.8.6",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-markdown": "^10.1.0",

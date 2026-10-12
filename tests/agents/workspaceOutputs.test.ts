@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { RunContext } from "../../src/RunContext";
 import { BaseAgent } from "../../src/agents/BaseAgent";
 import { changedWorkspaceFiles } from "../../src/agents/runtime/workspaceOutputs";
+import { permissionService } from "../../src/permissions/PermissionService";
 import { CreateFileTool } from "../../src/tools/create_file";
 import { workspaceService } from "../../src/workspaces/WorkspaceService";
 
@@ -17,6 +18,7 @@ test("attaches only tool-reported paths without scanning or leaking outside the 
   };
   const ctx = new RunContext(
     new BaseAgent("test", "test"),
+    permissionService.resolve(workspace),
     undefined,
     undefined,
     undefined,

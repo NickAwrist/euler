@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ToolPermissionsSchema } from "./toolPermissions";
 
 export const appearanceSchema = z.object({
   theme: z
@@ -69,6 +70,9 @@ export const imagePreferencesSchema = z.object({
     .default(DEFAULT_COMFYUI_NEGATIVE_PROMPT),
 });
 export const userPreferencesSchema = z.object({
+  toolPermissions: ToolPermissionsSchema.default(() =>
+    ToolPermissionsSchema.parse({}),
+  ),
   image: imagePreferencesSchema.default(() => imagePreferencesSchema.parse({})),
   settings: userSettingsSchema.default(() => userSettingsSchema.parse({})),
   appearance: appearanceSchema.default(() => appearanceSchema.parse({})),
@@ -89,6 +93,12 @@ const strictAppearanceSchema = z
   .strict();
 export const userPreferencesPatchSchema = z
   .object({
+    toolPermissions: z
+      .object({
+        rules: ToolPermissionsSchema.shape.rules.removeDefault().optional(),
+      })
+      .strict()
+      .optional(),
     image: z
       .object({
         defaultModel: imagePreferencesSchema.shape.defaultModel

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isWorkingAgent } from "../../../src/schemas/agents";
 import type { AgentEvent } from "../../../src/schemas/events";
+import type { ToolApproval } from "../../../src/schemas/toolPermissions";
 import {
   type RuntimeSnapshot,
   agentAction,
@@ -17,8 +18,11 @@ const empty = (): RuntimeSnapshot => ({
   queued: [],
   held: false,
   history: [],
+  approvals: [],
   sequence: 0,
 });
+// Snapshots parse a fresh empty list; one shared value keeps the approvals prop stable.
+const noApprovals: ToolApproval[] = [];
 function applyEvent(
   state: RuntimeSnapshot,
   event: AgentEvent,
@@ -97,7 +101,8 @@ export function useAgentEvents(
       previous.activation === value.activation &&
       previous.queued === value.queued &&
       previous.held === value.held &&
-      previous.history === value.history
+      previous.history === value.history &&
+      previous.approvals === value.approvals
     )
       return;
     setState(value);
@@ -181,6 +186,7 @@ export function useAgentEvents(
     phases,
     queued: state.queued,
     held: state.held,
+    approvals: state.approvals.length ? state.approvals : noApprovals,
     refresh,
     runPending: state.activation !== null,
     streamingContent: state.activation?.content ?? "",

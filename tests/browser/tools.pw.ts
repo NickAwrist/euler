@@ -58,7 +58,7 @@ test("tools desktop: paste a config, surface errors, and list server tools", asy
   await page.getByRole("button", { name: "Tools" }).click();
   await expect(page.getByText("No MCP servers yet.")).toBeVisible();
 
-  await page.getByRole("button", { name: "Add" }).click();
+  await page.getByRole("button", { name: "Add", exact: true }).click();
   const config = page.getByLabel("MCP server config");
   const add = page.getByRole("dialog").getByRole("button", { name: "Add" });
   await config.fill("{ not json");

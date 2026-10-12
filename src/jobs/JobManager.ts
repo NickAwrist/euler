@@ -3,6 +3,7 @@ import type { RunContext, Step } from "../RunContext";
 import { changedWorkspaceFiles } from "../agents/runtime/workspaceOutputs";
 import { getDb, transaction } from "../db/connection";
 import { logEvent, withBackgroundLogContext } from "../observability/logger";
+import { permissionService } from "../permissions/PermissionService";
 import { type Job, JobSchema, activeJob } from "../schemas/jobs";
 import { errorDetails } from "../schemas/observability";
 import {
@@ -96,6 +97,7 @@ export class JobManager {
     step?: Step,
   ): Promise<ToolResult> {
     const workspace = ctx.workspace;
+    permissionService.assertTool(ctx.permissions, tool.name);
     if (!workspace) throw new Error("Workspace required");
     const input = ToolInputSchema.parse(tool.describeInput(args));
     if (this.host.blocked(sessionId) || ctx.signal?.aborted)
@@ -237,6 +239,7 @@ export class JobManager {
         try {
           const execution = await tool.start(args, {
             workspace,
+            permissions: ctx.permissions,
             signal: controller.signal,
             background: true,
             emitProgress: (update) => publish("progress", update),

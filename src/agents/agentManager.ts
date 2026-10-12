@@ -2,6 +2,10 @@ import os from "node:os";
 import { listSkills } from "../db/index";
 import { effectiveUserPreferences } from "../db/userPreferences";
 import {
+  enabledBuiltinTools,
+  permissionService,
+} from "../permissions/PermissionService";
+import {
   type PersonalizationFields,
   type PromptContext,
   renderSystemPrompt,
@@ -13,20 +17,9 @@ import {
 import { MANAGE_SUBAGENTS_SKILL_NAME } from "../skills/defaults";
 import { modelInvocableSkills, renderSkillsPrompt } from "../skills/runtime";
 import type { BaseTool } from "../tools/BaseTool";
-import { ApplyPatchTool } from "../tools/apply_patch";
-import { BashTool } from "../tools/bash";
-import { enabledBuiltinTools } from "../tools/builtinTools";
-import { CreateFileTool } from "../tools/create_file";
-import { DeleteFileTool } from "../tools/delete_file";
-import { FetchWebPageTool } from "../tools/fetch_web_page";
-import { GenerateImageTool } from "../tools/generate_image";
-import { GrepTool } from "../tools/grep";
-import { ListFilesTool } from "../tools/list_files";
+import { createBuiltinTool } from "../tools/builtinTools";
 import { LoadSkillTool } from "../tools/load_skill";
 import { ManageSkillsTool } from "../tools/manage_skills";
-import { ModifyPlan } from "../tools/modify_plan";
-import { ReadFileTool } from "../tools/read_file";
-import { WebSearchTool } from "../tools/web_search";
 import { BaseAgent } from "./BaseAgent";
 import { MAIN_AGENT_NAME, SUBAGENT_NAME } from "./agentNames";
 
@@ -85,35 +78,6 @@ export function buildServerRunPromptContext(opts: {
   );
 }
 
-function createBuiltinTool(toolName: string): BaseTool {
-  switch (toolName) {
-    case "create_file":
-      return new CreateFileTool();
-    case "delete_file":
-      return new DeleteFileTool();
-    case "grep":
-      return new GrepTool();
-    case "list_files":
-      return new ListFilesTool();
-    case "modify_plan":
-      return new ModifyPlan();
-    case "read_file":
-      return new ReadFileTool();
-    case "apply_patch":
-      return new ApplyPatchTool();
-    case "web_search":
-      return new WebSearchTool();
-    case "fetch_web_page":
-      return new FetchWebPageTool();
-    case "bash":
-      return new BashTool();
-    case "generate_image":
-      return new GenerateImageTool();
-    default:
-      throw new Error(`Unknown tool: ${toolName}`);
-  }
-}
-
 function buildAgent(
   name: typeof MAIN_AGENT_NAME | typeof SUBAGENT_NAME,
   opts: CreateAgentOptions,
@@ -152,12 +116,16 @@ function buildAgent(
     finalPrompt,
   );
   const { capabilities } = effectiveUserPreferences(opts.ownerUuid);
-  agent.addTools(enabledBuiltinTools(capabilities).map(createBuiltinTool));
+  const permissions = permissionService.resolve(undefined, capabilities);
+  agent.addTools(enabledBuiltinTools(permissions).map(createBuiltinTool));
   if (loadableSkills.length > 0) {
     agent.addTool(new LoadSkillTool(loadableSkills));
   }
   // Skills persist into later chats, so only the user's own agent edits them.
-  if (!isSubagent && capabilities.skills) {
+  if (
+    !isSubagent &&
+    permissionService.toolDecision(permissions, "manage_skills").allowed
+  ) {
     agent.addTool(new ManageSkillsTool(opts.ownerUuid));
   }
   if (opts.reasoningEffort) {

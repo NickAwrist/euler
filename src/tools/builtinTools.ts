@@ -1,39 +1,64 @@
 import type { Capabilities } from "../schemas/userPreferences";
+import type { BaseTool } from "./BaseTool";
+import { ApplyPatchTool } from "./apply_patch";
+import { BashTool } from "./bash";
+import { CreateFileTool } from "./create_file";
+import { DeleteFileTool } from "./delete_file";
+import { FetchWebPageTool } from "./fetch_web_page";
+import { GenerateImageTool } from "./generate_image";
+import { GrepTool } from "./grep";
+import { ListFilesTool } from "./list_files";
+import { ModifyPlan } from "./modify_plan";
+import { ReadFileTool } from "./read_file";
+import { WebSearchTool } from "./web_search";
 
-export const BUILTIN_TOOLS = [
-  "create_file",
-  "delete_file",
-  "grep",
-  "list_files",
-  "modify_plan",
-  "read_file",
-  "apply_patch",
-  "web_search",
-  "fetch_web_page",
-  "bash",
-  "generate_image",
-] as const;
+export const BUILTIN_TOOL_REGISTRY = [
+  {
+    name: "create_file",
+    capability: "files",
+    create: () => new CreateFileTool(),
+  },
+  {
+    name: "delete_file",
+    capability: "files",
+    create: () => new DeleteFileTool(),
+  },
+  { name: "grep", capability: "files", create: () => new GrepTool() },
+  {
+    name: "list_files",
+    capability: "files",
+    create: () => new ListFilesTool(),
+  },
+  { name: "modify_plan", capability: null, create: () => new ModifyPlan() },
+  { name: "read_file", capability: "files", create: () => new ReadFileTool() },
+  {
+    name: "apply_patch",
+    capability: "files",
+    create: () => new ApplyPatchTool(),
+  },
+  { name: "web_search", capability: "web", create: () => new WebSearchTool() },
+  {
+    name: "fetch_web_page",
+    capability: "web",
+    create: () => new FetchWebPageTool(),
+  },
+  { name: "bash", capability: "shell", create: () => new BashTool() },
+  {
+    name: "generate_image",
+    capability: "imageGeneration",
+    create: () => new GenerateImageTool(),
+  },
+] as const satisfies readonly {
+  name: string;
+  capability: keyof Capabilities | null;
+  create(): BaseTool;
+}[];
 
-type BuiltinTool = (typeof BUILTIN_TOOLS)[number];
+export const BUILTIN_TOOLS = BUILTIN_TOOL_REGISTRY.map((tool) => tool.name);
+export type BuiltinTool = (typeof BUILTIN_TOOLS)[number];
 
-/** The capability that provides each tool; `null` tools are always on. */
-const TOOL_CAPABILITY: Record<BuiltinTool, keyof Capabilities | null> = {
-  create_file: "files",
-  delete_file: "files",
-  grep: "files",
-  list_files: "files",
-  modify_plan: null,
-  read_file: "files",
-  apply_patch: "files",
-  web_search: "web",
-  fetch_web_page: "web",
-  bash: "shell",
-  generate_image: "imageGeneration",
-};
-
-export function enabledBuiltinTools(capabilities: Capabilities): BuiltinTool[] {
-  return BUILTIN_TOOLS.filter((tool) => {
-    const capability = TOOL_CAPABILITY[tool];
-    return capability === null || capabilities[capability];
-  });
+export function createBuiltinTool(name: string): BaseTool {
+  const tool = BUILTIN_TOOL_REGISTRY.find((tool) => tool.name === name);
+  if (!tool) throw new Error(`Unknown tool: ${name}`);
+  return tool.create();
 }
