@@ -1,3 +1,10 @@
+/** Billed cost of a model call split by token class. */
+export interface CostBreakdown {
+  cachedInput: number;
+  uncachedInput: number;
+  output: number;
+}
+
 export interface MessageStep {
   kind: string;
   status?: string;
@@ -16,6 +23,8 @@ export interface MessageStep {
     loadDurationMs?: number;
     tokensPerSecond?: number;
     thinkingDurationMs?: number;
+    costBreakdown?: CostBreakdown;
+    cacheSavings?: number;
   };
   result?: string;
   error?: string;

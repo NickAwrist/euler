@@ -1,9 +1,13 @@
-import type { MessageStep } from "../../types";
+import type { CostBreakdown, MessageStep } from "../../types";
 
 export type TraceMetricsSummary = {
   calls: number;
   cost?: number;
+  /** Present only when every billed call reports its split. */
+  costBreakdown?: CostBreakdown;
+  cacheSavings?: number;
   inputTokens?: number;
+  cachedTokens?: number;
   outputTokens?: number;
   tokensPerSecond?: number;
 };
@@ -36,6 +40,13 @@ export function summarizeTraceMetrics(
   let hasInputTokens = false;
   let outputTokens = 0;
   let hasOutputTokens = false;
+  let cachedTokens: number | undefined;
+  let cacheSavings: number | undefined;
+  let costBreakdown: CostBreakdown | undefined = {
+    cachedInput: 0,
+    uncachedInput: 0,
+    output: 0,
+  };
   let outputDurationMs = 0;
   let lastTokensPerSecond: number | undefined;
 
@@ -44,6 +55,22 @@ export function summarizeTraceMetrics(
     if (metricCost !== undefined) {
       cost += metricCost;
       hasCost = true;
+    }
+    if (metricCost && costBreakdown) {
+      const split = metric.costBreakdown;
+      costBreakdown = split && {
+        cachedInput: costBreakdown.cachedInput + split.cachedInput,
+        uncachedInput: costBreakdown.uncachedInput + split.uncachedInput,
+        output: costBreakdown.output + split.output,
+      };
+    }
+    const metricCachedTokens = finiteNumber(metric.cachedTokens);
+    if (metricCachedTokens !== undefined) {
+      cachedTokens = (cachedTokens ?? 0) + metricCachedTokens;
+    }
+    const metricCacheSavings = finiteNumber(metric.cacheSavings);
+    if (metricCacheSavings !== undefined) {
+      cacheSavings = (cacheSavings ?? 0) + metricCacheSavings;
     }
     const metricInputTokens = finiteNumber(metric.promptTokens);
     if (metricInputTokens !== undefined) {
@@ -68,7 +95,10 @@ export function summarizeTraceMetrics(
   return {
     calls: metrics.length,
     cost: hasCost ? cost : undefined,
+    costBreakdown: cost > 0 ? costBreakdown : undefined,
+    cacheSavings,
     inputTokens: hasInputTokens ? inputTokens : undefined,
+    cachedTokens,
     outputTokens: hasOutputTokens ? outputTokens : undefined,
     tokensPerSecond,
   };

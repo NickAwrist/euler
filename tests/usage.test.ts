@@ -137,15 +137,15 @@ test("default spend sorting ranks equal-spend rows by tokens", () => {
   ).toEqual(["b", "c", "a"]);
 });
 
-test("invalid metrics remain unknown and cache counts cannot exceed input", () => {
+test("invalid metrics remain unknown", () => {
   recordUsage("alice", "openrouter:test/model", {
     promptTokens: 10,
-    cachedTokens: 100,
+    cachedTokens: Number.POSITIVE_INFINITY,
     cost: Number.NaN,
     outputTokens: -1,
   });
   expect(getUsageDashboard("alice", UsageQuery.parse({})).totals).toMatchObject(
-    { cached: 10, cost: null, output: null },
+    { cached: null, cost: null, output: null },
   );
 });
 

@@ -8,6 +8,7 @@ import {
   type LlmToolCall,
   streamModelChat,
 } from "../llm/index";
+import { priceLlmUsage } from "../llm/usageCost";
 import { logEvent } from "../observability/logger";
 import { permissionService } from "../permissions/PermissionService";
 import { CORE_DIRECTIVES } from "../prompts/render";
@@ -264,6 +265,12 @@ export class BaseAgent {
         if (!signal?.aborted) throw e;
       } finally {
         signal?.removeEventListener("abort", onAbort);
+        if (llmMetrics) {
+          llmMetrics = {
+            ...llmMetrics,
+            ...priceLlmUsage(this.model, llmMetrics),
+          };
+        }
         if (llmMetrics && ctx.ownerUuid) {
           try {
             recordUsage(ctx.ownerUuid, this.model, llmMetrics);

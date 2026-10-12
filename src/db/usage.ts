@@ -3,7 +3,7 @@ import {
   openRouterModelId,
   resolveModelSelection,
 } from "../llm/modelSelection";
-import { openRouterCatalog } from "../openRouterModels";
+import { validMetric } from "../llm/usageCost";
 import type {
   UsageDashboard,
   UsageGroup,
@@ -13,7 +13,7 @@ import type {
 import { getDb } from "./connection";
 
 const valid = (value: number | undefined): number | null =>
-  value !== undefined && Number.isFinite(value) && value >= 0 ? value : null;
+  validMetric(value) ?? null;
 
 export function recordUsage(
   owner: string,
@@ -25,38 +25,17 @@ export function recordUsage(
     resolved.provider === "openrouter"
       ? openRouterModelId(resolved.model)
       : resolved.model;
-  const input = valid(metrics.promptTokens);
-  const output = valid(metrics.outputTokens);
-  const rawCached = valid(metrics.cachedTokens);
-  const cached =
-    rawCached === null ? null : Math.min(rawCached, input ?? rawCached);
-  const pricing = openRouterCatalog
-    .peek()
-    .models?.find((item) => `openrouter:${item.route}` === modelId);
-  const savings =
-    cached === 0
-      ? 0
-      : cached !== null &&
-          pricing?.promptPricePerMillion != null &&
-          pricing.cacheReadPricePerMillion != null
-        ? (cached *
-            Math.max(
-              0,
-              pricing.promptPricePerMillion - pricing.cacheReadPricePerMillion,
-            )) /
-          1_000_000
-        : null;
   getDb().run(
     "INSERT INTO usage_events (owner_uuid, model, timestamp, input, output, cached, cost, savings) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     [
       owner,
       modelId,
       Date.now(),
-      input,
-      output,
-      cached,
+      valid(metrics.promptTokens),
+      valid(metrics.outputTokens),
+      valid(metrics.cachedTokens),
       resolved.provider === "ollama" ? 0 : valid(metrics.cost),
-      savings,
+      valid(metrics.cacheSavings),
     ],
   );
 }
