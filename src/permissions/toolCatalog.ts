@@ -1,6 +1,7 @@
 import { agentManager } from "../agents/agentManager";
 import { agentRuntime } from "../agents/runtime/AgentRuntime";
 import { openUserMcpTools } from "../mcp/userTools";
+import type { DisplayIcon } from "../schemas/icons";
 import { toolDefinition } from "../tools/background";
 import { mergeToolFields } from "./toolFieldMetadata";
 import { toolFields } from "./toolFields";
@@ -21,6 +22,7 @@ export async function toolCatalog(ownerUuid: string, signal: AbortSignal) {
         name: string;
         description: string;
         fields: ReturnType<typeof toolFields>;
+        icons?: readonly DisplayIcon[];
       }
     >();
     for (const tool of [...builtins, ...mcp.tools]) {
@@ -33,6 +35,7 @@ export async function toolCatalog(ownerUuid: string, signal: AbortSignal) {
           name,
           description: description ?? tool.description,
           fields,
+          ...(tool.icons.length ? { icons: tool.icons } : {}),
         });
         continue;
       }

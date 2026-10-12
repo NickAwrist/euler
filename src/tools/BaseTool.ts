@@ -2,6 +2,7 @@ import type { Tool } from "ollama";
 import { z } from "zod";
 import type { RunContext, Step } from "../RunContext";
 import type { ToolOutputAttachment } from "../attachments/types";
+import type { DisplayIcon } from "../schemas/icons";
 
 export type ToolResult = {
   text: string;
@@ -33,6 +34,10 @@ export class BaseTool {
   constructor(name: string, description: string) {
     this.name = name;
     this.description = description;
+  }
+
+  get icons(): readonly DisplayIcon[] {
+    return [];
   }
 
   async execute(

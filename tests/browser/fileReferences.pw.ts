@@ -23,9 +23,34 @@ for (const device of ["desktop", "mobile"] as const) {
     const files = ["src/index.ts", "src/server.ts", "docs/notes one.md"];
     const messages: { content: string }[] = [];
     let failFiles = false;
+    let failTools = false;
     await page.route("**/api/**", async (route) => {
       const url = new URL(route.request().url());
       const path = url.pathname;
+      if (path === "/api/mcp-servers/tools") {
+        return failTools
+          ? route.fulfill({ status: 500, json: { error: "Failed" } })
+          : route.fulfill({
+              json: {
+                tools: [
+                  {
+                    name: "mcp__test__echo",
+                    description: "Echo text",
+                    icons: [
+                      {
+                        src: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9X0AAAAASUVORK5CYII=",
+                      },
+                    ],
+                  },
+                  {
+                    name: "mcp__test__fail",
+                    description: "Fail",
+                    icons: [{ src: "data:image/png;base64,broken" }],
+                  },
+                ],
+              },
+            });
+      }
       if (path.endsWith("/workspace/files")) {
         if (failFiles)
           return route.fulfill({ status: 500, json: { error: "Failed" } });
@@ -169,6 +194,41 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect(picker).toBeHidden();
       await input.press("Tab");
       await expect(input).toHaveValue("Use $review ");
+      const integrations = page.locator("#command-picker");
+      await input.fill("/");
+      await expect(
+        integrations.getByRole("button", { name: /\/directory/ }),
+      ).toBeVisible();
+      await expect(
+        integrations.getByRole("button", { name: /mcp__test__echo/ }),
+      ).toBeVisible();
+      await expect(integrations.locator("img").first()).toBeVisible();
+      await expect(integrations.locator(".lucide-plug")).toBeVisible();
+      await input.fill("Use /echo");
+      await expect(integrations.getByRole("button")).toHaveCount(1);
+      await input.press("Tab");
+      await expect(input).toHaveValue("Use /mcp__test__echo ");
+      await expect(input).toBeFocused();
+      await expect(integrations).toBeHidden();
+      expect(messages).toHaveLength(1);
+      await input.fill("Use /mcp__test__echo hello");
+      await page
+        .getByRole("button", { name: "Send message", exact: true })
+        .click();
+      await expect.poll(() => messages.length).toBe(2);
+      expect(messages[1]?.content).toBe("Use /mcp__test__echo hello");
+      await input.fill("/fail");
+      await expect(integrations.getByRole("button")).toHaveCount(1);
+      await input.press("Escape");
+      await expect(integrations).toBeHidden();
+      await expect(input).toHaveValue("/fail");
+      failTools = true;
+      await input.fill("/echo");
+      await expect(
+        integrations.getByText("Could not load MCP tools"),
+      ).toBeVisible();
+      await input.press("Escape");
+      failTools = false;
       failFiles = true;
       await input.fill("@error");
       await expect(

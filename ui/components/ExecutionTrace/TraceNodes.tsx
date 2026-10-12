@@ -1,9 +1,10 @@
-import { ChevronRight, Wrench } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { MAIN_AGENT_NAME } from "../../../src/agents/agentNames";
 import { formatDuration } from "../../lib/formatDuration";
 import { cx, debugBlock, eyebrowText } from "../../styles";
 import type { MessageStep } from "../../types";
+import { ToolIcon } from "../ToolIcon";
 import {
   type TimelineSpan,
   traceStepDurationMs,
@@ -82,7 +83,9 @@ export function TraceStepBody({
           </span>
         ) : null}
         <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-[3px] text-[0.6875rem] font-medium text-foreground">
-          {step.kind === "tool_call" && <Wrench size={12} aria-hidden />}
+          {step.kind === "tool_call" && (
+            <ToolIcon name={step.toolName} icons={step.toolIcons} size={12} />
+          )}
           {traceStepLabel(step)}
         </span>
         {step.agentName && step.agentName !== MAIN_AGENT_NAME ? (

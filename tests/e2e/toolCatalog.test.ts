@@ -7,7 +7,8 @@ import { startTestServer, userHeaders } from "../helpers/server";
 
 test("the tool picker uses enabled user tools, actual MCP names, and runtime tools without saving agents", async () => {
   const server = await startTestServer();
-  const mcp = startMcpTestServer();
+  const icons = [{ src: "data:image/png;base64,AAAA" }];
+  const mcp = startMcpTestServer(icons);
   const other = "22222222-2222-4222-8222-222222222222";
   const names = async (owner?: string) => {
     const response = await fetch(`${server.url}/api/settings/user/tools`, {
@@ -87,6 +88,9 @@ test("the tool picker uses enabled user tools, actual MCP names, and runtime too
     expect(
       connected.tools.find((tool) => tool.name === "mcp__picker__echo")?.fields,
     ).toEqual([{ path: "text", type: "string" }]);
+    expect(
+      connected.tools.find((tool) => tool.name === "mcp__picker__echo")?.icons,
+    ).toEqual(icons);
     expect(await names(other)).not.toContain("mcp__picker__echo");
     const disabled = await fetch(
       `${server.url}/api/mcp-servers/${data.servers[0]!.id}`,

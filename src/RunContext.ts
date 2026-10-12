@@ -2,6 +2,7 @@ import type { BaseAgent } from "./agents/BaseAgent";
 import type { ToolOutputAttachment } from "./attachments/types";
 import type { RunPermissions } from "./permissions/PermissionService";
 import type { PromptContext } from "./prompts/render";
+import type { DisplayIcon } from "./schemas/icons";
 import type { Workspace } from "./workspaces/WorkspaceService";
 
 export type StepStatus = "running" | "done" | "error";
@@ -35,6 +36,7 @@ export type Step = {
   status: StepStatus;
   turnIndex: number;
   toolName?: string;
+  toolIcons?: readonly DisplayIcon[];
   jobId?: string;
   args?: Record<string, unknown>;
   result?: string;
@@ -57,6 +59,7 @@ export class RunContext {
   authorizeToolCall?: (
     tool: string,
     args: Record<string, unknown>,
+    icons?: readonly DisplayIcon[],
   ) => Promise<void>;
   jobs?: import("./tools/background").JobExecutor;
   agentInstance: BaseAgent;
@@ -110,6 +113,7 @@ export class RunContext {
     kind: Step["kind"];
     turnIndex: number;
     toolName?: string;
+    toolIcons?: readonly DisplayIcon[];
     args?: Record<string, unknown>;
   }): Step {
     const step: Step = {
@@ -117,6 +121,7 @@ export class RunContext {
       status: "running",
       turnIndex: init.turnIndex,
       toolName: init.toolName,
+      ...(init.toolIcons?.length ? { toolIcons: init.toolIcons } : {}),
       args: init.args,
       startedAt: new Date().toISOString(),
     };
@@ -200,6 +205,7 @@ export class RunContext {
     };
     if (step.endedAt) out.endedAt = step.endedAt;
     if (step.toolName) out.toolName = step.toolName;
+    if (step.toolIcons?.length) out.toolIcons = step.toolIcons;
     if (step.jobId) out.jobId = step.jobId;
     if (step.args) out.args = step.args;
     if (step.result !== undefined) out.result = step.result;

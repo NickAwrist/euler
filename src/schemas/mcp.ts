@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DisplayIconSchema } from "./icons";
 
 /** Server names prefix tool names, so they use only characters providers accept. */
 const McpServerNameSchema = z.string().regex(/^[A-Za-z0-9_-]{1,32}$/);
@@ -62,11 +63,29 @@ export const McpServerListResponseSchema = z.object({
 export const McpServerCheckSchema = z.discriminatedUnion("ok", [
   z.object({
     ok: z.literal(true),
+    icons: z.array(DisplayIconSchema).optional(),
     tools: z.array(
-      z.object({ name: z.string(), description: z.string().optional() }),
+      z.object({
+        name: z.string(),
+        description: z.string().optional(),
+        icons: z.array(DisplayIconSchema).optional(),
+      }),
     ),
   }),
   z.object({ ok: z.literal(false), error: z.string() }),
 ]);
 
 export type McpServerCheck = z.infer<typeof McpServerCheckSchema>;
+
+export const McpToolListResponseSchema = z.object({
+  tools: z.array(
+    z.object({
+      name: z.string(),
+      description: z.string(),
+      icons: z.array(DisplayIconSchema).optional(),
+    }),
+  ),
+});
+export type McpToolData = z.infer<
+  typeof McpToolListResponseSchema
+>["tools"][number];

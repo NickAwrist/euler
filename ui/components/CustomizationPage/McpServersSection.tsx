@@ -11,6 +11,7 @@ import { Button } from "../Button";
 import { IconButton } from "../IconButton";
 import { EnableSwitch } from "../ModelPreferenceControls";
 import { RefreshButton } from "../RefreshButton";
+import { ServiceIcon } from "../ServiceIcon";
 import { TruncateConfirmModal } from "../TruncateConfirmModal";
 import { AddMcpServersModal } from "./AddMcpServersModal";
 import { useMcpServers } from "./useMcpServers";
@@ -104,7 +105,12 @@ function McpServerItem({
   return (
     <div className="rounded-lg border border-border-subtle px-4 py-3">
       <div className="flex items-center gap-3">
-        <Plug size={15} className="shrink-0 text-muted-foreground" />
+        <ServiceIcon
+          icons={check?.ok ? check.icons : undefined}
+          fallback={Plug}
+          size={15}
+          className="text-muted-foreground"
+        />
         <div className="min-w-0 flex-1">
           <div className="truncate text-[0.8125rem] font-medium text-foreground">
             {server.name}
@@ -168,8 +174,9 @@ function McpToolSummary({ check }: { check: McpServerCheck | null }) {
         <li
           key={tool.name}
           title={tool.description}
-          className="rounded-md bg-muted px-2 py-[3px] font-mono text-[0.6875rem] text-foreground"
+          className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-[3px] font-mono text-[0.6875rem] text-foreground"
         >
+          <ServiceIcon icons={tool.icons} fallback={Plug} size={12} />
           {tool.name}
         </li>
       ))}

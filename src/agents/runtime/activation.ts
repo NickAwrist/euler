@@ -14,6 +14,7 @@ import { logEvent } from "../../observability/logger";
 import { permissionService } from "../../permissions/PermissionService";
 import { isFinalAgent } from "../../schemas/agents";
 import type { Activation } from "../../schemas/events";
+import type { DisplayIcon } from "../../schemas/icons";
 import type { WireMessageInput } from "../../schemas/run";
 import type { BaseTool } from "../../tools/BaseTool";
 import type { Workspace } from "../../workspaces/WorkspaceService";
@@ -33,6 +34,7 @@ export interface ActivationHost {
     signal: AbortSignal,
     tool: string,
     args: Record<string, unknown>,
+    icons?: readonly DisplayIcon[],
   ): Promise<void>;
   jobs: import("../../jobs/JobManager").JobManager;
   store: AgentStore;
@@ -228,8 +230,8 @@ export async function runActivation(
       workspace,
     );
     ctx.jobs = host.jobs.executor(agent.id, agent.sessionId, partial.id);
-    ctx.authorizeToolCall = (tool, args) =>
-      host.authorizeToolCall(agent, workspace, signal, tool, args);
+    ctx.authorizeToolCall = (tool, args, icons) =>
+      host.authorizeToolCall(agent, workspace, signal, tool, args, icons);
     model.checkpoint = () => host.store.saveHistory(agent, model.history);
     model.hasPendingInput = () =>
       !waiting && host.store.hasWakingMessage(agent.id, false);

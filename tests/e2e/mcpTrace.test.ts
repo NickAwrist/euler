@@ -12,7 +12,8 @@ const model = "openrouter:openai/gpt-5.6-terra";
 test("MCP tool calls are traced with their arguments and result", async () => {
   setOpenRouterApiKey("sk-or-mcp-test");
   setOpenRouterScenario("mcp-tool");
-  const mcp = startMcpTestServer();
+  const icons = [{ src: "data:image/png;base64,AAAA" }];
+  const mcp = startMcpTestServer(icons);
   createMcpServers(TEST_USER_ID, [
     {
       name: "test",
@@ -47,6 +48,7 @@ test("MCP tool calls are traced with their arguments and result", async () => {
       expect.objectContaining({
         kind: "tool_call",
         toolName: "mcp__test__echo",
+        toolIcons: icons,
         args: { text: "hello" },
         result: "hello",
       }),
