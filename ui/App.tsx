@@ -667,7 +667,7 @@ export default function App() {
 
   const openCustomization = () => {
     setSidebarOpen(false);
-    void navigate("/customization");
+    void navigate("/customization/personalization");
   };
 
   const openSettings = () => {
@@ -739,6 +739,8 @@ export default function App() {
         ) : route.view === "customization" ? (
           <main className="relative h-full min-h-0 min-w-0 flex-1 bg-background">
             <CustomizationPage
+              tab={route.tab}
+              onTabChange={(tab) => void navigate(`/customization/${tab}`)}
               onBack={backToChat}
               currentSettings={app.userSettings}
               onSave={app.savePersonalization}

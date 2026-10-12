@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
 import type { UserSettings } from "../../persist/userSettings";
-import { cx } from "../../styles";
-import type { Personalization } from "../../types";
+import type { CustomizationTab, Personalization } from "../../types";
 import { BackToChatButton } from "../BackToChatButton";
+import { PageTabRail } from "../PageTabRail";
 import { UnsavedChangesModal } from "../UnsavedChangesModal";
 import { PersonalizationTab } from "./PersonalizationTab";
 import { SkillsTab } from "./SkillsTab";
@@ -17,22 +17,31 @@ const TABS = [
   { id: "tools", label: "Tools" },
 ] as const;
 
-type Tab = (typeof TABS)[number]["id"];
-
 export function CustomizationPage({
+  tab,
+  onTabChange: openTab,
   onBack,
   currentSettings,
   onSave,
 }: {
+  tab: CustomizationTab;
+  onTabChange: (tab: CustomizationTab) => void;
   onBack: () => void;
   currentSettings: UserSettings;
   onSave: (settings: Partial<Personalization>) => Promise<void>;
 }) {
-  const [tab, setTab] = useState<Tab>("personalization");
+  const [failedTab, setFailedTab] = useState<CustomizationTab | null>(null);
+  // Let the rejected departure settle before navigating to its failing draft.
+  useEffect(() => {
+    if (failedTab === null) return;
+    openTab(failedTab);
+    setFailedTab(null);
+  }, [failedTab, openTab]);
   // Tabs mount on first visit and stay mounted to keep their state.
-  const [visited, setVisited] = useState<ReadonlySet<Tab>>(
-    () => new Set(["personalization"]),
+  const [visited, setVisited] = useState<ReadonlySet<CustomizationTab>>(
+    () => new Set([tab]),
   );
+  if (!visited.has(tab)) setVisited(new Set(visited).add(tab));
   const personalization = usePersonalizationDraft(currentSettings, onSave);
   const skills = useSkillsPage();
   const drafts = [
@@ -46,16 +55,16 @@ export function CustomizationPage({
   const changes = drafts.flatMap(({ label, draft }) =>
     draft.changes.map((change) => ({ ...change, group: label })),
   );
-  const { prompt, resolveLeave } = useUnsavedChanges(changes.length > 0);
-  const openTab = (id: Tab) => {
-    setTab(id);
-    setVisited((current) => new Set(current).add(id));
-  };
+  const { prompt, resolveLeave } = useUnsavedChanges(
+    changes.length > 0,
+    "/customization/",
+  );
   // Stops at the first failure and shows that tab's error.
   const saveAndLeave = async () => {
     for (const { tab: id, draft } of drafts) {
       if (!(await draft.save())) {
-        openTab(id);
+        resolveLeave(false);
+        setFailedTab(id);
         return;
       }
     }
@@ -70,28 +79,15 @@ export function CustomizationPage({
           Customization
         </h1>
       </header>
-      <div className="flex shrink-0 gap-1 border-b border-border-subtle px-3 sm:px-5">
-        {TABS.map(({ id, label }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => openTab(id)}
-            className={cx(
-              "flex items-center gap-1.5 rounded-t-md border-b-2 px-3 py-2 text-[0.8125rem] font-medium transition-colors sm:px-4",
-              tab === id
-                ? "border-foreground text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {label}
-            {drafts.some(
-              (entry) => entry.tab === id && entry.draft.changes.length > 0,
-            ) && (
-              <span aria-hidden className="size-1.5 rounded-full bg-accent" />
-            )}
-          </button>
-        ))}
-      </div>
+      <PageTabRail
+        label="Customization sections"
+        tabs={TABS}
+        activeTab={tab}
+        onTabChange={openTab}
+        dirtyTabs={drafts
+          .filter(({ draft }) => draft.changes.length > 0)
+          .map(({ tab }) => tab)}
+      />
       {visited.has("skills") && (
         <div
           className={

@@ -12,7 +12,11 @@ export function useUnsavedChanges(
   useEffect(() => {
     if (!isDirty) return;
     return addNavigationGuard(async (path) => {
-      if (internalPathPrefix && path.startsWith(internalPathPrefix))
+      if (
+        internalPathPrefix &&
+        (path.startsWith(internalPathPrefix) ||
+          path === internalPathPrefix.replace(/\/$/, ""))
+      )
         return true;
       return new Promise<boolean>((resolve) => {
         pendingLeave.current = resolve;

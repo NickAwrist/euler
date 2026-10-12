@@ -1,4 +1,4 @@
-import type { SettingsTab } from "../types";
+import type { CustomizationTab, SettingsTab } from "../types";
 
 export const NAVIGATION_EVENT = "euler:navigate";
 export type NavigationGuard = (
@@ -27,15 +27,21 @@ function settingsTab(path: string): SettingsTab {
 type AppRoute =
   | { view: "run"; sessionId: string | null }
   | { view: "settings"; tab: SettingsTab }
-  | { view: "customization" | "usage" };
+  | { view: "customization"; tab: CustomizationTab }
+  | { view: "usage" };
 
 export function parseRoute(path = window.location.pathname): AppRoute {
   if (path === "/settings" || path.startsWith("/settings/")) {
     return { view: "settings", tab: settingsTab(path) };
   }
-  if (path === "/customization" || path === "/usage") {
-    return { view: path === "/usage" ? "usage" : "customization" };
+  if (path === "/customization" || path.startsWith("/customization/")) {
+    const tab = path.split("/")[2];
+    return {
+      view: "customization",
+      tab: tab === "skills" || tab === "tools" ? tab : "personalization",
+    };
   }
+  if (path === "/usage") return { view: "usage" };
   let sessionId: string | null = null;
   if (path.startsWith("/run/")) {
     try {

@@ -1,8 +1,8 @@
 import { Save } from "lucide-react";
 import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
-import { cx } from "../../styles";
 import { BackToChatButton } from "../BackToChatButton";
 import { Button } from "../Button";
+import { PageTabRail } from "../PageTabRail";
 import { UnsavedChangesModal } from "../UnsavedChangesModal";
 import { AppearanceSettingsTab } from "./AppearanceSettingsTab";
 import { GeneralSettingsTab } from "./GeneralSettingsTab";
@@ -45,26 +45,13 @@ export function SettingsPage(props: SettingsPageProps) {
         </h1>
       </header>
 
-      <div className="flex shrink-0 flex-wrap gap-x-1 border-b border-border-subtle px-3 sm:flex-nowrap sm:px-5">
-        {SETTINGS_TABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            className={cx(
-              "flex items-center gap-1.5 whitespace-nowrap rounded-t-md border-b-2 px-3 py-2 text-[0.8125rem] font-medium transition-colors sm:px-4",
-              tab === t.id
-                ? "border-foreground text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-            onClick={() => setTab(t.id)}
-          >
-            {t.label}
-            {dirtyTabs.includes(t) && (
-              <span aria-hidden className="size-1.5 rounded-full bg-accent" />
-            )}
-          </button>
-        ))}
-      </div>
+      <PageTabRail
+        label="Settings sections"
+        tabs={SETTINGS_TABS}
+        activeTab={tab}
+        onTabChange={setTab}
+        dirtyTabs={dirtyTabs.map((t) => t.id)}
+      />
 
       <main className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="mx-auto max-w-2xl space-y-6">
