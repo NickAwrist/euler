@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RunContext } from "../../src/RunContext";
 import { BaseAgent } from "../../src/agents/BaseAgent";
+import { permissionService } from "../../src/permissions/PermissionService";
 import { ApplyPatchTool } from "../../src/tools/apply_patch";
 
 const roots: string[] = [];
@@ -22,6 +23,7 @@ async function fixture(content: string) {
   await fs.writeFile(path, content, { mode: 0o755 });
   const ctx = new RunContext(
     new BaseAgent("test", "test"),
+    permissionService.resolve({ kind: "local" }),
     undefined,
     undefined,
     undefined,

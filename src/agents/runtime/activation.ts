@@ -6,10 +6,12 @@ import type {
 import type { AgentRecord, AgentStore } from "../../db/agents";
 import { getAttachment } from "../../db/attachments";
 import { getSessionById } from "../../db/sessions";
+import { effectiveUserPreferences } from "../../db/userPreferences";
 import type { Unsequenced } from "../../events/eventHub";
 import type { LlmMessage } from "../../llm";
 import { type McpToolSet, openUserMcpTools } from "../../mcp/userTools";
 import { logEvent } from "../../observability/logger";
+import { permissionService } from "../../permissions/PermissionService";
 import { isFinalAgent } from "../../schemas/agents";
 import type { Activation } from "../../schemas/events";
 import type { WireMessageInput } from "../../schemas/run";
@@ -169,6 +171,10 @@ export async function runActivation(
     model.addTools(mcpTools.tools);
     ctx = new RunContext(
       model,
+      permissionService.resolve(
+        workspace,
+        effectiveUserPreferences(agent.ownerUuid).capabilities,
+      ),
       (context, step) => {
         const position = context.steps.indexOf(step) - segmentStart;
         if (position < 0) return;

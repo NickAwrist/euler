@@ -84,7 +84,7 @@ export function DirectoryModal({
   return (
     <Modal
       title="Choose working directory"
-      subtitle="The agent can read, edit, and run commands in this folder."
+      subtitle="The agent can read, edit, and run commands in this folder. File changes stay in this folder. Commands have full network access, including the internet and services on this machine and your local network, so they can install dependencies and run dev servers."
       onClose={onClose}
       closeDisabled={pending}
       hideCloseButton

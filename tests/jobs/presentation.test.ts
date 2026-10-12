@@ -4,6 +4,7 @@ import { BaseAgent } from "../../src/agents/BaseAgent";
 import { createSessionRow } from "../../src/db/sessions";
 import { JobManager } from "../../src/jobs/JobManager";
 import { updateContent } from "../../src/jobs/content";
+import { permissionService } from "../../src/permissions/PermissionService";
 import { JobSchema } from "../../src/schemas/jobs";
 import { BaseTool } from "../../src/tools/BaseTool";
 import type { JobContext, RunningExecution } from "../../src/tools/background";
@@ -69,6 +70,7 @@ function fixture() {
   });
   const ctx = new RunContext(
     new BaseAgent("test", "test"),
+    permissionService.resolve({ kind: "sandbox" }),
     undefined,
     undefined,
     undefined,

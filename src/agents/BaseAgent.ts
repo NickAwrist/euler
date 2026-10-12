@@ -9,6 +9,7 @@ import {
   streamModelChat,
 } from "../llm/index";
 import { logEvent } from "../observability/logger";
+import { permissionService } from "../permissions/PermissionService";
 import { CORE_DIRECTIVES } from "../prompts/render";
 import {
   type BaseTool,
@@ -85,6 +86,7 @@ export class BaseAgent {
     try {
       const tool = this.TOOL_MAP[toolName];
       if (!tool) throw new Error(`tool ${toolName} not found`);
+      if (ctx) permissionService.assertTool(ctx.permissions, toolName);
       const { background = false, ...operationArgs } = args;
       if (typeof background !== "boolean")
         throw new Error("background must be a boolean");
@@ -197,7 +199,13 @@ export class BaseAgent {
       const stream = await streamModelChat({
         model: this.model,
         messages,
-        tools: this.tools.map(toolDefinition),
+        tools: this.tools
+          .filter(
+            (tool) =>
+              permissionService.toolDecision(ctx.permissions, tool.name)
+                .allowed,
+          )
+          .map(toolDefinition),
         ...(this.reasoningEffort
           ? { reasoningEffort: this.reasoningEffort }
           : {}),

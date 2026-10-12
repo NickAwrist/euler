@@ -22,7 +22,7 @@ const CAPABILITIES: { id: keyof Capabilities; label: string; hint: string }[] =
     {
       id: "shell",
       label: "Shell",
-      hint: "Run commands in the sandboxed workspace.",
+      hint: "Run commands in the active workspace.",
     },
     {
       id: "files",

@@ -1,5 +1,6 @@
 import type { Tool } from "ollama";
 import type { RunContext, Step } from "../RunContext";
+import type { RunPermissions } from "../permissions/PermissionService";
 import type {
   ToolContent,
   ToolContentUpdate,
@@ -10,6 +11,7 @@ import type { BaseTool, ToolResult } from "./BaseTool";
 
 export interface JobContext {
   workspace: Workspace;
+  permissions: RunPermissions;
   signal: AbortSignal;
   background: boolean;
   emitProgress(update: ToolContentUpdate): void;

@@ -2,6 +2,10 @@ import os from "node:os";
 import { listSkills } from "../db/index";
 import { effectiveUserPreferences } from "../db/userPreferences";
 import {
+  enabledBuiltinTools,
+  permissionService,
+} from "../permissions/PermissionService";
+import {
   type PersonalizationFields,
   type PromptContext,
   renderSystemPrompt,
@@ -15,7 +19,6 @@ import { modelInvocableSkills, renderSkillsPrompt } from "../skills/runtime";
 import type { BaseTool } from "../tools/BaseTool";
 import { ApplyPatchTool } from "../tools/apply_patch";
 import { BashTool } from "../tools/bash";
-import { enabledBuiltinTools } from "../tools/builtinTools";
 import { CreateFileTool } from "../tools/create_file";
 import { DeleteFileTool } from "../tools/delete_file";
 import { FetchWebPageTool } from "../tools/fetch_web_page";
@@ -152,12 +155,16 @@ function buildAgent(
     finalPrompt,
   );
   const { capabilities } = effectiveUserPreferences(opts.ownerUuid);
-  agent.addTools(enabledBuiltinTools(capabilities).map(createBuiltinTool));
+  const permissions = permissionService.resolve(undefined, capabilities);
+  agent.addTools(enabledBuiltinTools(permissions).map(createBuiltinTool));
   if (loadableSkills.length > 0) {
     agent.addTool(new LoadSkillTool(loadableSkills));
   }
   // Skills persist into later chats, so only the user's own agent edits them.
-  if (!isSubagent && capabilities.skills) {
+  if (
+    !isSubagent &&
+    permissionService.toolDecision(permissions, "manage_skills").allowed
+  ) {
     agent.addTool(new ManageSkillsTool(opts.ownerUuid));
   }
   if (opts.reasoningEffort) {

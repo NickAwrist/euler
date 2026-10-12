@@ -1,3 +1,4 @@
+import { permissionService } from "../../src/permissions/PermissionService";
 import "../setup";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { RunContext } from "../../src/RunContext";
@@ -134,7 +135,7 @@ describe("OpenRouter provider", () => {
         `openrouter:${model}`,
         "Be concise.",
       );
-      const context = new RunContext(agent);
+      const context = new RunContext(agent, permissionService.resolve());
       await agent.run("Hello", context);
       return context.steps.find((step) => step.kind === "llm_call")?.metrics
         ?.thinkingDurationMs;
@@ -156,7 +157,7 @@ describe("OpenRouter provider", () => {
       `openrouter:${model}`,
       "Be concise.",
     );
-    const context = new RunContext(agent);
+    const context = new RunContext(agent, permissionService.resolve());
 
     expect(await agent.run("Use a tool", context)).toBe("Finished after tool.");
     const requests = getOpenRouterRequests();

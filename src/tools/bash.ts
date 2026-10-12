@@ -63,9 +63,11 @@ export class BashTool extends BaseTool {
 
     try {
       const { outputFiles } = parseToolArgs(BashArgs, args);
+      if (!ctx) throw new Error("RunContext is required for shell execution");
       const workspace = requireWorkspace(ctx);
       const execution = await this.start(args, {
         workspace,
+        permissions: ctx.permissions,
         signal: ctx?.signal ?? new AbortController().signal,
         background: false,
         emitProgress: () => {},
@@ -104,6 +106,7 @@ export class BashTool extends BaseTool {
     const execution = await sandboxRunner.spawn({
       command,
       workspace,
+      permissions: ctx.permissions,
       signal: ctx.signal,
       background: ctx.background,
       emitOutput: (chunk) =>

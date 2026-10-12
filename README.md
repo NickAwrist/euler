@@ -160,6 +160,33 @@ Shell commands and file tools use `/workspace` for both private and selected
 local workspaces. File tools also accept relative paths within that directory.
 The UI shows the selected host directory for local workspaces.
 
+Run permissions are resolved by `src/permissions/PermissionService.ts`. The
+dispatcher checks them before tool execution, and background jobs and the shell
+runner enforce the same policy. Existing capability switches continue to gate
+built-in tools; user-configured MCP tools retain their own access.
+
+`/sandbox` keeps isolated networking and existing resource limits. `/directory`
+uses a development policy with host networking, read-only access to installed
+Bun and Node executables, and no virtual-memory cap. Toolchains are discovered
+from the backend's PATH, with its own runtime executable as a fallback. Bunx is
+available when Bun is found. Both policies keep the selected workspace mounted
+at `/workspace`, system files read-only, and the host home and environment hidden.
+Credentials inside the selected folder remain accessible to the agent.
+Directory commands use a temporary home so package-manager caches do not clutter
+the selected folder. That home and its caches are discarded after each command.
+When a root backend switches to a local directory's owner, toolchain discovery
+skips executables that owner cannot read and execute, including root-private
+installations. Install runtimes in a location accessible to that owner.
+
+Directory commands can download dependencies and reach services on the backend
+machine and its local network. Background servers share host ports with other
+chats and applications. Use background execution for long-running servers and
+bind to `0.0.0.0` to access them remotely. Private sandbox commands still have
+separate networks and cannot expose servers to the host browser.
+Host networking also reaches loopback-only services such as Euler, Ollama, and
+ComfyUI. Requests from directory commands count as local requests, so loopback
+checks do not distinguish an agent command from a person using the machine.
+
 Workspace file operations require Linux with procfs. Reads, writes, directory
 listing, and scans open path components without following symlinks. Deletes use
 an open parent directory and unlink the final entry without following it. Ignore
@@ -196,7 +223,7 @@ sudo apparmor_parser -r /etc/apparmor.d/euler-bwrap
 
 This follows [Ubuntu's application-specific user namespace guidance](https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces).
 The profile permits Bubblewrap to create user namespaces. The runner continues
-using its filesystem restrictions and isolated network namespace.
+using its filesystem restrictions and the active workspace's network policy.
 
 Restart the backend after loading the profile because it caches the sandbox
 capability check. Then run the sandbox tests above; workspace writes and network

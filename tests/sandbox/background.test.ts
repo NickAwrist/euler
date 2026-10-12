@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { permissionService } from "../../src/permissions/PermissionService";
 import { BubblewrapSandboxRunner } from "../../src/sandbox/SandboxRunner";
 
 test("background cancellation tears down descendants and output overflow does not terminate work", async () => {
@@ -13,6 +14,7 @@ test("background cancellation tears down descendants and output overflow does no
   try {
     let output = "";
     const command = await runner.spawn({
+      permissions: permissionService.resolve(workspace),
       workspace,
       command: "(sleep 1; echo leaked > leaked.txt) & echo READY; wait",
       background: true,
@@ -32,6 +34,7 @@ test("background cancellation tears down descendants and output overflow does no
       await readFile(`${root}/leaked.txt`, "utf8").catch(() => null),
     ).toBeNull();
     const overflow = await runner.run({
+      permissions: permissionService.resolve(workspace),
       workspace,
       background: true,
       command: "yes X | head -c 3000000; echo DONE",
