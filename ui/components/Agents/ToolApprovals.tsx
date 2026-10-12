@@ -138,7 +138,7 @@ function ApprovalRequest({
               <span className="font-medium">{approval.agentTitle}</span> wants
               to run <code className="font-mono">{approval.tool}</code>
             </h3>
-            {approval.background && (
+            {approval.arguments.background === true && (
               <span className="rounded bg-muted px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground">
                 Background
               </span>

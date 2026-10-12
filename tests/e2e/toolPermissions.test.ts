@@ -65,7 +65,7 @@ test("approval API gates real execution, survives browser reload, and saves matc
     ).json()) as { approvals: unknown[] };
     const approval = ToolApprovalSchema.parse(snapshot.approvals[0]);
     expect(approval.arguments.command).toBe(command);
-    expect(approval.background).toBe(false);
+    expect(approval.arguments.background === true).toBe(false);
     const endpoint = `/api/sessions/${session.id}/approvals/${approval.id}`;
     expect(
       (

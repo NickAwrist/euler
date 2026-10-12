@@ -1,5 +1,3 @@
-import { type ChildProcess, spawn } from "node:child_process";
-import { rmSync } from "node:fs";
 import {
   type APIRequestContext,
   type Page,
@@ -11,6 +9,7 @@ import type {
   ToolPermissionRule,
 } from "../../src/schemas/toolPermissions";
 import type { UserPreferences } from "../../src/schemas/userPreferences";
+import { startAsyncBackend } from "./asyncBackend";
 
 // Real Express/SQLite/runtime/Bash backend; only the model catalog is mocked.
 const USER = "12345678-1234-4234-9234-123456789abc";
@@ -23,46 +22,18 @@ const ASK_ALL: ToolPermissionRule = {
   action: "ask",
   condition: { kind: "any" },
 };
-let server: ChildProcess;
+let server: Awaited<ReturnType<typeof startAsyncBackend>>;
 let backend: string;
 
 test.beforeAll(async () => {
-  // Each parallel worker (desktop and mobile projects) gets its own backend.
-  const port = String(5196 - Number(process.env.TEST_PARALLEL_INDEX ?? 0));
-  backend = `http://127.0.0.1:${port}`;
-  server = spawn("bun", ["tests/helpers/asyncFixture.ts"], {
-    stdio: "pipe",
-    env: {
-      ...process.env,
-      TOOL_PERMISSION_FIXTURE: "1",
-      JOB_FIXTURE_PORT: port,
-    },
+  // Each parallel worker gets its own backend.
+  server = await startAsyncBackend({
+    port: 5196 - Number(process.env.TEST_PARALLEL_INDEX ?? 0),
+    mode: "permissions",
   });
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error("Fixture failed to start")),
-      10000,
-    );
-    server.stdout?.on("data", (chunk) => {
-      if (String(chunk).includes("async fixture ready")) {
-        clearTimeout(timer);
-        resolve();
-      }
-    });
-    server.on("exit", (code) => {
-      clearTimeout(timer);
-      reject(new Error(`Fixture exited ${code}`));
-    });
-  });
+  backend = server.url;
 });
-test.afterAll(() => {
-  server?.kill();
-  if (server?.pid)
-    rmSync(`/tmp/euler-async-browser-${server.pid}`, {
-      recursive: true,
-      force: true,
-    });
-});
+test.afterAll(async () => server?.stop());
 
 test.beforeEach(async ({ page, request }) => {
   await page.addInitScript((user) => {

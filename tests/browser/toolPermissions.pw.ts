@@ -584,18 +584,8 @@ function approval(overrides: Partial<ToolApproval>): ToolApproval {
     agentTitle: "Main agent",
     tool: "bash",
     arguments: { command: "rm -rf build" },
-    background: false,
     workspacePath: "/repo",
     reason: "Tool calls ask before running.",
-    createdAt: 1,
-    matchingRule: {
-      id: "33333333-3333-4333-8333-333333333333",
-      tool: "bash",
-      action: "allow",
-      condition: { kind: "arguments", value: { command: "rm -rf build" } },
-      sessionId: "chat",
-      workspacePath: "/repo",
-    },
     matchingScope: "Identical arguments in this chat and workspace",
     ...overrides,
   };
@@ -628,7 +618,14 @@ async function openChat(page: Page, approvals: ToolApproval[]) {
         json: {
           ok: true,
           ...(decision === "allow_matching" && {
-            rule: answered?.matchingRule,
+            rule: {
+              id: "33333333-3333-4333-8333-333333333333",
+              tool: answered!.tool,
+              action: "allow",
+              condition: { kind: "arguments", value: answered!.arguments },
+              sessionId: "chat",
+              workspacePath: "/repo",
+            },
           }),
         },
       });
@@ -711,8 +708,7 @@ test("tools desktop: approvals sit above the composer without blocking it", asyn
       agentId: "sub",
       agentTitle: "Research helper",
       tool: "fetch_web_page",
-      arguments: { url: "https://example.com" },
-      background: true,
+      arguments: { url: "https://example.com", background: true },
     }),
   ]);
   const approvals = page.getByRole("region", { name: "Tool approvals" });

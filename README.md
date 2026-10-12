@@ -163,14 +163,12 @@ Allow exceptions. Argument fields come from the selected tool's own schema,
 including nested paths. Enum and boolean values use pickers, numeric fields
 use numbers, and text fields support exact values or regex. Regex uses RE2 syntax with no slash
 delimiters; use `^npm\s+publish\b` to match a command at the start, or
-`npm\s+publish` to match it anywhere. Invalid patterns are rejected. Existing
-prefix rules migrate to escaped, anchored patterns. A rule can
+`npm\s+publish` to match it anywhere. Invalid patterns are rejected. A rule can
 also match any arguments or the complete arguments saved from an
 approval. Deny rules always
 win; otherwise chat/workspace scope takes precedence, then a specific tool
 over All tools, then argument conditions, then the most recently saved rule.
-Calls with no matching rule are allowed. Saved approval defaults are converted
-to All tools rules.
+Calls with no matching rule are allowed.
 
 Approval requests appear above the chat input for both main agents and
 subagents. Allow once resumes just that call. Allow matching calls immediately

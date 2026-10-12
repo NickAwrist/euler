@@ -6,6 +6,7 @@ import {
   ToolPermissionRuleSchema,
   type ToolPermissions,
 } from "../../../src/schemas/toolPermissions";
+import { whileRunning } from "../../lib/whileRunning";
 import { createBrowserUuid } from "../../persist/userIdentity";
 import {
   type ToolPermissionTool,
@@ -210,21 +211,23 @@ function RuleRow({
     draft.tool !== ALL_TOOLS &&
     !tools?.some((tool) => tool.name === draft.tool);
 
-  const run = async (kind: "save" | "delete", action: () => Promise<void>) => {
-    setBusy(kind);
-    setError(null);
-    try {
-      await action();
-    } catch (actionError) {
-      setError(
-        errorMessage(
-          actionError,
-          kind === "save" ? "Failed to save rule" : "Failed to delete rule",
-        ),
-      );
-    }
-    setBusy(null);
-  };
+  const run = (kind: "save" | "delete", action: () => Promise<void>) =>
+    whileRunning(
+      (running) => setBusy(running ? kind : null),
+      async () => {
+        setError(null);
+        try {
+          await action();
+        } catch (actionError) {
+          setError(
+            errorMessage(
+              actionError,
+              kind === "save" ? "Failed to save rule" : "Failed to delete rule",
+            ),
+          );
+        }
+      },
+    );
   const setCondition = (next: Condition) =>
     setDraft((current) => ({ ...current, condition: next }));
   // A replaced condition has no chosen field, so its type resets too.
@@ -432,8 +435,10 @@ function ArgumentFields({
       : option.path;
   const values =
     field?.values ?? (fieldType === "boolean" ? [true, false] : undefined);
-  const setValue = (value: ArgumentCondition["value"]) =>
-    onChange({ ...condition, value });
+  const setValue = (value: ArgumentCondition["value"]) => {
+    if (condition.match === "exact") onChange({ ...condition, value });
+    else if (typeof value === "string") onChange({ ...condition, value });
+  };
   // Switching to Regex anchors the value so the rule still matches the same
   // calls. A pattern is not a value, so switching back requires a new one.
   const setMatch = (match: ArgumentCondition["match"]) => {

@@ -119,8 +119,7 @@ export class AgentRuntime {
   private stopping = new Set<string>();
   private transactions = new RuntimeTransaction();
   private scheduled = false;
-  private waitingForChild = new Set<string>();
-  private waitingForApproval = new Set<string>();
+  private releasedSlots = new Set<string>();
   private waiters = new Set<() => void>();
   resync(owner: string, sessionId: string) {
     this.emit(owner, { type: "resync", sessionId, agentId: "" });
@@ -136,10 +135,22 @@ export class AgentRuntime {
   private runningCount(owner: string) {
     return [...this.active.keys()].filter(
       (id) =>
-        !this.waitingForChild.has(id) &&
-        !this.waitingForApproval.has(id) &&
-        this.store.get(id)?.ownerUuid === owner,
+        !this.releasedSlots.has(id) && this.store.get(id)?.ownerUuid === owner,
     ).length;
+  }
+  private releaseSlot(agent: AgentRecord) {
+    this.releasedSlots.add(agent.id);
+    this.schedule();
+  }
+  private async reclaimSlot(agent: AgentRecord, signal: AbortSignal) {
+    await this.until(() => {
+      if (this.runningCount(agent.ownerUuid) >= this.maxRunningPerOwner)
+        return false;
+      // Claim the slot before another waiter checks availability.
+      this.releasedSlots.delete(agent.id);
+      return true;
+    }, signal);
+    this.releasedSlots.delete(agent.id);
   }
   /** Resolves once `ready` holds or `signal` aborts, re-checked on agent changes. */
   private until(ready: () => boolean, signal: AbortSignal) {
@@ -539,25 +550,17 @@ export class AgentRuntime {
           signal,
           waiting: () => {
             waited = true;
-            this.waitingForApproval.add(agent.id);
+            this.releaseSlot(agent);
             agent.activity = `Waiting for approval to call ${tool}`;
             this.status(agent);
-            this.schedule();
           },
         },
         tool,
         args,
       );
     } finally {
-      if (this.waitingForApproval.has(agent.id)) {
-        // Reclaim a slot before continuing, just like a blocking subagent call.
-        await this.until(() => {
-          if (this.runningCount(agent.ownerUuid) >= this.maxRunningPerOwner)
-            return false;
-          this.waitingForApproval.delete(agent.id);
-          return true;
-        }, signal);
-        this.waitingForApproval.delete(agent.id);
+      if (waited) {
+        await this.reclaimSlot(agent, signal);
         if (!signal.aborted) {
           agent.activity = activity;
           this.status(agent);
@@ -691,8 +694,7 @@ export class AgentRuntime {
     });
     if (!request.wait) return { agentId: child.id };
     // A blocking caller releases its scheduler slot so the child can start.
-    this.waitingForChild.add(parent.id);
-    this.schedule();
+    this.releaseSlot(parent);
     try {
       // Return for incoming input or a child waiting on the parent, including
       // other children that occupy the slots this new child needs.
@@ -729,14 +731,7 @@ export class AgentRuntime {
           : { result: current.activity }),
       };
     } finally {
-      await this.until(() => {
-        if (this.runningCount(parent.ownerUuid) >= this.maxRunningPerOwner)
-          return false;
-        // Claim the slot before another waiter checks availability.
-        this.waitingForChild.delete(parent.id);
-        return true;
-      }, signal);
-      this.waitingForChild.delete(parent.id);
+      await this.reclaimSlot(parent, signal);
     }
   }
   /** A blocking spawn returns the child's report, so it is not delivered again. */

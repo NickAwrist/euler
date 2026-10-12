@@ -6,26 +6,13 @@ import {
   type Capabilities,
   capabilitiesSchema,
 } from "../schemas/userPreferences";
-import { BUILTIN_TOOLS, type BuiltinTool } from "../tools/builtinTools";
+import {
+  BUILTIN_TOOLS,
+  BUILTIN_TOOL_REGISTRY,
+  type BuiltinTool,
+} from "../tools/builtinTools";
 import type { Workspace } from "../workspaces/WorkspaceService";
 import { type PermissionScope, matchesRule, ruleSpecificity } from "./rules";
-
-/** User capability switches gate built-in tools, not user-configured MCP tools. */
-type GatedTool = BuiltinTool | "manage_skills";
-const TOOL_CAPABILITY: Record<GatedTool, keyof Capabilities | null> = {
-  create_file: "files",
-  delete_file: "files",
-  grep: "files",
-  list_files: "files",
-  modify_plan: null,
-  read_file: "files",
-  apply_patch: "files",
-  web_search: "web",
-  fetch_web_page: "web",
-  bash: "shell",
-  generate_image: "imageGeneration",
-  manage_skills: "skills",
-};
 
 export type RunPermissions = {
   readonly toolPermissions: ToolPermissions;
@@ -73,9 +60,12 @@ export class PermissionService {
     permissions: RunPermissions,
     toolName: string,
   ): PermissionDecision {
-    const capability = Object.hasOwn(TOOL_CAPABILITY, toolName)
-      ? TOOL_CAPABILITY[toolName as GatedTool]
-      : null;
+    // User capabilities gate built-ins and skill management, not MCP tools.
+    const capability =
+      toolName === "manage_skills"
+        ? "skills"
+        : BUILTIN_TOOL_REGISTRY.find((tool) => tool.name === toolName)
+            ?.capability;
     if (capability && !permissions.capabilities[capability]) {
       return {
         allowed: false,

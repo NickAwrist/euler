@@ -5,6 +5,7 @@ import {
   type ToolApproval,
   type ToolApprovalResponse,
   ToolArgumentsSchema,
+  type ToolPermissionRule,
 } from "../schemas/toolPermissions";
 import {
   type Workspace,
@@ -79,21 +80,11 @@ export class ToolApprovalCoordinator {
       agentTitle: context.agentTitle,
       tool,
       arguments: args,
-      background: args.background === true,
       workspacePath:
         context.workspace.kind === "local"
           ? context.workspace.hostPath
           : context.workspace.displayPath,
       reason: decision.reason,
-      createdAt: Date.now(),
-      matchingRule: {
-        id: crypto.randomUUID(),
-        tool,
-        action: "allow",
-        condition: { kind: "arguments", value: structuredClone(args) },
-        sessionId: context.sessionId,
-        workspacePath: context.workspace.hostPath,
-      },
       matchingScope: "Identical arguments in this chat and workspace",
     };
     let abort: (() => void) | undefined;
@@ -172,9 +163,16 @@ export class ToolApprovalCoordinator {
         message: "Approval request is no longer pending",
       });
     }
-    const rule =
+    const rule: ToolPermissionRule | undefined =
       response.decision === "allow_matching"
-        ? approval.matchingRule
+        ? {
+            id: crypto.randomUUID(),
+            tool: approval.tool,
+            action: "allow",
+            condition: { kind: "arguments", value: approval.arguments },
+            sessionId,
+            workspacePath: context.workspace.hostPath,
+          }
         : undefined;
     if (rule) saveToolPermissionRule(owner, rule);
     entry.answered = true;
