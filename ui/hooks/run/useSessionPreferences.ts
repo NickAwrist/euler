@@ -18,7 +18,8 @@ import {
 } from "../../persist/sessions";
 import {
   loadThinkingPreferences,
-  saveThinkingPreferences,
+  saveThinkingPreference,
+  subscribeThinkingPreferences,
 } from "../../persist/thinkingPreferences";
 import type { Message, ModelOption, SessionWorkspace } from "../../types";
 
@@ -44,6 +45,7 @@ export function useSessionPreferences({
   const [thinkingPreferences, setThinkingPreferences] = useState(
     loadThinkingPreferences,
   );
+  useEffect(() => subscribeThinkingPreferences(setThinkingPreferences), []);
   const thinkingEffort = Object.hasOwn(thinkingPreferences, selectedModel)
     ? (thinkingPreferences[selectedModel] ?? null)
     : null;
@@ -61,9 +63,9 @@ export function useSessionPreferences({
 
   const handleThinkingEffortChange = useCallback(
     (effort: string) => {
-      const next = { ...thinkingPreferences, [selectedModel]: effort };
-      setThinkingPreferences(next);
-      saveThinkingPreferences(next);
+      setThinkingPreferences(
+        saveThinkingPreference(selectedModel, effort, thinkingPreferences),
+      );
     },
     [selectedModel, thinkingPreferences],
   );
