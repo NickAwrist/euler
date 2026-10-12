@@ -30,6 +30,30 @@ async function collect(): Promise<LlmStreamChunk[]> {
 }
 
 describe("OpenRouter provider", () => {
+  test.each([
+    "anthropic/claude-haiku-5.5",
+    "anthropic/claude-sonnet-5.5",
+    "openai/gpt-5.4-mini",
+    "deepseek/deepseek-v4.1-flash",
+  ])("uses default prompt caching only for Anthropic: %s", async (route) => {
+    setOpenRouterApiKey("sk-or-test");
+    const stream = await streamOpenRouterChat({
+      model: route,
+      messages: [{ role: "user", content: "Hello" }],
+      tools: [],
+    });
+    for await (const _chunk of stream) {
+      // Consume the response so the request is captured.
+    }
+
+    const body = getOpenRouterRequests()[0]!.body;
+    if (route.startsWith("anthropic/")) {
+      expect(body.cache_control).toEqual({ type: "ephemeral" });
+    } else {
+      expect(body).not.toHaveProperty("cache_control");
+    }
+  });
+
   test("streams content, usage, and authenticated provider metadata", async () => {
     setOpenRouterApiKey("sk-or-secret-test");
     const chunks = await collect();
