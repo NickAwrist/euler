@@ -46,12 +46,11 @@ export function matchesRule(
       return false;
     value = (value as Record<string, unknown>)[field];
   }
-  return (
-    typeof value === "string" &&
-    (condition.match === "exact"
-      ? value === condition.value
-      : value.startsWith(condition.value))
-  );
+  return condition.match === "exact"
+    ? value === condition.value
+    : typeof value === "string" &&
+        typeof condition.value === "string" &&
+        value.startsWith(condition.value);
 }
 
 export function ruleSpecificity(rule: ToolPermissionRule): number {

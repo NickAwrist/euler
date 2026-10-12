@@ -159,9 +159,11 @@ deployctl restart euler
 Customization's Tools tab has one rule list with Allow, Ask, and Deny actions.
 The tool picker lists currently enabled built-in, agent, skill, and connected
 MCP tools. Select All tools and Ask to require approval, then add individual
-Allow exceptions. A rule can match any arguments, a string
-argument by exact value or prefix, or the complete arguments saved from an
-approval. Nested string arguments use dotted field paths. Deny rules always
+Allow exceptions. Argument fields come from the selected tool's own schema,
+including nested paths. Enum and boolean values use pickers, numeric fields
+use numbers, and text fields support exact values or prefixes. A rule can
+also match any arguments or the complete arguments saved from an
+approval. Deny rules always
 win; otherwise chat/workspace scope takes precedence, then a specific tool
 over All tools, then argument conditions, then the most recently saved rule.
 Calls with no matching rule are allowed. Saved approval defaults are converted

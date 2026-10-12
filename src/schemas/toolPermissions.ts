@@ -3,6 +3,11 @@ import { z } from "zod";
 // One extra rule accommodates conversion of the former approval default.
 export const MAX_TOOL_PERMISSION_RULES = 101;
 export const ToolArgumentsSchema = z.record(z.string(), z.json());
+export const ToolPermissionValueSchema = z.union([
+  z.string().min(1).max(10000),
+  z.number().finite(),
+  z.boolean(),
+]);
 export const ToolPermissionConditionSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("any") }).strict(),
   z
@@ -10,9 +15,17 @@ export const ToolPermissionConditionSchema = z.discriminatedUnion("kind", [
       kind: z.literal("argument"),
       field: z.string().trim().min(1).max(200),
       match: z.enum(["exact", "prefix"]),
-      value: z.string().min(1).max(10000),
+      value: ToolPermissionValueSchema,
     })
-    .strict(),
+    .strict()
+    .refine(
+      (condition) =>
+        condition.match !== "prefix" || typeof condition.value === "string",
+      {
+        message: "Starts with requires a text value",
+        path: ["value"],
+      },
+    ),
   z
     .object({ kind: z.literal("arguments"), value: ToolArgumentsSchema })
     .strict(),
@@ -37,8 +50,21 @@ export const ToolPermissionsSchema = z
   })
   .strict();
 export type ToolPermissions = z.infer<typeof ToolPermissionsSchema>;
+export const ToolPermissionFieldSchema = z.object({
+  path: z.string().min(1).max(200),
+  type: z.enum(["string", "number", "boolean"]),
+  description: z.string().optional(),
+  values: z.array(ToolPermissionValueSchema).optional(),
+});
+export type ToolPermissionField = z.infer<typeof ToolPermissionFieldSchema>;
 export const ToolPermissionToolsSchema = z.object({
-  tools: z.array(z.object({ name: z.string(), description: z.string() })),
+  tools: z.array(
+    z.object({
+      name: z.string(),
+      description: z.string(),
+      fields: z.array(ToolPermissionFieldSchema),
+    }),
+  ),
 });
 export const ToolApprovalSchema = z.object({
   id: z.uuid(),

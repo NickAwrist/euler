@@ -167,3 +167,52 @@ test("argument rules read only own fields, and capability denials cannot be appr
   );
   expect(ToolPermissionsSchema.parse({}).rules).toEqual([]);
 });
+test("schema-selected boolean and numeric fields use typed equality and reject non-text prefix rules", () => {
+  const background = rule("deny", {
+    kind: "argument",
+    field: "background",
+    match: "exact",
+    value: false,
+  });
+  const count = {
+    ...rule("ask", {
+      kind: "argument",
+      field: "count",
+      match: "exact",
+      value: 0,
+    }),
+    tool: "web_search",
+  };
+  const policy = permissionService.resolve(
+    undefined,
+    capabilitiesSchema.parse({}),
+    { rules: [background, count] },
+  );
+  expect(
+    permissionService.callDecision(policy, "bash", { background: false })
+      .action,
+  ).toBe("deny");
+  expect(
+    permissionService.callDecision(policy, "bash", { background: true }).action,
+  ).toBe("allow");
+  expect(
+    permissionService.callDecision(policy, "bash", { background: "false" })
+      .action,
+  ).toBe("allow");
+  expect(
+    permissionService.callDecision(policy, "web_search", { count: 0 }).action,
+  ).toBe("ask");
+  expect(
+    permissionService.callDecision(policy, "web_search", { count: "0" }).action,
+  ).toBe("allow");
+  expect(
+    ToolPermissionsSchema.safeParse({
+      rules: [
+        {
+          ...background,
+          condition: { ...background.condition, match: "prefix" },
+        },
+      ],
+    }).success,
+  ).toBe(false);
+});

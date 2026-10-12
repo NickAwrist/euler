@@ -1,6 +1,7 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  type ToolPermissionField,
   type ToolPermissionRule,
   ToolPermissionRuleSchema,
   type ToolPermissions,
@@ -16,6 +17,14 @@ import {
 import { cx, eyebrowText } from "../../styles";
 import { Button } from "../Button";
 import { IconButton } from "../IconButton";
+import {
+  ALL_TOOLS,
+  type ArgumentCondition,
+  type FieldType,
+  conditionFits,
+  ruleFields,
+  valueType,
+} from "./toolPermissionFields";
 
 type Action = ToolPermissionRule["action"];
 type Condition = ToolPermissionRule["condition"];
@@ -28,8 +37,15 @@ const ACTIONS: { value: Action; label: string }[] = [
   { value: "deny", label: "Deny" },
 ];
 
-/** Rule tool that matches every tool. */
-const ALL_TOOLS = "*";
+const EMPTY_ARGUMENT: ArgumentCondition = {
+  kind: "argument",
+  field: "",
+  match: "exact",
+  value: "",
+};
+const fieldKey = (type: FieldType, path: string) => `${type}:${path}`;
+const conditionType = (condition: Condition): FieldType =>
+  condition.kind === "argument" ? valueType(condition.value) : "string";
 
 const errorMessage = (error: unknown, fallback: string) =>
   error instanceof Error ? error.message : fallback;
@@ -142,16 +158,40 @@ function RuleRow({
   onDelete: () => Promise<void>;
 }) {
   const [draft, setDraft] = useState(rule);
+  // An unset value has no type of its own, so the chosen field's type is kept.
+  const [fieldType, setFieldType] = useState(() =>
+    conditionType(rule.condition),
+  );
   const [busy, setBusy] = useState<"save" | "delete" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const parsed = ToolPermissionRuleSchema.safeParse(draft);
+  const { condition } = draft;
+  const fields = tools ? ruleFields(tools, draft.tool) : [];
+  const field =
+    condition.kind === "argument"
+      ? fields.find(
+          (option) =>
+            option.path === condition.field && option.type === fieldType,
+        )
+      : undefined;
+  // A saved condition stays valid after the tool's choices change, so editing
+  // only the action does not force a new value. New conditions must fit.
+  const savedCondition =
+    !isNew &&
+    draft.tool === rule.tool &&
+    JSON.stringify(condition) === JSON.stringify(rule.condition);
+  const valid =
+    parsed.success &&
+    (condition.kind !== "argument" ||
+      !field ||
+      savedCondition ||
+      conditionFits(field, condition));
   // The server returns normalized rules, so compare the normalized draft.
   const dirty =
     isNew ||
     !parsed.success ||
     JSON.stringify(parsed.data) !== JSON.stringify(rule);
   const label = toolLabel(draft.tool);
-  const { condition } = draft;
   // Keep a saved tool that is no longer offered instead of switching it.
   const missing =
     draft.tool !== "" &&
@@ -175,6 +215,22 @@ function RuleRow({
   };
   const setCondition = (next: Condition) =>
     setDraft((current) => ({ ...current, condition: next }));
+  // A replaced condition has no chosen field, so its type resets too.
+  const resetCondition = (next: Condition) => {
+    setCondition(next);
+    setFieldType(conditionType(next));
+  };
+  // A field condition only carries over to a tool with the same field.
+  const changeTool = (tool: string) => {
+    const next = tools ? ruleFields(tools, tool) : [];
+    setDraft((current) => ({ ...current, tool }));
+    if (condition.kind !== "argument") return;
+    if (next.length === 0) return resetCondition({ kind: "any" });
+    const fits = next.some(
+      (option) => option.type === fieldType && conditionFits(option, condition),
+    );
+    if (!fits) resetCondition(EMPTY_ARGUMENT);
+  };
 
   return (
     <fieldset
@@ -191,10 +247,7 @@ function RuleRow({
             aria-label="Tool"
             className={cx(fieldClass, "w-40 flex-1")}
             value={draft.tool}
-            onChange={(event) => {
-              const tool = event.target.value;
-              setDraft((current) => ({ ...current, tool }));
-            }}
+            onChange={(event) => changeTool(event.target.value)}
           >
             {draft.tool === "" && (
               <option value="" disabled>
@@ -224,15 +277,20 @@ function RuleRow({
             className={fieldClass}
             value={condition.kind}
             onChange={(event) =>
-              setCondition(
+              resetCondition(
                 event.target.value === "argument"
-                  ? { kind: "argument", field: "", match: "exact", value: "" }
+                  ? EMPTY_ARGUMENT
                   : { kind: "any" },
               )
             }
           >
             <option value="any">Any arguments</option>
-            <option value="argument">Field match</option>
+            <option
+              value="argument"
+              disabled={fields.length === 0 && condition.kind !== "argument"}
+            >
+              Field match
+            </option>
           </select>
         )}
         <select
@@ -263,40 +321,18 @@ function RuleRow({
         />
       </div>
       {condition.kind === "argument" && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <input
-            aria-label="Field"
-            placeholder="Field"
-            className={cx(fieldClass, "w-36")}
-            value={condition.field}
-            onChange={(event) =>
-              setCondition({ ...condition, field: event.target.value })
-            }
-          />
-          <select
-            aria-label="Match"
-            className={fieldClass}
-            value={condition.match}
-            onChange={(event) =>
-              setCondition({
-                ...condition,
-                match: event.target.value === "prefix" ? "prefix" : "exact",
-              })
-            }
-          >
-            <option value="exact">Equals</option>
-            <option value="prefix">Starts with</option>
-          </select>
-          <input
-            aria-label="Value"
-            placeholder="Value"
-            className={cx(fieldClass, "min-w-40 flex-1 font-mono")}
-            value={condition.value}
-            onChange={(event) =>
-              setCondition({ ...condition, value: event.target.value })
-            }
-          />
-        </div>
+        <ArgumentFields
+          condition={condition}
+          fields={fields}
+          field={field}
+          fieldType={fieldType}
+          known={tools !== null}
+          onFieldChange={(next) => {
+            setFieldType(next.type);
+            setCondition({ ...EMPTY_ARGUMENT, field: next.path });
+          }}
+          onChange={setCondition}
+        />
       )}
       {condition.kind === "arguments" && (
         <pre
@@ -329,7 +365,10 @@ function RuleRow({
               size="sm"
               variant="ghost"
               disabled={busy !== null}
-              onClick={() => setDraft(rule)}
+              onClick={() => {
+                setDraft(rule);
+                setFieldType(conditionType(rule.condition));
+              }}
             >
               Cancel
             </Button>
@@ -337,9 +376,9 @@ function RuleRow({
           <Button
             size="sm"
             loading={busy === "save"}
-            disabled={!parsed.success || busy !== null}
+            disabled={!valid || busy !== null}
             onClick={() => {
-              if (parsed.success) void run("save", () => onSave(parsed.data));
+              if (valid) void run("save", () => onSave(parsed.data));
             }}
           >
             Save rule
@@ -347,5 +386,135 @@ function RuleRow({
         </div>
       )}
     </fieldset>
+  );
+}
+
+/** Field, match, and value controls for a field condition. */
+function ArgumentFields({
+  condition,
+  fields,
+  field,
+  fieldType,
+  known,
+  onFieldChange,
+  onChange,
+}: {
+  condition: ArgumentCondition;
+  fields: ToolPermissionField[];
+  /** The tool field the condition names, if the tool still offers it. */
+  field: ToolPermissionField | undefined;
+  fieldType: FieldType;
+  /** Whether the tool catalogue loaded, so a missing field is unavailable. */
+  known: boolean;
+  onFieldChange: (field: ToolPermissionField) => void;
+  onChange: (condition: ArgumentCondition) => void;
+}) {
+  const current = condition.field ? fieldKey(fieldType, condition.field) : "";
+  // A path with several types (All tools) is labelled with each type.
+  const typed = (option: ToolPermissionField) =>
+    fields.filter((other) => other.path === option.path).length > 1
+      ? `${option.path} (${option.type})`
+      : option.path;
+  const values =
+    field?.values ?? (fieldType === "boolean" ? [true, false] : undefined);
+  const setValue = (value: ArgumentCondition["value"]) =>
+    onChange({ ...condition, value });
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <select
+        aria-label="Field"
+        className={cx(fieldClass, "w-40")}
+        value={current}
+        onChange={(event) => {
+          const next = fields.find(
+            (option) =>
+              fieldKey(option.type, option.path) === event.target.value,
+          );
+          if (next) onFieldChange(next);
+        }}
+      >
+        {current === "" && (
+          <option value="" disabled>
+            Field
+          </option>
+        )}
+        {fields.map((option) => {
+          const key = fieldKey(option.type, option.path);
+          return (
+            <option key={key} value={key} title={option.description}>
+              {typed(option)}
+            </option>
+          );
+        })}
+        {current !== "" && !field && (
+          <option value={current}>
+            {known ? `${condition.field} (unavailable)` : condition.field}
+          </option>
+        )}
+      </select>
+      <select
+        aria-label="Match"
+        className={fieldClass}
+        value={condition.match}
+        onChange={(event) =>
+          onChange({
+            ...condition,
+            match: event.target.value === "prefix" ? "prefix" : "exact",
+          })
+        }
+      >
+        <option value="exact">Equals</option>
+        {(condition.match === "prefix" ||
+          (fieldType === "string" && !values)) && (
+          <option value="prefix">Starts with</option>
+        )}
+      </select>
+      {values ? (
+        <select
+          aria-label="Value"
+          className={cx(fieldClass, "min-w-40 flex-1 font-mono")}
+          value={String(values.indexOf(condition.value))}
+          onChange={(event) => {
+            const value = values[Number(event.target.value)];
+            if (value !== undefined) setValue(value);
+          }}
+        >
+          {/* A saved value the field no longer offers stays shown as is. */}
+          {!values.includes(condition.value) && (
+            <option value="-1" disabled>
+              {condition.value === ""
+                ? "Value"
+                : `${String(condition.value)} (unavailable)`}
+            </option>
+          )}
+          {values.map((value, index) => (
+            <option key={String(index)} value={String(index)}>
+              {String(value)}
+            </option>
+          ))}
+        </select>
+      ) : fieldType === "number" ? (
+        <input
+          aria-label="Value"
+          type="number"
+          placeholder="Value"
+          className={cx(fieldClass, "min-w-40 flex-1 font-mono")}
+          value={typeof condition.value === "number" ? condition.value : ""}
+          onChange={(event) => {
+            const value = event.target.valueAsNumber;
+            setValue(Number.isFinite(value) ? value : "");
+          }}
+        />
+      ) : (
+        <input
+          aria-label="Value"
+          placeholder="Value"
+          className={cx(fieldClass, "min-w-40 flex-1 font-mono")}
+          value={typeof condition.value === "string" ? condition.value : ""}
+          onChange={(event) => setValue(event.target.value)}
+        />
+      )}
+    </div>
   );
 }

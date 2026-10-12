@@ -1,6 +1,7 @@
 import { type Page, expect, test } from "@playwright/test";
 import type {
   ToolApproval,
+  ToolPermissionField,
   ToolPermissionRule,
 } from "../../src/schemas/toolPermissions";
 import {
@@ -53,7 +54,17 @@ test("tools desktop: tool permission rules edit inline and save per user", async
     route.fulfill({ json: { servers: [] } }),
   );
   await mockUserPreferences(page, store);
-  const catalogue = [{ name: "bash", description: "Run a shell command" }];
+  const catalogue: {
+    name: string;
+    description: string;
+    fields: ToolPermissionField[];
+  }[] = [
+    {
+      name: "bash",
+      description: "Run a shell command",
+      fields: [{ path: "command", type: "string" }],
+    },
+  ];
   await page.route("**/api/settings/user/tools", (route) =>
     route.fulfill({ json: { tools: catalogue } }),
   );
@@ -113,7 +124,11 @@ test("tools desktop: tool permission rules edit inline and save per user", async
   });
 
   // Add rule reloads the catalogue, so newly enabled tools are offered.
-  catalogue.push({ name: "read_file", description: "Read a file" });
+  catalogue.push({
+    name: "read_file",
+    description: "Read a file",
+    fields: [{ path: "path", type: "string" }],
+  });
   await page.getByRole("button", { name: "Add rule" }).click();
   const next = page.getByRole("group", { name: "Rule for new rule" });
   await expect(next.getByRole("option", { name: "read_file" })).toBeAttached();
@@ -122,7 +137,7 @@ test("tools desktop: tool permission rules edit inline and save per user", async
     .selectOption("bash");
   const rule = page.getByRole("group", { name: "Rule for bash" }).last();
   await rule.getByLabel("Arguments").selectOption("argument");
-  await rule.getByLabel("Field", { exact: true }).fill("command");
+  await rule.getByLabel("Field", { exact: true }).selectOption("command");
   await rule.getByLabel("Match").selectOption("prefix");
   await rule.getByLabel("Value").fill("git push");
   await rule.getByLabel("Action").selectOption("allow");
@@ -204,11 +219,17 @@ test("tools desktop: a slow older catalogue response does not replace a newer on
       held += 1;
       await oldReleased;
       return route.fulfill({
-        json: { tools: [{ name: "bash", description: "Old catalogue" }] },
+        json: {
+          tools: [{ name: "bash", description: "Old catalogue", fields: [] }],
+        },
       });
     }
     await route.fulfill({
-      json: { tools: [{ name: "read_file", description: "New catalogue" }] },
+      json: {
+        tools: [
+          { name: "read_file", description: "New catalogue", fields: [] },
+        ],
+      },
     });
   });
 
@@ -234,6 +255,288 @@ test("tools desktop: a slow older catalogue response does not replace a newer on
     "All tools",
     "read_file",
   ]);
+});
+
+test("tools desktop: field match offers the selected tool's fields", async ({
+  page,
+}) => {
+  const unavailable: ToolPermissionRule = {
+    id: "66666666-6666-4666-8666-666666666666",
+    tool: "bash",
+    action: "deny",
+    condition: {
+      kind: "argument",
+      field: "cwd",
+      match: "prefix",
+      value: "/tmp",
+    },
+  };
+  const store = new Map<string, UserPreferences>([
+    [
+      USER,
+      userPreferencesSchema.parse({
+        toolPermissions: { rules: [unavailable] },
+      }),
+    ],
+  ]);
+  const saved = () => store.get(USER)?.toolPermissions;
+  await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
+  await page.route("**/api/mcp-servers", (route) =>
+    route.fulfill({ json: { servers: [] } }),
+  );
+  await mockUserPreferences(page, store);
+  await page.route("**/api/settings/user/tools", (route) =>
+    route.fulfill({
+      json: {
+        tools: [
+          {
+            name: "bash",
+            description: "Run a shell command",
+            fields: [
+              { path: "command", type: "string" },
+              { path: "background", type: "boolean" },
+            ],
+          },
+          {
+            name: "manage_skills",
+            description: "Manage skills",
+            fields: [
+              {
+                path: "action",
+                type: "string",
+                values: ["list", "create", "delete"],
+              },
+            ],
+          },
+          {
+            name: "generate_image",
+            description: "Generate an image",
+            fields: [{ path: "size.width", type: "number" }],
+          },
+          { name: "list_files", description: "List files", fields: [] },
+        ],
+      },
+    }),
+  );
+
+  await page.goto("/customization");
+  await page.getByRole("button", { name: "Tools" }).click();
+
+  // A saved field the tool no longer offers stays as saved.
+  const stale = page.getByRole("group", { name: "Rule for bash" });
+  await expect(stale.getByLabel("Field", { exact: true })).toHaveValue(
+    "string:cwd",
+  );
+  await expect(
+    stale.getByRole("option", { name: "cwd (unavailable)" }),
+  ).toBeAttached();
+  await expect(stale.getByLabel("Match")).toHaveValue("prefix");
+  await expect(stale.getByLabel("Value")).toHaveValue("/tmp");
+  await expect(stale.getByRole("button", { name: "Save rule" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Add rule" }).click();
+  await page
+    .getByRole("group", { name: "Rule for new rule" })
+    .getByRole("combobox", { name: "Tool", exact: true })
+    .selectOption("list_files");
+  const noFields = page.getByRole("group", { name: "Rule for list_files" });
+  await expect(
+    noFields.getByRole("option", { name: "Field match" }),
+  ).toBeDisabled();
+
+  await noFields
+    .getByRole("combobox", { name: "Tool", exact: true })
+    .selectOption("manage_skills");
+  const skills = page.getByRole("group", { name: "Rule for manage_skills" });
+  await skills.getByLabel("Arguments").selectOption("argument");
+  const field = skills.getByLabel("Field", { exact: true });
+  await expect(field.getByRole("option")).toHaveText(["Field", "action"]);
+  await field.selectOption("action");
+  await expect(skills.getByLabel("Match").getByRole("option")).toHaveText([
+    "Equals",
+  ]);
+  const choice = skills.getByLabel("Value");
+  await expect(choice.getByRole("option")).toHaveText([
+    "Value",
+    "list",
+    "create",
+    "delete",
+  ]);
+  await expect(
+    skills.getByRole("button", { name: "Save rule" }),
+  ).toBeDisabled();
+  await choice.selectOption("delete");
+
+  // A field the next tool lacks is cleared rather than carried over.
+  await skills
+    .getByRole("combobox", { name: "Tool", exact: true })
+    .selectOption("generate_image");
+  const image = page.getByRole("group", { name: "Rule for generate_image" });
+  await expect(image.getByLabel("Field", { exact: true })).toHaveValue("");
+  await expect(image.getByRole("button", { name: "Save rule" })).toBeDisabled();
+  await image.getByLabel("Field", { exact: true }).selectOption("size.width");
+  await image.getByLabel("Value").fill("1024");
+  await image.getByRole("button", { name: "Save rule" }).click();
+  await expect(image.getByRole("button", { name: "Save rule" })).toBeHidden();
+  expect(saved()?.rules.at(-1)).toMatchObject({
+    tool: "generate_image",
+    condition: { kind: "argument", field: "size.width", value: 1024 },
+  });
+
+  // All tools offers every tool's fields.
+  await page.getByRole("button", { name: "Add rule" }).click();
+  await page
+    .getByRole("group", { name: "Rule for new rule" })
+    .getByRole("combobox", { name: "Tool", exact: true })
+    .selectOption("*");
+  const all = page.getByRole("group", { name: "Rule for All tools" });
+  await all.getByLabel("Arguments").selectOption("argument");
+  await expect(
+    all.getByLabel("Field", { exact: true }).getByRole("option"),
+  ).toHaveText(["Field", "action", "background", "command", "size.width"]);
+  await all.getByLabel("Field", { exact: true }).selectOption("background");
+  await all.getByLabel("Value").selectOption("false");
+  await all.getByRole("button", { name: "Save rule" }).click();
+  await expect(all.getByRole("button", { name: "Save rule" })).toBeHidden();
+  expect(saved()?.rules.at(-1)).toMatchObject({
+    tool: "*",
+    condition: { kind: "argument", field: "background", value: false },
+  });
+  expect(saved()?.rules[0]).toEqual(unavailable);
+});
+
+test("tools desktop: saved field values outlive changed tool choices", async ({
+  page,
+}) => {
+  const obsolete: ToolPermissionRule = {
+    id: "77777777-7777-4777-8777-777777777777",
+    tool: "manage_skills",
+    action: "deny",
+    condition: {
+      kind: "argument",
+      field: "action",
+      match: "exact",
+      value: "archive",
+    },
+  };
+  const legacyPrefix: ToolPermissionRule = {
+    id: "88888888-8888-4888-8888-888888888888",
+    tool: "manage_skills",
+    action: "ask",
+    condition: {
+      kind: "argument",
+      field: "action",
+      match: "prefix",
+      value: "cre",
+    },
+  };
+  const store = new Map<string, UserPreferences>([
+    [
+      USER,
+      userPreferencesSchema.parse({
+        toolPermissions: { rules: [obsolete, legacyPrefix] },
+      }),
+    ],
+  ]);
+  const saved = () => store.get(USER)?.toolPermissions;
+  await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
+  await page.route("**/api/mcp-servers", (route) =>
+    route.fulfill({ json: { servers: [] } }),
+  );
+  await mockUserPreferences(page, store);
+  await page.route("**/api/settings/user/tools", (route) =>
+    route.fulfill({
+      json: {
+        tools: [
+          {
+            name: "bash",
+            description: "Run a shell command",
+            fields: [
+              { path: "command", type: "string" },
+              { path: "background", type: "boolean" },
+            ],
+          },
+          {
+            name: "manage_skills",
+            description: "Manage skills",
+            fields: [
+              {
+                path: "action",
+                type: "string",
+                values: ["list", "create", "delete"],
+              },
+            ],
+          },
+          { name: "list_files", description: "List files", fields: [] },
+        ],
+      },
+    }),
+  );
+
+  await page.goto("/customization");
+  await page.getByRole("button", { name: "Tools" }).click();
+  const skillRules = page.getByRole("group", {
+    name: "Rule for manage_skills",
+  });
+  const old = skillRules.first();
+  const prefix = skillRules.nth(1);
+
+  // A value the field no longer offers is shown rather than blanked.
+  await expect(old.getByLabel("Value")).toHaveValue("-1");
+  await expect(
+    old.getByRole("option", { name: "archive (unavailable)" }),
+  ).toBeAttached();
+
+  // A legacy prefix on a choice field keeps its match and raw value.
+  await expect(prefix.getByLabel("Match")).toHaveValue("prefix");
+  await expect(
+    prefix.getByRole("option", { name: "cre (unavailable)" }),
+  ).toBeAttached();
+
+  // Changing only the action keeps the saved condition savable.
+  await prefix.getByLabel("Action").selectOption("deny");
+  await prefix.getByRole("button", { name: "Save rule" }).click();
+  await expect(prefix.getByRole("button", { name: "Save rule" })).toBeHidden();
+  expect(saved()?.rules[1]).toEqual({ ...legacyPrefix, action: "deny" });
+
+  // Editing the condition must then pick one of the offered values.
+  await prefix.getByLabel("Match").selectOption("exact");
+  await expect(prefix.getByLabel("Match").getByRole("option")).toHaveText([
+    "Equals",
+  ]);
+  await expect(
+    prefix.getByRole("button", { name: "Save rule" }),
+  ).toBeDisabled();
+  await prefix.getByLabel("Value").selectOption("create");
+  await expect(prefix.getByRole("button", { name: "Save rule" })).toBeEnabled();
+
+  // Clearing a typed field resets its value control to the new field's type.
+  await page.getByRole("button", { name: "Add rule" }).click();
+  await page
+    .getByRole("group", { name: "Rule for new rule" })
+    .getByRole("combobox", { name: "Tool", exact: true })
+    .selectOption("bash");
+  const bash = page.getByRole("group", { name: "Rule for bash" });
+  await bash.getByLabel("Arguments").selectOption("argument");
+  await bash.getByLabel("Field", { exact: true }).selectOption("background");
+  await expect(bash.getByLabel("Value").getByRole("option")).toHaveText([
+    "Value",
+    "true",
+    "false",
+  ]);
+  await bash.getByLabel("Arguments").selectOption("any");
+  await bash.getByLabel("Arguments").selectOption("argument");
+  await expect(bash.getByRole("textbox", { name: "Value" })).toBeVisible();
+
+  await bash.getByLabel("Field", { exact: true }).selectOption("background");
+  await bash
+    .getByRole("combobox", { name: "Tool", exact: true })
+    .selectOption("manage_skills");
+  const skills = page
+    .getByRole("group", { name: "Rule for manage_skills" })
+    .last();
+  await expect(skills.getByLabel("Field", { exact: true })).toHaveValue("");
+  await expect(skills.getByRole("textbox", { name: "Value" })).toBeVisible();
 });
 
 const model: ModelOption = {

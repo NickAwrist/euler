@@ -26,6 +26,29 @@ test("the tool picker uses enabled user tools, actual MCP names, and runtime too
     expect(initial).toContain("spawn_agent");
     expect(initial).toContain("ask_parent");
     expect(initial).toContain("get_job");
+    const catalog = ToolPermissionToolsSchema.parse(
+      await (
+        await fetch(`${server.url}/api/settings/user/tools`, {
+          headers: userHeaders(),
+        })
+      ).json(),
+    );
+    expect(catalog.tools.find((tool) => tool.name === "bash")?.fields).toEqual([
+      { path: "background", type: "boolean", description: expect.any(String) },
+      { path: "command", type: "string", description: expect.any(String) },
+    ]);
+    expect(
+      catalog.tools
+        .find((tool) => tool.name === "send_message")
+        ?.fields.some((field) => field.path === "to"),
+    ).toBe(true);
+    expect(
+      catalog.tools.find((tool) => tool.name === "manage_skills")?.fields,
+    ).toContainEqual({
+      path: "action",
+      type: "string",
+      values: ["view", "create", "update", "delete"],
+    });
     expect(new Set(initial).size).toBe(initial.length);
     expect(getDb().query("SELECT COUNT(*) AS count FROM agents").get()).toEqual(
       before,
@@ -54,6 +77,16 @@ test("the tool picker uses enabled user tools, actual MCP names, and runtime too
     const available = await names();
     expect(available).toContain("mcp__picker__echo");
     expect(available).toContain("mcp__picker__fail");
+    const connected = ToolPermissionToolsSchema.parse(
+      await (
+        await fetch(`${server.url}/api/settings/user/tools`, {
+          headers: userHeaders(),
+        })
+      ).json(),
+    );
+    expect(
+      connected.tools.find((tool) => tool.name === "mcp__picker__echo")?.fields,
+    ).toEqual([{ path: "text", type: "string" }]);
     expect(await names(other)).not.toContain("mcp__picker__echo");
     const disabled = await fetch(
       `${server.url}/api/mcp-servers/${data.servers[0]!.id}`,

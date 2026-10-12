@@ -575,7 +575,7 @@ export class AgentRuntime {
     }
   }
   /** Metadata from the same tools used by main agents and subagents; no run is saved. */
-  toolCatalog(ownerUuid: string): Pick<BaseTool, "name" | "description">[] {
+  toolCatalog(ownerUuid: string): BaseTool[] {
     const signal = new AbortController().signal;
     return (["main", "general"] as const).flatMap((kind) => {
       const agent = createAgentRecord({
@@ -595,7 +595,7 @@ export class AgentRuntime {
         signal,
         () => {},
         () => agent.model,
-      ).map(({ name, description }) => ({ name, description }));
+      );
     });
   }
   private tools(
