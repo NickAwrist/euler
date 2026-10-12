@@ -34,7 +34,12 @@ export async function openUserMcpTools(
     }
     clients.push(result.value.client);
     for (const definition of result.value.tools) {
-      const tool = new McpTool(result.value.client, server.name, definition);
+      const tool = new McpTool(
+        result.value.client,
+        server.name,
+        definition,
+        server.url,
+      );
       // Distinct names can collide once sanitized; keep the first.
       if (!tools.has(tool.name)) tools.set(tool.name, tool);
     }

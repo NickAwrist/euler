@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { compileToolRegex } from "../permissions/toolRegex";
+import { DisplayIconSchema } from "./icons";
 
 export const MAX_TOOL_PERMISSION_RULES = 100;
 export const ToolArgumentsSchema = z.record(z.string(), z.json());
@@ -76,6 +77,7 @@ export const ToolPermissionToolsSchema = z.object({
       name: z.string(),
       description: z.string(),
       fields: z.array(ToolPermissionFieldSchema),
+      icons: z.array(DisplayIconSchema).optional(),
     }),
   ),
 });
@@ -85,6 +87,7 @@ export const ToolApprovalSchema = z.object({
   agentId: z.string(),
   agentTitle: z.string(),
   tool: z.string(),
+  icons: z.array(DisplayIconSchema).optional(),
   arguments: ToolArgumentsSchema,
   workspacePath: z.string(),
   reason: z.string(),

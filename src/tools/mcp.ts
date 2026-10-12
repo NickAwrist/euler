@@ -6,6 +6,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
+import { safeMcpIcons } from "../mcp/icons";
 import { BaseTool, type ToolResult } from "./BaseTool";
 
 /** Provider function names allow 64 characters from `[A-Za-z0-9_-]`. */
@@ -37,11 +38,19 @@ export class McpTool extends BaseTool {
     private readonly client: Client,
     serverName: string,
     private readonly definition: McpToolDefinition,
+    private readonly serverUrl: string,
   ) {
     super(
       mcpToolName(serverName, definition.name),
       definition.description ?? definition.title ?? definition.name,
     );
+  }
+
+  override get icons() {
+    const toolIcons = this.definition.icons ?? [];
+    const serverIcons = this.client.getServerVersion()?.icons ?? [];
+    const icons = safeMcpIcons(toolIcons, this.serverUrl);
+    return icons.length > 0 ? icons : safeMcpIcons(serverIcons, this.serverUrl);
   }
 
   override toTool(): Tool {

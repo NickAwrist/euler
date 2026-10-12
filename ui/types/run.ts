@@ -1,3 +1,5 @@
+import type { DisplayIcon } from "../../src/schemas/icons";
+
 /** Billed cost of a model call split by token class. */
 export interface CostBreakdown {
   cachedInput: number;
@@ -9,6 +11,7 @@ export interface MessageStep {
   kind: string;
   status?: string;
   toolName?: string;
+  toolIcons?: readonly DisplayIcon[];
   agentName?: string;
   args?: unknown;
   thinking?: string;

@@ -18,6 +18,7 @@ import {
 import { cx, eyebrowText } from "../../styles";
 import { Button } from "../Button";
 import { IconButton } from "../IconButton";
+import { ToolIcon } from "../ToolIcon";
 import {
   ALL_TOOLS,
   type ArgumentCondition,
@@ -253,6 +254,12 @@ function RuleRow({
       className="rounded-lg border border-border-subtle px-3 py-2.5"
     >
       <div className="flex flex-wrap items-center gap-2">
+        {draft.tool && draft.tool !== ALL_TOOLS && (
+          <ToolIcon
+            name={draft.tool}
+            icons={tools?.find((tool) => tool.name === draft.tool)?.icons}
+          />
+        )}
         {condition.kind === "arguments" ? (
           <code className="font-mono text-[0.8125rem] text-foreground">
             {draft.tool}

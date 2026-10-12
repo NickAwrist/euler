@@ -26,6 +26,7 @@ import {
   isWorkingAgent,
 } from "../../schemas/agents";
 import type { Activation } from "../../schemas/events";
+import type { DisplayIcon } from "../../schemas/icons";
 import type { WireMessageInput } from "../../schemas/run";
 import type { BaseTool } from "../../tools/BaseTool";
 import { AskParentTool } from "../../tools/ask_parent";
@@ -511,8 +512,8 @@ export class AgentRuntime {
       {
         store: this.store,
         jobs: this.jobs,
-        authorizeToolCall: (record, workspace, abort, tool, args) =>
-          this.authorizeToolCall(record, workspace, abort, tool, args),
+        authorizeToolCall: (record, workspace, abort, tool, args, icons) =>
+          this.authorizeToolCall(record, workspace, abort, tool, args, icons),
         status: (record) => this.status(record),
         emit: (owner, event) => this.emit(owner, event),
         append: (record, message) => this.append(record, message),
@@ -536,6 +537,7 @@ export class AgentRuntime {
     signal: AbortSignal,
     tool: string,
     args: Record<string, unknown>,
+    icons?: readonly DisplayIcon[],
   ) {
     const activity = agent.activity;
     let waited = false;
@@ -546,6 +548,7 @@ export class AgentRuntime {
           sessionId: agent.sessionId,
           agentId: agent.id,
           agentTitle: agent.title,
+          icons,
           workspace,
           signal,
           waiting: () => {

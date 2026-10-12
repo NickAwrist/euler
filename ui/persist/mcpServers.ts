@@ -4,6 +4,8 @@ import {
   type McpServerData,
   McpServerListResponseSchema,
   McpServerSchema,
+  type McpToolData,
+  McpToolListResponseSchema,
 } from "../../src/schemas/mcp";
 import { apiJson, apiVoid } from "../lib/api";
 
@@ -57,4 +59,15 @@ export async function checkMcpServerApi(id: string): Promise<McpServerCheck> {
       errorMessage: "Failed to check MCP server",
     }),
   );
+}
+
+export async function fetchMcpTools(
+  signal?: AbortSignal,
+): Promise<McpToolData[]> {
+  return McpToolListResponseSchema.parse(
+    await apiJson<unknown>("/api/mcp-servers/tools", {
+      signal,
+      errorMessage: "Failed to fetch MCP tools",
+    }),
+  ).tools;
 }

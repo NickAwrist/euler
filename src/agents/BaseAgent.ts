@@ -97,7 +97,8 @@ export class BaseAgent {
         throw new Error("This tool does not support background execution");
       if (background && !ctx.jobs)
         throw new Error("Background execution is unavailable");
-      if (ctx.authorizeToolCall) await ctx.authorizeToolCall(toolName, args);
+      if (ctx.authorizeToolCall)
+        await ctx.authorizeToolCall(toolName, args, tool.icons);
       else {
         const decision = permissionService.callDecision(
           ctx.permissions,
@@ -354,6 +355,7 @@ export class BaseAgent {
             kind: "tool_call",
             turnIndex,
             toolName,
+            toolIcons: this.TOOL_MAP[toolName]?.icons,
             args,
           });
           const result = await this.executeToolCall(

@@ -1,6 +1,7 @@
 import { getSessionById } from "../db/sessions";
 import { effectiveUserPreferences } from "../db/userPreferences";
 import { OperationError } from "../observability/errors";
+import type { DisplayIcon } from "../schemas/icons";
 import {
   type ToolApproval,
   type ToolApprovalResponse,
@@ -19,6 +20,7 @@ export type ApprovalContext = {
   sessionId: string;
   agentId: string;
   agentTitle: string;
+  icons?: readonly DisplayIcon[];
   workspace: Workspace;
   signal: AbortSignal;
   waiting(): void;
@@ -79,6 +81,7 @@ export class ToolApprovalCoordinator {
       agentId: context.agentId,
       agentTitle: context.agentTitle,
       tool,
+      ...(context.icons?.length ? { icons: [...context.icons] } : {}),
       arguments: args,
       workspacePath:
         context.workspace.kind === "local"

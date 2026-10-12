@@ -16,25 +16,19 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import { useComposerSuggestions } from "../hooks/useComposerSuggestions";
 import { useListNavigation } from "../hooks/useListNavigation";
 import { useWorkspaceFileSuggestions } from "../hooks/useWorkspaceFileSuggestions";
 import { hasConfigurableThinking } from "../lib/thinkingLevel";
-import { type SkillData, fetchSkills } from "../persist/skills";
 import { cx } from "../styles";
 import type { MessageStep, ModelOption, SessionWorkspace } from "../types";
 import { IconButton } from "./IconButton";
 import { ModelSelectBar } from "./ModelSelectBar";
-import { CommandPicker } from "./RunArea/CommandPicker";
 import { FilePicker } from "./RunArea/FilePicker";
-import { SkillPicker } from "./RunArea/SkillPicker";
+import { IntegrationPicker } from "./RunArea/IntegrationPicker";
 import { ThinkingLevelBar } from "./ThinkingLevelBar";
 import { completeFileToken, findActiveFileToken } from "./filePicker";
-import {
-  type RunCommandName,
-  exactRunCommand,
-  matchingRunCommands,
-} from "./runCommands";
-import { completeSkillToken, findActiveSkillToken } from "./skillPicker";
+import { type RunCommandName, exactRunCommand } from "./runCommands";
 
 const touchKeyboardQuery = "(pointer: coarse)";
 const getTouchKeyboardSnapshot = () =>
@@ -112,10 +106,10 @@ export function RunInputDock({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
   const [isFileDragActive, setIsFileDragActive] = useState(false);
-  const [skills, setSkills] = useState<SkillData[]>([]);
   const [caretIndex, setCaretIndex] = useState(input.length);
   const [filePickerDismissed, setFilePickerDismissed] = useState(false);
-  const [skillPickerDismissed, setSkillPickerDismissed] = useState(false);
+  const [integrationPickerDismissed, setIntegrationPickerDismissed] =
+    useState(false);
   const usesTouchKeyboard = useSyncExternalStore(
     subscribeTouchKeyboard,
     getTouchKeyboardSnapshot,
@@ -127,19 +121,6 @@ export function RunInputDock({
     (model) => model.id === selectedModel,
   );
   const canSend = modelSendReady && attachmentsSendReady;
-  const activeSkillToken = skillPickerDismissed
-    ? null
-    : findActiveSkillToken(input, caretIndex);
-  const matchingSkills = activeSkillToken
-    ? skills
-        .filter(
-          (skill) =>
-            skill.user_invocable &&
-            skill.name.startsWith(activeSkillToken.query),
-        )
-        .slice(0, 8)
-    : [];
-  const skillPickerOpen = matchingSkills.length > 0;
   const activeFileToken = filePickerDismissed
     ? null
     : findActiveFileToken(input, caretIndex);
@@ -149,25 +130,9 @@ export function RunInputDock({
     activeFileToken?.query,
   );
   const filePickerOpen = sessionId !== null && activeFileToken !== null;
-  const matchingCommands = matchingRunCommands(input, workspace);
-  const commandPickerOpen = !isBusy && matchingCommands.length > 0;
-
   const runCommand = (command: RunCommandName) => {
     setInput("");
     void onRunCommand(command);
-  };
-
-  const commandNav = useListNavigation({
-    items: matchingCommands,
-    onSelect: (command) => runCommand(command.name),
-    onDismiss: () => setInput(""),
-  });
-
-  const selectSkill = (skill: SkillData) => {
-    if (!activeSkillToken) return;
-    const completed = completeSkillToken(input, activeSkillToken, skill.name);
-    setSkillPickerDismissed(true);
-    applyCompletion(completed);
   };
 
   const applyCompletion = (completed: { value: string; caret: number }) => {
@@ -181,11 +146,23 @@ export function RunInputDock({
     });
   };
 
-  const skillNav = useListNavigation({
-    items: matchingSkills,
-    onSelect: selectSkill,
-    onDismiss: () => setSkillPickerDismissed(true),
-    resetKey: activeSkillToken?.query,
+  const suggestions = useComposerSuggestions({
+    input,
+    caret: caretIndex,
+    dismissed: integrationPickerDismissed,
+    busy: isBusy,
+    workspace,
+    runCommand,
+    complete: (completed) => {
+      setIntegrationPickerDismissed(true);
+      applyCompletion(completed);
+    },
+  });
+  const integrationNav = useListNavigation({
+    items: suggestions.options,
+    onSelect: (option) => option.select(),
+    onDismiss: () => setIntegrationPickerDismissed(true),
+    resetKey: suggestions.resetKey,
   });
 
   const selectFile = (file: { path: string }) => {
@@ -200,20 +177,6 @@ export function RunInputDock({
     onDismiss: () => setFilePickerDismissed(true),
     resetKey: activeFileToken?.query,
   });
-
-  useEffect(() => {
-    let cancelled = false;
-    void fetchSkills()
-      .then((availableSkills) => {
-        if (!cancelled) setSkills(availableSkills);
-      })
-      .catch(() => {
-        if (!cancelled) setSkills([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const syncInputHeight = useCallback(() => {
     const el = inputRef.current;
@@ -323,12 +286,14 @@ export function RunInputDock({
             : "border-border-subtle",
         )}
       >
-        {commandPickerOpen && (
-          <CommandPicker
-            commands={matchingCommands}
-            selectedIndex={commandNav.selectedIndex}
-            onSelectIndex={commandNav.setSelectedIndex}
-            onSelectCommand={runCommand}
+        {suggestions.open && (
+          <IntegrationPicker
+            id={suggestions.id}
+            label={suggestions.label}
+            options={suggestions.options}
+            selectedIndex={integrationNav.selectedIndex}
+            onSelectIndex={integrationNav.setSelectedIndex}
+            status={suggestions.status}
           />
         )}
         {filePickerOpen && (
@@ -338,14 +303,6 @@ export function RunInputDock({
             selectedIndex={fileNav.selectedIndex}
             onSelectIndex={fileNav.setSelectedIndex}
             onSelectFile={selectFile}
-          />
-        )}
-        {skillPickerOpen && (
-          <SkillPicker
-            skills={matchingSkills}
-            selectedIndex={skillNav.selectedIndex}
-            onSelectIndex={skillNav.setSelectedIndex}
-            onSelectSkill={selectSkill}
           />
         )}
         <div
@@ -418,12 +375,12 @@ export function RunInputDock({
             onChange={(e) => {
               setInput(e.target.value);
               setCaretIndex(e.currentTarget.selectionStart);
-              setSkillPickerDismissed(false);
+              setIntegrationPickerDismissed(false);
               setFilePickerDismissed(false);
             }}
             onClick={(e) => {
               setCaretIndex(e.currentTarget.selectionStart);
-              setSkillPickerDismissed(false);
+              setIntegrationPickerDismissed(false);
               setFilePickerDismissed(false);
             }}
             onSelect={(e) => setCaretIndex(e.currentTarget.selectionStart)}
@@ -436,11 +393,13 @@ export function RunInputDock({
             }}
             onKeyDown={(e) => {
               if (e.nativeEvent.isComposing) return;
-              if (commandPickerOpen && commandNav.onKeyDown(e)) {
-                return;
-              }
-              if (skillPickerOpen && skillNav.onKeyDown(e)) {
-                return;
+              if (suggestions.open) {
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setIntegrationPickerDismissed(true);
+                  return;
+                }
+                if (integrationNav.onKeyDown(e)) return;
               }
               if (filePickerOpen) {
                 if (e.key === "Escape") {
@@ -463,17 +422,13 @@ export function RunInputDock({
             placeholder="Send a message..."
             aria-autocomplete="list"
             aria-controls={
-              commandPickerOpen
-                ? "command-picker"
-                : skillPickerOpen
-                  ? "skill-picker"
-                  : filePickerOpen
-                    ? "file-picker"
-                    : undefined
+              suggestions.open
+                ? suggestions.id
+                : filePickerOpen
+                  ? "file-picker"
+                  : undefined
             }
-            aria-expanded={
-              skillPickerOpen || commandPickerOpen || filePickerOpen
-            }
+            aria-expanded={suggestions.open || filePickerOpen}
             className="min-h-10 max-h-[30vh] w-full flex-1 resize-none overflow-y-auto bg-transparent px-1 py-2.5 text-[0.9375rem] leading-[1.5] text-foreground outline-none placeholder:text-muted-foreground"
             rows={1}
           />

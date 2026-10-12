@@ -8,6 +8,7 @@ import type {
 import { whileRunning } from "../../lib/whileRunning";
 import { respondToToolApproval } from "../../persist/agents";
 import { Button } from "../Button";
+import { ToolIcon } from "../ToolIcon";
 import type { SavedRuleNotice } from "./useSavedRuleNotice";
 
 type Decision = ToolApprovalResponse["decision"];
@@ -136,7 +137,15 @@ function ApprovalRequest({
           <div className="flex flex-wrap items-center gap-1.5">
             <h3 id={titleId} className="text-[0.8125rem] text-foreground">
               <span className="font-medium">{approval.agentTitle}</span> wants
-              to run <code className="font-mono">{approval.tool}</code>
+              to run{" "}
+              <span className="inline-flex items-center gap-1.5">
+                <ToolIcon
+                  name={approval.tool}
+                  icons={approval.icons}
+                  size={12}
+                />
+                <code className="font-mono">{approval.tool}</code>
+              </span>
             </h3>
             {approval.arguments.background === true && (
               <span className="rounded bg-muted px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground">

@@ -1,4 +1,5 @@
 import type { MessageStep, TraceModalOpenPayload } from "../../types";
+import { ToolIcon } from "../ToolIcon";
 import { getLiveStepMeta } from "./liveStepMeta";
 
 type Props = {
@@ -39,6 +40,13 @@ export function StreamingStatusRow({
           <span className="font-medium text-foreground">{liveMeta.label}</span>
           {liveMeta.detail && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-border-subtle bg-transparent px-2 py-[3px] text-[0.6875rem] font-medium text-foreground">
+              {streamingStep?.kind === "tool_call" && (
+                <ToolIcon
+                  name={streamingStep.toolName}
+                  icons={streamingStep.toolIcons}
+                  size={12}
+                />
+              )}
               {liveMeta.detail}
             </span>
           )}
@@ -52,6 +60,13 @@ export function StreamingStatusRow({
           <span className="font-medium">{liveMeta.label}</span>
           {liveMeta.detail && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-border-subtle bg-transparent px-2 py-[3px] text-[0.6875rem] font-medium text-foreground">
+              {streamingStep?.kind === "tool_call" && (
+                <ToolIcon
+                  name={streamingStep.toolName}
+                  icons={streamingStep.toolIcons}
+                  size={12}
+                />
+              )}
               {liveMeta.detail}
             </span>
           )}

@@ -76,9 +76,10 @@ test("MCP server configs are validated, user scoped, and never return header val
     });
     expect(await check.json()).toEqual({
       ok: true,
+      icons: [],
       tools: [
-        { name: "echo", description: "Echo text." },
-        { name: "fail", description: "Always fails." },
+        { name: "echo", description: "Echo text.", icons: [] },
+        { name: "fail", description: "Always fails.", icons: [] },
       ],
     });
     const failedCheck = await fetch(`${url}/api/mcp-servers/${bad.id}/check`, {
@@ -87,12 +88,31 @@ test("MCP server configs are validated, user scoped, and never return header val
     });
     expect(await failedCheck.json()).toMatchObject({ ok: false });
 
+    const toolList = await fetch(`${url}/api/mcp-servers/tools`, {
+      headers: userHeaders(),
+    });
+    expect(await toolList.json()).toEqual({
+      tools: [
+        { name: "mcp__test__echo", description: "Echo text.", icons: [] },
+        { name: "mcp__test__fail", description: "Always fails.", icons: [] },
+      ],
+    });
+    const otherTools = await fetch(`${url}/api/mcp-servers/tools`, {
+      headers: userHeaders(otherUser),
+    });
+    expect(await otherTools.json()).toEqual({ tools: [] });
+
     const disable = await fetch(`${url}/api/mcp-servers/${good.id}`, {
       method: "PATCH",
       headers: jsonHeaders(),
       body: JSON.stringify({ enabled: false }),
     });
     expect(await disable.json()).toMatchObject({ enabled: false });
+
+    const disabledTools = await fetch(`${url}/api/mcp-servers/tools`, {
+      headers: userHeaders(),
+    });
+    expect(await disabledTools.json()).toEqual({ tools: [] });
 
     const remove = await fetch(`${url}/api/mcp-servers/${bad.id}`, {
       method: "DELETE",

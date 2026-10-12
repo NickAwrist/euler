@@ -1,18 +1,19 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import type { Icon } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 export const MCP_TEST_TOKEN = "test-token";
 
 /** A stateless Streamable HTTP MCP server that requires a bearer token. */
-export function startMcpTestServer() {
+export function startMcpTestServer(icons?: Icon[]) {
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
     async fetch(request) {
       if (request.headers.get("authorization") !== `Bearer ${MCP_TEST_TOKEN}`)
         return new Response("Unauthorized", { status: 401 });
-      const mcp = new McpServer({ name: "test", version: "1.0.0" });
+      const mcp = new McpServer({ name: "test", version: "1.0.0", icons });
       mcp.registerTool(
         "echo",
         { description: "Echo text.", inputSchema: { text: z.string() } },

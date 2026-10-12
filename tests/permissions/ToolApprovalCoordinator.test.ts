@@ -124,3 +124,17 @@ test("capabilities and workspace are rechecked while a user is considering appro
   controller.abort();
   await expect(pending).rejects.toThrow("cancelled");
 });
+
+test("approval requests retain tool icon metadata", async () => {
+  const { owner, id, coordinator, context } = await fixture();
+  const icons = [{ src: "data:image/png;base64,AAAA" }];
+  const pending = coordinator.authorize(
+    { ...context, icons },
+    "mcp__test__echo",
+    { text: "hello" },
+  );
+  const approval = coordinator.list(owner, id)[0]!;
+  expect(approval.icons).toEqual(icons);
+  await coordinator.respond(owner, id, approval.id, { decision: "allow_once" });
+  await pending;
+});
