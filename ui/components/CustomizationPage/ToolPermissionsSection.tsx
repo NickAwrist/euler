@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   type ToolPermissionField,
   type ToolPermissionRule,
@@ -22,6 +22,7 @@ import {
   type ArgumentCondition,
   type FieldType,
   conditionFits,
+  exactPattern,
   ruleFields,
   valueType,
 } from "./toolPermissionFields";
@@ -186,6 +187,17 @@ function RuleRow({
       !field ||
       savedCondition ||
       conditionFits(field, condition));
+  // An empty pattern only needs filling in, so it is not reported as invalid.
+  const patternError =
+    condition.kind === "argument" &&
+    condition.match === "regex" &&
+    condition.value !== "" &&
+    !parsed.success
+      ? parsed.error.issues.find(
+          (issue) =>
+            issue.path[0] === "condition" && issue.path.at(-1) === "value",
+        )?.message
+      : undefined;
   // The server returns normalized rules, so compare the normalized draft.
   const dirty =
     isNew ||
@@ -327,6 +339,7 @@ function RuleRow({
           field={field}
           fieldType={fieldType}
           known={tools !== null}
+          patternError={patternError}
           onFieldChange={(next) => {
             setFieldType(next.type);
             setCondition({ ...EMPTY_ARGUMENT, field: next.path });
@@ -396,6 +409,7 @@ function ArgumentFields({
   field,
   fieldType,
   known,
+  patternError,
   onFieldChange,
   onChange,
 }: {
@@ -406,6 +420,7 @@ function ArgumentFields({
   fieldType: FieldType;
   /** Whether the tool catalogue loaded, so a missing field is unavailable. */
   known: boolean;
+  patternError: string | undefined;
   onFieldChange: (field: ToolPermissionField) => void;
   onChange: (condition: ArgumentCondition) => void;
 }) {
@@ -419,6 +434,17 @@ function ArgumentFields({
     field?.values ?? (fieldType === "boolean" ? [true, false] : undefined);
   const setValue = (value: ArgumentCondition["value"]) =>
     onChange({ ...condition, value });
+  // Switching to Regex anchors the value so the rule still matches the same
+  // calls. A pattern is not a value, so switching back requires a new one.
+  const setMatch = (match: ArgumentCondition["match"]) => {
+    if (match === condition.match) return;
+    const value =
+      match === "regex" && typeof condition.value === "string"
+        ? exactPattern(condition.value)
+        : "";
+    onChange({ ...condition, match, value });
+  };
+  const errorId = useId();
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -458,19 +484,23 @@ function ArgumentFields({
         className={fieldClass}
         value={condition.match}
         onChange={(event) =>
-          onChange({
-            ...condition,
-            match: event.target.value === "prefix" ? "prefix" : "exact",
-          })
+          setMatch(event.target.value === "regex" ? "regex" : "exact")
         }
       >
         <option value="exact">Equals</option>
-        {(condition.match === "prefix" ||
-          (fieldType === "string" && !values)) && (
-          <option value="prefix">Starts with</option>
-        )}
+        {fieldType === "string" && <option value="regex">Regex</option>}
       </select>
-      {values ? (
+      {condition.match === "regex" ? (
+        <input
+          aria-label="Pattern"
+          placeholder="^npm\s+publish\b"
+          aria-invalid={patternError !== undefined}
+          aria-describedby={patternError ? errorId : undefined}
+          className={cx(fieldClass, "min-w-40 flex-1 font-mono")}
+          value={typeof condition.value === "string" ? condition.value : ""}
+          onChange={(event) => setValue(event.target.value)}
+        />
+      ) : values ? (
         <select
           aria-label="Value"
           className={cx(fieldClass, "min-w-40 flex-1 font-mono")}
@@ -514,6 +544,11 @@ function ArgumentFields({
           value={typeof condition.value === "string" ? condition.value : ""}
           onChange={(event) => setValue(event.target.value)}
         />
+      )}
+      {patternError && (
+        <p id={errorId} className="basis-full text-[0.75rem] text-red-400">
+          {patternError}
+        </p>
       )}
     </div>
   );

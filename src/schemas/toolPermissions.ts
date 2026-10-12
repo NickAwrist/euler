@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { compileToolRegex } from "../permissions/toolRegex";
 
 // One extra rule accommodates conversion of the former approval default.
 export const MAX_TOOL_PERMISSION_RULES = 101;
@@ -14,18 +15,37 @@ export const ToolPermissionConditionSchema = z.discriminatedUnion("kind", [
     .object({
       kind: z.literal("argument"),
       field: z.string().trim().min(1).max(200),
-      match: z.enum(["exact", "prefix"]),
-      value: ToolPermissionValueSchema,
+      match: z.enum(["exact", "regex"]),
+      // Escaping a former 10,000-character prefix can double its length, plus ^.
+      value: z.union([ToolPermissionValueSchema, z.string().min(1).max(20001)]),
     })
     .strict()
-    .refine(
-      (condition) =>
-        condition.match !== "prefix" || typeof condition.value === "string",
-      {
-        message: "Starts with requires a text value",
-        path: ["value"],
-      },
-    ),
+    .superRefine((condition, context) => {
+      if (condition.match === "exact") {
+        const parsed = ToolPermissionValueSchema.safeParse(condition.value);
+        if (!parsed.success)
+          for (const issue of parsed.error.issues)
+            context.addIssue({ ...issue, path: ["value", ...issue.path] });
+        return;
+      }
+      if (typeof condition.value !== "string") {
+        context.addIssue({
+          code: "custom",
+          message: "Regex requires a text pattern",
+          path: ["value"],
+        });
+        return;
+      }
+      try {
+        compileToolRegex(condition.value);
+      } catch {
+        context.addIssue({
+          code: "custom",
+          message: "Invalid or unsupported regex",
+          path: ["value"],
+        });
+      }
+    }),
   z
     .object({ kind: z.literal("arguments"), value: ToolArgumentsSchema })
     .strict(),

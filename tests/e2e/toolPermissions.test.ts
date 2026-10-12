@@ -223,8 +223,8 @@ test("permission preferences persist and rule CRUD merges current rules with use
             condition: {
               kind: "argument",
               field: "command",
-              match: "prefix",
-              value: "npm publish",
+              match: "regex",
+              value: "^npm\\s+publish\\b",
             },
           }),
         },
@@ -234,6 +234,31 @@ test("permission preferences persist and rule CRUD merges current rules with use
     expect(
       effectiveUserPreferences(TEST_USER_ID).toolPermissions.rules,
     ).toHaveLength(2);
+    for (const pattern of ["[", "(?=publish)"]) {
+      const response = await fetch(
+        `${url}/api/settings/user/tool-permission-rules/${ids[0]}`,
+        {
+          method: "PUT",
+          headers,
+          body: JSON.stringify({
+            id: ids[0],
+            tool: "bash",
+            action: "deny",
+            condition: {
+              kind: "argument",
+              field: "command",
+              match: "regex",
+              value: pattern,
+            },
+          }),
+        },
+      );
+      expect(response.status).toBe(400);
+      expect(
+        effectiveUserPreferences(TEST_USER_ID).toolPermissions.rules[0]
+          ?.condition,
+      ).toMatchObject({ match: "regex", value: "^npm\\s+publish\\b" });
+    }
     await fetch(`${url}/api/settings/user/tool-permission-rules/${ids[0]}`, {
       method: "DELETE",
       headers: userHeaders("22222222-2222-4222-8222-222222222222"),

@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
+import { RE2JS } from "re2js";
 import {
   conditionFits,
+  exactPattern,
   ruleFields,
 } from "../../ui/components/CustomizationPage/toolPermissionFields";
 
@@ -67,7 +69,11 @@ describe("tool permission fields", () => {
     const [command, background, mode] = tools[0]!.fields;
     const condition = { kind: "argument" as const, field: "command" };
     expect(
-      conditionFits(command!, { ...condition, match: "prefix", value: "git" }),
+      conditionFits(command!, {
+        ...condition,
+        match: "regex",
+        value: "^git\\s+push\\b",
+      }),
     ).toBe(true);
     expect(
       conditionFits(background!, {
@@ -85,13 +91,22 @@ describe("tool permission fields", () => {
         value: "c",
       }),
     ).toBe(false);
+    // A pattern on a choice field need not be one of its values.
     expect(
       conditionFits(mode!, {
         ...condition,
         field: "mode",
-        match: "prefix",
-        value: "a",
+        match: "regex",
+        value: "^(a|b)$",
       }),
-    ).toBe(false);
+    ).toBe(true);
+  });
+
+  test("an exact pattern matches only the literal value", () => {
+    const pattern = RE2JS.compile(exactPattern("git push (a.b)|[x]*"));
+    expect(pattern.test("git push (a.b)|[x]*")).toBe(true);
+    expect(pattern.test("git push (aXb)|[x]*")).toBe(false);
+    expect(pattern.test("git push (a.b)|[x]* --force")).toBe(false);
+    expect(exactPattern("")).toBe("");
   });
 });

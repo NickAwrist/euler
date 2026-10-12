@@ -1,3 +1,4 @@
+import { RE2JS } from "re2js";
 import { mergeToolFields } from "../../../src/permissions/toolFieldMetadata";
 import type {
   ToolPermissionField,
@@ -42,7 +43,11 @@ export function conditionFits(
 ): boolean {
   if (condition.field !== field.path) return false;
   if (valueType(condition.value) !== field.type) return false;
-  if (condition.match === "prefix" && (field.type !== "string" || field.values))
-    return false;
+  // A pattern need not name one of the field's values to match some of them.
+  if (condition.match === "regex") return field.type === "string";
   return !field.values || field.values.includes(condition.value);
 }
+
+/** Pattern matching exactly `value`, so switching to Regex keeps its meaning. */
+export const exactPattern = (value: string): string =>
+  value === "" ? "" : `^${RE2JS.quote(value)}$`;

@@ -138,8 +138,17 @@ test("tools desktop: tool permission rules edit inline and save per user", async
   const rule = page.getByRole("group", { name: "Rule for bash" }).last();
   await rule.getByLabel("Arguments").selectOption("argument");
   await rule.getByLabel("Field", { exact: true }).selectOption("command");
-  await rule.getByLabel("Match").selectOption("prefix");
-  await rule.getByLabel("Value").fill("git push");
+  await rule.getByLabel("Match").selectOption("regex");
+  const pattern = rule.getByLabel("Pattern");
+  await pattern.fill("^git push (");
+  await expect(rule.getByText("Invalid or unsupported regex")).toBeVisible();
+  await expect(pattern).toHaveAttribute("aria-invalid", "true");
+  await expect(rule.getByRole("button", { name: "Save rule" })).toBeDisabled();
+  // Lookahead is valid in JavaScript but not in RE2, which the server uses.
+  await pattern.fill("^git push(?!.*--force)");
+  await expect(rule.getByText("Invalid or unsupported regex")).toBeVisible();
+  await pattern.fill("^git\\s+push\\b");
+  await expect(rule.getByText("Invalid or unsupported regex")).toHaveCount(0);
   await rule.getByLabel("Action").selectOption("allow");
   await rule.getByRole("button", { name: "Save rule" }).click();
   await expect(rule.getByRole("button", { name: "Save rule" })).toBeHidden();
@@ -149,8 +158,8 @@ test("tools desktop: tool permission rules edit inline and save per user", async
     condition: {
       kind: "argument",
       field: "command",
-      match: "prefix",
-      value: "git push",
+      match: "regex",
+      value: "^git\\s+push\\b",
     },
   });
   expect(saved()?.rules.at(-1)?.sessionId).toBeUndefined();
@@ -168,7 +177,7 @@ test("tools desktop: tool permission rules edit inline and save per user", async
       .getByRole("group", { name: "Rule for All tools" })
       .getByLabel("Action"),
   ).toHaveValue("ask");
-  await expect(page.getByLabel("Value")).toHaveValue("git push");
+  await expect(page.getByLabel("Pattern")).toHaveValue("^git\\s+push\\b");
 });
 
 test("tools desktop: tool catalogue failures are shown without inventing tools", async ({
@@ -267,8 +276,8 @@ test("tools desktop: field match offers the selected tool's fields", async ({
     condition: {
       kind: "argument",
       field: "cwd",
-      match: "prefix",
-      value: "/tmp",
+      match: "regex",
+      value: "^/tmp/",
     },
   };
   const store = new Map<string, UserPreferences>([
@@ -330,8 +339,8 @@ test("tools desktop: field match offers the selected tool's fields", async ({
   await expect(
     stale.getByRole("option", { name: "cwd (unavailable)" }),
   ).toBeAttached();
-  await expect(stale.getByLabel("Match")).toHaveValue("prefix");
-  await expect(stale.getByLabel("Value")).toHaveValue("/tmp");
+  await expect(stale.getByLabel("Match")).toHaveValue("regex");
+  await expect(stale.getByLabel("Pattern")).toHaveValue("^/tmp/");
   await expect(stale.getByRole("button", { name: "Save rule" })).toHaveCount(0);
 
   await page.getByRole("button", { name: "Add rule" }).click();
@@ -354,6 +363,7 @@ test("tools desktop: field match offers the selected tool's fields", async ({
   await field.selectOption("action");
   await expect(skills.getByLabel("Match").getByRole("option")).toHaveText([
     "Equals",
+    "Regex",
   ]);
   const choice = skills.getByLabel("Value");
   await expect(choice.getByRole("option")).toHaveText([
@@ -375,6 +385,10 @@ test("tools desktop: field match offers the selected tool's fields", async ({
   await expect(image.getByLabel("Field", { exact: true })).toHaveValue("");
   await expect(image.getByRole("button", { name: "Save rule" })).toBeDisabled();
   await image.getByLabel("Field", { exact: true }).selectOption("size.width");
+  // Regex only matches text, so typed fields only offer Equals.
+  await expect(image.getByLabel("Match").getByRole("option")).toHaveText([
+    "Equals",
+  ]);
   await image.getByLabel("Value").fill("1024");
   await image.getByRole("button", { name: "Save rule" }).click();
   await expect(image.getByRole("button", { name: "Save rule" })).toBeHidden();
@@ -395,6 +409,9 @@ test("tools desktop: field match offers the selected tool's fields", async ({
     all.getByLabel("Field", { exact: true }).getByRole("option"),
   ).toHaveText(["Field", "action", "background", "command", "size.width"]);
   await all.getByLabel("Field", { exact: true }).selectOption("background");
+  await expect(all.getByLabel("Match").getByRole("option")).toHaveText([
+    "Equals",
+  ]);
   await all.getByLabel("Value").selectOption("false");
   await all.getByRole("button", { name: "Save rule" }).click();
   await expect(all.getByRole("button", { name: "Save rule" })).toBeHidden();
@@ -419,22 +436,22 @@ test("tools desktop: saved field values outlive changed tool choices", async ({
       value: "archive",
     },
   };
-  const legacyPrefix: ToolPermissionRule = {
+  const savedPattern: ToolPermissionRule = {
     id: "88888888-8888-4888-8888-888888888888",
     tool: "manage_skills",
     action: "ask",
     condition: {
       kind: "argument",
       field: "action",
-      match: "prefix",
-      value: "cre",
+      match: "regex",
+      value: "^cre",
     },
   };
   const store = new Map<string, UserPreferences>([
     [
       USER,
       userPreferencesSchema.parse({
-        toolPermissions: { rules: [obsolete, legacyPrefix] },
+        toolPermissions: { rules: [obsolete, savedPattern] },
       }),
     ],
   ]);
@@ -479,7 +496,7 @@ test("tools desktop: saved field values outlive changed tool choices", async ({
     name: "Rule for manage_skills",
   });
   const old = skillRules.first();
-  const prefix = skillRules.nth(1);
+  const regex = skillRules.nth(1);
 
   // A value the field no longer offers is shown rather than blanked.
   await expect(old.getByLabel("Value")).toHaveValue("-1");
@@ -487,28 +504,38 @@ test("tools desktop: saved field values outlive changed tool choices", async ({
     old.getByRole("option", { name: "archive (unavailable)" }),
   ).toBeAttached();
 
-  // A legacy prefix on a choice field keeps its match and raw value.
-  await expect(prefix.getByLabel("Match")).toHaveValue("prefix");
-  await expect(
-    prefix.getByRole("option", { name: "cre (unavailable)" }),
-  ).toBeAttached();
+  // A pattern on a choice field is edited as text, not as one of its values.
+  await expect(regex.getByLabel("Match")).toHaveValue("regex");
+  await expect(regex.getByLabel("Pattern")).toHaveValue("^cre");
+  await expect(regex.getByRole("combobox", { name: "Value" })).toHaveCount(0);
 
   // Changing only the action keeps the saved condition savable.
-  await prefix.getByLabel("Action").selectOption("deny");
-  await prefix.getByRole("button", { name: "Save rule" }).click();
-  await expect(prefix.getByRole("button", { name: "Save rule" })).toBeHidden();
-  expect(saved()?.rules[1]).toEqual({ ...legacyPrefix, action: "deny" });
+  await regex.getByLabel("Action").selectOption("deny");
+  await regex.getByRole("button", { name: "Save rule" }).click();
+  await expect(regex.getByRole("button", { name: "Save rule" })).toBeHidden();
+  expect(saved()?.rules[1]).toEqual({ ...savedPattern, action: "deny" });
 
-  // Editing the condition must then pick one of the offered values.
-  await prefix.getByLabel("Match").selectOption("exact");
-  await expect(prefix.getByLabel("Match").getByRole("option")).toHaveText([
-    "Equals",
-  ]);
-  await expect(
-    prefix.getByRole("button", { name: "Save rule" }),
-  ).toBeDisabled();
-  await prefix.getByLabel("Value").selectOption("create");
-  await expect(prefix.getByRole("button", { name: "Save rule" })).toBeEnabled();
+  // A pattern is not a value, so Equals must then pick an offered one.
+  await regex.getByLabel("Match").selectOption("exact");
+  await expect(regex.getByLabel("Value")).toHaveValue("-1");
+  await expect(regex.getByRole("button", { name: "Save rule" })).toBeDisabled();
+  await regex.getByLabel("Value").selectOption("create");
+  await expect(regex.getByRole("button", { name: "Save rule" })).toBeEnabled();
+
+  // Switching a value to Regex anchors it, so it still matches the same calls.
+  await old.getByLabel("Match").selectOption("regex");
+  await expect(old.getByLabel("Pattern")).toHaveValue("^archive$");
+  await old.getByLabel("Pattern").fill("^(create|delete)$");
+  await old.getByRole("button", { name: "Save rule" }).click();
+  await expect(old.getByRole("button", { name: "Save rule" })).toBeHidden();
+  expect(saved()?.rules[0]).toEqual({
+    ...obsolete,
+    condition: {
+      ...obsolete.condition,
+      match: "regex",
+      value: "^(create|delete)$",
+    },
+  });
 
   // Clearing a typed field resets its value control to the new field's type.
   await page.getByRole("button", { name: "Add rule" }).click();

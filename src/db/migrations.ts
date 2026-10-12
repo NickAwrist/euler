@@ -3,7 +3,7 @@ import { POPULAR_PUBLISHERS } from "../openRouterPublishers";
 import { createAgentTables } from "./agentTables";
 import { migrateAttachmentMetadata } from "./attachmentMetadataMigration";
 import { migrateJobErrors } from "./jobErrorMigration";
-import { migrateToolPermissionDefaults } from "./toolPermissionMigration";
+import { migrateToolPermissions } from "./toolPermissionMigration";
 
 function tableExists(db: Database, name: string): boolean {
   return (
@@ -211,7 +211,7 @@ export function runMigrations(db: Database) {
   db.run(
     "CREATE TABLE IF NOT EXISTS user_preferences (owner_uuid TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL)",
   );
-  migrateToolPermissionDefaults(db);
+  migrateToolPermissions(db);
   createAgentTables(db);
   db.run(
     "CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, owner_uuid TEXT NOT NULL, payload TEXT NOT NULL)",

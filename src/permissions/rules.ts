@@ -1,4 +1,5 @@
 import type { ToolPermissionRule } from "../schemas/toolPermissions";
+import { compileToolRegex } from "./toolRegex";
 
 /** JSON object key order must not change whether an approved call matches. */
 function sameArguments(left: unknown, right: unknown): boolean {
@@ -50,7 +51,7 @@ export function matchesRule(
     ? value === condition.value
     : typeof value === "string" &&
         typeof condition.value === "string" &&
-        value.startsWith(condition.value);
+        compileToolRegex(condition.value).test(value);
 }
 
 export function ruleSpecificity(rule: ToolPermissionRule): number {

@@ -36,8 +36,8 @@ test("deny wins over allows; specific allows override general Ask rules", () => 
   const deny = rule("deny", {
     kind: "argument",
     field: "command",
-    match: "prefix",
-    value: "npm publish",
+    match: "regex",
+    value: "^npm\\s+publish\\b",
   });
   expect(evaluate([allow, ask], "bun run build").action).toBe("allow");
   expect(
@@ -167,7 +167,7 @@ test("argument rules read only own fields, and capability denials cannot be appr
   );
   expect(ToolPermissionsSchema.parse({}).rules).toEqual([]);
 });
-test("schema-selected boolean and numeric fields use typed equality and reject non-text prefix rules", () => {
+test("schema-selected boolean and numeric fields use typed equality and reject non-text regex rules", () => {
   const background = rule("deny", {
     kind: "argument",
     field: "background",
@@ -210,9 +210,103 @@ test("schema-selected boolean and numeric fields use typed equality and reject n
       rules: [
         {
           ...background,
-          condition: { ...background.condition, match: "prefix" },
+          condition: { ...background.condition, match: "regex" },
         },
       ],
     }).success,
   ).toBe(false);
+});
+
+test("regex rules support anchors, alternatives and repeated matching on text fields", () => {
+  const condition: Extract<
+    ToolPermissionRule["condition"],
+    { kind: "argument" }
+  > = {
+    kind: "argument",
+    field: "command",
+    match: "regex",
+    value: "(^|[;&]\\s*)npm\\s+publish\\b",
+  };
+  const deny = rule("deny", condition);
+  for (const command of [
+    "npm publish",
+    "npm  publish --dry-run",
+    "echo ready; npm publish",
+  ])
+    for (let repeat = 0; repeat < 2; repeat++)
+      expect(evaluate([deny], command).action).toBe("deny");
+  for (const command of ["npm publishable", "echo npm publish", "npm install"])
+    expect(evaluate([deny], command).action).toBe("ask");
+  expect(
+    evaluate([rule("allow", { ...condition, value: "build|test" })], "bun test")
+      .action,
+  ).toBe("allow");
+  expect(
+    evaluate(
+      [rule("deny", { ...condition, value: "(?i)^npm publish" })],
+      "NPM PUBLISH",
+    ).action,
+  ).toBe("deny");
+  const nested = rule("ask", {
+    kind: "argument",
+    field: "options.action",
+    match: "regex",
+    value: "^(create|delete)$",
+  });
+  const policy = permissionService.resolve(undefined, undefined, {
+    rules: [nested],
+  });
+  expect(
+    permissionService.callDecision(policy, "bash", {
+      options: { action: "delete" },
+    }).action,
+  ).toBe("ask");
+  expect(
+    permissionService.callDecision(policy, "bash", {
+      options: { action: false },
+    }).action,
+  ).toBe("allow");
+});
+
+test("invalid, unsupported and former match types are rejected before saving", () => {
+  for (const pattern of ["[", "(", "(?=publish)", "(a)\\1"]) {
+    expect(
+      ToolPermissionsSchema.safeParse({
+        rules: [
+          rule("deny", {
+            kind: "argument",
+            field: "command",
+            match: "regex",
+            value: pattern,
+          }),
+        ],
+      }).success,
+    ).toBe(false);
+  }
+  expect(
+    ToolPermissionsSchema.safeParse({
+      rules: [
+        {
+          ...rule("deny", { kind: "any" }),
+          condition: {
+            kind: "argument",
+            field: "command",
+            match: "prefix",
+            value: "npm",
+          },
+        },
+      ],
+    }).success,
+  ).toBe(false);
+});
+
+test("nested repetition cannot stall permission matching", () => {
+  const deny = rule("deny", {
+    kind: "argument",
+    field: "command",
+    match: "regex",
+    value: "^(a+)+$",
+  });
+  expect(evaluate([deny], `${"a".repeat(100000)}!`).action).toBe("ask");
+  expect(evaluate([deny], "a".repeat(100000)).action).toBe("deny");
 });
