@@ -305,6 +305,9 @@ export async function streamOpenRouterChat(
     },
     body: JSON.stringify({
       model: request.model,
+      ...(request.model.startsWith("anthropic/")
+        ? { cache_control: { type: "ephemeral" } }
+        : {}),
       messages: toOpenRouterMessages(request.messages),
       tools: request.tools,
       stream: true,
