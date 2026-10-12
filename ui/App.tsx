@@ -13,6 +13,7 @@ import { AgentTraceModal } from "./components/Agents/AgentTraceModal";
 import { AgentsList } from "./components/Agents/AgentsList";
 import { QueuedMessages } from "./components/Agents/QueuedMessages";
 import { SubagentModelNotice } from "./components/Agents/SubagentModelNotice";
+import { ToolApprovals } from "./components/Agents/ToolApprovals";
 import { ArtifactContext } from "./components/Artifacts/ArtifactContext";
 import { initialArtifactWidth } from "./components/Artifacts/ArtifactSidebar";
 import { WorkspaceArtifacts } from "./components/Artifacts/WorkspaceArtifacts";
@@ -517,6 +518,12 @@ function ChatView({
                         sessionId={app.activeSessionId}
                         messages={app.queuedMessages}
                         held={app.heldUpdates}
+                        refresh={app.refreshRuntime}
+                      />
+                      <ToolApprovals
+                        key={app.activeSessionId}
+                        sessionId={app.activeSessionId}
+                        approvals={app.toolApprovals}
                         refresh={app.refreshRuntime}
                       />
                     </>

@@ -27,12 +27,45 @@ export async function mockUserPreferences(
           layout: { ...current.layout, ...patch.layout },
           image: { ...current.image, ...patch.image },
           capabilities: { ...current.capabilities, ...patch.capabilities },
+          toolPermissions: {
+            ...current.toolPermissions,
+            ...patch.toolPermissions,
+          },
         });
       }
     }
     if (preferences) store.set(lastUser, preferences);
     await route.fulfill({ json: preferences });
   });
+  await page.route(
+    "**/api/settings/user/tool-permission-rules/*",
+    async (route) => {
+      lastUser = route.request().headers()["x-euler-user-id"] ?? lastUser;
+      const current = store.get(lastUser) ?? userPreferencesSchema.parse({});
+      const id = decodeURIComponent(
+        new URL(route.request().url()).pathname.split("/").at(-1) ?? "",
+      );
+      const rules = current.toolPermissions.rules.filter(
+        (rule) => rule.id !== id,
+      );
+      if (route.request().method() === "PUT") {
+        const index = current.toolPermissions.rules.findIndex(
+          (rule) => rule.id === id,
+        );
+        rules.splice(
+          index < 0 ? rules.length : index,
+          0,
+          route.request().postDataJSON(),
+        );
+      }
+      const preferences = userPreferencesSchema.parse({
+        ...current,
+        toolPermissions: { ...current.toolPermissions, rules },
+      });
+      store.set(lastUser, preferences);
+      await route.fulfill({ json: preferences });
+    },
+  );
   await page.route("**/api/comfyui/config", async (route) => {
     lastUser = route.request().headers()["x-euler-user-id"] ?? lastUser;
     let preferences = store.get(lastUser) ?? userPreferencesSchema.parse({});

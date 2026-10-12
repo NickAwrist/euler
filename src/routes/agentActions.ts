@@ -3,6 +3,7 @@ import { agentRuntime } from "../agents/runtime/AgentRuntime";
 import { getOpenRouterApiKey } from "../db";
 import { getAttachment } from "../db/attachments";
 import { getSessionById, markSessionViewed } from "../db/sessions";
+import { asyncRoute } from "../http/asyncRoute";
 import { resolveModelSelection } from "../llm";
 import { sendError, sendValidationError } from "../observability/http";
 import {
@@ -10,6 +11,7 @@ import {
   RewindSchema,
   SendMessageSchema,
 } from "../schemas/agents";
+import { ToolApprovalResponseSchema } from "../schemas/toolPermissions";
 import { requireUserId } from "../userIdentity";
 
 /** Sends an error for a model that cannot run and returns false. */
@@ -148,6 +150,23 @@ export function agentActions() {
     if (!owner) return;
     res.json(agentRuntime.snapshot(owner, req.params.id));
   });
+  router.post(
+    "/:id/approvals/:approvalId",
+    asyncRoute(async (req, res) => {
+      const owner = requireUserId(req, res);
+      if (!owner) return;
+      const parsed = ToolApprovalResponseSchema.safeParse(req.body);
+      if (!parsed.success) return sendValidationError(res, parsed.error);
+      res.json(
+        await agentRuntime.approvals.respond(
+          owner,
+          req.params.id as string,
+          req.params.approvalId as string,
+          parsed.data,
+        ),
+      );
+    }),
+  );
   router.get("/:id/agents/:agentId", (req, res) => {
     const owner = requireUserId(req, res);
     if (!owner) return;

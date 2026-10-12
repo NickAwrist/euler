@@ -113,6 +113,7 @@ export function useRunApp() {
     agentPhases: stream.phases,
     queuedMessages: stream.queued,
     heldUpdates: stream.held,
+    toolApprovals: stream.approvals,
     refreshRuntime: stream.refresh,
     input: stream.input,
     setInput: stream.setInput,

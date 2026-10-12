@@ -154,6 +154,35 @@ deployctl env set euler EULER_BACKEND_PORT=3100
 deployctl restart euler
 ```
 
+## Tool permissions
+
+Customization's Tools tab controls the default tool decision, Allow or Ask,
+and rules for individual tools. A rule can match any arguments, a string
+argument by exact value or prefix, or the complete arguments saved from an
+approval. Nested string arguments use dotted field paths. Deny rules always
+win; otherwise chat/workspace scope takes precedence, then more specific
+argument conditions, then the most recently saved matching rule.
+
+Approval requests appear above the chat input for both main agents and
+subagents. Allow once resumes just that call. Allow matching calls immediately
+saves an exact-arguments rule for the same chat and workspace and resumes the
+call; Undo removes that rule. The input remains available, and no modal or
+navigation is required. Rules also apply to user-configured MCP tool names.
+Disabled built-in capabilities remain hard denials.
+
+PermissionService decides whether to allow, deny, or ask; ToolApprovalCoordinator
+handles pending requests. Background jobs are created only after authorization.
+Pending approvals release execution slots, survive browser reloads through the
+runtime snapshot, and are cancelled by Stop, rewind, or deletion. Backend restart
+interrupts pending calls instead of retaining approvals or replaying execution.
+Rules are stored in user preferences and remain across backend restarts.
+Deleting a chat removes its scoped rules while preserving global rules and rules
+for other chats.
+
+Shell argument rules compare command text. Scripts, interpreters, quoting, or
+other command forms can bypass that comparison, so these rules are guardrails;
+filesystem and network policy still provide the underlying containment.
+
 ## Workspaces
 
 Shell commands and file tools use `/workspace` for both private and selected
@@ -163,7 +192,8 @@ The UI shows the selected host directory for local workspaces.
 Run permissions are resolved by `src/permissions/PermissionService.ts`. The
 dispatcher checks them before tool execution, and background jobs and the shell
 runner enforce the same policy. Existing capability switches continue to gate
-built-in tools; user-configured MCP tools retain their own access.
+built-in tools; user-configured MCP calls also pass through argument rules and
+approvals, while their server connections retain their configured access.
 
 `/sandbox` keeps isolated networking and existing resource limits. `/directory`
 uses a development policy with host networking, read-only access to installed

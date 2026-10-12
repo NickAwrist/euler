@@ -33,10 +33,28 @@ import {
   savedModelMetadata,
 } from "../openRouterPreferences";
 import { publisherName } from "../openRouterPublishers";
+import {
+  removeToolPermissionRule,
+  saveToolPermissionRule,
+} from "../permissions/preferences";
+import { ToolPermissionRuleSchema } from "../schemas/toolPermissions";
 import { userPreferencesPatchSchema } from "../schemas/userPreferences";
 import { requireUserId } from "../userIdentity";
 
 const settingsRoutes = Router();
+settingsRoutes.put("/user/tool-permission-rules/:ruleId", (req, res) => {
+  const owner = requireUserId(req, res);
+  if (!owner) return;
+  const parsed = ToolPermissionRuleSchema.safeParse(req.body);
+  if (!parsed.success) return sendValidationError(res, parsed.error);
+  if (parsed.data.id !== req.params.ruleId)
+    return sendError(res, "INVALID_REQUEST", "Rule ID does not match");
+  res.json(saveToolPermissionRule(owner, parsed.data));
+});
+settingsRoutes.delete("/user/tool-permission-rules/:ruleId", (req, res) => {
+  const owner = requireUserId(req, res);
+  if (owner) res.json(removeToolPermissionRule(owner, req.params.ruleId));
+});
 settingsRoutes.get("/user", (req, res) => {
   const owner = requireUserId(req, res);
   if (!owner) return;

@@ -43,6 +43,11 @@ export type OnStreamDelta = (
 ) => void;
 
 export class RunContext {
+  /** Server runs use live rules and approvals; standalone runs use the supplied policy and fail closed on Ask. */
+  authorizeToolCall?: (
+    tool: string,
+    args: Record<string, unknown>,
+  ) => Promise<void>;
   jobs?: import("./tools/background").JobExecutor;
   agentInstance: BaseAgent;
   readonly agentName: string;

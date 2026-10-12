@@ -1,9 +1,14 @@
 import {
+  type ToolPermissions,
+  ToolPermissionsSchema,
+} from "../schemas/toolPermissions";
+import {
   type Capabilities,
   capabilitiesSchema,
 } from "../schemas/userPreferences";
 import { BUILTIN_TOOLS, type BuiltinTool } from "../tools/builtinTools";
 import type { Workspace } from "../workspaces/WorkspaceService";
+import { type PermissionScope, matchesRule, ruleSpecificity } from "./rules";
 
 /** User capability switches gate built-in tools, not user-configured MCP tools. */
 type GatedTool = BuiltinTool | "manage_skills";
@@ -23,6 +28,7 @@ const TOOL_CAPABILITY: Record<GatedTool, keyof Capabilities | null> = {
 };
 
 export type RunPermissions = {
+  readonly toolPermissions: ToolPermissions;
   readonly capabilities: Readonly<Capabilities>;
   readonly shell: {
     readonly network: "isolated" | "host";
@@ -38,14 +44,20 @@ export type PermissionDecision =
   | { allowed: true }
   | { allowed: false; reason: string };
 
+export type ToolCallDecision =
+  | { action: "allow" }
+  | { action: "deny" | "ask"; reason: string };
+
 export class PermissionService {
   resolve(
     workspace?: Pick<Workspace, "kind">,
     capabilities: Capabilities = capabilitiesSchema.parse({}),
+    toolPermissions: ToolPermissions = ToolPermissionsSchema.parse({}),
   ): RunPermissions {
     const development = workspace?.kind === "local";
     return {
       capabilities: { ...capabilities },
+      toolPermissions: structuredClone(toolPermissions),
       shell: {
         network: development ? "host" : "isolated",
         hostToolchains: development,
@@ -76,6 +88,42 @@ export class PermissionService {
   assertTool(permissions: RunPermissions, toolName: string): void {
     const decision = this.toolDecision(permissions, toolName);
     if (!decision.allowed) throw new Error(decision.reason);
+  }
+
+  callDecision(
+    permissions: RunPermissions,
+    tool: string,
+    args: Record<string, unknown>,
+    scope: PermissionScope = {},
+  ): ToolCallDecision {
+    const capability = this.toolDecision(permissions, tool);
+    if (!capability.allowed)
+      return { action: "deny", reason: capability.reason };
+    const matches = permissions.toolPermissions.rules.filter((rule) =>
+      matchesRule(rule, tool, args, scope),
+    );
+    if (matches.some((rule) => rule.action === "deny"))
+      return {
+        action: "deny",
+        reason: `A tool permission rule blocks this ${tool} call`,
+      };
+    // Later entries win equal specificity; explicit denials always win above.
+    const rule = matches.reduce<(typeof matches)[number] | undefined>(
+      (selected, candidate) =>
+        !selected || ruleSpecificity(candidate) >= ruleSpecificity(selected)
+          ? candidate
+          : selected,
+      undefined,
+    );
+    const action = rule?.action ?? permissions.toolPermissions.defaultAction;
+    return action === "allow"
+      ? { action }
+      : {
+          action: "ask",
+          reason: rule
+            ? `A tool permission rule requires approval for this ${tool} call`
+            : "Your default tool policy requires approval",
+        };
   }
 }
 

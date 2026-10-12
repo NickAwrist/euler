@@ -74,31 +74,47 @@ export class BaseAgent {
 
   private async executeToolCall(
     toolCall: LlmToolCall,
-    ctx?: RunContext,
+    ctx: RunContext,
     parentStep?: Step,
     turnIndex?: number,
   ): Promise<ToolResult> {
     const toolName = toolCall.function.name;
-    const args = this.parseToolArguments(toolCall.function.arguments);
+    const args = structuredClone(
+      this.parseToolArguments(toolCall.function.arguments),
+    );
     const started = performance.now();
     let failure: unknown;
     let result: ToolResult | undefined;
     try {
       const tool = this.TOOL_MAP[toolName];
       if (!tool) throw new Error(`tool ${toolName} not found`);
-      if (ctx) permissionService.assertTool(ctx.permissions, toolName);
+      permissionService.assertTool(ctx.permissions, toolName);
       const { background = false, ...operationArgs } = args;
       if (typeof background !== "boolean")
         throw new Error("background must be a boolean");
-      if ("background" in args) {
-        if (!isBackgroundCapable(tool))
-          throw new Error("This tool does not support background execution");
-        if (background) {
-          if (!ctx?.jobs)
-            throw new Error("Background execution is unavailable");
-          result = await ctx.jobs.start(tool, operationArgs, ctx, parentStep);
-          return result;
-        }
+      if ("background" in args && !isBackgroundCapable(tool))
+        throw new Error("This tool does not support background execution");
+      if (background && !ctx.jobs)
+        throw new Error("Background execution is unavailable");
+      if (ctx.authorizeToolCall) await ctx.authorizeToolCall(toolName, args);
+      else {
+        const decision = permissionService.callDecision(
+          ctx.permissions,
+          toolName,
+          args,
+          { workspacePath: ctx.workspace?.hostPath },
+        );
+        if (decision.action !== "allow")
+          throw new Error(
+            decision.action === "deny"
+              ? decision.reason
+              : "Tool approval is unavailable in this run",
+          );
+      }
+      if (ctx.signal?.aborted) throw new Error("Tool call cancelled");
+      if (background && isBackgroundCapable(tool) && ctx.jobs) {
+        result = await ctx.jobs.start(tool, operationArgs, ctx, parentStep);
+        return result;
       }
       result = await tool.execute(operationArgs, ctx, parentStep);
       return result;

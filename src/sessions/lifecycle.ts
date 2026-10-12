@@ -1,4 +1,5 @@
 import { agentRuntime } from "../agents/runtime/AgentRuntime";
+import { transaction } from "../db/connection";
 import {
   deleteSessionRow,
   findWorkspaceUser,
@@ -8,6 +9,7 @@ import {
 import type { SessionRow } from "../db/types";
 import { envConfig } from "../env";
 import { logEvent } from "../observability/logger";
+import { removeSessionToolPermissionRules } from "../permissions/preferences";
 import { workspaceService } from "../workspaces/WorkspaceService";
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -38,7 +40,15 @@ export function deleteSession(row: SessionRow): Promise<boolean | undefined> {
   return agentRuntime.deleteSession(row.owner_uuid, row.id, async () => {
     const current = getSessionById(row.owner_uuid, row.id);
     // Delete first so this chat no longer counts as using its sandboxes.
-    if (!current || !deleteSessionRow(row.owner_uuid, row.id)) return false;
+    if (
+      !current ||
+      !transaction(() => {
+        if (!deleteSessionRow(row.owner_uuid, row.id)) return false;
+        removeSessionToolPermissionRules(row.owner_uuid, row.id);
+        return true;
+      })
+    )
+      return false;
     await releaseWorkspace(
       row.owner_uuid,
       current.id,

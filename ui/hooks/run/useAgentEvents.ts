@@ -17,6 +17,7 @@ const empty = (): RuntimeSnapshot => ({
   queued: [],
   held: false,
   history: [],
+  approvals: [],
   sequence: 0,
 });
 function applyEvent(
@@ -97,7 +98,8 @@ export function useAgentEvents(
       previous.activation === value.activation &&
       previous.queued === value.queued &&
       previous.held === value.held &&
-      previous.history === value.history
+      previous.history === value.history &&
+      previous.approvals === value.approvals
     )
       return;
     setState(value);
@@ -181,6 +183,7 @@ export function useAgentEvents(
     phases,
     queued: state.queued,
     held: state.held,
+    approvals: state.approvals,
     refresh,
     runPending: state.activation !== null,
     streamingContent: state.activation?.content ?? "",

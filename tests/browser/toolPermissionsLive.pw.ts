@@ -1,0 +1,245 @@
+import { type ChildProcess, spawn } from "node:child_process";
+import { rmSync } from "node:fs";
+import {
+  type APIRequestContext,
+  type Page,
+  expect,
+  test,
+} from "@playwright/test";
+import type { ToolApproval } from "../../src/schemas/toolPermissions";
+import type { UserPreferences } from "../../src/schemas/userPreferences";
+
+// Real Express/SQLite/runtime/Bash backend; only the model catalog is mocked.
+const USER = "12345678-1234-4234-9234-123456789abc";
+const MODEL = "openrouter:openai/gpt-5.6-terra";
+const COMMAND = "echo approved >> marker.txt";
+const REPLY = "The script is running in the background. You can keep chatting.";
+let server: ChildProcess;
+let backend: string;
+
+test.beforeAll(async () => {
+  // Each parallel worker (desktop and mobile projects) gets its own backend.
+  const port = String(5196 - Number(process.env.TEST_PARALLEL_INDEX ?? 0));
+  backend = `http://127.0.0.1:${port}`;
+  server = spawn("bun", ["tests/helpers/asyncFixture.ts"], {
+    stdio: "pipe",
+    env: {
+      ...process.env,
+      TOOL_PERMISSION_FIXTURE: "1",
+      JOB_FIXTURE_PORT: port,
+    },
+  });
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("Fixture failed to start")),
+      10000,
+    );
+    server.stdout?.on("data", (chunk) => {
+      if (String(chunk).includes("async fixture ready")) {
+        clearTimeout(timer);
+        resolve();
+      }
+    });
+    server.on("exit", (code) => {
+      clearTimeout(timer);
+      reject(new Error(`Fixture exited ${code}`));
+    });
+  });
+});
+test.afterAll(() => {
+  server?.kill();
+  if (server?.pid)
+    rmSync(`/tmp/euler-async-browser-${server.pid}`, {
+      recursive: true,
+      force: true,
+    });
+});
+
+test.beforeEach(async ({ page, request }) => {
+  await page.addInitScript((user) => {
+    localStorage.setItem("euler:userUuid", user);
+  }, USER);
+  await page.route("**/api/**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname === "/api/models")
+      return route.fulfill({
+        json: {
+          models: [
+            {
+              id: MODEL,
+              name: "Fixture",
+              provider: "openrouter",
+              lab: "Test",
+              configured: true,
+              inputCapabilities: ["text"],
+            },
+          ],
+        },
+      });
+    return route.continue({ url: `${backend}${url.pathname}${url.search}` });
+  });
+  await api(request, "PATCH", "/api/settings/user", {
+    settings: { defaultModel: MODEL },
+    toolPermissions: { defaultAction: "ask" },
+  });
+});
+
+async function api<T>(
+  request: APIRequestContext,
+  method: "GET" | "PATCH",
+  path: string,
+  data?: unknown,
+): Promise<T> {
+  const response = await request.fetch(`${backend}${path}`, {
+    method,
+    headers: { "x-euler-user-id": USER },
+    data,
+  });
+  expect(response.ok()).toBe(true);
+  return (await response.json()) as T;
+}
+
+const pendingApprovals = async (request: APIRequestContext, session: string) =>
+  (
+    await api<{ approvals: ToolApproval[] }>(
+      request,
+      "GET",
+      `/api/sessions/${session}/runtime`,
+    )
+  ).approvals;
+
+async function sendCommand(page: Page) {
+  await page.getByPlaceholder("Send a message...").fill(`command:${COMMAND}`);
+  await page.getByRole("button", { name: "Send message" }).click();
+}
+
+const approvalCard = (page: Page) =>
+  page
+    .getByRole("region", { name: "Tool approvals" })
+    .getByRole("article", { name: /wants to run bash/ });
+
+const sessionFrom = (page: Page) => new URL(page.url()).pathname.split("/")[2]!;
+
+test.describe("wide", () => {
+  test.use({
+    viewport: { width: 1280, height: 900 },
+    isMobile: false,
+    hasTouch: false,
+    deviceScaleFactor: 1,
+  });
+
+  test("tools desktop: live approval saves an exact rule that skips later identical calls", async ({
+    page,
+    request,
+  }, testInfo) => {
+    await page.goto("/");
+    await sendCommand(page);
+    const card = approvalCard(page);
+    await expect(card.getByLabel("bash arguments")).toContainText(COMMAND);
+    await expect(card).toContainText(
+      "Matching calls: Identical arguments in this chat and workspace",
+    );
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page).toHaveURL(/\/run\//);
+    const session = sessionFrom(page);
+
+    // Pending approvals come from the runtime snapshot, so they survive reload.
+    await page.reload();
+    await expect(card).toBeVisible();
+    const input = page.getByPlaceholder("Send a message...");
+    const cardBox = await card.boundingBox();
+    const inputBox = await input.boundingBox();
+    expect(cardBox!.y + cardBox!.height).toBeLessThanOrEqual(inputBox!.y);
+    expect(cardBox!.width).toBeGreaterThan(600);
+    await input.fill("Draft while waiting");
+    await expect(input).toHaveValue("Draft while waiting");
+    await page.screenshot({ path: testInfo.outputPath("pending-wide.png") });
+    expect(await pendingApprovals(request, session)).toHaveLength(1);
+
+    await card.getByRole("button", { name: "Allow matching calls" }).click();
+    await expect(card).toBeHidden();
+    await expect(page.getByText(REPLY, { exact: true })).toHaveCount(1);
+    expect(await pendingApprovals(request, session)).toEqual([]);
+    const { toolPermissions } = await api<UserPreferences>(
+      request,
+      "GET",
+      "/api/settings/user",
+    );
+    expect(toolPermissions.defaultAction).toBe("ask");
+    expect(toolPermissions.rules).toEqual([
+      expect.objectContaining({
+        tool: "bash",
+        action: "allow",
+        condition: {
+          kind: "arguments",
+          value: expect.objectContaining({ command: COMMAND }),
+        },
+        sessionId: session,
+      }),
+    ]);
+
+    await input.fill("");
+    await sendCommand(page);
+    await expect(page.getByText(REPLY, { exact: true })).toHaveCount(2);
+    await expect(card).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Undo" }).click();
+    await expect(page.getByText("Removed the rule for bash.")).toBeVisible();
+    await expect
+      .poll(
+        async () =>
+          (await api<UserPreferences>(request, "GET", "/api/settings/user"))
+            .toolPermissions.rules,
+      )
+      .toEqual([]);
+
+    // Without the rule the identical call asks again; stopping cancels it.
+    await sendCommand(page);
+    await expect(card).toBeVisible();
+    await page.getByRole("button", { name: "Stop generation" }).click();
+    await expect(card).toHaveCount(0);
+    await expect.poll(() => pendingApprovals(request, session)).toEqual([]);
+    await page.reload();
+    await expect(page.getByText(REPLY, { exact: true })).toHaveCount(2);
+    await expect(card).toHaveCount(0);
+  });
+});
+
+test("composer selectors mobile: live tool approval denies inline without a stale request", async ({
+  page,
+  request,
+}, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await sendCommand(page);
+  const card = approvalCard(page);
+  await expect(card).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const input = page.getByPlaceholder("Send a message...");
+  const cardBox = await card.boundingBox();
+  expect(cardBox!.x).toBeGreaterThanOrEqual(0);
+  expect(cardBox!.x + cardBox!.width).toBeLessThanOrEqual(390);
+  expect(cardBox!.y + cardBox!.height).toBeLessThanOrEqual(
+    (await input.boundingBox())!.y,
+  );
+  await input.fill("Draft while waiting");
+  await page.screenshot({ path: testInfo.outputPath("pending-narrow.png") });
+  const session = sessionFrom(page);
+
+  await card.getByRole("button", { name: "Deny" }).click();
+  await expect(card).toHaveCount(0);
+  await expect(page.getByText(REPLY, { exact: true })).toBeVisible();
+  await expect(input).toHaveValue("Draft while waiting");
+  expect(await pendingApprovals(request, session)).toEqual([]);
+  const { toolPermissions } = await api<UserPreferences>(
+    request,
+    "GET",
+    "/api/settings/user",
+  );
+  expect(
+    toolPermissions.rules.filter((rule) => rule.sessionId === session),
+  ).toEqual([]);
+  await page.reload();
+  await expect(page.getByText(REPLY, { exact: true })).toBeVisible();
+  await expect(card).toHaveCount(0);
+});
