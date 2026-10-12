@@ -161,6 +161,100 @@ test("model defaults desktop: thinking preferences survive model changes, reload
     ]);
 });
 
+test("model defaults desktop: thinking preferences stay synchronized across tabs", async ({
+  page,
+  context,
+}) => {
+  test.setTimeout(60_000);
+  const second = await context.newPage();
+  const catalog = async () =>
+    models.map((model) => ({
+      ...model,
+      reasoning: {
+        supportedEfforts: ["low", "medium", "high"],
+        defaultEffort: "medium",
+        defaultEnabled: true,
+        mandatory: false,
+      },
+    }));
+  const preferenceKey =
+    "euler:thinkingPreferences:12345678-1234-4234-9234-123456789abc";
+  const thinking = (tab: Page) =>
+    tab.getByRole("button", { name: /^Thinking level:/ });
+  const chooseEffort = async (tab: Page, effort: string) => {
+    await thinking(tab).click();
+    await tab.getByRole("menuitemradio", { name: effort, exact: true }).click();
+  };
+  const chooseModel = async (tab: Page, remote: boolean) => {
+    await tab.getByRole("button", { name: /^Model:/ }).click();
+    await tab.getByRole("tab", { name: remote ? "Test" : "Ollama" }).click();
+    await tab
+      .getByRole("button", {
+        name: remote ? "Remote Thinking" : "Local Thinking",
+        exact: true,
+      })
+      .click();
+  };
+  try {
+    for (const tab of [page, second]) {
+      await mockApp(tab, "local", catalog);
+      await mockUserPreferences(tab);
+      await tab.goto("/");
+      await tab
+        .getByRole("button", { name: "New chat", exact: true })
+        .first()
+        .click();
+      await expect(thinking(tab)).toHaveAccessibleName(
+        "Thinking level: Medium",
+      );
+    }
+    await chooseEffort(page, "High");
+    await expect(thinking(second)).toHaveAccessibleName("Thinking level: High");
+    await chooseModel(second, true);
+    await chooseEffort(second, "Low");
+    expect(
+      await second.evaluate(
+        (key) => JSON.parse(localStorage.getItem(key) ?? "{}"),
+        preferenceKey,
+      ),
+    ).toEqual({ local: "high", "openrouter:test/remote": "low" });
+    await page.reload();
+    await expect(thinking(page)).toHaveAccessibleName("Thinking level: High");
+    await chooseModel(second, false);
+    await chooseEffort(second, "Low");
+    await expect(thinking(page)).toHaveAccessibleName("Thinking level: Low");
+    await chooseModel(page, true);
+    await expect(thinking(page)).toHaveAccessibleName("Thinking level: Low");
+
+    // Other users' preferences and session storage must not affect this user.
+    await second.evaluate((key) => {
+      localStorage.setItem(
+        `${key}-other-user`,
+        JSON.stringify({ "openrouter:test/remote": "high" }),
+      );
+      sessionStorage.setItem(
+        key,
+        JSON.stringify({ "openrouter:test/remote": "high" }),
+      );
+    }, preferenceKey);
+    await expect(thinking(page)).toHaveAccessibleName("Thinking level: Low");
+    await second.evaluate((key) => localStorage.removeItem(key), preferenceKey);
+    await expect(thinking(page)).toHaveAccessibleName("Thinking level: Medium");
+    await chooseEffort(second, "High");
+    await expect(thinking(page)).toHaveAccessibleName("Thinking level: Medium");
+    await chooseModel(second, true);
+    await expect(thinking(second)).toHaveAccessibleName(
+      "Thinking level: Medium",
+    );
+    await chooseModel(page, false);
+    await expect(thinking(page)).toHaveAccessibleName("Thinking level: High");
+    await second.evaluate(() => localStorage.clear());
+    await expect(thinking(page)).toHaveAccessibleName("Thinking level: Medium");
+  } finally {
+    await second.close();
+  }
+});
+
 test("model defaults desktop: unavailable preference matches settings, new chats and ephemeral chats", async ({
   page,
 }) => {

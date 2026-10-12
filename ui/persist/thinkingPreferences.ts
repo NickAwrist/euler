@@ -16,8 +16,24 @@ export function loadThinkingPreferences(): ThinkingPreferences {
   return result.success ? result.data : {};
 }
 
-export function saveThinkingPreferences(
-  preferences: ThinkingPreferences,
-): void {
-  safeStorage.setJSON(storageKey(), preferences);
+export function saveThinkingPreference(
+  model: string,
+  effort: string,
+  inMemoryPreferences: ThinkingPreferences = {},
+): ThinkingPreferences {
+  const preferences = { ...loadThinkingPreferences(), [model]: effort };
+  if (safeStorage.setJSON(storageKey(), preferences)) return preferences;
+  return { ...preferences, ...inMemoryPreferences, [model]: effort };
+}
+
+export function subscribeThinkingPreferences(
+  onChange: (preferences: ThinkingPreferences) => void,
+): () => void {
+  const handleStorage = (event: StorageEvent) => {
+    if (event.storageArea !== window.localStorage) return;
+    if (event.key !== null && event.key !== storageKey()) return;
+    onChange(loadThinkingPreferences());
+  };
+  window.addEventListener("storage", handleStorage);
+  return () => window.removeEventListener("storage", handleStorage);
 }
