@@ -16,6 +16,10 @@ import {
   selectSessionDirectory,
   switchSessionToSandbox,
 } from "../../persist/sessions";
+import {
+  loadThinkingPreferences,
+  saveThinkingPreferences,
+} from "../../persist/thinkingPreferences";
 import type { Message, ModelOption, SessionWorkspace } from "../../types";
 
 export interface UseSessionPreferencesOptions {
@@ -37,7 +41,12 @@ export function useSessionPreferences({
     effectiveDefaultRunModel(userSettingsDefaultModel, ollamaModels),
   );
   const [sessionModel, setSessionModel] = useState<string | null>(null);
-  const [thinkingEffort, setThinkingEffort] = useState<string | null>(null);
+  const [thinkingPreferences, setThinkingPreferences] = useState(
+    loadThinkingPreferences,
+  );
+  const thinkingEffort = Object.hasOwn(thinkingPreferences, selectedModel)
+    ? (thinkingPreferences[selectedModel] ?? null)
+    : null;
   const [workspace, setWorkspace] = useState<SessionWorkspace>({
     kind: "sandbox",
   });
@@ -50,15 +59,19 @@ export function useSessionPreferences({
     );
   }, [sessionModel, ollamaModels, userSettingsDefaultModel]);
 
-  const handleThinkingEffortChange = useCallback((effort: string) => {
-    setThinkingEffort(effort);
-  }, []);
+  const handleThinkingEffortChange = useCallback(
+    (effort: string) => {
+      const next = { ...thinkingPreferences, [selectedModel]: effort };
+      setThinkingPreferences(next);
+      saveThinkingPreferences(next);
+    },
+    [selectedModel, thinkingPreferences],
+  );
 
   const handleModelChange = useCallback(
     async (model: string) => {
       setSelectedModel(model);
       setSessionModel(model);
-      setThinkingEffort(null);
       const sid = activeSessionIdRef.current;
       if (sid) {
         try {
@@ -123,7 +136,6 @@ export function useSessionPreferences({
     sessionModel,
     setSessionModel,
     thinkingEffort,
-    setThinkingEffort,
     workspace,
     setWorkspace,
     handleThinkingEffortChange,

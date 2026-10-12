@@ -92,6 +92,75 @@ async function mockApp(
   return created;
 }
 
+test("model defaults desktop: thinking preferences survive model changes, reloads and new chats", async ({
+  page,
+}) => {
+  await mockApp(page, "local", async () =>
+    models.map((model) => ({
+      ...model,
+      reasoning: {
+        supportedEfforts: ["low", "medium", "high"],
+        defaultEffort: "medium",
+        defaultEnabled: true,
+        mandatory: false,
+      },
+    })),
+  );
+  await mockUserPreferences(page);
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "New chat", exact: true })
+    .first()
+    .click();
+  const thinking = page.getByRole("button", { name: /^Thinking level:/ });
+  await expect(thinking).toHaveAccessibleName("Thinking level: Medium");
+  await thinking.click();
+  await page.getByRole("menuitemradio", { name: "High", exact: true }).click();
+
+  const model = page.getByRole("button", { name: /^Model:/ });
+  await model.click();
+  await page.getByRole("tab", { name: "Test" }).click();
+  await page
+    .getByRole("button", { name: "Remote Thinking", exact: true })
+    .click();
+  await expect(thinking).toHaveAccessibleName("Thinking level: Medium");
+  await thinking.click();
+  await page.getByRole("menuitemradio", { name: "Off", exact: true }).click();
+  await model.click();
+  await page.getByRole("tab", { name: "Ollama" }).click();
+  await page
+    .getByRole("button", { name: "Local Thinking", exact: true })
+    .click();
+  await expect(thinking).toHaveAccessibleName("Thinking level: High");
+
+  await page.reload();
+  await expect(thinking).toHaveAccessibleName("Thinking level: High");
+  await model.click();
+  await page.getByRole("tab", { name: "Test" }).click();
+  await page
+    .getByRole("button", { name: "Remote Thinking", exact: true })
+    .click();
+  await expect(thinking).toHaveAccessibleName("Thinking level: Off");
+  await page
+    .getByRole("button", { name: "New chat", exact: true })
+    .first()
+    .click();
+  await expect(thinking).toHaveAccessibleName("Thinking level: High");
+
+  const submissions: unknown[] = [];
+  await page.route("**/api/sessions/new/messages", async (route) => {
+    submissions.push(route.request().postDataJSON());
+    await route.fulfill({ status: 202, json: { messageId: 1, queued: false } });
+  });
+  await page.getByPlaceholder("Send a message...").fill("Use my preference");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect
+    .poll(() => submissions)
+    .toEqual([
+      expect.objectContaining({ model: "local", reasoningEffort: "high" }),
+    ]);
+});
+
 test("model defaults desktop: unavailable preference matches settings, new chats and ephemeral chats", async ({
   page,
 }) => {

@@ -132,8 +132,7 @@ export function useSessionsAndNavigation({
     refreshSessions,
     setMessages,
   });
-  const { selectedModel, setSessionModel, setThinkingEffort, setWorkspace } =
-    preferences;
+  const { selectedModel, setSessionModel, setWorkspace } = preferences;
 
   const loadGenRef = useRef(0);
   const restoreDoneRef = useRef(false);
@@ -149,7 +148,6 @@ export function useSessionsAndNavigation({
     setStepsModalData(null);
     setDebugOpen(false);
     setDebugData(null);
-    setThinkingEffort(null);
     setSessionModel(null);
   }, [
     setMessages,
@@ -158,7 +156,6 @@ export function useSessionsAndNavigation({
     setStepsModalData,
     setDebugOpen,
     setDebugData,
-    setThinkingEffort,
     setSessionModel,
   ]);
 
@@ -185,7 +182,6 @@ export function useSessionsAndNavigation({
       setActiveExpiresAt(null);
       setSessionLoadState("loading");
       setSessionError(null);
-      setThinkingEffort(null);
       const cleared: Message[] = [];
       setMessages(cleared);
       setEditingUserIndex(null);
@@ -225,7 +221,6 @@ export function useSessionsAndNavigation({
       setMessages,
       setEditingUserIndex,
       setTruncateConfirm,
-      setThinkingEffort,
       setSessionModel,
       setWorkspace,
     ],
