@@ -70,7 +70,7 @@ async function mockApp(page: Page) {
   });
 }
 
-for (const width of [390, 1024, 1440]) {
+for (const width of [320, 390, 1024, 1440]) {
   const device = width <= 900 ? "mobile" : "desktop";
   test(`chat sidebar ${device} ${width} stationary toggle and chevron`, async ({
     page,
@@ -142,6 +142,20 @@ for (const width of [390, 1024, 1440]) {
     // The keyboard shortcut and button must reflect the same state.
     await page.keyboard.press("Control+b");
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    // Contents fill the responsive drawer, with only the intended edge padding.
+    const layout = await panel.evaluate((panel) => {
+      const content = panel.firstElementChild as HTMLElement;
+      const row = content.querySelector("section button")!.parentElement!;
+      const padding = Number.parseFloat(getComputedStyle(content).paddingRight);
+      return {
+        panelWidth: panel.clientWidth,
+        contentWidth: content.getBoundingClientRect().width,
+        rowRight: row.getBoundingClientRect().right,
+        contentRight: content.getBoundingClientRect().right - padding,
+      };
+    });
+    expect(layout.contentWidth).toBeCloseTo(layout.panelWidth, 0);
+    expect(layout.rowRight).toBeCloseTo(layout.contentRight, 0);
     await page
       .locator("#app-sidebar")
       .getByRole("button", { name: /Sidebar test chat/ })

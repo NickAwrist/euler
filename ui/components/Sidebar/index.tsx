@@ -32,7 +32,7 @@ export function Sidebar({
   const now = Date.now();
 
   return (
-    <div className="grid h-full w-[260px] min-w-[260px] grid-rows-[auto_minmax(0,1fr)_auto] overflow-x-hidden px-2.5 pb-3">
+    <div className="grid h-full w-full min-w-0 grid-rows-[auto_minmax(0,1fr)_auto] overflow-x-hidden px-2.5 pb-3">
       <div className="workspace-header -mx-2.5 mb-2.5 gap-2 pl-14 pr-3">
         <div className="min-w-0">
           <div className="flex min-w-0 flex-col gap-0.5">
@@ -67,7 +67,7 @@ export function Sidebar({
           className="mt-1 min-h-0 overflow-x-hidden overflow-y-auto border-t border-border-subtle pt-1"
           onScroll={() => setOpenMenu(null)}
         >
-          <div className="w-[calc(260px-1.25rem)] min-w-[calc(260px-1.25rem)] shrink-0">
+          <div className="w-full min-w-0">
             {groupSessionsByDate(sessions, now).map((group) => (
               <section key={group.label}>
                 <h3 className={`${eyebrowText} px-2 pb-1 pt-3`}>
