@@ -269,7 +269,7 @@ export class BaseAgent {
         if (llmMetrics) {
           llmMetrics = {
             ...llmMetrics,
-            ...priceLlmUsage(this.model, llmMetrics),
+            ...(await priceLlmUsage(this.model, llmMetrics)),
           };
         }
         if (llmMetrics && ctx.ownerUuid) {
