@@ -81,7 +81,10 @@ for (const device of ["desktop", "mobile"] as const) {
       path: testInfo.outputPath(`${device}-customization.png`),
     });
     await name.fill("Ada");
-    await page.getByRole("button", { name: "Skills", exact: true }).click();
+    await page
+      .getByRole("navigation", { name: "Customization sections" })
+      .getByRole("button", { name: "Skills", exact: true })
+      .click();
     await expect(
       page.getByText("No skills yet.", { exact: false }),
     ).toBeVisible();
@@ -93,7 +96,10 @@ for (const device of ["desktop", "mobile"] as const) {
       .getByRole("button", { name: "Personalization", exact: true })
       .click();
     await expect(name).toHaveValue("Ada");
-    await page.getByRole("button", { name: "Skills", exact: true }).click();
+    await page
+      .getByRole("navigation", { name: "Customization sections" })
+      .getByRole("button", { name: "Skills", exact: true })
+      .click();
     await expect(skillName).toHaveValue("draft-skill");
     await page
       .getByRole("button", { name: "Personalization", exact: true })
@@ -131,12 +137,8 @@ for (const device of ["desktop", "mobile"] as const) {
     await expect(page.getByRole("alert")).toContainText(
       "Could not save settings",
     );
-    await expect(dialog).toBeVisible();
-    await expect(page).toHaveURL(/\/customization$/);
-    await dialog
-      .getByRole("button", { name: "Keep editing", exact: true })
-      .last()
-      .click();
+    await expect(dialog).toBeHidden();
+    await expect(page).toHaveURL(/\/customization\/personalization$/);
     await page
       .locator("footer")
       .getByRole("button", { name: "Discard", exact: true })

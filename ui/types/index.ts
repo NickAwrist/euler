@@ -14,6 +14,6 @@ export type { ModelOption, ModelReasoning } from "./models";
 export type { ComfyUIConfigPayload } from "./settingsApi";
 export type { TraceModalOpenPayload, TraceModalSelection } from "./traceModal";
 
-export type { SettingsTab } from "./navigation";
+export type { CustomizationTab, SettingsTab } from "./navigation";
 export type { AgentPhase } from "./agents";
 export type { Personalization } from "./personalization";

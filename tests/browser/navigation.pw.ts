@@ -168,9 +168,9 @@ test("view navigation desktop keeps unsaved customization on Back and resumes ap
   await page.getByPlaceholder("Enter your name").fill("Unsaved");
   await page.goBack();
   await expect(page.getByRole("dialog")).toBeVisible();
-  await expect(page).toHaveURL(/\/customization$/);
+  await expect(page).toHaveURL(/\/customization\/personalization$/);
   await page.goBack();
-  await expect(page).toHaveURL(/\/customization$/);
+  await expect(page).toHaveURL(/\/customization\/personalization$/);
   await page
     .getByRole("button", { name: "Keep editing", exact: true })
     .last()
@@ -313,7 +313,7 @@ test("view navigation desktop stays in Customization when a chat sent from Home 
   );
   created.resolve();
   await started;
-  await expect(page).toHaveURL(/\/customization$/);
+  await expect(page).toHaveURL(/\/customization\/personalization$/);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByPlaceholder("Enter your name")).toHaveValue(
     "Keep this draft",
@@ -543,7 +543,7 @@ test("view navigation desktop expires customization approval when a later guard 
     await page.goBack();
     await page.getByRole("button", { name: "Discard changes" }).click();
     await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(page).toHaveURL(/\/customization$/);
+    await expect(page).toHaveURL(/\/customization\/personalization$/);
     await expect(page.getByPlaceholder("Enter your name")).toHaveValue(
       "Unsaved",
     );
@@ -582,4 +582,122 @@ test("view navigation desktop guards unsaved appearance and applies it only on S
   await expect(page.locator("html")).toHaveAttribute("data-font", "geist");
   await page.reload();
   await expect(page.locator("html")).toHaveAttribute("data-font", "geist");
+});
+
+test("view navigation desktop opens customization subroutes and restores them on reload", async ({
+  page,
+}) => {
+  await mockApp(page);
+  await mockUserPreferences(page);
+  for (const [tab, label] of [
+    ["personalization", "Personalization"],
+    ["skills", "Skills"],
+    ["tools", "Tools"],
+  ]) {
+    await page.goto(`/customization/${tab}`);
+    const button = page.getByRole("button", { name: label, exact: true });
+    await expect(button).toHaveAttribute("aria-current", "page");
+    await page.reload();
+    await expect(button).toHaveAttribute("aria-current", "page");
+    await expect(
+      page.getByRole("heading", { name: "Customization", exact: true }),
+    ).toBeVisible();
+  }
+  for (const path of ["/customization", "/customization/unknown"]) {
+    await page.goto(path);
+    await expect(page.getByPlaceholder("Enter your name")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Personalization", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
+  }
+});
+
+test("view navigation desktop preserves customization drafts across tab history and guards departure", async ({
+  page,
+}) => {
+  await mockApp(page);
+  await mockUserPreferences(page);
+  await page.goto("/run/a");
+  await page
+    .getByRole("button", { name: "Customization", exact: true })
+    .click();
+  await page.getByPlaceholder("Enter your name").fill("Keep this draft");
+  await page.getByRole("button", { name: "Skills", exact: true }).click();
+  await expect(page).toHaveURL(/\/customization\/skills$/);
+  await page.getByRole("button", { name: "Tools", exact: true }).click();
+  await expect(page).toHaveURL(/\/customization\/tools$/);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.goBack();
+  await expect(
+    page.getByRole("button", { name: "Skills", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+  await page.goBack();
+  await expect(page.getByPlaceholder("Enter your name")).toHaveValue(
+    "Keep this draft",
+  );
+  await page.goForward();
+  await expect(page).toHaveURL(/\/customization\/skills$/);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByRole("button", { name: "Back to chat" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Leave customization?" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Keep editing", exact: true })
+    .last()
+    .click();
+  await expect(page).toHaveURL(/\/customization\/skills$/);
+  await page
+    .getByRole("button", { name: "Personalization", exact: true })
+    .click();
+  await expect(page.getByPlaceholder("Enter your name")).toHaveValue(
+    "Keep this draft",
+  );
+  await page.getByRole("button", { name: "Back to chat" }).click();
+  await page.getByRole("button", { name: "Save & leave", exact: true }).click();
+  await expect(page).toHaveURL(/\/run\/a$/);
+  await page.goto("/customization");
+  await page.getByPlaceholder("Enter your name").fill("Root draft");
+  await page.getByRole("button", { name: "Tools", exact: true }).click();
+  await expect(page).toHaveURL(/\/customization\/tools$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/customization$/);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByPlaceholder("Enter your name")).toHaveValue(
+    "Root draft",
+  );
+});
+
+test("view navigation desktop returns to a failed customization draft when leaving another tab", async ({
+  page,
+}) => {
+  await mockApp(page);
+  await mockUserPreferences(page);
+  await page.goto("/customization/personalization");
+  await page.getByPlaceholder("Enter your name").fill("Unsaved");
+  await page
+    .getByRole("navigation", { name: "Customization sections" })
+    .getByRole("button", { name: "Tools", exact: true })
+    .click();
+  await expect(page).toHaveURL(/\/customization\/tools$/);
+  await page.route("**/api/settings/user", (route) =>
+    route.request().method() === "PATCH"
+      ? route.fulfill({
+          status: 503,
+          json: {
+            error: { code: "INTERNAL_ERROR", message: "Save unavailable" },
+          },
+        })
+      : route.fallback(),
+  );
+  await page.getByRole("button", { name: "Back to chat" }).click();
+  await page.getByRole("button", { name: "Save & leave", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/customization\/personalization$/);
+  await expect(page.getByRole("alert")).toHaveText("Save unavailable");
+  await expect(page.getByPlaceholder("Enter your name")).toHaveValue("Unsaved");
+  await page.getByRole("button", { name: "Back to chat" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Leave customization?" }),
+  ).toBeVisible();
 });

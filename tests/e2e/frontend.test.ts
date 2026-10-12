@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-test("serves direct run URLs from a hidden deployment directory", async () => {
+test("serves direct app URLs from a hidden deployment directory", async () => {
   const root = mkdtempSync(join(tmpdir(), "agents-frontend-"));
   const cwd = join(root, ".deployment");
   const dist = join(cwd, "dist");
@@ -27,7 +27,7 @@ test("serves direct run URLs from a hidden deployment directory", async () => {
           await new Promise(resolve => server.once("listening", resolve));
           const base = "http://127.0.0.1:" + server.address().port;
           try {
-            for (const path of ["/", "/run/aeb31153-6ca7-46ac-8547-e71ccb4cfb07"]) {
+            for (const path of ["/", "/run/aeb31153-6ca7-46ac-8547-e71ccb4cfb07", "/customization/personalization", "/customization/skills", "/customization/tools"]) {
               const response = await fetch(base + path);
               assert.equal(response.status, 200, path);
               assert.ok(response.headers.get("content-type").includes("text/html"));

@@ -5,3 +5,5 @@ export type SettingsTab =
   | "openrouter"
   | "image-generation"
   | "web-search";
+
+export type CustomizationTab = "personalization" | "skills" | "tools";
