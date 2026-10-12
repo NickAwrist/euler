@@ -38,6 +38,10 @@ test("tools desktop: tool permission rules edit inline and save per user", async
     ],
   ]);
   const saved = () => store.get(USER)?.toolPermissions;
+  // Plain-HTTP origins (e.g. over the tailnet) do not expose randomUUID.
+  await page.addInitScript(() => {
+    Object.defineProperty(crypto, "randomUUID", { value: undefined });
+  });
   await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
   await page.route("**/api/mcp-servers", (route) =>
     route.fulfill({ json: { servers: [] } }),

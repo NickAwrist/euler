@@ -5,6 +5,7 @@ import {
   ToolPermissionRuleSchema,
   type ToolPermissions,
 } from "../../../src/schemas/toolPermissions";
+import { createBrowserUuid } from "../../persist/userIdentity";
 import {
   deleteToolPermissionRule,
   getUserPreferences,
@@ -86,7 +87,7 @@ export function ToolPermissionsSection() {
             setDrafts((current) => [
               ...current,
               {
-                id: crypto.randomUUID(),
+                id: createBrowserUuid(),
                 tool: "",
                 action: "ask",
                 condition: { kind: "any" },
