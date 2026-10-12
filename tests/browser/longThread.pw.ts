@@ -20,6 +20,24 @@ test("long thread skips history work during typing and streaming", async ({
     page.evaluate(() => performance.clearMarks("history-read"));
   const readCount = () =>
     page.evaluate(() => performance.getEntriesByName("history-read").length);
+  // The chat follows new content to the bottom with an animation whose next
+  // step can undo a wheel. Scroll up only once the scroll position settles.
+  const scrollToTop = async () => {
+    const scrollTop = () =>
+      page
+        .locator("[data-index]")
+        .first()
+        .evaluate((row) => row.closest(".overflow-y-auto")?.scrollTop);
+    await expect
+      .poll(async () => {
+        const before = await scrollTop();
+        await page.waitForTimeout(100);
+        return (await scrollTop()) === before;
+      })
+      .toBe(true);
+    await page.mouse.move(600, 300);
+    await page.mouse.wheel(0, -1_000_000);
+  };
   // Rows keep measuring for a few hundred milliseconds after the thread first
   // appears. Count history work only once a 200ms window passes without any.
   await expect
@@ -74,8 +92,7 @@ test("long thread skips history work during typing and streaming", async ({
     page.getByText("More streamed text.", { exact: true }).last(),
   ).toBeInViewport();
 
-  await page.mouse.move(600, 300);
-  await page.mouse.wheel(0, -1_000_000);
+  await scrollToTop();
   await page.getByText("Question 0", { exact: true }).scrollIntoViewIfNeeded();
   await expect(page.getByText("Question 0", { exact: true })).toBeInViewport();
   await page.getByRole("button", { name: "Stream token" }).click();
@@ -91,7 +108,7 @@ test("long thread skips history work during typing and streaming", async ({
   await page.mouse.wheel(0, 1_000_000);
   await expect(reply).toBeInViewport();
   await expect(editor).toHaveValue("Draft edit");
-  await page.mouse.wheel(0, -1_000_000);
+  await scrollToTop();
   await expect(editor).toBeInViewport();
   await expect(editor).toHaveValue("Draft edit");
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
@@ -112,7 +129,7 @@ test("long thread skips history work during typing and streaming", async ({
   await page.mouse.wheel(0, 1_000_000);
   await expect(reply).toBeInViewport();
   await expect(earlierReply).toHaveCount(0);
-  await page.mouse.wheel(0, -1_000_000);
+  await scrollToTop();
   await expect(earlierReply).toBeVisible();
   await expect(
     message.getByRole("button", { name: "Thoughts", exact: true }),
