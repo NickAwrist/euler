@@ -1,5 +1,5 @@
 import { ShieldQuestion } from "lucide-react";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import type {
   ToolApproval,
   ToolApprovalResponse,
@@ -20,7 +20,7 @@ type Saved = { rule: ToolPermissionRule; scope: string; undone: boolean };
 const SAVED_NOTICE_MS = 10_000;
 
 /** Pending tool calls from this chat's agents, answered above the composer. */
-export function ToolApprovals({
+export const ToolApprovals = memo(function ToolApprovals({
   sessionId,
   approvals,
   refresh,
@@ -97,7 +97,7 @@ export function ToolApprovals({
       )}
     </section>
   );
-}
+});
 
 function ApprovalRequest({
   sessionId,
