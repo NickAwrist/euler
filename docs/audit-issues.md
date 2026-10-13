@@ -381,14 +381,6 @@ current requirement. Before deleting a migration, confirm the production
 database has already run it, for example by checking that the old column or
 table no longer exists.
 
-### LEG-4. Retired ComfyUI image default rows remain (Low, S)
-
-**Where:** `app_settings` rows `comfyui_default_model`, `comfyui_default_width`,
-`comfyui_default_height`, and `comfyui_negative_prompt`. No code reads them
-since defaults come from `userPreferencesSchema.parse({})`.
-
-**Fix:** Delete the rows once from the production database.
-
 ### LEG-6. Docker networking hints after Docker was removed (Low, S)
 
 **Where:** `src/models/containerNetworkHint.ts`, used in `src/routes/ollama.ts` and
@@ -1047,7 +1039,7 @@ invalid configured values cannot silently select a different port or limit.
 
 1. **Security day:** `SEC-1`, `SEC-3`, `SEC-4` (with `API-1`), then `SEC-2`.
 2. **Agent quality:** `TOOL-1`, `TOOL-2`, `LLM-1`, `LLM-2`, `OBS-2`.
-3. **Cleanup:** `LEG-4`, `LEG-6` through `LEG-11`, `TEST-4`, `DX-5`.
+3. **Cleanup:** `LEG-6` through `LEG-11`, `TEST-4`, `DX-5`.
 4. **Safety net:** `TEST-1`, `TEST-2`.
 5. **Contracts:** `TYPE-1`, `TYPE-2`, `TYPE-3`.
 6. **Structural:** `ARCH-2` with `FE-1`.
