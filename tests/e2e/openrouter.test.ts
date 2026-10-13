@@ -19,7 +19,7 @@ import {
   type CatalogResult,
   normalizeCatalog,
   openRouterCatalog,
-} from "../../src/openRouterModels";
+} from "../../src/models/openRouterModels";
 import { setOpenRouterScenario } from "../helpers/mockOpenRouter";
 import { startTestServer, userHeaders } from "../helpers/server";
 

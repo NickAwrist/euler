@@ -74,7 +74,6 @@ describe("agent runtime", () => {
     for (const tool of ["web_search", "fetch_web_page", "generate_image"])
       expect(owned).not.toContain(tool);
     expect(owned).toContain("bash");
-    expect(owned).toContain("modify_plan");
     expect(tools(OTHER_USER_ID)).toContain("generate_image");
     expect(
       agentManager.createAgent({ ownerUuid: RUNTIME_USER_ID }).TOOL_MAP
@@ -178,8 +177,4 @@ describe("agent runtime", () => {
     });
     expect(agent.systemPrompt).not.toContain("Current date:");
   });
-});
-
-test("registers patch editing", () => {
-  expect(agentManager.getToolInstance("apply_patch").name).toBe("apply_patch");
 });

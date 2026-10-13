@@ -1,8 +1,6 @@
 import { Router } from "express";
-import { getSessionById } from "../db/sessions";
 import { downloadWorkspaceFile } from "../http/downloadWorkspaceFile";
-import { sendError } from "../observability/http";
-import { requireUserId } from "../userIdentity";
+import { requestSession } from "../http/sessionRoute";
 import { workspaceService } from "../workspaces/WorkspaceService";
 import {
   listArtifactDirectory,
@@ -10,17 +8,12 @@ import {
 } from "../workspaces/artifacts";
 
 export function artifactRoutes() {
-  const router = Router({ mergeParams: true });
+  const router = Router();
   for (const action of ["tree", "preview", "download"] as const) {
     router.get(`/${action}`, async (req, res) => {
-      const owner = requireUserId(req, res);
-      if (!owner) return;
-      const row = getSessionById(owner, (req.params as { id: string }).id);
-      if (!row) {
-        sendError(res, "NOT_FOUND", "Session not found");
-        return;
-      }
-      const workspace = await workspaceService.resolveSession(row);
+      const workspace = await workspaceService.resolveSession(
+        requestSession(req),
+      );
       const path = typeof req.query.path === "string" ? req.query.path : ".";
       res.setHeader("Cache-Control", "no-store");
       if (action === "download") {

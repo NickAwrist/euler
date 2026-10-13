@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { fetchOpenRouterBalance } from "../src/openRouterBalance";
+import { fetchOpenRouterBalance } from "../src/models/openRouterBalance";
 
 const key = {
   limit: 20,

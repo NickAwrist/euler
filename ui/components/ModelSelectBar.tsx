@@ -1,6 +1,6 @@
 import { Check, ChevronDown, Search, Star } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { compareModels } from "../../src/modelSort";
+import { compareModels } from "../../src/models/modelSort";
 import { modelSettingsRequest } from "../lib/modelSettingsRequest";
 import { navigate } from "../lib/navigation";
 import { setKeyPending, whileRunning } from "../lib/whileRunning";

@@ -28,20 +28,24 @@ test.skipIf(
     const previousSecret = process.env.EULER_DEVELOPMENT_TEST_SECRET;
     process.env.EULER_DEVELOPMENT_TEST_SECRET = "host-only-marker";
     try {
-      const result = await runner.run({
-        permissions: permissionService.resolve(workspace),
-        workspace,
-        command: `bun --version && bunx --version && ${tools.some((tool) => tool.name === "node") ? "node --version && " : ""}test ! -e '${root}/secret' && test -z "$EULER_DEVELOPMENT_TEST_SECRET" && touch /workspace/allowed && test ! -w /opt/euler/bin/bun && test ! -w /usr && ulimit -v && bun pm cache`,
-      });
+      const result = await runner
+        .spawn({
+          permissions: permissionService.resolve(workspace),
+          workspace,
+          command: `bun --version && bunx --version && ${tools.some((tool) => tool.name === "node") ? "node --version && " : ""}test ! -e '${root}/secret' && test -z "$EULER_DEVELOPMENT_TEST_SECRET" && touch /workspace/allowed && test ! -w /opt/euler/bin/bun && test ! -w /usr && ulimit -v && bun pm cache`,
+        })
+        .then(({ completion }) => completion);
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("unlimited");
       expect(result.stdout.trim().split("\n").at(-1)).toStartWith("/tmp/home/");
       await expect(
-        runner.run({
-          permissions: permissionService.resolve(workspace),
-          workspace,
-          command: "touch /usr/euler-denied",
-        }),
+        runner
+          .spawn({
+            permissions: permissionService.resolve(workspace),
+            workspace,
+            command: "touch /usr/euler-denied",
+          })
+          .then(({ completion }) => completion),
       ).resolves.toMatchObject({ exitCode: 1 });
       await expect(
         runner.spawn({
@@ -93,11 +97,13 @@ test.skipIf(
       const port = /READY (\d+)/.exec(output)![1];
       const response = await fetch(`http://127.0.0.1:${port}`);
       expect(await response.text()).toBe("development server");
-      const result = await runner.run({
-        permissions: permissionService.resolve(workspace),
-        workspace,
-        command: `bun -e 'console.log(await (await fetch("http://127.0.0.1:${port}")).text())'`,
-      });
+      const result = await runner
+        .spawn({
+          permissions: permissionService.resolve(workspace),
+          workspace,
+          command: `bun -e 'console.log(await (await fetch("http://127.0.0.1:${port}")).text())'`,
+        })
+        .then(({ completion }) => completion);
       expect(result.exitCode).toBe(0);
       expect(result.stdout).toContain("development server");
       await execution.cancel();

@@ -2,13 +2,13 @@ import { type Response, Router } from "express";
 import { agentRuntime } from "../agents/runtime/AgentRuntime";
 import { getOpenRouterApiKey } from "../db";
 import { getAttachment } from "../db/attachments";
-import { getSessionById, markSessionViewed } from "../db/sessions";
+import { markSessionViewed } from "../db/sessions";
 import { asyncRoute } from "../http/asyncRoute";
+import { requestSession } from "../http/sessionRoute";
 import { resolveModelSelection } from "../llm";
 import { sendError, sendValidationError } from "../observability/http";
 import { RewindSchema, SendMessageSchema } from "../schemas/agents";
 import { ToolApprovalResponseSchema } from "../schemas/toolPermissions";
-import { requireUserId } from "../userIdentity";
 
 /** Sends an error for a model that cannot run and returns false. */
 function modelAvailable(res: Response, model: string) {
@@ -28,31 +28,20 @@ function modelAvailable(res: Response, model: string) {
 
 export function agentActions() {
   const router = Router();
-  router.use("/:id", (req, res, next) => {
-    const owner = requireUserId(req, res);
-    if (!owner) return;
-    if (!getSessionById(owner, req.params.id)) {
-      sendError(res, "NOT_FOUND", "Session not found");
-      return;
-    }
-    next();
-  });
   router.post("/:id/viewed", (req, res) => {
-    const owner = requireUserId(req, res);
-    if (!owner) return;
-    markSessionViewed(owner, req.params.id);
+    const { owner_uuid: owner, id } = requestSession(req);
+    markSessionViewed(owner, id);
     res.json({ ok: true });
   });
   router.post("/:id/messages", (req, res) => {
-    const owner = requireUserId(req, res);
-    if (!owner) return;
+    const { owner_uuid: owner, id } = requestSession(req);
     const parsed = SendMessageSchema.safeParse(req.body);
     if (!parsed.success) {
       sendValidationError(res, parsed.error);
       return;
     }
     const body = parsed.data;
-    if (agentRuntime.isChanging(req.params.id)) {
+    if (agentRuntime.isChanging(id)) {
       sendError(
         res,
         "CONFLICT",
@@ -62,33 +51,30 @@ export function agentActions() {
     }
     if (
       body.attachmentIds.some(
-        (id) => getAttachment(owner, id)?.sessionId !== req.params.id,
+        (attachmentId) => getAttachment(owner, attachmentId)?.sessionId !== id,
       )
     ) {
       sendError(res, "INVALID_REQUEST", "Invalid attachment");
       return;
     }
-    const main = agentRuntime.main(owner, req.params.id);
+    const main = agentRuntime.main(owner, id);
     if (!modelAvailable(res, body.model ?? main.model)) return;
     const { message, queued } = agentRuntime.send(main, body);
     res.status(202).json({ messageId: message.id, queued });
   });
   router.post("/:id/stop", async (req, res) => {
-    const owner = requireUserId(req, res);
-    if (!owner) return;
-    await agentRuntime.cancel(agentRuntime.main(owner, req.params.id));
+    const { owner_uuid: owner, id } = requestSession(req);
+    await agentRuntime.cancel(agentRuntime.main(owner, id));
     res.json({ ok: true });
   });
   router.post("/:id/deliver", (req, res) => {
-    const owner = requireUserId(req, res);
-    if (!owner) return;
-    agentRuntime.deliver(agentRuntime.main(owner, req.params.id));
+    const { owner_uuid: owner, id } = requestSession(req);
+    agentRuntime.deliver(agentRuntime.main(owner, id));
     res.json({ ok: true });
   });
   router.delete("/:id/messages/:messageId", (req, res) => {
-    const owner = requireUserId(req, res);
-    if (!owner) return;
-    const main = agentRuntime.main(owner, req.params.id);
+    const { owner_uuid: owner, id } = requestSession(req);
+    const main = agentRuntime.main(owner, id);
     if (!agentRuntime.removeQueued(main, Number(req.params.messageId))) {
       sendError(res, "CONFLICT", "Message was already delivered");
       return;
@@ -96,45 +82,39 @@ export function agentActions() {
     res.json({ ok: true });
   });
   router.get("/:id/jobs", (req, res) => {
-    const owner = requireUserId(req, res);
-    if (owner) res.json(agentRuntime.jobs.list(owner, req.params.id));
+    const { owner_uuid: owner, id } = requestSession(req);
+    res.json(agentRuntime.jobs.list(owner, id));
   });
   router.get("/:id/jobs/:jobId", (req, res) => {
-    const owner = requireUserId(req, res);
-    if (!owner) return;
+    const { owner_uuid: owner, id } = requestSession(req);
     try {
-      res.json(agentRuntime.jobs.read(owner, req.params.id, req.params.jobId));
+      res.json(agentRuntime.jobs.read(owner, id, req.params.jobId));
     } catch {
       sendError(res, "NOT_FOUND", "Job not found");
     }
   });
   router.post("/:id/jobs/:jobId/cancel", async (req, res) => {
-    const owner = requireUserId(req, res);
-    if (!owner) return;
+    const { owner_uuid: owner, id } = requestSession(req);
     try {
-      res.json(
-        await agentRuntime.jobs.cancel(owner, req.params.id, req.params.jobId),
-      );
+      res.json(await agentRuntime.jobs.cancel(owner, id, req.params.jobId));
     } catch {
       sendError(res, "NOT_FOUND", "Job not found");
     }
   });
   router.get("/:id/runtime", (req, res) => {
-    const owner = requireUserId(req, res);
-    if (!owner) return;
-    res.json(agentRuntime.snapshot(owner, req.params.id));
+    const { owner_uuid: owner, id } = requestSession(req);
+    res.json(agentRuntime.snapshot(owner, id));
   });
   router.post(
     "/:id/approvals/:approvalId",
     asyncRoute(async (req, res) => {
-      const owner = requireUserId(req, res);
-      if (!owner) return;
+      const { owner_uuid: owner, id } = requestSession(req);
       const parsed = ToolApprovalResponseSchema.safeParse(req.body);
       if (!parsed.success) return sendValidationError(res, parsed.error);
       res.json(
         await agentRuntime.approvals.respond(
           owner,
-          req.params.id as string,
+          id,
           req.params.approvalId as string,
           parsed.data,
         ),
@@ -142,9 +122,8 @@ export function agentActions() {
     }),
   );
   router.get("/:id/agents/:agentId", (req, res) => {
-    const owner = requireUserId(req, res);
-    if (!owner) return;
-    const agents = agentRuntime.store.view(owner, req.params.id);
+    const { owner_uuid: owner, id } = requestSession(req);
+    const agents = agentRuntime.store.view(owner, id);
     const agent = agents.find((a) => a.id === req.params.agentId);
     if (!agent) {
       sendError(res, "NOT_FOUND", "Agent not found");
@@ -157,10 +136,9 @@ export function agentActions() {
     res.json({ agent, steps: agentRuntime.store.steps(agent.id), messages });
   });
   router.post("/:id/agents/:agentId/cancel", async (req, res) => {
-    const owner = requireUserId(req, res);
-    if (!owner) return;
+    const { owner_uuid: owner, id } = requestSession(req);
     const visible = agentRuntime.store
-      .view(owner, req.params.id)
+      .view(owner, id)
       .find((a) => a.id === req.params.agentId && a.kind !== "main");
     const agent = visible ? agentRuntime.store.get(visible.id) : undefined;
     if (!agent) {
@@ -171,16 +149,15 @@ export function agentActions() {
     res.json({ ok: true });
   });
   router.post("/:id/rewind", async (req, res) => {
-    const owner = requireUserId(req, res);
-    if (!owner) return;
+    const { owner_uuid: owner, id } = requestSession(req);
     const parsed = RewindSchema.safeParse(req.body);
     if (!parsed.success) {
       sendValidationError(res, parsed.error);
       return;
     }
-    const main = agentRuntime.main(owner, req.params.id);
+    const main = agentRuntime.main(owner, id);
     if (!modelAvailable(res, parsed.data.model ?? main.model)) return;
-    await agentRuntime.rewind(owner, req.params.id, parsed.data);
+    await agentRuntime.rewind(owner, id, parsed.data);
     res.json({ ok: true });
   });
   return router;

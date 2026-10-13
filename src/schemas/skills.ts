@@ -49,9 +49,3 @@ export const SkillSchema = z.object({
 });
 
 export type SkillData = z.infer<typeof SkillSchema>;
-
-export const SkillListResponseSchema = z.object({
-  skills: z.array(SkillSchema),
-});
-
-export type SkillListResponse = z.infer<typeof SkillListResponseSchema>;

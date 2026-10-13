@@ -54,19 +54,15 @@ for (const device of ["desktop", "mobile"] as const) {
         ? { width: 1280, height: 900 }
         : { width: 390, height: 844 },
     );
-    await page.addInitScript(() =>
-      localStorage.setItem(
-        "euler:userSettings",
-        JSON.stringify({ defaultModel: "saved-model", showDebugButton: true }),
-      ),
-    );
     const writes: string[] = [];
     await page.route("**/api/**", (route) => {
       if (route.request().method() === "PUT")
         writes.push(route.request().url());
       return route.fulfill({ json: { skills: [] } });
     });
-    await mockUserPreferences(page);
+    await mockUserPreferences(page, undefined, {
+      settings: { defaultModel: "saved-model", showDebugButton: true },
+    });
     await page.goto("/customization");
     const prompt = page.getByLabel("System Prompt");
     const name = page.getByPlaceholder("Enter your name");

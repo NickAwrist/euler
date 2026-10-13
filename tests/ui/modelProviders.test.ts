@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { InputCapability } from "../../src/modelCapabilities";
+import { InputCapability } from "../../src/models/modelCapabilities";
 import { groupModelProviders } from "../../ui/components/modelProviders";
 import type { ModelOption } from "../../ui/types";
 

@@ -1,5 +1,5 @@
 import { Ollama } from "ollama";
-import { getOllamaHost } from "./db/index";
+import { getOllamaHost } from "../db/index";
 import { providerHostConfig } from "./providerHostConfig";
 
 let cached: { hostKey: string; client: Ollama } | null = null;
@@ -23,9 +23,11 @@ export function invalidateOllamaClientCache(): void {
   cached = null;
 }
 
-/** Normalized host string as used by the client (for display). */
-export function getResolvedOllamaHost(): string {
-  return getOllamaHostConfig().effectiveHost;
+/** The base URL ollama-js derives from `host`, or its default without one. */
+export function normalizeOllamaHost(host = ""): string {
+  // ollama-js keeps its normalized host on an untyped `config` field.
+  const client = host ? new Ollama({ host }) : new Ollama();
+  return (client as unknown as { config: { host: string } }).config.host;
 }
 
 export function getOllamaHostConfig(): {
@@ -34,13 +36,7 @@ export function getOllamaHostConfig(): {
 } {
   return providerHostConfig({
     host: getOllamaHost(),
-    fallbackHost: normalizedOllamaHost(),
-    normalize: (host) =>
-      (new Ollama({ host }) as unknown as { config: { host: string } }).config
-        .host,
+    fallbackHost: normalizeOllamaHost(),
+    normalize: normalizeOllamaHost,
   });
-}
-
-function normalizedOllamaHost(): string {
-  return (new Ollama() as unknown as { config: { host: string } }).config.host;
 }

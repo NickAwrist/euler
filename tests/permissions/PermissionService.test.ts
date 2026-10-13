@@ -40,13 +40,10 @@ test("workspace policies preserve user capability denials and MCP tools", () => 
     expect(
       permissionService.toolDecision(policy, "mcp_custom_tool").allowed,
     ).toBe(true);
-    expect(permissionService.toolDecision(policy, "modify_plan").allowed).toBe(
-      true,
-    );
   }
   expect(
     enabledBuiltinTools(permissionService.resolve(undefined, capabilities)),
-  ).toEqual(["modify_plan", "generate_image"]);
+  ).toEqual(["generate_image"]);
   capabilities.shell = true;
   expect(
     permissionService.toolDecision(

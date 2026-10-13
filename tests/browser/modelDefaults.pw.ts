@@ -1,4 +1,5 @@
 import { type Page, expect, test } from "@playwright/test";
+import type { UserPreferences } from "../../src/schemas/userPreferences";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 // These checks exercise returning users; first-visit setup has its own suite.
@@ -33,14 +34,9 @@ async function mockApp(
   page: Page,
   saved: string,
   catalog: () => Promise<typeof models>,
+  store?: Map<string, UserPreferences>,
 ) {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.addInitScript((defaultModel) => {
-    localStorage.setItem(
-      "euler:userSettings",
-      JSON.stringify({ defaultModel }),
-    );
-  }, saved);
   const created: Array<{ model?: string; ephemeral?: boolean }> = [];
   let sessionModel: string | null = null;
   await page.route("**/api/**", async (route) => {
@@ -89,6 +85,9 @@ async function mockApp(
                 : {};
     return route.fulfill({ json });
   });
+  await mockUserPreferences(page, store, {
+    settings: { defaultModel: saved },
+  });
   return created;
 }
 
@@ -106,7 +105,6 @@ test("model defaults desktop: thinking preferences survive model changes, reload
       },
     })),
   );
-  await mockUserPreferences(page);
   await page.goto("/");
   await page
     .getByRole("button", { name: "New chat", exact: true })
@@ -198,7 +196,6 @@ test("model defaults desktop: thinking preferences stay synchronized across tabs
   try {
     for (const tab of [page, second]) {
       await mockApp(tab, "local", catalog);
-      await mockUserPreferences(tab);
       await tab.goto("/");
       await tab
         .getByRole("button", { name: "New chat", exact: true })
@@ -264,7 +261,6 @@ test("model defaults desktop: unavailable preference matches settings, new chats
     if (request.method() === "DELETE")
       deleted.push(new URL(request.url()).pathname);
   });
-  await mockUserPreferences(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(
@@ -356,7 +352,6 @@ test("model defaults desktop: the Home composer resolves its model when the cata
     () => pending.promise,
   );
   try {
-    await mockUserPreferences(page);
     await page.goto("/");
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     await expect(
@@ -388,7 +383,6 @@ test("model defaults desktop: empty catalogs show no default and cannot send", a
   page,
 }) => {
   const created = await mockApp(page, "removed", async () => []);
-  await mockUserPreferences(page);
   await page.goto("/");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(
@@ -413,7 +407,6 @@ test("model defaults desktop: reset icon clears and saves the explicit preferenc
   page,
 }) => {
   await mockApp(page, "openrouter:test/remote", async () => models);
-  await mockUserPreferences(page);
   await page.goto("/settings/general");
   await expect(
     page.getByText("New chats will use this model.", { exact: true }),
@@ -452,10 +445,7 @@ test("model defaults desktop: reset icon clears and saves the explicit preferenc
 test("model defaults desktop: two devices share preferences only for the same user", async ({
   browser,
 }) => {
-  const store = new Map<
-    string,
-    import("../../src/schemas/userPreferences").UserPreferences
-  >();
+  const store = new Map<string, UserPreferences>();
   const first = await browser.newPage();
   const second = await browser.newPage();
   const other = await browser.newPage();
@@ -466,12 +456,11 @@ test("model defaults desktop: two devices share preferences only for the same us
       [second, sameUser],
       [other, "22222222-2222-4222-8222-222222222222"],
     ] as const) {
-      await mockApp(page, "local", async () => models);
+      await mockApp(page, "local", async () => models, store);
       await page.addInitScript(
         (user) => localStorage.setItem("euler:userUuid", user),
         user,
       );
-      await mockUserPreferences(page, store);
     }
     await first.goto("/settings/general");
     await first
@@ -491,7 +480,7 @@ test("model defaults desktop: two devices share preferences only for the same us
     await expect(
       first.getByRole("button", { name: "Save settings", exact: true }),
     ).toBeHidden();
-    // The second browser starts with stale local settings; the server wins.
+    // The second browser loads what the first one saved.
     await second.goto("/settings/general");
     await expect(
       second.getByRole("button", { name: "Model: Remote", exact: true }),
@@ -513,10 +502,7 @@ test("model defaults desktop: two devices share preferences only for the same us
 test("model defaults desktop: stale device saves preserve another device's changed fields", async ({
   browser,
 }) => {
-  const store = new Map<
-    string,
-    import("../../src/schemas/userPreferences").UserPreferences
-  >();
+  const store = new Map<string, UserPreferences>();
   const first = await browser.newPage();
   const second = await browser.newPage();
   const other = await browser.newPage();
@@ -527,12 +513,11 @@ test("model defaults desktop: stale device saves preserve another device's chang
       [second, sameUser],
       [other, "22222222-2222-4222-8222-222222222222"],
     ] as const) {
-      await mockApp(page, "local", async () => models);
+      await mockApp(page, "local", async () => models, store);
       await page.addInitScript(
         (user) => localStorage.setItem("euler:userUuid", user),
         user,
       );
-      await mockUserPreferences(page, store);
     }
     await second.goto("/settings/general");
     await expect(

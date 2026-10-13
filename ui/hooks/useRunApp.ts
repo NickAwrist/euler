@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { InputCapability } from "../../src/modelCapabilities";
+import { InputCapability } from "../../src/models/modelCapabilities";
 import { traceStepsForModal } from "../components/ExecutionTrace";
 import { linkedChatLabel } from "../lib/sessionLabel";
 import { resolveEffectiveThinkingEffort } from "../lib/thinkingLevel";

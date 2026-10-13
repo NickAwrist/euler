@@ -1,4 +1,4 @@
-import { compareModels } from "../../src/modelSort";
+import { compareModels } from "../../src/models/modelSort";
 import type { ModelOption } from "../types";
 
 export type ModelProvider = {

@@ -7,7 +7,6 @@ import {
   getResolvedComfyUIHost,
   invalidateComfyUIClient,
 } from "../comfyui/client";
-import { withContainerLoopbackHint } from "../containerNetworkHint";
 import { setComfyUIHost } from "../db/index";
 import {
   effectiveUserPreferences,
@@ -16,6 +15,7 @@ import {
 import { envConfig } from "../env";
 import { asyncRoute } from "../http/asyncRoute";
 import { canEditEnvironmentSetting } from "../http/environmentSettings";
+import { withContainerLoopbackHint } from "../models/containerNetworkHint";
 import { sendError, sendValidationError } from "../observability/http";
 import { logEvent } from "../observability/logger";
 import {

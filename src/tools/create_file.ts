@@ -1,8 +1,24 @@
 import type { Tool } from "ollama";
+import { z } from "zod";
 import type { RunContext } from "../RunContext";
 import { workspaceService } from "../workspaces/WorkspaceService";
-import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
-import { requireWorkspace, workspaceError } from "./workspace";
+import {
+  BaseTool,
+  type ToolResult,
+  parseToolArgs,
+  textToolResult,
+} from "./BaseTool";
+import {
+  FILE_PATH_PARAMETER,
+  FilePathArgs,
+  requireWorkspace,
+  workspaceError,
+} from "./workspace";
+
+const CreateFileArgs = FilePathArgs.extend({
+  content: z.string().optional(),
+  lines: z.array(z.string()).optional(),
+});
 
 export class CreateFileTool extends BaseTool {
   constructor() {
@@ -19,11 +35,7 @@ export class CreateFileTool extends BaseTool {
           type: "object",
           required: ["path"],
           properties: {
-            path: {
-              type: "string",
-              description:
-                "File path (relative to /workspace or absolute under /workspace)",
-            },
+            path: FILE_PATH_PARAMETER,
             content: {
               type: "string",
               description:
@@ -45,26 +57,16 @@ export class CreateFileTool extends BaseTool {
     args: Record<string, unknown>,
     ctx?: RunContext,
   ): Promise<ToolResult> {
-    const rawPath =
-      typeof args.path === "string" && args.path.length > 0
-        ? args.path
-        : typeof args.filename === "string" && args.filename.length > 0
-          ? args.filename
-          : "";
-    if (!rawPath) {
-      return textToolResult("Error: missing path (provide path or filename)");
-    }
-    const content =
-      typeof args.content === "string"
-        ? args.content
-        : Array.isArray(args.lines)
-          ? args.lines.join("\n")
-          : "";
     try {
+      const { path, content, lines } = parseToolArgs(CreateFileArgs, args);
       const workspace = requireWorkspace(ctx);
-      await workspaceService.writeFile(workspace, rawPath, content);
-      ctx?.writtenFiles.add(rawPath);
-      return textToolResult(`File created at ${rawPath}`);
+      await workspaceService.writeFile(
+        workspace,
+        path,
+        content ?? lines?.join("\n") ?? "",
+      );
+      ctx?.writtenFiles.add(path);
+      return textToolResult(`File created at ${path}`);
     } catch (error) {
       return textToolResult(workspaceError(error));
     }

@@ -4,7 +4,7 @@ import {
   type CatalogModel,
   OpenRouterCatalog,
   openRouterCatalog,
-} from "../../src/openRouterModels";
+} from "../../src/models/openRouterModels";
 
 const model: CatalogModel = {
   route: "test/model",

@@ -16,7 +16,6 @@ import {
 } from "../prompts/systemPrompt";
 import { MANAGE_SUBAGENTS_SKILL_NAME } from "../skills/defaults";
 import { modelInvocableSkills, renderSkillsPrompt } from "../skills/runtime";
-import type { BaseTool } from "../tools/BaseTool";
 import { createBuiltinTool } from "../tools/builtinTools";
 import { LoadSkillTool } from "../tools/load_skill";
 import { ManageSkillsTool } from "../tools/manage_skills";
@@ -140,9 +139,5 @@ export const agentManager = {
   },
   createAgent(opts: CreateAgentOptions): BaseAgent {
     return buildAgent(MAIN_AGENT_NAME, opts);
-  },
-
-  getToolInstance(toolName: string): BaseTool {
-    return createBuiltinTool(toolName);
   },
 };

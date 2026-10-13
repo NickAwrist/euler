@@ -42,13 +42,9 @@ test("session loading: async agents continue across chat messages and browser re
     url.port = "5198";
     return route.continue({ url: url.toString() });
   });
-  await page.addInitScript(() =>
-    localStorage.setItem(
-      "euler:userSettings",
-      JSON.stringify({ defaultModel: "openrouter:openai/gpt-5.6-terra" }),
-    ),
-  );
-  await mockUserPreferences(page);
+  await mockUserPreferences(page, undefined, {
+    settings: { defaultModel: "openrouter:openai/gpt-5.6-terra" },
+  });
   await page.goto("/");
   const input = page.getByPlaceholder("Send a message...");
   await input.fill("Research this");

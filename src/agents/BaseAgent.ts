@@ -1,4 +1,3 @@
-import type { Plan } from "../Plan";
 import type { LlmMetrics, RunContext, Step } from "../RunContext";
 import { DEFAULT_RUN_MODEL } from "../constants";
 import { recordUsage } from "../db/usage";
@@ -32,7 +31,6 @@ export class BaseAgent {
 
   TOOL_MAP: Record<string, BaseTool>;
 
-  plan?: Plan;
   beforeModelCall?: () => Promise<boolean>;
   checkpoint?: () => void;
   hasPendingInput?: () => boolean;

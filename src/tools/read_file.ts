@@ -1,8 +1,18 @@
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
 import { workspaceService } from "../workspaces/WorkspaceService";
-import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
-import { requireWorkspace, workspaceError } from "./workspace";
+import {
+  BaseTool,
+  type ToolResult,
+  parseToolArgs,
+  textToolResult,
+} from "./BaseTool";
+import {
+  FILE_PATH_PARAMETER,
+  FilePathArgs,
+  requireWorkspace,
+  workspaceError,
+} from "./workspace";
 
 export class ReadFileTool extends BaseTool {
   constructor() {
@@ -19,11 +29,7 @@ export class ReadFileTool extends BaseTool {
           type: "object",
           required: ["path"],
           properties: {
-            path: {
-              type: "string",
-              description:
-                "File path (relative to /workspace or absolute under /workspace)",
-            },
+            path: FILE_PATH_PARAMETER,
           },
         },
       },
@@ -34,17 +40,9 @@ export class ReadFileTool extends BaseTool {
     args: Record<string, unknown>,
     ctx?: RunContext,
   ): Promise<ToolResult> {
-    const rawPath =
-      typeof args.path === "string" && args.path.length > 0
-        ? args.path
-        : typeof args.filename === "string" && args.filename.length > 0
-          ? args.filename
-          : "";
     try {
-      const file = await workspaceService.openFile(
-        requireWorkspace(ctx),
-        rawPath,
-      );
+      const { path } = parseToolArgs(FilePathArgs, args);
+      const file = await workspaceService.openFile(requireWorkspace(ctx), path);
       try {
         return textToolResult(await file.readFile("utf8"));
       } finally {

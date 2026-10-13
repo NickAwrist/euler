@@ -1,7 +1,7 @@
 import { Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
-import { comparePublisherModels } from "../../../src/modelSort";
-import type { CatalogFreshness } from "../../../src/openRouterModels";
+import { comparePublisherModels } from "../../../src/models/modelSort";
+import type { CatalogFreshness } from "../../../src/models/openRouterModels";
 import { setKeyPending, whileRunning } from "../../lib/whileRunning";
 import { Button } from "../Button";
 import { Modal } from "../Modal";

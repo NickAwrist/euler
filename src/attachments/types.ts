@@ -75,7 +75,3 @@ export type WebSourceAttachment = z.infer<typeof WebSourceAttachmentSchema>;
 export type ToolOutputAttachment =
   | z.infer<typeof GeneratedImageAttachmentSchema>
   | WebSourceAttachment;
-
-export function imageUrl(attachmentId: string): string {
-  return `/api/attachments/${encodeURIComponent(attachmentId)}`;
-}

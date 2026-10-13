@@ -4,13 +4,13 @@ import { listModelFavorites, listOpenRouterPublishers } from "../db/openrouter";
 import { asyncRoute } from "../http/asyncRoute";
 import { openRouterModelId } from "../llm/index";
 import { ollamaReasoning } from "../llm/ollamaProvider";
-import { InputCapability } from "../modelCapabilities";
-import { getOllamaClient } from "../ollamaClient";
+import { InputCapability } from "../models/modelCapabilities";
+import { getOllamaClient } from "../models/ollamaClient";
 import {
   getCatalogPreferences,
   publisherModels,
-} from "../openRouterPreferences";
-import { publisherName } from "../openRouterPublishers";
+} from "../models/openRouterPreferences";
+import { publisherName } from "../models/openRouterPublishers";
 import { requireUserId } from "../userIdentity";
 import { errorMessage } from "../utils/errors";
 

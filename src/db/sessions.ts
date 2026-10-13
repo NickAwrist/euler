@@ -7,6 +7,9 @@ import type { SessionRow, SessionSummaryRow, WireMessage } from "./types";
 
 export type { SessionRow, SessionSummaryRow, WireMessage } from "./types";
 
+const SESSION_COLUMNS =
+  "id, owner_uuid, created_at, updated_at, title, model, session_directory, workspace_kind, expires_at, linked_workspace_id";
+
 function previewFromTitleAndFirstUser(
   title: string | null,
   firstUser: string | null,
@@ -86,7 +89,7 @@ export function getSessionById(
 ): SessionRow | null {
   const row = getDb()
     .query(
-      "SELECT id, owner_uuid, created_at, updated_at, title, model, session_directory, workspace_kind, expires_at, linked_workspace_id FROM sessions WHERE owner_uuid = ? AND id = ?",
+      `SELECT ${SESSION_COLUMNS} FROM sessions WHERE owner_uuid = ? AND id = ?`,
     )
     .get(ownerUuid, id) as SessionRow | null;
   return row ?? null;
@@ -95,9 +98,7 @@ export function getSessionById(
 /** Ephemeral chats whose expiry has passed, across owners. */
 export function listExpiredSessions(now: number): SessionRow[] {
   return getDb()
-    .query(
-      "SELECT id, owner_uuid, created_at, updated_at, title, model, session_directory, workspace_kind, expires_at, linked_workspace_id FROM sessions WHERE expires_at <= ?",
-    )
+    .query(`SELECT ${SESSION_COLUMNS} FROM sessions WHERE expires_at <= ?`)
     .all(now) as SessionRow[];
 }
 

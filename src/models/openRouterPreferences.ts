@@ -4,7 +4,7 @@ import {
   listOpenRouterModels,
   listOpenRouterPublishers,
   refreshRegistryMetadata,
-} from "./db/openrouter";
+} from "../db/openrouter";
 import { InputCapability } from "./modelCapabilities";
 import { comparePublisherModels } from "./modelSort";
 import { isNewModel } from "./newModels";
@@ -12,6 +12,7 @@ import {
   type CatalogModel,
   type CatalogResult,
   catalogFreshness,
+  isBatchRoute,
   isInteractiveModel,
   openRouterCatalog,
 } from "./openRouterModels";
@@ -57,7 +58,7 @@ export function publisherModels(
   for (const saved of registered) {
     if (availableRoutes.has(saved.route)) continue;
     // Never present a saved batch route as an interactive selection.
-    if (saved.route.split(":").slice(1).includes("batch")) continue;
+    if (isBatchRoute(saved.route)) continue;
     models.push({
       route: saved.route,
       publisherId,
@@ -128,21 +129,23 @@ export function catalogSettings(catalog: CatalogResult, ownerUuid: string) {
     modelsByPublisher: Object.fromEntries(
       [...ids].map((id) => [id, publisherModels(catalog, id, ownerUuid)]),
     ),
-    discoveredPublishers:
-      catalog.models === null
-        ? null
-        : [
-            ...new Set(
-              catalog.models
-                .filter(isInteractiveModel)
-                .map((model) => model.publisherId),
-            ),
-          ]
-            .map((id) => ({
-              id,
-              name: publisherName(id),
-              tracked: tracked.has(id),
-            }))
-            .sort((a, b) => a.name.localeCompare(b.name)),
+    discoveredPublishers: discoveredPublishers(catalog, tracked),
   };
+}
+
+/** Every publisher with an interactive catalog model, or null without a catalog. */
+export function discoveredPublishers(
+  catalog: CatalogResult,
+  tracked: ReadonlySet<string>,
+) {
+  if (catalog.models === null) return null;
+  return [
+    ...new Set(
+      catalog.models
+        .filter(isInteractiveModel)
+        .map((model) => model.publisherId),
+    ),
+  ]
+    .map((id) => ({ id, name: publisherName(id), tracked: tracked.has(id) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

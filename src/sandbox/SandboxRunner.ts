@@ -26,12 +26,6 @@ export type SandboxRunResult = {
   truncated: boolean;
 };
 
-export interface SandboxRunner {
-  capability(): Promise<{ available: boolean; diagnostic?: string }>;
-  run(options: SandboxRunOptions): Promise<SandboxRunResult>;
-  spawn(options: SandboxRunOptions): Promise<SandboxExecution>;
-}
-
 export interface SandboxExecution {
   completion: Promise<SandboxRunResult>;
   cancel(): Promise<void>;
@@ -39,7 +33,7 @@ export interface SandboxExecution {
 
 const DEFAULT_MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
 
-export class BubblewrapSandboxRunner implements SandboxRunner {
+export class BubblewrapSandboxRunner {
   private capabilityPromise?: Promise<{
     available: boolean;
     diagnostic?: string;
@@ -48,10 +42,6 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
   capability(): Promise<{ available: boolean; diagnostic?: string }> {
     this.capabilityPromise ??= this.probe();
     return this.capabilityPromise;
-  }
-
-  async run(options: SandboxRunOptions): Promise<SandboxRunResult> {
-    return (await this.spawn(options)).completion;
   }
 
   async spawn(options: SandboxRunOptions): Promise<SandboxExecution> {
@@ -347,4 +337,4 @@ export class BubblewrapSandboxRunner implements SandboxRunner {
   }
 }
 
-export const sandboxRunner: SandboxRunner = new BubblewrapSandboxRunner();
+export const sandboxRunner = new BubblewrapSandboxRunner();

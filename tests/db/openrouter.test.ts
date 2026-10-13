@@ -1,9 +1,6 @@
-import { ensureUserData } from "../../src/db/users";
 import "../setup";
-import { Database } from "bun:sqlite";
 import { describe, expect, test } from "bun:test";
 import { getDb } from "../../src/db/connection";
-import { migrateOpenRouterCatalog } from "../../src/db/migrations";
 import {
   applyPublisherSubscriptions,
   listModelFavorites,
@@ -16,11 +13,12 @@ import {
   setPublisherSubscription,
   trackOpenRouterPublisher,
 } from "../../src/db/openrouter";
+import { createSchema } from "../../src/db/schema";
 import {
   getOpenRouterApiKey,
   setOpenRouterApiKey,
 } from "../../src/db/settings";
-import { normalizeCatalog } from "../../src/openRouterModels";
+import { normalizeCatalog } from "../../src/models/openRouterModels";
 
 const model = (route = "openai/test", created = 101) =>
   normalizeCatalog({
@@ -41,34 +39,6 @@ describe("OpenRouter preferences", () => {
   test("fresh database has common publishers and no selections", () => {
     expect(listOpenRouterPublishers()).toHaveLength(9);
     expect(listOpenRouterModels()).toEqual([]);
-  });
-  test("migration replaces legacy registry once and preserves unrelated data", () => {
-    const db = new Database(":memory:");
-    db.run(`CREATE TABLE app_settings (key TEXT PRIMARY KEY, value TEXT);
-      INSERT INTO app_settings VALUES ('openrouter_api_key', 'secret'), ('openrouter_models_seeded_v3', '1'), ('other', 'keep');
-      CREATE TABLE sessions (id TEXT PRIMARY KEY, model TEXT);
-      INSERT INTO sessions VALUES ('session', 'openrouter:openai/old');
-      CREATE TABLE openrouter_models (id INTEGER PRIMARY KEY, route TEXT, name TEXT, ai_lab TEXT);
-      INSERT INTO openrouter_models VALUES (1, 'openai/old', 'Old', 'OpenAI');`);
-    migrateOpenRouterCatalog(db);
-    expect(db.query("SELECT * FROM openrouter_models").all()).toEqual([]);
-    expect(db.query("SELECT * FROM app_settings ORDER BY key").all()).toEqual([
-      { key: "openrouter_api_key", value: "secret" },
-      { key: "other", value: "keep" },
-    ]);
-    db.run(
-      "INSERT INTO openrouter_models VALUES ('openai/new', 'openai', 'New', 0, 100)",
-    );
-    db.run("INSERT INTO model_favorites VALUES ('owner', 'ollama', 'local')");
-    migrateOpenRouterCatalog(db);
-    expect(db.query("SELECT enabled FROM openrouter_models").get()).toEqual({
-      enabled: 0,
-    });
-    expect(db.query("SELECT * FROM model_favorites").all()).toHaveLength(1);
-    expect(db.query("SELECT model FROM sessions").get()).toEqual({
-      model: "openrouter:openai/old",
-    });
-    db.close();
   });
   test("subscription transitions preserve timestamps and never backfill existing additions", () => {
     setPublisherSubscription("openai", true, 100);
@@ -113,7 +83,7 @@ describe("OpenRouter preferences", () => {
     expect(
       listModelFavorites("11111111-1111-4111-8111-111111111111"),
     ).toHaveLength(1);
-    migrateOpenRouterCatalog(getDb());
+    createSchema(getDb());
     expect(
       listOpenRouterPublishers().some((p) => p.id === "openai"),
     ).toBeFalse();
@@ -159,7 +129,7 @@ describe("OpenRouter preferences", () => {
     expect(listModelFavorites("11111111-1111-4111-8111-111111111111")).toEqual([
       { provider: "ollama", model_id: "openai/test" },
     ]);
-    migrateOpenRouterCatalog(getDb());
+    createSchema(getDb());
     expect(
       listModelFavorites("11111111-1111-4111-8111-111111111111"),
     ).toHaveLength(1);
@@ -167,38 +137,3 @@ describe("OpenRouter preferences", () => {
     expect(getOpenRouterApiKey()).toBe("secret");
   });
 });
-
-for (const recordedOwner of [null, "11111111-1111-4111-8111-111111111111"]) {
-  test(`legacy favorites migrate once to ${recordedOwner ? "the recorded owner" : "the first user"}`, () => {
-    const db = getDb();
-    db.run("DROP TABLE model_favorites");
-    db.run(
-      "CREATE TABLE model_favorites (provider TEXT NOT NULL, model_id TEXT NOT NULL, PRIMARY KEY (provider, model_id))",
-    );
-    db.run("INSERT INTO model_favorites VALUES ('ollama', 'local')");
-    if (recordedOwner)
-      db.run(
-        "INSERT INTO app_settings (key, value) VALUES ('legacy_user_data_claimed_by', ?)",
-        [recordedOwner],
-      );
-    migrateOpenRouterCatalog(db);
-    const first = "22222222-2222-4222-8222-222222222222";
-    ensureUserData(first);
-    expect(listModelFavorites(recordedOwner ?? first)).toEqual([
-      { provider: "ollama", model_id: "local" },
-    ]);
-    ensureUserData("33333333-3333-4333-8333-333333333333");
-    expect(listModelFavorites("33333333-3333-4333-8333-333333333333")).toEqual(
-      [],
-    );
-    expect(
-      db
-        .query(
-          "SELECT 1 FROM sqlite_master WHERE name = 'legacy_model_favorites'",
-        )
-        .get(),
-    ).toBeNull();
-    migrateOpenRouterCatalog(db);
-    expect(listModelFavorites(recordedOwner ?? first)).toHaveLength(1);
-  });
-}

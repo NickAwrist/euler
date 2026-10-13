@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { OpenRouterBalance } from "./schemas/openRouterBalance";
+import type { OpenRouterBalance } from "../schemas/openRouterBalance";
 
 const keySchema = z.object({
   data: z.object({

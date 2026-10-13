@@ -1,8 +1,8 @@
-import type { CatalogModel } from "../../src/openRouterModels";
+import type { CatalogModel } from "../../src/models/openRouterModels";
 import {
   POPULAR_PUBLISHERS,
   publisherName,
-} from "../../src/openRouterPublishers";
+} from "../../src/models/openRouterPublishers";
 
 export type DemoScenario =
   | "ready"

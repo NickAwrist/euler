@@ -1,5 +1,5 @@
 import type { LlmMetrics } from "../RunContext";
-import { openRouterCatalog } from "../openRouterModels";
+import { openRouterCatalog } from "../models/openRouterModels";
 import { resolveModelSelection } from "./modelSelection";
 
 /** Provider metrics are untrusted: negative or non-finite values are unknown. */

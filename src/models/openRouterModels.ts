@@ -9,8 +9,16 @@ import {
 
 const TTL_MS = 2 * 60 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 15_000;
+const ROUTE_PATTERN = /^[^/\s]+\/[^\s]+$/;
+/** A raw OpenRouter route, such as `openai/gpt-4o`. */
+export const openRouterRouteSchema = z
+  .string()
+  .trim()
+  .min(3)
+  .max(200)
+  .regex(ROUTE_PATTERN);
 const RemoteModel = z.object({
-  id: z.string().regex(/^[^/\s]+\/[^\s]+$/),
+  id: z.string().regex(ROUTE_PATTERN),
   name: z.string().trim().min(1),
   description: z.string().nullish(),
   created: z.number().int().nonnegative(),
@@ -109,9 +117,12 @@ export function normalizeCatalog(payload: unknown): CatalogModel[] {
   }));
 }
 /** The live catalog identifies asynchronous routes with the :batch variant. */
+export function isBatchRoute(route: string): boolean {
+  return route.split(":").slice(1).includes("batch");
+}
 export function isInteractiveModel(model: CatalogModel): boolean {
   return (
-    !model.route.split(":").slice(1).includes("batch") &&
+    !isBatchRoute(model.route) &&
     model.inputCapabilities.includes(InputCapability.Text) &&
     model.outputCapabilities.includes("text")
   );

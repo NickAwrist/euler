@@ -1,6 +1,6 @@
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { NEW_MODEL_DAYS } from "../../../src/newModels";
+import { NEW_MODEL_DAYS } from "../../../src/models/newModels";
 import { whileRunning } from "../../lib/whileRunning";
 import { Button } from "../Button";
 import { NewBadge } from "../ModelPreferenceControls";

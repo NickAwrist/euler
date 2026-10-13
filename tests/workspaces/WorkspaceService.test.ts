@@ -1,9 +1,7 @@
-import { Database } from "bun:sqlite";
 import { afterEach, describe, expect, test } from "bun:test";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { migrateSessionsWorkspaceKindColumn } from "../../src/db/migrations";
 import type { SessionRow } from "../../src/db/types";
 import {
   WorkspaceError,
@@ -131,22 +129,4 @@ describe("workspace service", () => {
     await expect(fs.access(sandbox.hostPath)).rejects.toThrow();
     expect(await fs.readFile(localFile, "utf8")).toBe("keep");
   });
-});
-
-test("workspace migration backfills local and sandbox rows", () => {
-  const db = new Database(":memory:");
-  db.run("CREATE TABLE sessions (id TEXT PRIMARY KEY, session_directory TEXT)");
-  db.run(
-    "INSERT INTO sessions VALUES ('local', '/tmp/project'), ('empty', '  '), ('unset', NULL)",
-  );
-  migrateSessionsWorkspaceKindColumn(db);
-  const rows = db
-    .query("SELECT id, workspace_kind FROM sessions ORDER BY id")
-    .all();
-  expect(rows).toEqual([
-    { id: "empty", workspace_kind: "sandbox" },
-    { id: "local", workspace_kind: "local" },
-    { id: "unset", workspace_kind: "sandbox" },
-  ]);
-  db.close();
 });

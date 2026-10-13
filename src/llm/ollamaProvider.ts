@@ -1,6 +1,6 @@
 import type { ChatRequest, ChatResponse, Message, ToolCall } from "ollama";
-import type { ModelReasoning } from "../modelCapabilities";
-import { getOllamaClient } from "../ollamaClient";
+import type { ModelReasoning } from "../models/modelCapabilities";
+import { getOllamaClient } from "../models/ollamaClient";
 import type {
   LlmChatRequest,
   LlmChatStream,

@@ -1,14 +1,17 @@
 import { Router } from "express";
 import { Ollama } from "ollama";
-import { withContainerLoopbackHint } from "../containerNetworkHint";
 import { setOllamaHost } from "../db/index";
 import { envConfig } from "../env";
 import { canEditEnvironmentSetting } from "../http/environmentSettings";
+import { withContainerLoopbackHint } from "../models/containerNetworkHint";
 import {
   getOllamaClient,
   getOllamaHostConfig,
   invalidateOllamaClientCache,
-} from "../ollamaClient";
+  normalizeOllamaHost,
+} from "../models/ollamaClient";
+import { sendValidationError } from "../observability/http";
+import { OllamaHostBodySchema } from "../schemas/ollama";
 import { errorMessage } from "../utils/errors";
 
 const ollamaRoutes = Router();
@@ -30,8 +33,9 @@ ollamaRoutes.get("/config", (_req, res) => {
 });
 
 ollamaRoutes.put("/config", (req, res) => {
-  const body = req.body as { host?: unknown };
-  const host = typeof body.host === "string" ? body.host.trim() : "";
+  const parsed = OllamaHostBodySchema.safeParse(req.body ?? {});
+  if (!parsed.success) return sendValidationError(res, parsed.error);
+  const { host } = parsed.data;
   if (canEditEnvironmentSetting(envConfig.ollamaHost, host)) {
     setOllamaHost(host);
   }
@@ -40,11 +44,14 @@ ollamaRoutes.put("/config", (req, res) => {
 });
 
 ollamaRoutes.post("/test", async (req, res) => {
-  const body = req.body as { host?: unknown };
-  const raw = typeof body.host === "string" ? body.host.trim() : "";
+  const parsed = OllamaHostBodySchema.safeParse(req.body ?? {});
+  if (!parsed.success) return sendValidationError(res, parsed.error);
+  const { host } = parsed.data;
   let client: Ollama;
+  let effectiveHost: string;
   try {
-    client = raw ? new Ollama({ host: raw }) : new Ollama();
+    client = host ? new Ollama({ host }) : new Ollama();
+    effectiveHost = normalizeOllamaHost(host);
   } catch (e) {
     res.json({
       ok: false,
@@ -52,8 +59,6 @@ ollamaRoutes.post("/test", async (req, res) => {
     });
     return;
   }
-  const effectiveHost = (client as unknown as { config: { host: string } })
-    .config.host;
   try {
     const v = await client.version();
     res.json({
@@ -64,7 +69,7 @@ ollamaRoutes.post("/test", async (req, res) => {
   } catch (e) {
     res.json({
       ok: false,
-      error: withContainerLoopbackHint(errorMessage(e), raw || effectiveHost),
+      error: withContainerLoopbackHint(errorMessage(e), host || effectiveHost),
       effectiveHost,
     });
   }

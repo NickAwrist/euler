@@ -1,5 +1,8 @@
-import { type CatalogModel, isInteractiveModel } from "../openRouterModels";
-import { publisherName } from "../openRouterPublishers";
+import {
+  type CatalogModel,
+  isInteractiveModel,
+} from "../models/openRouterModels";
+import { publisherName } from "../models/openRouterPublishers";
 import { getDb } from "./connection";
 import type { OpenRouterModel } from "./types";
 

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import { getDb } from "../../src/db/connection";
-import { runMigrations } from "../../src/db/migrations";
+import { createSchema } from "../../src/db/schema";
 import { setOllamaHost } from "../../src/db/settings";
 import {
   getUserPreferences,
@@ -20,15 +20,16 @@ test("preferences require identity, isolate users, preserve unrelated fields, an
     });
   try {
     expect((await fetch(`${url}/api/settings/user`)).status).toBe(400);
-    expect(await (await request(TEST_USER_ID)).json()).toBeNull();
+    // A user who never saved preferences gets the defaults.
+    expect(await (await request(TEST_USER_ID)).json()).toEqual(
+      userPreferencesSchema.parse({}),
+    );
     const initial = {
       settings: { defaultModel: "model-a", name: "Nick" },
       appearance: { theme: "nord" },
       layout: { sidebarCollapsed: true },
     };
-    expect((await request(TEST_USER_ID, "PUT", initial)).status).toBe(200);
-    // A second device's stale local preferences never overwrite the existing user.
-    await request(TEST_USER_ID, "PUT", { settings: { defaultModel: "stale" } });
+    expect((await request(TEST_USER_ID, "PATCH", initial)).status).toBe(200);
     await request(TEST_USER_ID, "PATCH", {
       settings: { showDebugButton: true },
     });
@@ -42,7 +43,10 @@ test("preferences require identity, isolate users, preserve unrelated fields, an
     });
     expect(saved.appearance.theme).toBe("nord");
     expect(saved.layout.sidebarCollapsed).toBe(true);
-    expect(await (await request(other)).json()).toBeNull();
+    expect(
+      userPreferencesSchema.parse(await (await request(other)).json()).settings
+        .defaultModel,
+    ).toBe("");
     await request(other, "PATCH", { settings: { defaultModel: "model-b" } });
     expect(getUserPreferences(TEST_USER_ID)?.settings.defaultModel).toBe(
       "model-a",
@@ -64,13 +68,13 @@ test("preferences require identity, isolate users, preserve unrelated fields, an
   }
 });
 
-test("startup migrations preserve saved preferences", () => {
+test("startup schema creation preserves saved preferences", () => {
   updateUserPreferences(TEST_USER_ID, {
     settings: { defaultModel: "persisted" },
   });
-  // Re-running startup migrations must preserve saved preferences.
+  // Re-running startup schema creation must preserve saved preferences.
   const db = getDb();
-  runMigrations(db);
+  createSchema(db);
   expect(getUserPreferences(TEST_USER_ID)?.settings.defaultModel).toBe(
     "persisted",
   );
