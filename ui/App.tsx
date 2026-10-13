@@ -730,7 +730,7 @@ export default function App() {
       )}
       <div
         className={cx(
-          "h-screen overflow-hidden",
+          "h-dvh overflow-hidden",
           app.noProviderAvailable && "pt-9",
         )}
       >

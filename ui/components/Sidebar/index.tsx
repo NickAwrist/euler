@@ -64,7 +64,7 @@ export function Sidebar({
         </div>
 
         <div
-          className="mt-1 min-h-0 overflow-x-hidden overflow-y-auto border-t border-border-subtle pt-1"
+          className="mt-1 min-h-0 overflow-x-hidden overflow-y-auto overscroll-contain border-t border-border-subtle pt-1"
           onScroll={() => setOpenMenu(null)}
         >
           <div className="w-full min-w-0">

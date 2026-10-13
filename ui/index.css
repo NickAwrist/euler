@@ -345,6 +345,12 @@ pre code {
     height: 100%;
   }
 
+  html,
+  body {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
   body {
     margin: 0;
     background: var(--color-background);
