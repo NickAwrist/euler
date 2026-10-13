@@ -191,6 +191,82 @@ for (const width of [320, 390, 1024, 1440]) {
   });
 }
 
+for (const width of [320, 390]) {
+  test(`chat sidebar mobile ${width} contains scrolling at drawer boundaries`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 664 });
+    await mockApp(page);
+    await page.route("**/api/sessions", (route) =>
+      route.fulfill({
+        json: {
+          sessions: Array.from({ length: 40 }, (_, i) => ({
+            id: `scroll-${i}`,
+            preview: `Conversation ${i + 1}`,
+            createdAt: Date.now(),
+            updatedAt: Date.now() - i * 1000,
+            expiresAt: null,
+          })),
+        },
+      }),
+    );
+    await mockUserPreferences(page);
+    await page.goto("/");
+    const toggle = page.getByRole("button", {
+      name: "Toggle chats",
+      exact: true,
+    });
+    await toggle.click();
+    const panel = page.locator("#app-sidebar");
+    await expect.poll(async () => (await panel.boundingBox())!.x).toBe(0);
+    const position = (await toggle.boundingBox())!;
+    const list = panel.locator(".overflow-y-auto");
+    await expect(list).toBeVisible();
+    // Chromium cannot render iOS's elastic bounce. Check the declarations
+    // Safari needs as well as actual scrolling and stationary controls.
+    for (const root of [page.locator("html"), page.locator("body")]) {
+      await expect(root).toHaveCSS("overscroll-behavior-y", "none");
+      await expect(root).toHaveCSS("overflow-y", "hidden");
+    }
+    await expect(list).toHaveCSS("overscroll-behavior-y", "contain");
+    const bounds = (await list.boundingBox())!;
+    await page.mouse.move(
+      bounds.x + bounds.width / 2,
+      bounds.y + bounds.height / 2,
+    );
+    await page.mouse.wheel(0, 300);
+    await expect
+      .poll(() => list.evaluate((el) => el.scrollTop))
+      .toBeGreaterThan(0);
+    for (const delta of [3000, 200, -3000, -200]) {
+      await page.mouse.wheel(0, delta);
+      await expect
+        .poll(() => list.evaluate((el) => el.scrollTop))
+        .toBe(
+          delta > 0
+            ? await list.evaluate((el) => el.scrollHeight - el.clientHeight)
+            : 0,
+        );
+      expect(await toggle.boundingBox()).toEqual(position);
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    }
+    // Scrolling outside the drawer must not move its toggle either.
+    await page.mouse.move(width - 5, 300);
+    await page.mouse.wheel(0, -200);
+    expect(await toggle.boundingBox()).toEqual(position);
+    await page.setViewportSize({ width, height: 550 });
+    await expect(panel).toHaveCSS("height", "550px");
+    expect((await toggle.boundingBox())!.y).toBe(position.y);
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      panel.getByRole("button", { name: "Settings", exact: true }),
+    ).toBeInViewport();
+  });
+}
+
 test("chat sidebar desktop workspace changes refresh open artifacts without remounting the chat", async ({
   page,
 }) => {
@@ -462,8 +538,15 @@ test("chat sidebar desktop restores artifact preview and width on reload", async
   const resize = page.getByRole("separator", {
     name: "Resize artifact sidebar",
   });
+  const savedWidth = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/settings/user" &&
+      response.request().method() === "PATCH" &&
+      response.request().postDataJSON().layout?.artifactWidth !== undefined,
+  );
   await resize.press("ArrowLeft");
   const width = await resize.getAttribute("aria-valuenow");
+  await (await savedWidth).finished();
   await page.reload();
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
   await expect(
