@@ -16,6 +16,30 @@ These conventions supplement the general engineering instructions.
   Similar markup alone does not justify an abstraction.
 - Keep domain behavior in domain components and hooks. Keep generic
   components independent of sessions, agents, workspaces, and runs.
+- Build fields and options from the schema or catalog that already
+  defines them, such as tool input schemas and the model catalog.
+  Render tool results in the shape the tool returns; don't invent
+  fields such as exit codes.
+
+## UI copy
+
+- Use short labels. Don't add helper subtext, sentence-length
+  placeholders, or explanatory lines unless the user asks for them.
+- Don't invent branding, icons, or marketing text.
+
+## Running the app
+
+- In a new worktree, run `bun run init:worktree` once, then `bun run dev`.
+- Use the ports in the worktree's `.env`. Don't pass other ports on the
+  command line: the user ID lives in browser storage per origin, so a new
+  port opens an empty app.
+- Give the user `http://spaceheater:<EULER_FRONTEND_PORT>` and leave the
+  server running.
+- Before handing it over, open it and confirm it shows the copied chats
+  and a ready model provider. Values in `.env` override saved settings,
+  so a stale key there breaks a provider that looks right in Settings.
+- `/dev/...` routes are fixtures for browser tests. Final screenshots come
+  from the running app. Label any fixture or mocked screenshot as such.
 
 ## Data and types
 
@@ -47,3 +71,5 @@ These conventions supplement the general engineering instructions.
 - Review the diff for duplicated behavior, unnecessary abstractions,
   and competing sources of truth. Report checks actually run and
   any verification gaps.
+- In the handoff, give net lines changed in src/, ui/, and tests/.
+  Name each new component or hook and why an existing one didn't fit.
