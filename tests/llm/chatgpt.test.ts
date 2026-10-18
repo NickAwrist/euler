@@ -200,6 +200,14 @@ test("refresh is serialized and cannot restore a disconnected connection", async
 test("Responses streams require completion, retain tool IDs and propagate midstream failures", async () => {
   const chunks = await collect(
     sse([
+      {
+        type: "response.created",
+        response: { error: null, usage: null },
+      },
+      {
+        type: "response.in_progress",
+        response: { error: null, usage: null },
+      },
       { type: "response.output_text.delta", delta: "Hello" },
       {
         type: "response.output_item.done",
@@ -219,6 +227,11 @@ test("Responses streams require completion, retain tool IDs and propagate midstr
   expect(chunks[0]?.contentDelta).toBe("Hello");
   expect(chunks.at(-1)?.toolCalls?.[0]?.id).toBe("call-1");
   expect(chunks.at(-1)?.metrics?.promptTokens).toBe(12);
+  expect(
+    await collect(
+      sse([{ type: "response.completed", response: { usage: null } }]),
+    ),
+  ).toEqual([{ done: true }]);
   await expect(
     collect(sse([{ type: "response.output_text.delta", delta: "partial" }])),
   ).rejects.toThrow("before completion");
@@ -229,6 +242,7 @@ test("Responses streams require completion, retain tool IDs and propagate midstr
           type: "response.failed",
           response: {
             error: { code: "subscription_sharing_usage_limit_exceeded" },
+            usage: null,
           },
         },
       ]),

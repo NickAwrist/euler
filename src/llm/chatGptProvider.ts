@@ -88,7 +88,7 @@ const eventSchema = z.object({
             .object({ cached_tokens: z.number() })
             .optional(),
         })
-        .optional(),
+        .nullish(),
     })
     .optional(),
 });
