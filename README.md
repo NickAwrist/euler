@@ -31,6 +31,23 @@ over Streamable HTTP and offers their tools as `mcp__<server>__<tool>`. A server
 that fails to connect is skipped and logged. The tab connects to each server
 to list its tools, or shows why it could not connect.
 
+## ChatGPT inference
+
+Under **Settings > ChatGPT**, sign in and authorize use of your ChatGPT plan.
+After sign-in redirects to the loopback callback page, copy its full address
+into the Callback URL field and select **Connect**. This manual step also works
+when the browser is on a different machine from the Euler server.
+
+The connection belongs to your Euler user UUID. Other users connect their own
+accounts. Credentials stay on the server in owner-only files under
+`<data root>/chatgpt/`; they are never returned to the browser. ChatGPT models
+appear in the model selector after connection. **Disconnect** clears local
+credentials and attempts to revoke the renewable session.
+
+This uses OpenAI's [Sign in with ChatGPT flow](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)
+and [Responses API](https://developers.openai.com/siwc/token-sharing-open-source/models-and-inference).
+Access and limits depend on the signed-in account's granted plan permissions.
+
 ## Requirements
 
 - [Bun](https://bun.sh/)

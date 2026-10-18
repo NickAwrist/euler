@@ -19,6 +19,7 @@ export const money = (n: number | null) =>
 const colors: Record<string, string> = {
   anthropic: "#D97757",
   openai: "#e8e8e8",
+  chatgpt: "#e8e8e8",
   google: "#3186FF",
   deepseek: "#4D6BFE",
   qwen: "#6F69F7",
@@ -35,6 +36,7 @@ export function providerColor(id: string) {
 const providerNames: Record<string, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
+  chatgpt: "ChatGPT",
   google: "Google",
   deepseek: "DeepSeek",
   qwen: "Qwen",

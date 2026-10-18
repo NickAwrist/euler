@@ -4,6 +4,7 @@ import { listModelFavorites, listOpenRouterPublishers } from "../db/openrouter";
 import { asyncRoute } from "../http/asyncRoute";
 import { openRouterModelId } from "../llm/index";
 import { ollamaReasoning } from "../llm/ollamaProvider";
+import { chatGptModels, chatGptStatus } from "../models/chatgpt";
 import { InputCapability } from "../models/modelCapabilities";
 import { getOllamaClient } from "../models/ollamaClient";
 import {
@@ -95,9 +96,32 @@ modelsRoutes.get(
           }))
       : [];
 
+    let chatgptError: string | null = null;
+    const chatgptConfigured = chatGptStatus(owner).planEnabled;
+    let chatgptModels: Array<Record<string, unknown>> = [];
+    if (chatgptConfigured) {
+      try {
+        chatgptModels = (await chatGptModels(owner)).map((model) => ({
+          id: `chatgpt:${model.slug}`,
+          name: model.display_name,
+          provider: "chatgpt",
+          lab: "OpenAI",
+          favorite: favorites.some(
+            (row) => row.provider === "chatgpt" && row.model_id === model.slug,
+          ),
+          inputCapabilities: [InputCapability.Text],
+          supportsTools: true,
+          reasoning: null,
+        }));
+      } catch (error) {
+        chatgptError = errorMessage(error);
+      }
+    }
+    res.setHeader("Cache-Control", "no-store");
     res.json({
-      models: [...ollamaModels, ...openRouterModels],
+      models: [...ollamaModels, ...openRouterModels, ...chatgptModels],
       providers: {
+        chatgpt: { configured: chatgptConfigured, error: chatgptError },
         ollama: { connected: ollamaError === null, error: ollamaError },
         openrouter: { configured: openrouterConfigured },
       },

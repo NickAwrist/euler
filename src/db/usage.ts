@@ -24,7 +24,9 @@ export function recordUsage(
   const modelId =
     resolved.provider === "openrouter"
       ? openRouterModelId(resolved.model)
-      : resolved.model;
+      : resolved.provider === "chatgpt"
+        ? `chatgpt:${resolved.model}`
+        : resolved.model;
   getDb().run(
     "INSERT INTO usage_events (owner_uuid, model, timestamp, input, output, cached, cost, savings) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     [
@@ -46,6 +48,7 @@ const BASE = `WITH calls AS (
     THEN CASE WHEN instr(substr(model, 12), '/') > 0
       THEN substr(model, 12, instr(substr(model, 12), '/') - 1)
       ELSE substr(model, 12) END
+    WHEN model LIKE 'chatgpt:%' THEN 'chatgpt'
     ELSE 'ollama' END AS provider
   FROM usage_events WHERE owner_uuid = ? AND timestamp >= ? AND timestamp <= ?
 )`;

@@ -13,11 +13,16 @@ import {
   modelCapabilities,
 } from "./ModelCapabilityIcons";
 import { FavoriteButton, NewBadge } from "./ModelPreferenceControls";
-import { type ModelProvider, groupModelProviders } from "./modelProviders";
+import {
+  type ModelProvider,
+  groupModelProviders,
+  modelRoute,
+} from "./modelProviders";
 
 function isMonochromeProviderIcon(url: string): boolean {
   return (
     url.endsWith("/openai.svg") ||
+    url.endsWith("/codex.svg") ||
     url.endsWith("/xai.svg") ||
     url.endsWith("/moonshot.svg") ||
     url === "/icons/ollama.svg"
@@ -150,7 +155,7 @@ export function ModelSelectBar({
   const label =
     selected?.name ??
     (selectedModel
-      ? `${selectedModel.replace(/^openrouter:/, "")} (unavailable)`
+      ? `${modelRoute(selectedModel)} (unavailable)`
       : statusLabel);
 
   return (
@@ -384,10 +389,9 @@ export function ModelSelectBar({
                         [model.id]: !model.favorite,
                       }));
                       const modelId =
-                        model.provider === "openrouter"
-                          ? (model.route ??
-                            model.id.replace(/^openrouter:/, ""))
-                          : model.id;
+                        model.provider === "ollama"
+                          ? model.id
+                          : (model.route ?? modelRoute(model.id));
                       const favorite = !model.favorite;
                       void whileRunning(
                         setKeyPending(setFavoritePending, model.id),

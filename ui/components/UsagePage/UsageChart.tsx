@@ -393,7 +393,7 @@ export function UsageChart({
                 <div key={item.model}>
                   <Swatch item={item} bars={bars} />
                   <span className="usage-tooltip-name">
-                    {item.model.replace(/^openrouter:/, "")}
+                    {item.model.replace(/^(?:openrouter|chatgpt):/, "")}
                   </span>
                   <b>
                     {metric === "tokens"
@@ -411,7 +411,7 @@ export function UsageChart({
           {styled.map((item) => (
             <li key={item.model}>
               <Swatch item={item} bars={bars} />
-              {item.model.replace(/^openrouter:/, "")}
+              {item.model.replace(/^(?:openrouter|chatgpt):/, "")}
             </li>
           ))}
         </ul>

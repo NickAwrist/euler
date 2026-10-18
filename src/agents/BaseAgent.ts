@@ -213,6 +213,7 @@ export class BaseAgent {
       let lastThinkingAt: number | undefined;
 
       const stream = await streamModelChat({
+        ownerUuid: ctx.ownerUuid,
         model: this.model,
         messages,
         tools: this.tools

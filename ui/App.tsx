@@ -719,6 +719,7 @@ export default function App() {
         onSaveOllamaHost={app.saveOllamaHost}
         onSaveComfyUI={app.saveComfyUISettings}
         onModelsChanged={() => refreshModels(true)}
+        chatgptCatalogError={app.chatgptCatalogError}
         onComplete={() => setOnboarding(false)}
       />
     );
@@ -763,6 +764,7 @@ export default function App() {
               comfyuiDefaultHeight={app.comfyuiDefaultHeight}
               comfyuiNegativePrompt={app.comfyuiNegativePrompt}
               onSave={app.saveUserSettings}
+              chatgptCatalogError={app.chatgptCatalogError}
               onModelsChanged={() => refreshModels(true)}
               onBack={backToChat}
             />

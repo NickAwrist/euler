@@ -122,7 +122,7 @@ test("settings save desktop: saving a user preference does not rewrite shared pr
   await mockSettings(page, writes);
   await mockUserPreferences(page, preferences);
   await page.goto("/");
-  for (let step = 0; step < 7; step++)
+  for (let step = 0; step < 8; step++)
     await page.getByRole("button", { name: "Skip", exact: true }).click();
   await page
     .getByRole("button", { name: "Toggle chats", exact: true })

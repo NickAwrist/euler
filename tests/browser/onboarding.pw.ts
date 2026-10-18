@@ -16,6 +16,14 @@ const comfyDefaults = {
   negativePrompt: "",
 };
 
+const chatGptStatus = (connected: boolean) => ({
+  connected,
+  email: connected ? "nick@example.com" : null,
+  name: connected ? "Nick Example" : null,
+  picture: null,
+  planEnabled: connected,
+});
+
 function defaultApi(path: string, body: unknown): unknown {
   const sent = (body ?? {}) as Record<string, unknown>;
   if (path.endsWith("/catalog"))
@@ -29,6 +37,7 @@ function defaultApi(path: string, body: unknown): unknown {
   if (path === "/api/sessions") return { sessions: [] };
   if (path === "/api/settings/environment")
     return { ollamaHost: false, comfyuiHost: false };
+  if (path === "/api/settings/chatgpt") return chatGptStatus(false);
   if (path === "/api/settings/openrouter" || path === "/api/settings/brave")
     return { hasKey: Boolean(sent.apiKey), environmentManaged: false };
   if (path.endsWith("/test")) return { ok: true, version: "0.9.0" };
@@ -155,6 +164,10 @@ for (const device of ["desktop", "mobile"] as const) {
       });
       await button(page, "Continue").click();
       await expect(
+        page.getByRole("heading", { name: "ChatGPT", exact: true }),
+      ).toBeFocused();
+      await button(page, "Continue").click();
+      await expect(
         page.getByRole("heading", { name: "Default model" }),
       ).toBeFocused();
       expect(writes).toEqual([
@@ -194,6 +207,101 @@ for (const device of ["desktop", "mobile"] as const) {
         expect.objectContaining({ name: "Nick", location: "Seattle" }),
       ]);
       await expectSecretNotStored(page, "brave-secret");
+    } finally {
+      await page.close();
+    }
+  });
+}
+
+for (const device of ["desktop", "mobile"] as const) {
+  test(`onboarding ${device}: ChatGPT sign-in offers its models as the default`, async ({
+    browser,
+  }) => {
+    const page = await browser.newPage({
+      baseURL: "http://127.0.0.1:5199",
+      viewport:
+        device === "desktop"
+          ? { width: 1280, height: 900 }
+          : { width: 390, height: 844 },
+    });
+    const authorizationUrl = "https://auth.example.test/authorize?state=abc";
+    let connected = false;
+    await page
+      .context()
+      .route("https://auth.example.test/**", (route) =>
+        route.fulfill({ body: "sign in" }),
+      );
+    await routeApi(page, (path, method) => {
+      // The account is per user, so it must not need shared settings.
+      if (path === "/api/settings/environment")
+        return {
+          status: 503,
+          json: { error: { code: "INTERNAL_ERROR", message: "Unavailable" } },
+        };
+      if (path === "/api/settings/chatgpt/login")
+        return { json: { authorizationUrl } };
+      if (path === "/api/settings/chatgpt/callback") {
+        connected = true;
+        return { json: chatGptStatus(true) };
+      }
+      if (path === "/api/settings/chatgpt" && method === "GET")
+        return { json: chatGptStatus(connected) };
+      if (path === "/api/models")
+        return {
+          json: {
+            models: connected
+              ? [
+                  {
+                    id: "chatgpt:gpt-5.5",
+                    name: "GPT-5.5",
+                    provider: "chatgpt",
+                    lab: "OpenAI",
+                    inputCapabilities: ["text"],
+                  },
+                ]
+              : [],
+          },
+        };
+      return null;
+    });
+    try {
+      await page.goto("/");
+      for (let step = 0; step < 4; step++) await button(page, "Skip").click();
+      await expect(
+        page.getByRole("heading", { name: "ChatGPT", exact: true }),
+      ).toBeFocused();
+      await expect(
+        page.getByText("Shared with everyone on this Euler server."),
+      ).toBeHidden();
+      await expect(page.getByRole("alert")).toBeHidden();
+
+      const popup = page.waitForEvent("popup");
+      await button(page, "Sign in with ChatGPT").click();
+      await popup;
+      await page
+        .getByLabel("Callback URL")
+        .fill("http://127.0.0.1:1455/auth/callback?code=c&state=abc");
+      await button(page, "Connect").click();
+      await expect(page.getByText("Nick Example")).toBeVisible();
+      await expect(page.getByText("nick@example.com")).toHaveCSS(
+        "filter",
+        "blur(5px)",
+      );
+      if (device === "desktop")
+        await expect(progress(page)).toContainText("ChatGPT connected");
+
+      await button(page, "Continue").click();
+      await expect(
+        page.getByRole("heading", { name: "Default model" }),
+      ).toBeFocused();
+      await expect(
+        page.getByRole("button", { name: "Model: GPT-5.5" }),
+      ).toBeVisible();
+
+      // Going back reloads the saved account.
+      await button(page, "Back").click();
+      await expect(page.getByText("Nick Example")).toBeVisible();
+      await expect(button(page, "Disconnect")).toBeVisible();
     } finally {
       await page.close();
     }
@@ -252,6 +360,7 @@ test("onboarding desktop: skipped drafts are discarded and never reach later sav
   await button(page, "Back").click();
   await expect(page.getByLabel("Server URL")).toHaveValue("");
   await button(page, "Skip").click();
+  await button(page, "Skip").click();
 
   // A later save must carry only its own step.
   await page.getByRole("button", { name: "Reset default model" }).click();
@@ -281,7 +390,7 @@ test("onboarding desktop: new UUID enters setup and finishing opens the app with
   await page.evaluate(() => {
     document.documentElement.dataset.setupPage = "kept";
   });
-  for (let step = 0; step < 7; step++) await button(page, "Skip").click();
+  for (let step = 0; step < 8; step++) await button(page, "Skip").click();
   await expect(button(page, "Toggle chats")).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-setup-page", "kept");
   await page.reload();
@@ -317,6 +426,7 @@ test.describe("onboarding desktop layout", () => {
       "http://saved-ollama:11434",
     );
     await expect(progress(page)).toContainText("Ollama configured");
+    await button(page, "Continue").click();
     await button(page, "Continue").click();
     await button(page, "Continue").click();
     await expect(page.getByLabel("Server URL")).toBeDisabled();
@@ -364,7 +474,7 @@ test.describe("onboarding desktop layout", () => {
       page.getByRole("heading", { name: "About you" }),
     ).toBeFocused();
     await expect(progress(page)).not.toContainText("Local models");
-    for (let step = 0; step < 7; step++) await button(page, "Skip").click();
+    for (let step = 0; step < 8; step++) await button(page, "Skip").click();
     await expect(button(page, "Toggle chats")).toBeVisible();
   });
 });

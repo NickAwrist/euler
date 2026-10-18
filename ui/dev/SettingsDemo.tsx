@@ -34,6 +34,7 @@ export default function SettingsDemo() {
         onSave={async (next) =>
           setSettings((current) => ({ ...current, ...next }))
         }
+        chatgptCatalogError={null}
         onModelsChanged={async () => {}}
         onBack={() => {}}
       />

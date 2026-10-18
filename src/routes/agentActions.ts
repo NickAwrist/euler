@@ -6,12 +6,13 @@ import { markSessionViewed } from "../db/sessions";
 import { asyncRoute } from "../http/asyncRoute";
 import { requestSession } from "../http/sessionRoute";
 import { resolveModelSelection } from "../llm";
+import { chatGptStatus } from "../models/chatgpt";
 import { sendError, sendValidationError } from "../observability/http";
 import { RewindSchema, SendMessageSchema } from "../schemas/agents";
 import { ToolApprovalResponseSchema } from "../schemas/toolPermissions";
 
 /** Sends an error for a model that cannot run and returns false. */
-function modelAvailable(res: Response, model: string) {
+function modelAvailable(res: Response, model: string, owner: string) {
   if (
     resolveModelSelection(model).provider === "openrouter" &&
     !getOpenRouterApiKey()
@@ -20,6 +21,17 @@ function modelAvailable(res: Response, model: string) {
       res,
       "INVALID_REQUEST",
       "Configure an OpenRouter API key in Settings before using this model",
+    );
+    return false;
+  }
+  if (
+    resolveModelSelection(model).provider === "chatgpt" &&
+    !chatGptStatus(owner).planEnabled
+  ) {
+    sendError(
+      res,
+      "INVALID_REQUEST",
+      "Connect ChatGPT in Settings before using this model",
     );
     return false;
   }
@@ -58,7 +70,7 @@ export function agentActions() {
       return;
     }
     const main = agentRuntime.main(owner, id);
-    if (!modelAvailable(res, body.model ?? main.model)) return;
+    if (!modelAvailable(res, body.model ?? main.model, owner)) return;
     const { message, queued } = agentRuntime.send(main, body);
     res.status(202).json({ messageId: message.id, queued });
   });
@@ -156,7 +168,7 @@ export function agentActions() {
       return;
     }
     const main = agentRuntime.main(owner, id);
-    if (!modelAvailable(res, parsed.data.model ?? main.model)) return;
+    if (!modelAvailable(res, parsed.data.model ?? main.model, owner)) return;
     await agentRuntime.rewind(owner, id, parsed.data);
     res.json({ ok: true });
   });

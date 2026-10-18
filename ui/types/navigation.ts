@@ -3,6 +3,7 @@ export type SettingsTab =
   | "appearance"
   | "ollama"
   | "openrouter"
+  | "chatgpt"
   | "image-generation"
   | "web-search";
 

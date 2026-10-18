@@ -7,7 +7,7 @@ export type { ModelReasoning };
 export interface ModelOption {
   id: string;
   name: string;
-  provider: "ollama" | "openrouter";
+  provider: "ollama" | "openrouter" | "chatgpt";
   lab: string;
   route?: string;
   publisherId?: string;

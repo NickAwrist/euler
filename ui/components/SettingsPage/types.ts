@@ -33,6 +33,7 @@ export type SettingsPageProps = {
     ollamaHost: string | undefined,
     comfyui?: ComfyUIConfigPayload,
   ) => Promise<void>;
+  chatgptCatalogError: string | null;
   onModelsChanged: () => Promise<void>;
   onBack: () => void;
 };

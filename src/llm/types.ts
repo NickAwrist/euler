@@ -26,6 +26,7 @@ export type LlmImage = ImageAttachment & {
 };
 
 export type LlmChatRequest = {
+  ownerUuid?: string;
   model: string;
   messages: LlmMessage[];
   tools: Tool[];
@@ -45,7 +46,7 @@ export interface LlmChatStream extends AsyncIterable<LlmStreamChunk> {
   abort(): void;
 }
 
-export type ModelProvider = "ollama" | "openrouter";
+export type ModelProvider = "ollama" | "openrouter" | "chatgpt";
 
 export type ResolvedModel = {
   provider: ModelProvider;

@@ -12,6 +12,7 @@ import {
   sendError,
 } from "./observability/http";
 import attachmentsRoutes from "./routes/attachments";
+import chatGptRoutes from "./routes/chatgpt";
 import comfyuiRoutes from "./routes/comfyui";
 import debugPromptRoutes from "./routes/debugPrompt";
 import directoriesRoutes from "./routes/directories";
@@ -55,6 +56,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use("/api/usage", usageRoutes);
 app.use("/api/directories", directoriesRoutes);
 app.use("/api/settings/openrouter", openRouterRoutes);
+app.use("/api/settings/chatgpt", chatGptRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/skills", skillsRoutes);
 app.use("/api/mcp-servers", mcpServersRoutes);
