@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { chatGptAccessToken } from "../models/chatgpt";
+import { chatGptReasoningEffortSchema } from "../schemas/chatgpt";
 import type {
   LlmChatRequest,
   LlmChatStream,
@@ -178,6 +179,13 @@ export async function streamChatGptChat(
   request: LlmChatRequest,
 ): Promise<LlmChatStream> {
   if (!request.ownerUuid) throw new Error("ChatGPT requires a user UUID");
+  const effort = request.reasoningEffort
+    ? chatGptReasoningEffortSchema.safeParse(request.reasoningEffort)
+    : null;
+  if (effort && !effort.success)
+    throw new Error(
+      "Unsupported ChatGPT thinking level. Choose a level offered by the model.",
+    );
   const token = await chatGptAccessToken(request.ownerUuid);
   const controller = new AbortController();
   const response = await fetch("https://api.openai.com/v1/responses", {
@@ -192,6 +200,7 @@ export async function streamChatGptChat(
       include: ["reasoning.encrypted_content"],
       store: false,
       stream: true,
+      ...(effort?.success ? { reasoning: { effort: effort.data } } : {}),
       tools: request.tools.map((tool) => ({
         type: "function",
         name: tool.function.name,

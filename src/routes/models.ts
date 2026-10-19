@@ -111,7 +111,7 @@ modelsRoutes.get(
           ),
           inputCapabilities: [InputCapability.Text],
           supportsTools: true,
-          reasoning: null,
+          reasoning: model.reasoning,
         }));
       } catch (error) {
         chatgptError = errorMessage(error);

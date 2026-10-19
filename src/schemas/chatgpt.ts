@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+export const chatGptReasoningEffortSchema = z.enum([
+  "none",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+]);
+
 export const chatGptProfileSchema = z.object({
   name: z.string().trim().min(1).max(512).nullable().default(null),
   picture: z

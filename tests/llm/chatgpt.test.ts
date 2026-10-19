@@ -17,6 +17,7 @@ import { resolveModelSelection } from "../../src/llm/modelSelection";
 import type { LlmStreamChunk } from "../../src/llm/types";
 import {
   chatGptAccessToken,
+  chatGptModels,
   chatGptStatus,
   disconnectChatGpt,
   finishChatGptLogin,
@@ -255,28 +256,101 @@ test("Responses streams require completion, retain tool IDs and propagate midstr
   ]);
 });
 
-test("inference uses only the selected user's OAuth credential and disables storage", async () => {
+test("ChatGPT catalog exposes each model's supported API efforts and default", async () => {
   saveChatGptCredential(owner, credential());
+  mockFetch(async () =>
+    Response.json({
+      models: [
+        {
+          slug: "gpt-example",
+          display_name: "GPT Example",
+          visibility: "list",
+          default_reasoning_level: "medium",
+          supported_reasoning_levels: [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "ultra",
+          ].map((effort) => ({ effort })),
+        },
+        {
+          slug: "gpt-optional",
+          display_name: "Optional reasoning",
+          visibility: "list",
+          default_reasoning_level: "none",
+          supported_reasoning_levels: [{ effort: "none" }, { effort: "high" }],
+        },
+        { slug: "plain", display_name: "Plain", visibility: "list" },
+        { slug: "hidden", display_name: "Hidden", visibility: "hide" },
+      ],
+    }),
+  );
+  const models = await chatGptModels(owner);
+  expect(models.map((model) => model.slug)).toEqual([
+    "gpt-example",
+    "gpt-optional",
+    "plain",
+  ]);
+  expect(models[0]?.reasoning).toEqual({
+    mandatory: true,
+    defaultEnabled: true,
+    supportedEfforts: ["low", "medium", "high", "xhigh", "max"],
+    defaultEffort: "medium",
+  });
+  expect(models[1]?.reasoning).toEqual({
+    mandatory: false,
+    defaultEnabled: false,
+    supportedEfforts: ["none", "high"],
+    defaultEffort: "none",
+  });
+  expect(models[2]?.reasoning).toBeNull();
+});
+
+test("inference uses the selected user's credential and effort and disables storage", async () => {
+  saveChatGptCredential(owner, credential());
+  let expectedEffort: string | undefined;
+  let requests = 0;
   mockFetch(async (_input, init) => {
+    requests++;
     expect(new Headers(init?.headers).get("Authorization")).toBe(
       "Bearer private-access",
     );
-    expect(JSON.parse(String(init?.body))).toMatchObject({
+    const body = JSON.parse(String(init?.body));
+    expect(body).toMatchObject({
       store: false,
       stream: true,
       model: "gpt-example",
     });
+    expect(body.reasoning).toEqual(
+      expectedEffort ? { effort: expectedEffort } : undefined,
+    );
     return sse([{ type: "response.completed" }]);
   });
-  const stream = await streamChatGptChat({
-    ownerUuid: owner,
-    model: "gpt-example",
-    messages: [],
-    tools: [],
-  });
-  for await (const _chunk of stream) {
-    /* consume */
+  for (const effort of [undefined, "low", "xhigh", "max", "none"]) {
+    expectedEffort = effort;
+    const stream = await streamChatGptChat({
+      ownerUuid: owner,
+      model: "gpt-example",
+      messages: [],
+      tools: [],
+      reasoningEffort: effort,
+    });
+    for await (const _chunk of stream) {
+      /* consume */
+    }
   }
+  await expect(
+    streamChatGptChat({
+      ownerUuid: owner,
+      model: "gpt-example",
+      messages: [],
+      tools: [],
+      reasoningEffort: "ultra",
+    }),
+  ).rejects.toThrow("Unsupported ChatGPT thinking level");
+  expect(requests).toBe(5);
   await expect(
     streamChatGptChat({
       ownerUuid: other,

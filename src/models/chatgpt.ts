@@ -10,7 +10,11 @@ import {
 } from "../db/chatgpt";
 import type { ChatGptCredential, ChatGptRegistration } from "../db/chatgpt";
 import { OperationError } from "../observability/errors";
-import { chatGptProfileSchema } from "../schemas/chatgpt";
+import {
+  chatGptProfileSchema,
+  chatGptReasoningEffortSchema,
+} from "../schemas/chatgpt";
+import type { ModelReasoning } from "./modelCapabilities";
 
 const issuer = "https://auth.openai.com";
 const resource = "https://api.openai.com/v1";
@@ -246,6 +250,10 @@ const catalogSchema = z.object({
       slug: z.string().min(1),
       display_name: z.string(),
       visibility: z.string(),
+      default_reasoning_level: z.string().nullish(),
+      supported_reasoning_levels: z
+        .array(z.object({ effort: z.string() }))
+        .nullish(),
     }),
   ),
 });
@@ -261,5 +269,27 @@ export async function chatGptModels(owner: string) {
     );
   return catalogSchema
     .parse(await response.json())
-    .models.filter((model) => model.visibility === "list");
+    .models.filter((model) => model.visibility === "list")
+    .map(
+      ({ default_reasoning_level, supported_reasoning_levels, ...model }) => {
+        // Catalog presets such as "ultra" are not Responses API effort values.
+        const supportedEfforts = (supported_reasoning_levels ?? [])
+          .map((level) => level.effort)
+          .filter(
+            (effort) => chatGptReasoningEffortSchema.safeParse(effort).success,
+          );
+        const defaultEffort = supportedEfforts.find(
+          (effort) => effort === default_reasoning_level,
+        );
+        const reasoning: ModelReasoning | null = supportedEfforts.length
+          ? {
+              mandatory: !supportedEfforts.includes("none"),
+              defaultEnabled: defaultEffort !== "none",
+              supportedEfforts,
+              ...(defaultEffort ? { defaultEffort } : {}),
+            }
+          : null;
+        return { ...model, reasoning };
+      },
+    );
 }
