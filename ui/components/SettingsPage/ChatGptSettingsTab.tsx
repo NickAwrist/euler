@@ -135,7 +135,16 @@ export function ChatGptSettingsTab({
                   >
                     <span
                       aria-hidden={!emailShown}
-                      className={`transition-[filter] duration-150 motion-reduce:transition-none ${emailShown ? "" : "select-none blur-[5px]"}`}
+                      className="transition duration-150 motion-reduce:transition-none"
+                      style={
+                        emailShown
+                          ? undefined
+                          : {
+                              filter: "blur(5px)",
+                              WebkitUserSelect: "none",
+                              userSelect: "none",
+                            }
+                      }
                     >
                       {status.email}
                     </span>
@@ -177,13 +186,19 @@ export function ChatGptSettingsTab({
         )}
 
         {status && !connected && !authorizationUrl && (
-          <Button
-            variant="primary"
-            loading={busy}
-            onClick={() => void signIn()}
-          >
-            Sign in with ChatGPT
-          </Button>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              After signing in, you'll need to copy the redirected URL and paste
+              it here.
+            </p>
+            <Button
+              variant="primary"
+              loading={busy}
+              onClick={() => void signIn()}
+            >
+              Sign in with ChatGPT
+            </Button>
+          </div>
         )}
 
         {status && !connected && authorizationUrl && (
@@ -194,7 +209,7 @@ export function ChatGptSettingsTab({
               void connect();
             }}
           >
-            <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground marker:text-muted-foreground">
+            <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
               <li>
                 Sign in on the{" "}
                 <a
