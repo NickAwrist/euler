@@ -41,6 +41,7 @@ export default function OnboardingDemo() {
         await saveComfyUIConfig(config);
       }}
       onModelsChanged={async () => {}}
+      chatgptCatalogError={null}
       onComplete={() => setDone(true)}
     />
   );

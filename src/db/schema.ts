@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS openrouter_models (
 );
 CREATE TABLE IF NOT EXISTS model_favorites (
   owner_uuid TEXT NOT NULL,
-  provider TEXT NOT NULL CHECK (provider IN ('openrouter', 'ollama')),
+  provider TEXT NOT NULL CHECK (provider IN ('openrouter', 'ollama', 'chatgpt')),
   model_id TEXT NOT NULL,
   PRIMARY KEY (owner_uuid, provider, model_id)
 );
@@ -167,6 +167,20 @@ CREATE INDEX IF NOT EXISTS idx_jobs_session ON jobs(session_id, owner_uuid);`;
 export function createSchema(db: Database) {
   db.transaction(() => {
     db.run(TABLES);
+    const favorites = db
+      .query("SELECT sql FROM sqlite_master WHERE name = 'model_favorites'")
+      .get() as { sql: string };
+    if (!favorites.sql.includes("'chatgpt'")) {
+      db.run(`ALTER TABLE model_favorites RENAME TO model_favorites_previous;
+        CREATE TABLE model_favorites (
+          owner_uuid TEXT NOT NULL,
+          provider TEXT NOT NULL CHECK (provider IN ('openrouter', 'ollama', 'chatgpt')),
+          model_id TEXT NOT NULL,
+          PRIMARY KEY (owner_uuid, provider, model_id)
+        );
+        INSERT INTO model_favorites SELECT * FROM model_favorites_previous;
+        DROP TABLE model_favorites_previous;`);
+    }
     db.run(INDEXES);
     // A publisher the user removed stays untracked.
     const insert = db.prepare(

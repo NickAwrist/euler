@@ -120,7 +120,7 @@ settingsRoutes.put("/models/favorite", (req, res) => {
   if (!owner) return;
   const parsed = z
     .object({
-      provider: z.enum(["openrouter", "ollama"]),
+      provider: z.enum(["openrouter", "ollama", "chatgpt"]),
       modelId: z.string().trim().min(1).max(200),
       favorite: z.boolean(),
     })

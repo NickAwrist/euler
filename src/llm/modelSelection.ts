@@ -8,6 +8,8 @@ export function openRouterModelId(route: string): string {
 
 export function resolveModelSelection(selection: string): ResolvedModel {
   const trimmed = selection.trim();
+  if (trimmed.startsWith("chatgpt:"))
+    return { provider: "chatgpt", model: trimmed.slice(8) };
   return trimmed.startsWith(OPENROUTER_MODEL_PREFIX)
     ? {
         provider: "openrouter",

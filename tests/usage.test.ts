@@ -297,3 +297,17 @@ test("provider combinations filter all aggregates and preserve the unfiltered pr
     getUsageDashboard("alice", query({ providers: [] }), now).totals.calls,
   ).toBe(4);
 });
+
+test("ChatGPT usage retains its provider prefix and unknown plan costs", () => {
+  recordUsage("alice", "chatgpt:gpt-example", {
+    promptTokens: 20,
+    outputTokens: 5,
+  });
+  const dashboard = getUsageDashboard(
+    "alice",
+    UsageQuery.parse({ providers: ["chatgpt"] }),
+  );
+  expect(dashboard.providers[0]?.key).toBe("chatgpt");
+  expect(dashboard.breakdown.rows[0]?.key).toBe("chatgpt:gpt-example");
+  expect(dashboard.totals).toMatchObject({ calls: 1, tokens: 25, cost: null });
+});

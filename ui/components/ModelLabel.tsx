@@ -1,5 +1,5 @@
 import { ProviderIcon } from "./ModelSelectBar";
-import { modelProviderId, providerIcons } from "./modelProviders";
+import { modelProviderId, modelRoute, providerIcons } from "./modelProviders";
 
 export function ModelLabel({
   model,
@@ -12,7 +12,7 @@ export function ModelLabel({
   hideProvider?: boolean;
 }) {
   const provider = modelProviderId(model);
-  const route = model.replace(/^openrouter:/, "");
+  const route = modelRoute(model);
   const name =
     hideProvider && route !== model
       ? route.slice(route.indexOf("/") + 1)

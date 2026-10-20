@@ -5,6 +5,7 @@ import { Button } from "../Button";
 import { PageTabRail } from "../PageTabRail";
 import { UnsavedChangesModal } from "../UnsavedChangesModal";
 import { AppearanceSettingsTab } from "./AppearanceSettingsTab";
+import { ChatGptSettingsTab } from "./ChatGptSettingsTab";
 import { GeneralSettingsTab } from "./GeneralSettingsTab";
 import { ImageGenerationTab } from "./ImageGenerationTab";
 import { OllamaSettingsTab } from "./OllamaSettingsTab";
@@ -12,12 +13,14 @@ import { OpenRouterSettingsTab } from "./OpenRouterSettingsTab";
 import { WebSearchTab } from "./WebSearchTab";
 import { SETTINGS_TABS } from "./constants";
 import type { SettingsPageProps } from "./types";
+import { useChatGptStatus } from "./useChatGptStatus";
 import { useEnvironmentSettings } from "./useEnvironmentSettings";
 import { useSettingsPageState } from "./useSettingsPageState";
 
 export function SettingsPage(props: SettingsPageProps) {
   const p = useSettingsPageState(props);
   const environment = useEnvironmentSettings();
+  const chatGptAccount = useChatGptStatus();
   const { tab, onTabChange: setTab } = props;
   const { prompt, setPrompt, resolveLeave } = useUnsavedChanges(
     p.isDirty,
@@ -85,6 +88,14 @@ export function SettingsPage(props: SettingsPageProps) {
               ollamaConnected={p.ollama.connected}
               testState={p.ollama.testState}
               onTestOllama={p.ollama.test}
+            />
+          )}
+
+          {tab === "chatgpt" && (
+            <ChatGptSettingsTab
+              account={chatGptAccount}
+              catalogError={props.chatgptCatalogError}
+              onModelsChanged={props.onModelsChanged}
             />
           )}
 

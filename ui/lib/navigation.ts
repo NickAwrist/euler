@@ -18,6 +18,7 @@ function settingsTab(path: string): SettingsTab {
   return tab === "appearance" ||
     tab === "ollama" ||
     tab === "openrouter" ||
+    tab === "chatgpt" ||
     tab === "image-generation" ||
     tab === "web-search"
     ? tab

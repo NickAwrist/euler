@@ -15,12 +15,14 @@ import {
   AppearanceSettingsTab,
   themes,
 } from "./SettingsPage/AppearanceSettingsTab";
+import { ChatGptSettingsTab } from "./SettingsPage/ChatGptSettingsTab";
 import { DefaultModelSetting } from "./SettingsPage/DefaultModelSetting";
 import { ImageGenerationTab } from "./SettingsPage/ImageGenerationTab";
 import { OllamaSettingsTab } from "./SettingsPage/OllamaSettingsTab";
 import { OpenRouterSettingsTab } from "./SettingsPage/OpenRouterSettingsTab";
 import { useApiKeySetting } from "./SettingsPage/useApiKeySetting";
 import { useAppearanceDraft } from "./SettingsPage/useAppearanceDraft";
+import { useChatGptStatus } from "./SettingsPage/useChatGptStatus";
 import { useEnvironmentSettings } from "./SettingsPage/useEnvironmentSettings";
 import {
   type ServiceStatus,
@@ -60,6 +62,7 @@ type Props = {
   onSaveOllamaHost: (host: string) => Promise<void>;
   onSaveComfyUI: (config: ComfyUIConfigPayload) => Promise<void>;
   onModelsChanged: () => Promise<void>;
+  chatgptCatalogError: string | null;
   onComplete: () => void;
 };
 export function Onboarding({
@@ -72,6 +75,7 @@ export function Onboarding({
   onSaveOllamaHost,
   onSaveComfyUI,
   onModelsChanged,
+  chatgptCatalogError,
   onComplete,
 }: Props) {
   const [step, setStep] = useState(0);
@@ -82,6 +86,7 @@ export function Onboarding({
   const aboutYou = useSavedDraft(settings);
   const appearance = useAppearanceDraft();
   const [openRouterKey, setOpenRouterKey] = useState(false);
+  const chatGptAccount = useChatGptStatus();
   const ollamaDraft = useOllamaDraft(ollama.host, ollama.connected);
   const defaultModel = useSavedDraft(settings.defaultModel);
   const comfy = useComfyUIDraft(comfyui, comfyui.connected);
@@ -159,6 +164,7 @@ export function Onboarding({
       summary: servicesSummary([
         ["OpenRouter", openRouterKey ? "configured" : null],
         ["Ollama", ollamaDraft.status],
+        ["ChatGPT", chatGptAccount.status?.planEnabled ? "connected" : null],
       ]),
       steps: [
         {
@@ -198,6 +204,20 @@ export function Onboarding({
             return true;
           },
           discard: ollamaDraft.reset,
+        },
+        {
+          title: "ChatGPT",
+          description: "Use the models included with your ChatGPT plan.",
+          content: (
+            <ChatGptSettingsTab
+              account={chatGptAccount}
+              catalogError={chatgptCatalogError}
+              onModelsChanged={onModelsChanged}
+            />
+          ),
+          // The account connects and disconnects from its own controls.
+          save: async () => true,
+          discard: () => {},
         },
       ],
     },

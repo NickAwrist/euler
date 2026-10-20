@@ -159,6 +159,64 @@ test("model defaults desktop: thinking preferences survive model changes, reload
     ]);
 });
 
+for (const device of ["desktop", "mobile"] as const) {
+  test(`composer selectors ${device}: ChatGPT thinking choices persist and reach the run`, async ({
+    page,
+  }) => {
+    await mockApp(page, "chatgpt:gpt-example", async () => [
+      {
+        id: "chatgpt:gpt-example",
+        name: "GPT Example",
+        provider: "chatgpt",
+        lab: "OpenAI",
+        inputCapabilities: ["text"],
+        reasoning: {
+          mandatory: true,
+          defaultEnabled: true,
+          supportedEfforts: ["low", "medium", "high", "xhigh", "max"],
+          defaultEffort: "medium",
+        },
+      },
+    ]);
+    if (device === "mobile")
+      await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    const thinking = page.getByRole("button", { name: /^Thinking level:/ });
+    await expect(thinking).toHaveAccessibleName("Thinking level: Medium");
+    await thinking.click();
+    await expect(page.getByRole("menuitemradio")).toHaveCount(5);
+    await expect(
+      page.getByRole("menuitemradio", { name: "Off", exact: true }),
+    ).toHaveCount(0);
+    await page
+      .getByRole("menuitemradio", { name: "Extra High", exact: true })
+      .click();
+    await page.reload();
+    await expect(thinking).toHaveAccessibleName("Thinking level: Extra High");
+
+    const submissions: unknown[] = [];
+    await page.route("**/api/sessions/new/messages", async (route) => {
+      submissions.push(route.request().postDataJSON());
+      await route.fulfill({
+        status: 202,
+        json: { messageId: 1, queued: false },
+      });
+    });
+    await page
+      .getByPlaceholder("Send a message...")
+      .fill("Use extra high reasoning");
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect
+      .poll(() => submissions)
+      .toEqual([
+        expect.objectContaining({
+          model: "chatgpt:gpt-example",
+          reasoningEffort: "xhigh",
+        }),
+      ]);
+  });
+}
+
 test("model defaults desktop: thinking preferences stay synchronized across tabs", async ({
   page,
   context,

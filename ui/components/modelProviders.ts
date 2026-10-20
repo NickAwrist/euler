@@ -12,6 +12,7 @@ export type ModelProvider = {
 export const providerIcons: Record<string, string> = {
   anthropic: "/icons/providers/claude.svg",
   openai: "/icons/providers/openai.svg",
+  chatgpt: "/icons/providers/codex.svg",
   google: "/icons/providers/gemini.svg",
   deepseek: "/icons/providers/deepseek.svg",
   xai: "/icons/providers/xai.svg",
@@ -29,10 +30,14 @@ export function groupModelProviders(models: ModelOption[]): ModelProvider[] {
   const groups = new Map<string, ModelProvider>();
   for (const model of models) {
     const name =
-      model.provider === "ollama" ? "Ollama" : model.lab.trim() || "OpenRouter";
-    const id =
       model.provider === "ollama"
-        ? "ollama"
+        ? "Ollama"
+        : model.provider === "chatgpt"
+          ? "ChatGPT"
+          : model.lab.trim() || "OpenRouter";
+    const id =
+      model.provider === "ollama" || model.provider === "chatgpt"
+        ? model.provider
         : `openrouter:${model.publisherId ?? (model.route ?? model.id.replace(/^openrouter:/, "")).split("/")[0]}`;
     let group = groups.get(id);
     if (!group) {
@@ -50,7 +55,12 @@ export function groupModelProviders(models: ModelOption[]): ModelProvider[] {
       group = {
         id,
         name,
-        iconUrl: model.provider === "ollama" ? "/icons/ollama.svg" : icon,
+        iconUrl:
+          model.provider === "ollama"
+            ? "/icons/ollama.svg"
+            : model.provider === "chatgpt"
+              ? providerIcons.chatgpt
+              : icon,
         models: [],
       };
       groups.set(id, group);
@@ -62,7 +72,13 @@ export function groupModelProviders(models: ModelOption[]): ModelProvider[] {
 }
 
 export function modelProviderId(model: string) {
+  if (model.startsWith("chatgpt:")) return "chatgpt";
   return model.startsWith("openrouter:")
     ? model.slice(11).split("/")[0]!
     : "ollama";
+}
+
+/** Model ID without its catalog prefix, for display. */
+export function modelRoute(model: string) {
+  return model.replace(/^(openrouter|chatgpt):/, "");
 }

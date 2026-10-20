@@ -5,6 +5,7 @@ export const SETTINGS_TABS: readonly { id: SettingsTab; label: string }[] = [
   { id: "appearance", label: "Appearance" },
   { id: "ollama", label: "Ollama" },
   { id: "openrouter", label: "OpenRouter" },
+  { id: "chatgpt", label: "ChatGPT" },
   { id: "image-generation", label: "Image Generation" },
   { id: "web-search", label: "Web Search" },
 ];

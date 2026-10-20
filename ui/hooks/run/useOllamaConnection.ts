@@ -20,12 +20,14 @@ export function mapModelOptions(value: unknown): ModelOption[] {
       ): m is Record<string, unknown> & {
         id: string;
         name: string;
-        provider: "ollama" | "openrouter";
+        provider: "ollama" | "openrouter" | "chatgpt";
         lab: string;
       } =>
         typeof m.id === "string" &&
         typeof m.name === "string" &&
-        (m.provider === "ollama" || m.provider === "openrouter") &&
+        (m.provider === "ollama" ||
+          m.provider === "openrouter" ||
+          m.provider === "chatgpt") &&
         typeof m.lab === "string",
     )
     .map((m) => ({
@@ -69,10 +71,20 @@ export function mapModelOptions(value: unknown): ModelOption[] {
     }));
 }
 
+function chatgptCatalogErrorOf(
+  providers: { chatgpt?: { error?: unknown } } | undefined,
+): string | null {
+  const error = providers?.chatgpt?.error;
+  return typeof error === "string" ? error : null;
+}
+
 export function useOllamaConnection() {
   const [ollamaModels, setOllamaModels] = useState<ModelOption[]>([]);
   const [catalogLoaded, setCatalogLoaded] = useState(false);
   const [modelsLoadError, setModelsLoadError] = useState<string | null>(null);
+  const [chatgptCatalogError, setChatgptCatalogError] = useState<string | null>(
+    null,
+  );
   const [ollamaHost, setOllamaHost] = useState("");
   const [ollamaConnected, setOllamaConnected] = useState<boolean | null>(null);
 
@@ -118,9 +130,11 @@ export function useOllamaConnection() {
       }
       const data = (await res.json()) as {
         models?: unknown;
+        providers?: { chatgpt?: { error?: unknown } };
       };
       if (requestId !== modelRequestId.current) return;
       setModelsLoadError(null);
+      setChatgptCatalogError(chatgptCatalogErrorOf(data.providers));
       const list = mapModelOptions(data.models);
       setOllamaModels(list);
       setCatalogLoaded(true);
@@ -164,6 +178,7 @@ export function useOllamaConnection() {
     ollamaModels,
     catalogLoaded,
     modelsLoadError,
+    chatgptCatalogError,
     ollamaHost,
     setOllamaHost,
     ollamaConnected,

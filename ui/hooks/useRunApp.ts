@@ -59,9 +59,12 @@ export function useRunApp() {
   const modelSendReady =
     selectedModelOption?.provider === "openrouter"
       ? selectedModelOption.configured === true
-      : selectedModelOption?.provider === "ollama" && ollama.ollamaReady;
-  const openRouterReady = ollama.ollamaModels.some(
-    (model) => model.provider === "openrouter" && model.configured === true,
+      : selectedModelOption?.provider === "chatgpt" ||
+        (selectedModelOption?.provider === "ollama" && ollama.ollamaReady);
+  const remoteProviderReady = ollama.ollamaModels.some(
+    (model) =>
+      model.provider === "chatgpt" ||
+      (model.provider === "openrouter" && model.configured === true),
   );
   const supportsImageInput =
     selectedModelOption?.inputCapabilities.includes(InputCapability.Image) ===
@@ -69,7 +72,7 @@ export function useRunApp() {
   const noProviderAvailable =
     ollama.catalogLoaded &&
     ollama.ollamaConnected === false &&
-    !openRouterReady;
+    !remoteProviderReady;
 
   const effectiveThinkingEffort = selectedModelOption?.reasoning
     ? resolveEffectiveThinkingEffort(
@@ -158,6 +161,7 @@ export function useRunApp() {
     ollamaModels: ollama.ollamaModels,
     catalogLoaded: ollama.catalogLoaded,
     modelsLoadError: ollama.modelsLoadError,
+    chatgptCatalogError: ollama.chatgptCatalogError,
     selectedModel: sessions.selectedModel,
     workspace: sessions.workspace,
     linkedLabel: linkedChatLabel(sessions.workspace, sessions.sessions),

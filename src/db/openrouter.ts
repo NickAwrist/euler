@@ -13,7 +13,7 @@ export type OpenRouterPublisher = {
   subscribed_at: number | null;
 };
 export type ModelFavorite = {
-  provider: "openrouter" | "ollama";
+  provider: "openrouter" | "ollama" | "chatgpt";
   model_id: string;
 };
 
