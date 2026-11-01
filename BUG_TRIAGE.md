@@ -1,10 +1,7 @@
 # GitHub issue priorities and branch plan
 
-Reviewed September 24, 2026 against `main` at `910e6c94ceb5cd94d690feb7d538f8197e0e993e` in [NickAwrist/euler](https://github.com/NickAwrist/euler).
-
-The review covered all 32 open issues, their comments, and relevant source code. Twelve issues were labeled bugs, and there were no open pull requests. This is a source-based triage, not a browser reproduction pass. Counts and priorities are a snapshot.
-
-Tool-output display, ephemeral-exit protection, chat titles/export, workspace feedback, Usage display, chat layout, drafting during a run, settings save/discard, model selection, skill validation, skill import and invocation flags, the Home composer, regenerate with reply versions, sidebar date groups, Ollama thinking control, reasoning progress with a readable trace, and LaTeX math rendering shipped in PRs #46, #45, #47, #48, #49, #50, #51, #52, #53, #54, #55, #56, #57, #58, #59, #60, and #61. The remaining work is grouped below by shared behavior and code ownership.
+Open work in [NickAwrist/euler](https://github.com/NickAwrist/euler/issues),
+checked against the source on November 1, 2026. Priorities are a snapshot.
 
 ## Priorities
 
@@ -16,11 +13,13 @@ Tool-output display, ephemeral-exit protection, chat titles/export, workspace fe
 
 | Priority | Issues | Recommended boundary |
 | --- | --- | --- |
-| P3 | Remaining [#37](https://github.com/NickAwrist/euler/issues/37) | Bulk deletion and model-generated titles. Date groups, relative times, hover menus, and preview cleanup have shipped; search was dropped. |
+| P2 | [#94](https://github.com/NickAwrist/euler/issues/94) | Keyboard scrolling, and likely scrollbar drags, stay pinned to the bottom while a reply streams. The cause is in `use-stick-to-bottom`'s scroll handler. |
+| P3 | Remaining [#38](https://github.com/NickAwrist/euler/issues/38) | A Continue or Retry action beside a stopped reply. Stopped replies show no marker; Regenerate is only in the reply menu. |
+| P3 | Remaining [#37](https://github.com/NickAwrist/euler/issues/37) | Bulk deletion and model-generated titles. |
 | P3 | [#27](https://github.com/NickAwrist/euler/issues/27) | UUID transfer via QR/link, retaining the existing identity model. The comment rules out making accounts or single-user mode part of this task. |
 | P3 | [#40](https://github.com/NickAwrist/euler/issues/40) | Shortcut hints/help and a neutral slash-command icon. Small independent branch. |
-| P3 | [#42](https://github.com/NickAwrist/euler/issues/42) | Dedicated theme branch after layout work settles. Review across the whole UI. |
-| P3 | Remaining [#30](https://github.com/NickAwrist/euler/issues/30) | Persist an ephemeral chat and its files. Discard confirmation has shipped; saving changes session/workspace lifecycle. |
+| P3 | Remaining [#30](https://github.com/NickAwrist/euler/issues/30) | Persist an ephemeral chat and its files. #30 is closed, so this has no open issue. Saving changes session/workspace lifecycle. |
+| P3 | [#42](https://github.com/NickAwrist/euler/issues/42) | Light theme that follows `prefers-color-scheme`, with a manual override. Review across the whole UI. |
 
 An issue split across multiple merges should remain open until its agreed scope is complete, or have the remaining work tracked explicitly in follow-up issues.
 

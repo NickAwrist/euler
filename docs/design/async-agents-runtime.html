@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Euler agent runtime: old vs new</title>
+<title>Euler agent runtime</title>
 <style>
   :root {
     --bg: #0f1115; --panel: #161a21; --panel2: #1c212a; --border: #2a303b;
@@ -27,17 +27,15 @@
   nav a:hover { color: var(--text); border-color: var(--faint); }
 
   /* Side-by-side flows */
-  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   .flow { display: flex; flex-direction: column; align-items: stretch; }
   .flow h3 { margin: 0 0 4px; font-size: 17px; }
   .flow .tag { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
-  .old .tag { color: var(--red); } .new .tag { color: var(--blue); }
   .flow .sub { color: var(--muted); font-size: 13.5px; margin-bottom: 14px; }
   .box { border: 1px solid var(--border); background: var(--panel2); border-radius: 10px; padding: 10px 14px; }
   .box b { display: block; font-size: 14.5px; }
   .box span { color: var(--muted); font-size: 13px; }
-  .old .box { border-left: 3px solid var(--red); }
   .new .box { border-left: 3px solid var(--blue); }
+  .new .tag { color: var(--blue); }
   .new .box.store { border-left-color: var(--green); }
   .new .box.events { border-left-color: var(--purple); }
   .arrow { text-align: center; color: var(--faint); font-size: 12.5px; padding: 3px 0; line-height: 1.3; }
@@ -45,14 +43,13 @@
   .arrow.up::before { content: "↑"; }
   .pill-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
   .pill { font-size: 12.5px; border-radius: 999px; padding: 3px 10px; border: 1px solid var(--border); color: var(--muted); }
-  .old .pill { border-color: #5a2d33; color: #f3a6ad; }
   .new .pill { border-color: #2b456b; color: #a9c9ff; }
 
   table { width: 100%; border-collapse: collapse; font-size: 14px; }
   th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--border); }
   th { color: var(--muted); font-weight: 600; font-size: 12.5px; text-transform: uppercase; letter-spacing: .06em; }
   td:first-child { color: var(--muted); width: 180px; }
-  td.o { color: #f3c0c5; } td.n { color: #cfe0ff; }
+  td.n { color: #cfe0ff; }
 
   /* Architecture layers */
   .layer { display: grid; grid-template-columns: 170px 1fr; gap: 16px; align-items: stretch; margin-bottom: 10px; }
@@ -89,8 +86,8 @@
 </head>
 <body>
 <main>
-  <h1>Euler agent runtime: old vs new</h1>
-  <p class="lede">The old runtime was a single browser request: the page sent the whole conversation, one agent ran, and the answer streamed back over that request. The new runtime lives on the server. Each chat has durable agents with their own inboxes. A scheduler decides what runs, and every change is broadcast to the browser as an event.</p>
+  <h1>Euler agent runtime</h1>
+  <p class="lede">The runtime lives on the server. Each chat has durable agents with their own inboxes. A scheduler decides what runs, and every change is broadcast to the browser as an event.</p>
   <nav>
     <a href="#s1">1 · Big picture</a><a href="#s2">2 · Who owns what</a><a href="#s3">3 · A message's journey</a>
     <a href="#s4">4 · Agent lifecycle</a><a href="#s5">5 · Parent ↔ subagent</a><a href="#s6">6 · Limits &amp; the budget</a>
@@ -99,32 +96,13 @@
 
   <!-- 1 -->
   <h2 id="s1"><span class="num">1</span>The big picture</h2>
-  <p class="lede">The biggest change is who owns a turn. Before, it was the browser request. Now it's the server runtime, and the browser only watches.</p>
-  <div class="compare">
-    <div class="panel flow old">
-      <div class="tag">Old · request-driven</div>
-      <h3>One POST = one turn</h3>
-      <div class="sub"><code>POST /api/runs</code> → <code>AgentSession</code> → SSE on the same request</div>
-      <div class="box"><b>Browser</b><span>Holds the transcript and the model history. Composer is disabled while a turn runs.</span></div>
-      <div class="arrow">POST /api/runs { message, history, modelMessages }</div>
-      <div class="box"><b>runController + workspace lock</b><span><code>beginTurn()</code> allows one turn per chat. A second one gets 409.</span></div>
-      <div class="arrow">builds a fresh session from the request body</div>
-      <div class="box"><b>AgentSession</b> <span>Lives in memory for this request only. It rehydrates history from what the client sent.</span></div>
-      <div class="arrow">agent.run()</div>
-      <div class="box"><b>BaseAgent loop</b><span>LLM call → tools → repeat until no tool calls</span></div>
-      <div class="arrow">tool: run_subagent (blocks)</div>
-      <div class="box"><b>Nested subagent</b><span>Runs <em>inside</em> the parent's tool call. Its trace is nested under the step as <code>childRun</code>, and it's gone when it finishes.</span></div>
-      <div class="arrow">saveInitial / saveFinal: rewrite the transcript and <code>sessions.model_messages</code></div>
-      <div class="box"><b>SQLite</b><span>messages + one JSON blob of model history per chat</span></div>
-      <div class="pill-row"><span class="pill">closing the tab = losing the stream</span><span class="pill">restart = lost turn</span><span class="pill">no queueing</span></div>
-    </div>
-
+  <p class="lede">The server runtime owns every turn; the browser sends messages and watches events.</p>
     <div class="panel flow new">
-      <div class="tag">New · server-owned, event-driven</div>
+      <div class="tag">Server-owned, event-driven</div>
       <h3>Messages go into inboxes; a runtime does the work</h3>
       <div class="sub"><code>POST /sessions/:id/messages</code> returns 202 right away; progress arrives on <code>/api/events</code></div>
       <div class="box"><b>Browser</b><span>Sends only the new text and settings. The composer stays enabled, so extra messages queue up.</span></div>
-      <div class="arrow">POST …/messages { content, model, effort } → 202</div>
+      <div class="arrow">POST …/messages { content, attachmentIds, model, reasoningEffort, metadata } → 202</div>
       <div class="box store"><b>Inbox</b> <span>Row in <code>agent_messages</code> for the chat's main agent. It's durable, so a restart doesn't lose it.</span></div>
       <div class="arrow">schedule() → pump(): slots free? budget left?</div>
       <div class="box"><b>AgentRuntime (the scheduler)</b><span>Starts one activation per agent. It enforces concurrency limits and the automatic-turn budget.</span></div>
@@ -136,20 +114,19 @@
       <div class="box events"><b>EventHub → one SSE stream per user</b><span>Sequenced and replayable with Last-Event-ID. <code>useAgentEvents</code> applies events to a snapshot.</span></div>
       <div class="pill-row"><span class="pill">survives disconnects</span><span class="pill">restart-safe</span><span class="pill">parallel subagents</span><span class="pill">queue / edit / deliver</span></div>
     </div>
-  </div>
 
   <div class="panel" style="margin-top:20px">
     <table>
-      <thead><tr><th></th><th>Old</th><th>New</th></tr></thead>
+      <thead><tr><th></th><th>Current</th></tr></thead>
       <tbody>
-        <tr><td>Who owns a turn</td><td class="o">The HTTP request. The turn ends if the connection does.</td><td class="n"><code>AgentRuntime</code> on the server. The request only enqueues a message.</td></tr>
-        <tr><td>Source of model history</td><td class="o">Sent by the client each turn and saved as one JSON blob.</td><td class="n">Server-owned. Each agent has its own <code>agent_history</code>, one row per message, and only changed rows are written.</td></tr>
-        <tr><td>Concurrency</td><td class="o">One turn per chat; anything else gets 409.</td><td class="n">Several agents per chat. At most 3 active subagents per chat and <code>EULER_MAX_RUNNING_AGENTS</code> (default 4) running per user.</td></tr>
-        <tr><td>Typing while busy</td><td class="o">Composer disabled</td><td class="n">Queued. You can edit, remove, or let it arrive at the next model call.</td></tr>
-        <tr><td>Subagents</td><td class="o">Blocking tool call, nested and throwaway</td><td class="n">Durable agents: async by default, can be reused, can ask questions, can be stopped or dismissed</td></tr>
-        <tr><td>Streaming</td><td class="o">One SSE stream per run (<code>SseManager</code>), reconnect via <code>/runs/active</code></td><td class="n">One SSE stream per user for everything, with a replay buffer and <code>resync</code> fallback</td></tr>
-        <tr><td>Server restart</td><td class="o">In-flight turn lost</td><td class="n"><code>recovery.ts</code> saves the partial reply, fixes tool history, and holds input until you press Deliver</td></tr>
-        <tr><td>Sidebar</td><td class="o">No per-chat status</td><td class="n">"working" / "unread" badges</td></tr>
+        <tr><td>Who owns a turn</td><td class="n"><code>AgentRuntime</code> on the server. The request only enqueues a message.</td></tr>
+        <tr><td>Source of model history</td><td class="n">Server-owned. Each agent has its own <code>agent_history</code>, one row per message, and only changed rows are written.</td></tr>
+        <tr><td>Concurrency</td><td class="n">Several agents per chat. At most 3 active subagents per chat and <code>EULER_MAX_RUNNING_AGENTS</code> (default 4) running per user.</td></tr>
+        <tr><td>Typing while busy</td><td class="n">Queued. You can edit, remove, or let it arrive at the next model call.</td></tr>
+        <tr><td>Subagents</td><td class="n">Durable agents: async by default, can be reused, can ask questions, can be stopped or dismissed</td></tr>
+        <tr><td>Streaming</td><td class="n">One SSE stream per user for everything, with a replay buffer and <code>resync</code> fallback</td></tr>
+        <tr><td>Server restart</td><td class="n"><code>recovery.ts</code> saves the partial reply, fixes tool history, and holds input until you press Deliver</td></tr>
+        <tr><td>Sidebar</td><td class="n">"working" / "unread" badges</td></tr>
       </tbody>
     </table>
   </div>
@@ -169,7 +146,7 @@
 
     <div class="layer l-http"><div class="label"><b>HTTP</b><span>src/routes/</span></div>
       <div class="cards" style="grid-template-columns: 2fr 1fr">
-        <div class="card"><div class="file">routes/agentActions.ts</div><div class="title">Thin adapter, same for saved and temporary chats</div><p><code>messages</code> · <code>stop</code> · <code>deliver</code> · <code>rewind</code> · edit/remove queued · <code>runtime</code> snapshot · agent detail · cancel agent · <code>viewed</code>. Validates with Zod, then calls one runtime method.</p></div>
+        <div class="card"><div class="file">routes/agentActions.ts</div><div class="title">Thin adapter, same for saved and ephemeral chats</div><p><code>messages</code> · <code>stop</code> · <code>deliver</code> · <code>rewind</code> · remove queued, restore text to edit · <code>runtime</code> snapshot · agent detail · cancel agent · <code>viewed</code> · jobs · approvals. Validates with Zod, then calls one runtime method.</p></div>
         <div class="card"><div class="file">app.ts · events/eventHub.ts</div><div class="title">/api/events</div><p>Per-user SSE with sequence ids, 2000-event / 4 MB replay, slow-client cutoff.</p></div>
       </div></div>
     <div class="down">↓</div>
@@ -178,7 +155,7 @@
       <div class="cards" style="grid-template-columns: repeat(4, 1fr)">
         <div class="card brain"><div class="title">Scheduler</div><ul><li><code>schedule()</code> / <code>pump()</code></li><li>picks agents with waking mail</li><li>child slots (3/chat), owner slots (N/user)</li><li>blocking spawn frees its slot</li></ul></div>
         <div class="card brain"><div class="title">Automatic-turn budget</div><ul><li>10 agent-driven turns per chat</li><li>when exceeded: hold mail, show Deliver</li><li>user message or Deliver resets it</li></ul></div>
-        <div class="card brain"><div class="title">Messaging &amp; tools</div><ul><li><code>enqueue()</code>: the only way into an inbox</li><li>wires spawn_agent, send_message, ask_parent, cancel_agent</li></ul></div>
+        <div class="card brain"><div class="title">Messaging &amp; tools</div><ul><li><code>enqueue()</code>: the only way to send waking mail</li><li>wires spawn_agent, send_message, ask_parent, cancel_agent</li></ul></div>
         <div class="card brain"><div class="title">Conversation control</div><ul><li><code>cancel</code> (stop / dismiss)</li><li><code>rewind</code> (edit / regenerate)</li><li><code>deleteSession</code>, <code>deliver</code></li></ul></div>
       </div></div>
     <div class="down">↓ starts one activation per agent at a time</div>
@@ -188,20 +165,20 @@
         <div class="card"><div class="file">activation.ts</div><div class="title">One activation, start to finish</div><ul><li>builds a BaseAgent from saved history + tools</li><li><code>beforeModelCall</code>: delivers inbox, checks budget, closes transcript segments</li><li>saves steps and partial reply as it goes; emits delta/step events</li><li>at the end: attaches outputs, reports result/failure to the parent</li></ul></div>
         <div class="card"><div class="file">recovery.ts</div><div class="title">Startup repair</div><p>Settles agents a restart interrupted. Nothing restarts on its own.</p></div>
         <div class="card"><div class="file">agentContext.ts</div><div class="title">What the model sees</div><p><code>&lt;agent_message&gt;</code> envelopes and the <code>&lt;background_agents&gt;</code> summary.</p></div>
-        <div class="card"><div class="file">workspaceOutputs.ts · toolResults.ts</div><div class="title">Small utilities</div><p>Files written by tools → attachments; placeholder results for unfinished tool calls.</p></div>
+        <div class="card"><div class="file">workspaceOutputs.ts · ../toolResults.ts</div><div class="title">Small utilities</div><p>Files written by tools → attachments; placeholder results for unfinished tool calls.</p></div>
       </div></div>
     <div class="down">↓</div>
 
     <div class="layer l-eng"><div class="label"><b>Agent engine</b><span>unchanged core</span></div>
       <div class="cards" style="grid-template-columns: 1fr 1fr">
-        <div class="card"><div class="file">agents/BaseAgent.ts</div><div class="title">LLM ⇄ tools loop</div><p>Same loop as before, plus three hooks the runtime plugs into: <code>beforeModelCall</code>, <code>checkpoint</code>, <code>hasPendingInput</code>. A tool can end the activation early (<code>ask_parent</code>).</p></div>
+        <div class="card"><div class="file">agents/BaseAgent.ts</div><div class="title">LLM ⇄ tools loop</div><p>The model and tool loop, with three hooks the runtime plugs into: <code>beforeModelCall</code>, <code>checkpoint</code>, <code>hasPendingInput</code>. A tool can end the activation early (<code>ask_parent</code>).</p></div>
         <div class="card"><div class="file">RunContext.ts · tools/*</div><div class="title">Steps &amp; tools</div><p>Records steps, streams deltas, tracks files written. New tools: <code>spawn_agent</code>, <code>send_message</code>, <code>ask_parent</code>, <code>cancel_agent</code>. <code>run_subagent</code> is gone.</p></div>
       </div></div>
     <div class="down">↓</div>
 
     <div class="layer l-state"><div class="label"><b>State</b><span>src/db/</span></div>
       <div class="cards" style="grid-template-columns: 1.3fr 1fr 1fr">
-        <div class="card"><div class="file">db/agents.ts: AgentStore</div><div class="title">One live record per agent</div><p>Caches a chat's agents while it has work, so every code path shares one object, and releases them when idle. Temporary chats live only in memory.</p></div>
+        <div class="card"><div class="file">db/agents.ts: AgentStore</div><div class="title">One live record per agent</div><p>Caches a chat's agents while it has work, so every code path shares one object, and releases them when idle. Ephemeral chats use SQLite until their expiry sweep deletes them.</p></div>
         <div class="card"><div class="file">RuntimeTransaction.ts</div><div class="title">All-or-nothing writes</div><p>DB transaction + in-memory rollback. Events and scheduling wait until commit, so the UI never sees a rolled-back change.</p></div>
         <div class="card"><div class="file">SQLite</div><div class="title">Tables</div><p><code>agents</code> · <code>agent_messages</code> · <code>agent_history</code> · <code>agent_steps</code> · <code>agent_replies</code> · <code>messages</code> (transcript)</p></div>
       </div></div>
@@ -337,7 +314,7 @@
     </defs>
     <!-- working zone -->
     <rect x="40" y="40" width="620" height="330" rx="16" fill="#6ea8fe" opacity="0.05" stroke="#2b456b" stroke-dasharray="5 5"/>
-    <text x="56" y="64" fill="#6ea8fe" font-size="12" font-weight="600" letter-spacing=".08em">WORKING: counts toward limits · "working" badge</text>
+    <text x="56" y="64" fill="#6ea8fe" font-size="12" font-weight="600" letter-spacing=".08em">WORKING: running/waiting hold child slots · queued/running show "working"</text>
 
     <g font-size="15" font-weight="700" text-anchor="middle">
       <rect x="80" y="110" width="170" height="64" rx="12" fill="#1c212a" stroke="#9aa3b2"/><text x="165" y="138" fill="#e6e8ee">queued</text><text x="165" y="158" font-size="12" font-weight="400" fill="#9aa3b2">"Queued"</text>
@@ -458,7 +435,7 @@
   <h2 id="s6"><span class="num">6</span>Limits and the automatic-turn budget</h2>
   <p class="lede">Agents can wake each other, so without limits two agents could loop forever and burn tokens. There are three guards.</p>
   <div class="grid3">
-    <div class="limit"><div class="big" style="color:var(--blue)">3</div><div class="what">active subagents per chat</div><p>Running or waiting subagents take a child slot. Extra subagents show as <b>queued</b> until a slot frees up. A waiting child keeps its slot, so a blocking spawn can't deadlock.</p></div>
+    <div class="limit"><div class="big" style="color:var(--blue)">3</div><div class="what">active subagents per chat</div><p>Running or waiting subagents take a child slot. Extra subagents show as <b>queued</b> until a slot frees up. A waiting child keeps its slot. A blocking spawn returns early when its child is queued behind a child waiting on the parent, so it can't deadlock.</p></div>
     <div class="limit"><div class="big" style="color:var(--teal)">4</div><div class="what">running activations per user</div><p>Across all chats, main agents included. Set with <code>EULER_MAX_RUNNING_AGENTS</code>. An agent waiting on a blocking spawn gives its slot back.</p></div>
     <div class="limit"><div class="big" style="color:var(--amber)">10</div><div class="what">automatic turns per chat</div><p>Model calls triggered by agents or the runtime instead of by you. Tool continuations inside one activation don't count.</p></div>
   </div>
@@ -487,16 +464,16 @@
   <h2 id="s7"><span class="num">7</span>Where data lives</h2>
   <div class="panel">
     <table>
-      <thead><tr><th>Data</th><th>Old</th><th>New</th></tr></thead>
+      <thead><tr><th>Data</th><th>Stored in</th></tr></thead>
       <tbody>
-        <tr><td>Transcript (what you see)</td><td class="o"><code>messages</code>, rewritten from the client's copy</td><td class="n"><code>messages</code>, append-only from the runtime (<code>appendRuntimeMessage</code>); rewind truncates it</td></tr>
-        <tr><td>Model history</td><td class="o"><code>sessions.model_messages</code>: one JSON blob</td><td class="n"><code>agent_history</code>: one row per message, per agent</td></tr>
-        <tr><td>Agents</td><td class="o">none (in memory, per request)</td><td class="n"><code>agents</code>: status column + JSON data (title, model, config, checkpoints…)</td></tr>
-        <tr><td>Pending input</td><td class="o">none</td><td class="n"><code>agent_messages</code>: the inbox, with <code>wakes</code>, <code>held</code>, <code>delivered_at</code></td></tr>
-        <tr><td>Trace steps</td><td class="o">inside the assistant message, subagents nested as <code>childRun</code></td><td class="n"><code>agent_steps</code> per activation while it runs; a main agent's steps move to the transcript when its segment closes</td></tr>
-        <tr><td>Partial reply</td><td class="o">none: lost on crash</td><td class="n"><code>agent_replies</code>: saved on each step so recovery can keep it</td></tr>
-        <tr><td>Temporary chats</td><td class="o">not persisted</td><td class="n">same <code>AgentStore</code> API, kept only in memory</td></tr>
-        <tr><td>Sidebar badges</td><td class="o"></td><td class="n"><code>sessions.last_activity_at</code> / <code>last_viewed_at</code> + working statuses</td></tr>
+        <tr><td>Transcript (what you see)</td><td class="n"><code>messages</code>, append-only from the runtime (<code>appendRuntimeMessage</code>); rewind truncates it</td></tr>
+        <tr><td>Model history</td><td class="n"><code>agent_history</code>: one row per message, per agent</td></tr>
+        <tr><td>Agents</td><td class="n"><code>agents</code>: status column + JSON data (title, model, config, checkpoints…)</td></tr>
+        <tr><td>Pending input</td><td class="n"><code>agent_messages</code>: the inbox, with <code>wakes</code>, <code>held</code>, <code>delivered_at</code></td></tr>
+        <tr><td>Trace steps</td><td class="n"><code>agent_steps</code>: a subagent's rows are its permanent trace; a main agent's move to the transcript when its segment closes</td></tr>
+        <tr><td>Partial reply</td><td class="n"><code>agent_replies</code>: saved on each step so recovery can keep it</td></tr>
+        <tr><td>Ephemeral chats</td><td class="n">same SQLite persistence, deleted on expiry</td></tr>
+        <tr><td>Sidebar badges</td><td class="n"><code>sessions.last_activity_at</code> / <code>last_viewed_at</code> + working statuses</td></tr>
       </tbody>
     </table>
   </div>

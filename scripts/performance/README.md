@@ -55,8 +55,10 @@ across three two-frame samples. This lets image load, intersection, and resize
 callbacks finish before the next action. Streaming waits for each token to
 render before sending the next, so a slower machine cannot batch tokens into
 fewer commits. The scroll count traverses the thread from bottom to top in
-200 settled steps. Timing samples keep the original 40-step traversal
-without those settling waits.
+200 settled steps. Timing samples use a 40-step traversal
+without those settling waits. The count gate covers small scroll steps, not
+remount work during large jumps; the 40-step timing pass reports
+`scroll.worstFrameMs` without gating it.
 
 `bundle.jsGzipBytes` counts only scripts the app loaded during the check.
 Shiki ships a lazy chunk per language, and summing all of them would measure
@@ -92,57 +94,7 @@ bun run build
 bun run perf:check
 ```
 
-## Rebase measurement, 2026-10-11
-
-Measured main at `3170cde` and the rebased compiler/virtualization branch with
-the same expanded fixture, bundled Geist fonts, and production Chromium runner:
-
-| Metric | Main | Optimized |
-| --- | ---: | ---: |
-| Open-chat DOM nodes | 15,366 | 1,768 |
-| Typing renders | 62,154 | 324 |
-| File autocomplete renders | 6,879 | 50 |
-| File autocomplete requests | 1 | 1 |
-| Streaming renders | 38,450 | 550 or 551 |
-| Finish-reply renders | 6,294 | 123 |
-| Open-chat renders | 11,399 | 723 |
-| Full-thread scrolling renders, 200 steps | 303 | 5,981 |
-| Loaded JavaScript gzip bytes | 700,481 | 759,707 |
-
-Scrolling mounts messages as they enter the virtual window, so it does more
-React work while initial mounting and reply completion do less. Main's new
-image-preview behavior increased the earlier optimized baseline's scroll
-renders from 5,445 to 5,755 and open-chat renders from 701 to 718 under the
-original system-font fixture. Loaded JavaScript rises from 751,699 to 759,707
-bytes with the new features and fixes. The baseline accepts those changes and
-the new autocomplete metrics.
-
-The original fixture resolved to Noto Sans locally and DejaVu Sans on GitHub's
-runner. Assistant rows were 99 px taller in CI, changing the virtual scroll
-path. CI measured 5,769 renders against a local baseline of 5,755. Selecting
-bundled fonts makes both hosts measure the same typography.
-
-Font pinning alone did not make the original 40-step scroll count constant:
-local runs measured 5,728 or 5,786 renders, and CI measured 5,826. The final
-geometry matched, but mount traces identified transient extra mounts of rows
-92, 93, and 69 in CI. Waiting longer after each jump cannot remove work that
-already happened during it. A 60-render allowance proved insufficient.
-
-The count traversal now uses 200 smaller steps, keeping the actual app,
-observers, and image previews. Three local count runs and a diagnostic run
-at 4× CPU throttling produced 5,981 renders with each newly encountered row
-mounted once. The finer traversal also runs more scroll updates and encounters
-more previews, so its total is not comparable to the previous 40-step count. Main is remeasured with the same
-200-step traversal. The scroll budget returns to 2 renders of timer slack.
-This count gate covers small scroll steps; it no longer covers remount work
-during large jumps. The 40-step timing pass reports `scroll.worstFrameMs`
-without gating it. Per-step artifacts retain row mount counts and geometry
-for checking the result in CI.
-
-The stronger settling check also includes work that the earlier windows
-missed: finish-reply rises from 120 to 123 and opening from 718 to 723.
-These are measurement changes, with no change to app rendering. Mocked image
-responses keep preview loading independent of external sites.
+## Coverage
 
 These scenarios cover chat interactions, not settings-page performance or
 searching a large workspace. The autocomplete endpoint still walks the entire

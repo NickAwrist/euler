@@ -1,10 +1,12 @@
 # Euler
 
-A local-first agent runtime with a run UI, powered by [Ollama](https://ollama.com/).
+A local-first agent runtime with a chat UI. Run local models through
+[Ollama](https://ollama.com/), remote models through OpenRouter, or connect
+your ChatGPT plan.
 
-Every chat uses one agent with all built-in tools. It can hand self-contained
-work to subagents, which share its tools and instructions but run in a fresh
-context. Customize the system prompt under **Settings > General**.
+Every chat uses one agent with the enabled tools. It can hand self-contained
+work to subagents, which share its system prompt and built-in tools but run in a
+fresh context. Subagents cannot start their own subagents or change skills. Customize the system prompt under **Customization > Personalization**.
 
 Custom skills live under **Customization > Skills**. A skill follows the
 `SKILL.md` shape: a lowercase hyphenated name, a description that tells agents
@@ -31,6 +33,13 @@ over Streamable HTTP and offers their tools as `mcp__<server>__<tool>`. A server
 that fails to connect is skipped and logged. The tab connects to each server
 to list its tools, or shows why it could not connect.
 
+## Artifacts and appearance
+
+The artifact sidebar previews workspace files, including Markdown, images, and
+HTML with inline CSS. HTML previews disable scripts and external resources.
+Choose themes, interface and code fonts, and chat layout under
+**Settings > Appearance**.
+
 ## ChatGPT inference
 
 Under **Settings > ChatGPT**, sign in and authorize use of your ChatGPT plan.
@@ -51,13 +60,21 @@ Access and limits depend on the signed-in account's granted plan permissions.
 ## Requirements
 
 - [Bun](https://bun.sh/)
-- [Ollama](https://ollama.com/) running locally
+- A model provider: Ollama, an OpenRouter API key, or a connected ChatGPT plan
+- Linux with procfs for workspace file tools, and working Bubblewrap at
+  `/usr/bin/bwrap` or `/bin/bwrap` for shell tools
+- Optional services: ComfyUI for image generation and a Brave Search API key for web search
 
 ## Setup
 
 ```bash
 bun install
+cp .env.example .env
 ```
+
+Edit `.env` before starting. For local inference, run Ollama and install a model.
+For remote inference, configure **Settings > OpenRouter** or **Settings > ChatGPT**.
+Ollama is not required for remote inference.
 
 ## Development
 
@@ -74,12 +91,6 @@ bun run dev:server
 bun run dev:ui
 ```
 
-Create your own local settings file, then edit it before starting the app:
-
-```bash
-cp .env.example .env
-```
-
 Bun and Vite load `.env` automatically. Restart the dev processes after changing it.
 The file is ignored by Git. For example:
 
@@ -91,10 +102,11 @@ EULER_OLLAMA_HOST=http://127.0.0.1:11434
 EULER_COMFYUI_HOST=http://127.0.0.1:8188
 ```
 
-Nonempty environment values always take precedence over saved settings and defaults.
-Settings controlled by the environment are disabled in the UI. Remove the environment
-value and restart the server to manage that setting through the UI. API requests that
-change an environment-controlled setting are rejected; saving other settings still works.
+For provider endpoints and API keys, nonempty environment values take precedence
+over saved settings and defaults.
+Environment-controlled endpoint fields are disabled in the UI. Remove the environment
+value and restart the server to manage that endpoint through the UI. API requests that
+change an environment-controlled endpoint are rejected; saving other settings still works.
 Empty or whitespace-only optional values are treated as unset.
 
 In development, the backend API and Vite UI are separate processes:
@@ -104,6 +116,10 @@ In development, the backend API and Vite UI are separate processes:
 
 `EULER_MAX_RUNNING_AGENTS` sets how many agent activations, replies and subagents,
 one user may run at once across all chats. Extra work waits as queued. Default: `4`.
+
+See [.env.example](.env.example) for storage paths, background-job limits, provider
+API keys, and other overrides. `EULER_SERVE_FRONTEND=false` disables serving the
+built UI from the backend. Vite still serves the development UI.
 
 ## Worktree development
 
@@ -124,7 +140,8 @@ primary checkout has no dependencies installed.
 New worktrees copy the primary checkout's SQLite database and retained workspaces.
 The database snapshot includes committed WAL data. Existing destination data is
 preserved, and rerunning setup with an existing `.env` does not copy data again.
-Workspace trash is not copied. Environment values
+Workspace trash and ChatGPT connections are not copied; reconnect under
+**Settings > ChatGPT**. Environment values
 in `.env` take precedence over copied Settings values, including in existing worktrees.
 The primary database and existing worktrees are unchanged. Service endpoints,
 environment API keys, and `EULER_HOST_DIRECTORY` are copied unchanged. Open `/` on your configured Vite
@@ -144,31 +161,41 @@ in-memory database and mocked services. Dev instances use your real configuratio
 Deploy natively with [deployctl](https://github.com/NickAwrist/deployctl) using systemd process supervision:
 
 ```bash
-deployctl create git@github.com:NickAwrist/orbis-agents.git --name euler
-deployctl deploy euler --build
+deployctl create git@github.com:NickAwrist/euler.git --name agents
+deployctl deploy agents --build
 ```
 
-In production, the backend server serves both the built UI and API from a single process on `EULER_BACKEND_PORT` (default `3000`).
+In production, the backend server serves both the built UI and API from a single
+process on `EULER_BACKEND_HOST:EULER_BACKEND_PORT` (default `127.0.0.1:3000`).
+Set `EULER_BACKEND_HOST` to accept remote connections.
 
 `deployctl.yaml` specifies build commands and runtime service configuration:
 - `build.commands`: installs dependencies and runs `bun run build` to generate `dist/`.
 - `build.include`: packages `package.json`, `bun.lock`, `tsconfig.json`, `src`, `dist`, and `node_modules` into the immutable release directory.
 - `services.euler`: executes `bun run src/server.ts` supervised by systemd.
 
-Persistent application data (SQLite database and workspaces) is stored in `DEPLOYCTL_DATA_DIR`, which deployctl provides and preserves across releases.
+Persistent application data (SQLite database, workspaces, workspace trash, and
+ChatGPT credentials) is stored in `DEPLOYCTL_DATA_DIR`, which deployctl provides
+and preserves across releases, unless `EULER_DB_PATH` or `EULER_DATA_ROOT`
+override it.
 
 To update and redeploy:
 
 ```bash
-deployctl update euler
-deployctl deploy euler --build
+deployctl update agents --build
+deployctl deploy agents
+deployctl status agents
 ```
+
+`update --build` prepares a release; `deploy` applies it. Check the applied
+release and source SHA with `status`. The commands use the existing deployment
+name `agents`; use your chosen name for a separate installation.
 
 Manage environment variables with `deployctl env`:
 
 ```bash
-deployctl env set euler EULER_BACKEND_PORT=3100
-deployctl restart euler
+deployctl env set agents EULER_BACKEND_PORT=3100
+deployctl restart agents
 ```
 
 ## Tool permissions
@@ -220,10 +247,12 @@ built-in tools; user-configured MCP calls also pass through argument rules and
 approvals, while their server connections retain their configured access.
 
 `/sandbox` keeps isolated networking and existing resource limits. `/directory`
-uses a development policy with host networking, read-only access to installed
-Bun and Node executables, and no virtual-memory cap. Toolchains are discovered
-from the backend's PATH, with its own runtime executable as a fallback. Bunx is
-available when Bun is found. Both policies keep the selected workspace mounted
+uses a development policy with host networking, read-only access to the `bun`
+and `node` binaries, and no virtual-memory cap. Toolchains are discovered from
+the backend's own runtime executable first, then its PATH. Script shims, such as
+version-manager wrappers, are skipped. Bunx is available when Bun is found.
+Other package managers, such as npm, are available only if installed under
+`/usr` or `/usr/local`. Both policies keep the selected workspace mounted
 at `/workspace`, system files read-only, and the host home and environment hidden.
 Credentials inside the selected folder remain accessible to the agent.
 Directory commands use a temporary home so package-manager caches do not clutter
@@ -249,17 +278,19 @@ rules are read only from within the workspace through the same protected access.
 Run `/link` in a chat to work in another chat's sandbox. Linking to a chat that
 is itself linked joins the same sandbox, so links never chain. `/sandbox`
 returns the chat to its own sandbox. A sandbox is kept while any chat created it
-or links to it, and is removed once the last of them is deleted or switches away.
+or links to it. Once the last of them is deleted or switches away, it moves to
+the workspace trash for 7 days.
 
 Ephemeral chats expire after 24 hours, or `EULER_EPHEMERAL_CHAT_TTL_HOURS`. The
-server checks for expired chats every minute, deferring deletion during active
-turns, and permanently deletes their messages, agents, jobs, and sandbox without
+server checks for expired chats every minute, deferring deletion while agents
+or background jobs are running, and permanently deletes their messages, agents, jobs, and sandbox without
 moving it to the trash. A sandbox another chat still links to is kept, and goes
 to the trash once no chat uses it. Selected local directories are never removed.
 
-The sandbox integration tests report skips when Bubblewrap is unavailable. Run
-`bun test --preload ./tests/setup.ts tests/sandbox` on a Linux host with working
-Bubblewrap namespaces to verify workspace writes and network isolation.
+Most sandbox integration tests report skips when Bubblewrap is unavailable;
+`tests/sandbox/background.test.ts` fails instead. Run `bun test tests/sandbox`
+on a Linux host with working Bubblewrap namespaces to verify workspace writes
+and network isolation.
 
 ### Bubblewrap on Ubuntu 24.04
 
@@ -287,9 +318,10 @@ isolation tests should run rather than skip.
 
 Run `bun run dev:ui` and open `/dev/messages` on the Vite server. The demo uses
 real message components with in-memory examples for single-line, multiline, and
-scrolling code. Hold a user message for its actions; tap the dots beside an assistant reply.
-Copy, edit, retry confirmation, and trace viewing work without a
-backend or model. Reload to reset the examples. The route and fixtures are
+scrolling code. On touch devices, hold a user message for its actions;
+otherwise use its dots button. Tap the dots beside an assistant reply. Copy,
+edit, regenerate with reply versions, their confirmations, and trace viewing
+work without a backend or model. Reload to reset the examples. The route and fixtures are
 excluded from production builds.
 
 To check the layout on a headless server:
@@ -304,8 +336,32 @@ and desktop interactions, and save conversation and popover screenshots in
 `.cache/browser-results/`. No display server is needed. Files use `.pw.ts` so
 Bun's unit-test discovery does not run the Playwright suite.
 
-## Project Structure
+## Checks
+
+```bash
+bun test
+bunx tsc --noEmit
+bun run lint
+bun run build
+bun run test:browser
+```
+
+CI currently builds the app and runs the production performance gate. See
+[scripts/performance/README.md](scripts/performance/README.md) for local commands
+and baseline updates. CI does not yet run all the checks above.
+
+## Documentation
+
+- [Issue triage](BUG_TRIAGE.md) and [codebase audit](docs/audit-issues.md) track remaining work.
+- [Async agents](docs/design/async-agents.md) documents the agent runtime.
+- [Background tools and networking](docs/design/background-tools-and-session-networking.md) separates implemented jobs from proposed sandbox networking.
+
+## Project structure
 
 - `src/` - backend server, agent loop, tools, and session storage
 - `ui/` - React frontend
-- `data/` - local persisted data
+- `tests/` - unit, integration, and Playwright browser tests (`tests/browser/*.pw.ts`)
+- `scripts/` - worktree setup and the performance check
+- `config/apparmor/` - Bubblewrap AppArmor profile
+- `docs/` - design notes and the codebase audit
+- `data/` - default local data root, ignored by Git

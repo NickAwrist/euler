@@ -5,6 +5,9 @@ Audited October 3, 2026 against `main` at `523104d`. Each issue has a stable ID
 uses Critical / High / Medium / Low. Effort uses S (under a day), M (a few days),
 and L (a week or more).
 
+Rechecked against the source on November 1, 2026. Findings are source
+observations, not fresh exploit or UI reproductions.
+
 Issues are listed once, under the category that owns the fix. Related issues are
 cross-referenced by ID. Remove an issue from this file when it is resolved.
 
@@ -204,10 +207,11 @@ the truncation note.
 
 **Where:** `parseToolArgs` with Zod in `bash.ts`, `spawn_agent.ts`,
 `send_message.ts`, `ask_parent.ts`, `cancel_agent.ts`, `jobs.ts`,
-`read_file.ts`, `create_file.ts`, and `delete_file.ts`, compared with
-hand-written `typeof` checks in `grep.ts`, `list_files.ts`, `web_search.ts`,
-`fetch_web_page.ts`, and `generate_image.ts`. Each tool also hand-writes its
-JSON schema in `toTool()`.
+`read_file.ts`, `create_file.ts`, `delete_file.ts`, and `manage_skills.ts`,
+compared with hand-written `typeof` checks in `grep.ts`, `list_files.ts`,
+`web_search.ts`, `fetch_web_page.ts`, `generate_image.ts`, `apply_patch.ts`, and
+`load_skill.ts`. Each tool also hand-writes its JSON schema in `toTool()`; MCP
+tools use their server's `inputSchema`.
 
 **Problem:** There are two validation styles, and the JSON schemas can drift
 from the actual checks.
@@ -241,7 +245,8 @@ performance fix.
 **Where:** `src/agents/BaseAgent.ts` (`run` awaits `streamModelChat` before
 adding the abort listener), `src/llm/openRouterProvider.ts`
 (`streamOpenRouterChat` makes its own `AbortController` that is reachable only
-after headers arrive), `src/llm/ollamaProvider.ts`, and
+after headers arrive), `src/llm/chatGptProvider.ts` (`streamChatGptChat`, same
+pattern), `src/llm/ollamaProvider.ts`, and
 `src/agents/runtime/AgentRuntime.ts` (`cancel` awaits `active.promise`).
 
 **Problem:** Until the provider sends its first byte, which can take a long time
@@ -375,11 +380,8 @@ startup outcome and does not escape as an unhandled rejection.
 
 ## 4. Legacy and dead code
 
-This app has one deployment, and data migrations are one-shot (see the project
-memory note). This code runs on every startup or request but no longer serves a
-current requirement. Before deleting a migration, confirm the production
-database has already run it, for example by checking that the old column or
-table no longer exists.
+This app has one deployment. The items below are code and documents that no
+longer serve a current requirement.
 
 ### LEG-6. Docker networking hints after Docker was removed (Low, S)
 
@@ -419,14 +421,15 @@ state with a clear message.
   (only ever called as `run("", ctx)`), the `userMessage`/`userImages` path, and
   the unused `name`/`description` fields if nothing reads them after
   `RunContext.agentName` (check before removing)
-- `src/http/asyncRoute.ts`: Express 5 already forwards rejected promises (see
-  `CONS-3`)
+- `src/http/asyncRoute.ts`: Express 5 already forwards rejected promises
 - The `/api/runs` 404 assertion in `tests/e2e/asyncAgents.test.ts`, which tests
   a route removed long ago
 
 ### LEG-10. Stale root documents (Low, S)
 
-**Where:** `BUG_TRIAGE.md` (snapshot dated September 24), `wishlist.md`.
+**Where:** `BUG_TRIAGE.md` and `wishlist.md`. Both are hand-maintained snapshots
+of GitHub issues and source state. Within five weeks the triage had dropped an
+open issue, listed a closed one, and missed a new bug.
 
 **Fix:** Move open items to GitHub issues and delete `BUG_TRIAGE.md`. Keep
 `wishlist.md` only if it is maintained, or move it to `docs/`.
@@ -454,8 +457,8 @@ needed for import removal.
 
 **Where:** `ui/hooks/useRunApp.ts` (returns about 95 fields), `ui/App.tsx`
 (`ChatView` takes `app: ReturnType<typeof useRunApp>`),
-`ui/hooks/run/useSessionsAndNavigation.ts` (13 arguments, including six state
-setters and two refs), `ui/hooks/run/useRunStreaming.ts`.
+`ui/hooks/run/useSessionsAndNavigation.ts` (11 arguments, including six state
+setters and a ref), `ui/hooks/run/useRunStreaming.ts`.
 
 **Problem:** Session, navigation, runtime events, composer, model catalog,
 provider health, modals, and settings are combined in one object. Hooks change
@@ -465,7 +468,7 @@ any change touches `App.tsx`.
 **Fix:** Split by owner:
 - a session store (active ID, list, navigation, rename and delete)
 - a runtime store (event subscription, snapshot, streaming state; see `FE-1`)
-- a model catalog hook (models, provider readiness; see `CONS-5`)
+- a model catalog hook (models, provider readiness)
 - composer state local to `RunInputDock`
 
 Pass narrow props or use context.
@@ -533,9 +536,9 @@ from the schema, add a `CHECK` constraint on the column, and remove the cast.
 
 ### TYPE-3. API helpers return unvalidated casts (Medium, M)
 
-**Where:** `ui/lib/api.ts` (`userApiJson<T>` returns `response.json() as
-Promise<T>`, and `null as T`). Callers that trust the shape include
-`selectSessionDirectory` and `fetchWorkspaceFiles` in `ui/persist/sessions.ts`.
+**Where:** `ui/lib/api.ts` (`userApiJson<T>` and `globalApiJson<T>` return
+`response.json() as Promise<T>` and `null as T`). Callers that skip their own
+validation trust the cast shape.
 
 **Fix:** Make the JSON helpers take a Zod schema
 (`userApiJson(url, Schema, options)`) and return `z.infer` of it. Use a separate
@@ -575,34 +578,22 @@ failure rather than a later property-access error or silent empty result.
 
 ## 7. Frontend engineering
 
-### FE-1. Every streamed token re-renders the app root (Medium, M; profile first)
+### FE-1. Main-agent streaming updates root-owned state (Medium, M; profile first)
 
-**Where:** `ui/hooks/run/useAgentEvents.ts` (`setState` and `setPhases` on every
-`delta` event, including subagent tokens), `ui/hooks/useRunApp.ts`,
-`ui/App.tsx`, `ui/components/MarkdownMessage.tsx` (the streaming message is
-parsed three times per render: `normalizeMathDelimiters`,
-`extractComfyUIImageUrls`, and react-markdown).
+**Where:** `ui/hooks/run/useAgentEvents.ts`, `ui/hooks/useRunApp.ts`, and
+`ui/App.tsx`.
 
-**Problem:** Long replies do quadratic work, and the app root re-renders
-continuously while streaming.
-
-**Fix:** First profile a long streamed reply with React DevTools. If it
-confirms the problem, move streaming text into a small external store read with
-`useSyncExternalStore` by the streaming bubble only, and batch updates per
-animation frame. Skip phase updates for events that do not change a phase.
-Memoize the markdown preprocessing per content string.
-
-**Investigation note:** `nextAgentPhases` already returns the same object when
-the phase has not changed, and `useAgentEvents.publish` skips state updates when
-an unrelated/subagent event only advances the sequence. Main-agent streaming
-still updates root-owned state. Profile that remaining path rather than adding
-phase deduplication that already exists.
+Main-agent deltas update root-owned state. Each delta also reruns
+`MarkdownMessage` preprocessing and react-markdown over the full reply, so long
+replies still do quadratic parsing work. Measure that cost before proposing an
+external streaming store or another rendering refactor.
 
 ### FE-2. UI failures are swallowed (Medium, S)
 
-**Where:** 19 `.catch(console.error)` calls, including Stop
-(`ui/hooks/run/useRunStreaming.ts`, `stopGeneration`), the artifact layout
-preference save (`ui/App.tsx`), and "viewed" and refresh calls in
+**Where:** `.catch(console.error)` calls, including Stop
+(`ui/hooks/run/useRunStreaming.ts`, `stopGeneration`), layout preference saves
+(`ui/App.tsx`, `ui/hooks/useSidebarState.ts`, and the artifact width in
+`ui/components/Artifacts/ArtifactSidebar.tsx`), and "viewed" and refresh calls in
 `useAgentEvents.ts`. Also `refreshSessions` in
 `ui/hooks/run/useSessionsAndNavigation.ts`, which clears the session list on any
 error.
@@ -613,8 +604,8 @@ Background refreshes may stay console-only.
 
 ### FE-3. Raw buttons instead of shared primitives (Low, M)
 
-**Where:** 66 raw `<button>` elements in 39 files, compared with `IconButton`
-used in 10. Example: the debug button in `ui/App.tsx`.
+**Where:** About 65 raw `<button>` elements in nearly 40 files, compared with
+`IconButton` used in about a dozen. Example: the debug button in `ui/App.tsx`.
 
 **Fix:** When touching a file, migrate icon-only buttons to `IconButton` and
 text buttons to `Button`, as AGENTS.md requires. No dedicated sweep is needed.
@@ -692,24 +683,19 @@ workspace different from the committed selection.
 
 Most items need measurement first. `TOOL-2` and `TOOL-4` are the confirmed wins.
 
-### PERF-1. Agent histories are loaded and parsed on every request (Medium, M; measure first)
+### PERF-1. Main-agent action lookups load chat histories (Medium, M; measure first)
 
-**Where:** `src/agents/runtime/AgentRuntime.ts` (`main()` calls
-`store.list()`, and `pump()` lists session agents then releases every cached
-session), `src/db/agents.ts` (`get()` runs `RecordSchema.parse` on full
-history).
+**Where:** `src/agents/runtime/AgentRuntime.ts` (`main()` calls `store.list()`),
+`src/db/agents.ts` (`list()` calls `get()` for each agent).
 
-**Problem:** Each agent-action request, and each scheduler pass, reads and
-validates every agent's full history in the chat, then drops the cache.
+**Problem:** Uncached action lookups load all agents' histories to find the
+main agent.
 
-**Measure:** Time `POST /messages` and `GET /runtime` on a chat with about 200
-messages and large tool outputs.
+**Measure:** Time `POST /messages` on an idle chat with many subagents and large
+histories. If material, find the main agent by its indexed identity before
+loading its history. Preserve shared record ownership while work is active.
 
-**Fix if confirmed:** Load the main agent's record without its history for
-routes that do not need it, using `view()`-style reads. Keep records cached
-while a chat has activity, instead of releasing them at the end of every pump.
-
-### PERF-2. The main bundle is 1.1 MB (Medium, S)
+### PERF-2. Secondary pages are eagerly imported (Medium, S)
 
 **Where:** `ui/main.tsx` and `ui/App.tsx`. Settings, Usage, Customization,
 Onboarding, and KaTeX are all eagerly imported. Only the `/dev` demos use
@@ -732,8 +718,9 @@ route as part of `API-1`.
 
 ### PERF-4. Not worth pursuing now
 
-`EventHub` cloning and serializing each event, unbounded `EventHub.users` and
-`JobManager.records` maps at a single user, and the fixed 1-second SSE
+`AgentRuntime` cloning each event and `EventHub` serializing it, the
+`EventHub.users` and `JobManager.records` maps growing per user (each replay
+buffer is already capped at 2000 events and 4 MB), and the fixed 1-second SSE
 reconnect. Revisit only if memory or CPU measurements point here.
 
 ### PERF-5. Whole-chat snapshots remain cached in the browser (Medium, S; measure first)
@@ -791,15 +778,6 @@ when known, and token counts. Pair this with `LLM-1` and `LLM-2`.
 
 **Fix:** Log the inbox `messageId` with the `POST /messages` request completion,
 and log the delivered message IDs in `activation.started`.
-
-### OBS-4. `LOG_LEVEL=debug` does nothing (Low, S)
-
-**Where:** `.env.example` sets `LOG_LEVEL=debug`. `src/observability/logger.ts`
-supports only `info`, `warn`, `error`, and `silent`, and treats unknown values
-as `info`.
-
-**Fix:** Add a `debug` level, or change the example to `info` and list the
-valid values.
 
 ### OBS-5. Failed tools can be logged as successful (Medium, S)
 
@@ -868,7 +846,8 @@ gradually.
 
 ### UX-6. Generated-image loading failures have no retry control (Low, S)
 
-**Where:** `ui/components/MarkdownMessage.tsx` (`ComfyUIImageCard`).
+**Where:** `ui/components/MarkdownMessage.tsx` (`MarkdownImageCard`, which also
+renders image link previews).
 
 **Problem:** A failed generated-image request leaves an error and URL in the
 card without a retry action. Uploaded attachment previews already provide a
@@ -884,13 +863,16 @@ and verifies that the layout remains stable.
 
 ## 12. Testing and CI
 
-### TEST-1. No CI and no pre-commit checks (High, S)
+### TEST-1. CI omits correctness checks (High, S)
 
-**Fix:** Add a GitHub Actions workflow that runs `bun install --frozen-lockfile`,
-`bunx tsc --noEmit`, `bun run lint`, `bun test`, `bun run build`, and
-`bun run test:browser` (install Chromium with
-`bunx playwright install chromium --no-shell`). Bubblewrap tests already skip
-when the sandbox is unavailable. Optionally add a pre-push hook that runs `tsc`,
+**Where:** `.github/workflows/ci.yml` installs dependencies and Chromium, builds
+the app, runs `perf:check`, and uploads measurements.
+
+**Fix:** Extend the workflow to run `bunx tsc --noEmit`, `bun run lint`,
+`bun test`, and `bun run test:browser`. It already installs with
+`--frozen-lockfile`, installs Chromium, and builds. Most Bubblewrap tests skip
+when the sandbox is unavailable, but `tests/sandbox/background.test.ts` does not
+and would fail on a runner without working namespaces. Optionally add a pre-push hook that runs `tsc`,
 lint, and `bun test`.
 
 ### TEST-2. Playwright projects select tests by name regex (Medium, S)
@@ -926,20 +908,20 @@ Delete them with the code they cover: see `LEG-9`.
 
 ### TEST-5. Fixed polling deadlines can be flaky (Low, S)
 
-**Where:** `until()` helpers with 4-second deadlines, for example in
-`tests/e2e/asyncAgents.test.ts`.
+**Where:** Seven copied `until()` helpers with fixed 3 to 15 second deadlines,
+for example in `tests/e2e/asyncAgents.test.ts` and `tests/agents/recovery.test.ts`.
 
-**Fix:** Before adding CI, centralize the helper in `tests/helpers` with a
-configurable deadline. Prefer waiting on runtime events where practical.
+**Fix:** Centralize one helper with a configurable deadline in `tests/helpers`,
+next to `waitForActivation`. Prefer waiting on runtime events where practical.
 
 ### TEST-6. No disk-backed crash test or complete browser/backend smoke (Medium, M)
 
 **Where:** `tests/env-setup.ts` (in-memory database), `tests/setup.ts`
-(mocked external services), and `tests/browser` (intercepted application APIs).
+(mocked external services), and `tests/browser`.
 
-**Problem:** Runtime recovery tests and browser fixtures provide useful coverage,
-but neither proves recovery from killing a real process with SQLite/WAL data on
-disk, nor the complete browser-to-backend streaming path. The global fetch mock
+**Problem:** No test proves recovery from killing a real process with SQLite/WAL
+data on disk, or covers send, stream, reload, and stop together against a real
+backend. The global fetch mock
 also returns a successful generic response for unknown external URLs, which can
 hide unexpected calls.
 
@@ -951,15 +933,14 @@ stop smoke. Make unknown external mock requests fail explicitly.
 **Done when:** The tests run without paid services and detect persistence or
 browser/backend contract failures that intercepted fixtures cannot.
 
-### TEST-7. The unavailable-sandbox assertion differs from the current error (Low, S)
+### TEST-7. The unavailable-sandbox path only runs on hosts without Bubblewrap (Low, S)
 
 **Where:** `tests/sandbox/SandboxRunner.test.ts` ("fails closed when containment
 is unavailable"), `src/sandbox/SandboxRunner.ts` (`spawn`).
 
-**Problem:** The test expects "Shell tools are disabled", but the current runner
-throws its capability diagnostic or "Shell containment is unavailable on this
-host". This branch was skipped on the audit host because Bubblewrap was available.
-The other sandbox restriction and cancellation tests ran successfully.
+**Problem:** The test uses `skipIf(capability.available)`, so the fail-closed
+branch never runs where Bubblewrap works, including the audit host. Its
+"Shell tools are disabled" assertion matches the current probe diagnostics.
 
 **Fix:** Exercise unavailable capability deterministically and assert the current
 fail-closed contract. Keep this test rather than deleting it as obsolete.
@@ -971,25 +952,14 @@ without depending on which capabilities the developer machine has.
 
 ## 13. Developer experience, configuration, and dependencies
 
-### DX-1. README deployment instructions are out of date (Low, S)
-
-**Where:** `README.md` ("Deployment (deployctl)").
-
-**Problem:** It says to clone `orbis-agents` with `--name euler`, while the live
-deployment is `agents` from `NickAwrist/euler`. It also does not say that
-`deployctl update --build` only prepares a release and `deployctl deploy` must
-apply it.
-
-**Fix:** Correct the names and document `update --build` followed by `deploy`,
-then checking the applied release's source SHA in `deployctl status`.
-
 ### DX-2. Configuration is read outside `envConfig` (Low, S)
 
 **Where:** `src/db/constants.ts` reads `EULER_DB_PATH`, `EULER_DATA_ROOT`, and
-`DEPLOYCTL_DATA_DIR`, and `src/observability/logger.ts` reads `LOG_LEVEL`.
+`DEPLOYCTL_DATA_DIR`, `src/observability/logger.ts` reads `LOG_LEVEL`, and
+`src/models/containerNetworkHint.ts` reads `CONTAINER`.
 
-**Fix:** Read all configuration through `src/env.ts` and document each variable
-in `.env.example`.
+**Fix:** Read all configuration through `src/env.ts`. `.env.example` already
+documents the variables except `CONTAINER`, which goes away with `LEG-6`.
 
 ### DX-3. Environment parsing is duplicated in Vite config (Low, S)
 

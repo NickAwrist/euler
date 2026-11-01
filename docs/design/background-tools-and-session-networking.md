@@ -38,8 +38,8 @@ streams stdout/stderr into one Output block, retained at completion, and returns
 the real process exit code as Metadata. Nothing infers status from printed text.
 
 The [job manager](../../src/jobs/JobManager.ts) owns IDs, agent/session ownership,
-status, timestamps, cancellation, limits, persistence, and notifications. Retained
-jobs use SQLite; temporary jobs stay in memory. Live handles and intermediate
+status, timestamps, cancellation, limits, persistence, and notifications. All
+jobs, including ephemeral-chat jobs, use SQLite. Live handles and intermediate
 output are memory-only, so a crash can lose recent logs. Runtime boundaries and
 stored records use shared Zod schemas. Defaults allow four active jobs per
 session and sixteen per user, including starting jobs.
@@ -61,7 +61,7 @@ and local-network access and share host ports across chats.
 Verification lives in `tests/e2e/backgroundJobs.test.ts`, `tests/jobs/`,
 `tests/sandbox/background.test.ts`, and `tests/browser/jobs.pw.ts`. It covers real
 Bash completion, live inspection, attachments, failure, admission limits, output
-bounds, descendant cleanup, temporary sessions, rewind, deletion, restart, and UI
+bounds, descendant cleanup, ephemeral sessions, rewind, deletion, restart, and UI
 reload/cancellation. The browser fixture uses deterministic model replies with
 the actual HTTP server, SQLite, and Bash runner. Screenshots and recordings are
 under `.cache/jobs-evidence` and `.cache/browser-results`.
@@ -128,9 +128,8 @@ must close admission first, then drain leases, then change or delete workspace
 state. Integrate with the existing runtime mutation guards rather than adding
 an unrelated busy flag.
 
-Update workspace switching and temporary-expiry checks to account for job
-activity. A running server keeps a temporary workspace leased; explicit session
-deletion still overrides the lease and cancels it. A later idle-expiry policy
+Ephemeral-chat expiry and workspace switching already wait for running jobs.
+Explicit session deletion still overrides a lease and cancels it. A later idle-expiry policy
 for abandoned servers can be added separately.
 
 ### Connectivity contract
