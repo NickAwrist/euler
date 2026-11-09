@@ -1,33 +1,45 @@
 import { expect, test } from "@playwright/test";
-import type { ModelOption } from "../../ui/types";
+import { AgentService } from "../../src/gen/euler/v1/agent_pb";
+import {
+  InputCapability,
+  ModelProvider,
+  ModelService,
+  Model_Availability,
+} from "../../src/gen/euler/v1/models_pb";
+import {
+  CatalogFreshness_Status,
+  ProviderService,
+} from "../../src/gen/euler/v1/providers_pb";
+import { SessionService } from "../../src/gen/euler/v1/sessions_pb";
+import {
+  type ModelInit,
+  at,
+  mockApp,
+  ollamaModel,
+  openRouterModel,
+} from "./appFixture";
+import { mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
-const models: ModelOption[] = [
-  {
-    id: "gemma4:e4b",
-    name: "gemma4:e4b",
-    lab: "Ollama",
-    provider: "ollama",
-    inputCapabilities: ["text", "image"],
+const models: ModelInit[] = [
+  ollamaModel("gemma4:e4b", {
+    inputCapabilities: [InputCapability.TEXT, InputCapability.IMAGE],
     supportsTools: true,
-  },
+  }),
   ...(
     [
       ["anthropic/claude-sonnet", "Claude Sonnet", "Anthropic"],
       ["anthropic/claude-opus", "Claude Opus", "Anthropic"],
       ["openai/gpt", "GPT", "OpenAI"],
     ] as const
-  ).map(
-    ([route, name, lab]): ModelOption => ({
-      id: `openrouter:${route}`,
-      route,
+  ).map(([route, name, lab]) =>
+    openRouterModel(route, {
       name,
       lab,
-      provider: "openrouter",
-      configured: true,
-      inputCapabilities: ["text"],
       // Unverified routes carry placeholder capabilities.
-      ...(route === "openai/gpt" && { availability: "unverified" as const }),
+      ...(route === "openai/gpt" && {
+        availability: Model_Availability.UNVERIFIED,
+      }),
     }),
   ),
 ];
@@ -57,79 +69,43 @@ for (const device of ["desktop", "mobile"] as const) {
     let catalog = models;
     let sessionReads = 0;
     const runs: { model: string; content: string }[] = [];
-    await page.route("**/api/**", async (route) => {
-      const path = new URL(route.request().url()).pathname;
-      if (
-        path === "/api/sessions/selector" &&
-        route.request().method() === "GET"
-      )
-        sessionReads++;
-      if (path === "/api/settings/openrouter")
-        return route.fulfill({
-          json: { hasKey: true, environmentManaged: false },
-        });
-      if (path === "/api/settings/openrouter/catalog")
-        return route.fulfill({
-          json: {
-            publishers: [],
-            modelsByPublisher: {},
-            discoveredPublishers: [],
-            catalog: {
-              status: "fresh",
-              lastSuccessfulFetchAt: Date.now(),
-              error: null,
-            },
-          },
-        });
-      if (
-        path === "/api/sessions/selector/messages" &&
-        route.request().method() === "POST"
-      ) {
-        runs.push(route.request().postDataJSON());
-        await route.fulfill({
-          status: 202,
-          json: { messageId: runs.length, queued: false },
-        });
-        return;
-      }
-      if (
-        path === "/api/sessions/selector" &&
-        route.request().method() === "PATCH"
-      ) {
-        const patch = route.request().postDataJSON() as { model?: string };
-        if (patch.model) sessionModel = patch.model;
-      }
-      const json =
-        path === "/api/models"
-          ? { models: catalog }
-          : path === "/api/sessions/selector"
-            ? { id: "selector", model: sessionModel, history: [] }
-            : path === "/api/sessions"
-              ? {
-                  sessions: [
-                    {
-                      id: "selector",
-                      preview: "Selector test",
-                      createdAt: 1,
-                      updatedAt: 1,
-                      expiresAt: null,
-                    },
-                  ],
-                }
-              : path.endsWith("/runtime")
-                ? {
-                    agents: [],
-                    activation: null,
-                    queued: [],
-                    held: false,
-                    sequence: 0,
-                    history: [],
-                  }
-                : path.endsWith("/health")
-                  ? { connected: true }
-                  : {};
-      await route.fulfill({ json });
+    await mockApp(page, {
+      sessions: [
+        {
+          id: "selector",
+          preview: "Selector test",
+          createdAt: at(1),
+          updatedAt: at(1),
+        },
+      ],
     });
+    await mockRpc(page, [
+      on(ModelService.method.listModels, () => ({ models: catalog })),
+      on(SessionService.method.getSession, ({ id }) => {
+        if (id !== "selector") return undefined;
+        sessionReads++;
+        return { session: { id, model: sessionModel } };
+      }),
+      on(SessionService.method.updateSession, ({ model }) => {
+        if (model) sessionModel = model;
+        return {};
+      }),
+      on(AgentService.method.sendMessage, ({ settings, content }) => {
+        runs.push({ model: settings?.model ?? "", content });
+        return { messageId: BigInt(runs.length), queued: false };
+      }),
+      on(ProviderService.method.getApiKey, () => ({
+        state: { hasKey: true, environmentManaged: false },
+      })),
+      on(ProviderService.method.getOpenRouterCatalog, () => ({
+        catalog: {
+          freshness: {
+            status: CatalogFreshness_Status.FRESH,
+            lastSuccessfulFetchAt: at(Date.now()),
+          },
+        },
+      })),
+    ]);
     // Exercise icon failure without depending on an external service.
     await page.route("https://openrouter.ai/**", (route) => route.abort());
     try {
@@ -295,7 +271,9 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect(input).toHaveValue("");
 
       // A refreshed catalog must not silently replace the selected model.
-      catalog = models.filter((entry) => entry.provider === "openrouter");
+      catalog = models.filter(
+        (entry) => entry.provider === ModelProvider.OPENROUTER,
+      );
       await page.evaluate(() =>
         window.dispatchEvent(new Event("model-preferences-changed")),
       );
