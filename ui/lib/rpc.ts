@@ -83,3 +83,20 @@ export const debugClient = rpcClient(DebugService);
 export function isNotFound(error: unknown): boolean {
   return error instanceof ApiError && error.code === Code.NotFound;
 }
+
+/**
+ * Runs a call whose failures the server did not explain, such as a dropped
+ * connection, report as `message` instead of the protocol's wording.
+ */
+export async function withErrorMessage<T>(
+  call: Promise<T>,
+  message: string,
+): Promise<T> {
+  try {
+    return await call;
+  } catch (error) {
+    if (error instanceof ApiError && !error.diagnostic)
+      throw new ApiError(message, error.status, undefined, error.code);
+    throw error;
+  }
+}

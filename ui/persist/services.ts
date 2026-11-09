@@ -1,5 +1,5 @@
 import type { GetEnvironmentResponse } from "../../src/gen/euler/v1/preferences_pb";
-import { preferenceClient, providerClient } from "../lib/rpc";
+import { preferenceClient, providerClient, withErrorMessage } from "../lib/rpc";
 import type { MessageFields } from "../types";
 
 /** Which provider addresses the server's environment sets. */
@@ -12,7 +12,12 @@ export async function loadEnvironmentSettings(
 }
 
 export async function saveOllamaConfig(host: string) {
-  return (await providerClient.updateOllamaConfig({ host })).config!;
+  return (
+    await withErrorMessage(
+      providerClient.updateOllamaConfig({ host }),
+      "Failed to save Ollama URL",
+    )
+  ).config!;
 }
 
 export async function loadComfyUIModels(): Promise<string[]> {

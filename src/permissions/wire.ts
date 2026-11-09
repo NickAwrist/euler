@@ -8,6 +8,7 @@ import {
 } from "../gen/euler/v1/permissions_pb";
 import {
   type PermissionField,
+  PermissionFieldSchema,
   PermissionField_Type,
 } from "../gen/euler/v1/preferences_pb";
 import type {
@@ -28,6 +29,12 @@ const FIELD_TYPES = {
   [PermissionField_Type.STRING]: "string",
   [PermissionField_Type.NUMBER]: "number",
   [PermissionField_Type.BOOLEAN]: "boolean",
+} as const;
+
+const PROTO_FIELD_TYPES = {
+  string: PermissionField_Type.STRING,
+  number: PermissionField_Type.NUMBER,
+  boolean: PermissionField_Type.BOOLEAN,
 } as const;
 
 export function toProtoRule(value: DomainRule): ToolPermissionRule {
@@ -125,4 +132,13 @@ export function fromProtoField(value: PermissionField): ToolPermissionField {
         }
       : {}),
   };
+}
+
+export function toProtoField(value: ToolPermissionField): PermissionField {
+  return create(PermissionFieldSchema, {
+    path: value.path,
+    type: PROTO_FIELD_TYPES[value.type],
+    description: value.description,
+    values: (value.values ?? []).map((entry) => fromJson(ValueSchema, entry)),
+  });
 }

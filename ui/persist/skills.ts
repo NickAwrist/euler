@@ -1,6 +1,6 @@
 import type { Skill } from "../../src/gen/euler/v1/skills_pb";
 import type { SkillWriteBody } from "../../src/schemas/skills";
-import { skillClient } from "../lib/rpc";
+import { skillClient, withErrorMessage } from "../lib/rpc";
 
 export type { Skill, SkillWriteBody };
 
@@ -13,20 +13,35 @@ const fields = (body: SkillWriteBody) => ({
 });
 
 export async function fetchSkills(): Promise<Skill[]> {
-  return (await skillClient.listSkills({})).skills;
+  return (
+    await withErrorMessage(skillClient.listSkills({}), "Failed to fetch skills")
+  ).skills;
 }
 
 export async function createSkillApi(body: SkillWriteBody): Promise<Skill> {
-  return (await skillClient.createSkill({ skill: fields(body) })).skill!;
+  return (
+    await withErrorMessage(
+      skillClient.createSkill({ skill: fields(body) }),
+      "Failed to create skill",
+    )
+  ).skill!;
 }
 
 export async function updateSkillApi(
   id: string,
   body: SkillWriteBody,
 ): Promise<Skill> {
-  return (await skillClient.updateSkill({ id, skill: fields(body) })).skill!;
+  return (
+    await withErrorMessage(
+      skillClient.updateSkill({ id, skill: fields(body) }),
+      "Failed to update skill",
+    )
+  ).skill!;
 }
 
 export async function deleteSkillApi(id: string): Promise<void> {
-  await skillClient.deleteSkill({ id });
+  await withErrorMessage(
+    skillClient.deleteSkill({ id }),
+    "Failed to delete skill",
+  );
 }

@@ -8,7 +8,7 @@ import {
 } from "../../src/gen/euler/v1/preferences_pb";
 import { fromProtoField } from "../../src/permissions/wire";
 import type { ToolPermissionField } from "../../src/schemas/toolPermissions";
-import { preferenceClient } from "../lib/rpc";
+import { preferenceClient, withErrorMessage } from "../lib/rpc";
 
 export type { UserPreferences };
 
@@ -73,7 +73,12 @@ export function deleteToolPermissionRule(
 export async function fetchToolPermissionTools(): Promise<
   ToolPermissionTool[]
 > {
-  return (await preferenceClient.listPermissionTools({})).tools.map((tool) => ({
+  return (
+    await withErrorMessage(
+      preferenceClient.listPermissionTools({}),
+      "Failed to load tools",
+    )
+  ).tools.map((tool) => ({
     name: tool.name,
     description: tool.description,
     fields: tool.fields.map(fromProtoField),
