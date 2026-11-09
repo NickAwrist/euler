@@ -34,6 +34,10 @@ targets:
     platform: iOS
     sources:
       - path: Euler
+      # The web's bundled fonts, registered at launch; one copy serves both clients.
+      - path: ../public/fonts
+        type: folder
+        buildPhase: resources
     dependencies:
       - package: EulerAPI
       - package: Markdown

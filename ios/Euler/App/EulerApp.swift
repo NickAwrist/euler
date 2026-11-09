@@ -2,9 +2,15 @@ import SwiftUI
 
 @main
 struct EulerApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @State private var identityStore = IdentityStore()
+
     var body: some Scene {
         WindowGroup {
-            Text("Euler")
+            RootView()
+                .environment(identityStore)
+                .environment(appDelegate.push)
+                .preferredColorScheme(.dark)
         }
     }
 }

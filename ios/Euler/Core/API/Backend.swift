@@ -13,6 +13,13 @@ nonisolated struct Backend: Sendable {
     let attachments: any Euler_V1_AttachmentServiceClientInterface
     let models: any Euler_V1_ModelServiceClientInterface
     let devices: any Euler_V1_DeviceServiceClientInterface
+    let preferences: any Euler_V1_PreferenceServiceClientInterface
+    let workspace: any Euler_V1_WorkspaceServiceClientInterface
+    let skills: any Euler_V1_SkillServiceClientInterface
+    let mcpServers: any Euler_V1_McpServerServiceClientInterface
+    let providers: any Euler_V1_ProviderServiceClientInterface
+    let usage: any Euler_V1_UsageServiceClientInterface
+    let directories: any Euler_V1_DirectoryServiceClientInterface
 
     init(baseURL: URL, userID: String) {
         self.baseURL = baseURL
@@ -36,6 +43,13 @@ nonisolated struct Backend: Sendable {
         attachments = Euler_V1_AttachmentServiceClient(client: client)
         models = Euler_V1_ModelServiceClient(client: client)
         devices = Euler_V1_DeviceServiceClient(client: client)
+        preferences = Euler_V1_PreferenceServiceClient(client: client)
+        workspace = Euler_V1_WorkspaceServiceClient(client: client)
+        skills = Euler_V1_SkillServiceClient(client: client)
+        mcpServers = Euler_V1_McpServerServiceClient(client: client)
+        providers = Euler_V1_ProviderServiceClient(client: client)
+        usage = Euler_V1_UsageServiceClient(client: client)
+        directories = Euler_V1_DirectoryServiceClient(client: client)
     }
 
     /// Resolves a path the server returned, such as `/api/comfyui/view/…`.
