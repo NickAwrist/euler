@@ -1,16 +1,22 @@
 import { type Page, expect, test } from "@playwright/test";
-import type { SkillData } from "../../src/schemas/skills";
+import {
+  type SkillFields,
+  type SkillSchema,
+  SkillService,
+} from "../../src/gen/euler/v1/skills_pb";
+import { type Init, at } from "./appFixture";
+import { mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
-const skill: SkillData = {
+const skill: Init<typeof SkillSchema> = {
   id: "skill-1",
   name: "storytelling",
   description: "Write short stories.",
   instructions: `# Storytelling\n\n${"Use three acts.\n".repeat(40)}`,
-  user_invocable: true,
-  disable_model_invocation: false,
-  created_at: 1,
-  updated_at: 1,
+  userInvocable: true,
+  disableModelInvocation: false,
+  createdAt: at(1),
+  updatedAt: at(1),
 };
 
 async function openSkill(page: Page) {
@@ -20,11 +26,12 @@ async function openSkill(page: Page) {
       "12345678-1234-4234-9234-123456789abc",
     );
   });
-  await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
-  await mockUserPreferences(page);
-  await page.route("**/api/skills", (route) =>
-    route.fulfill({ json: { skills: [skill] } }),
+  await mockRpc(
+    page,
+    [on(SkillService.method.listSkills, () => ({ skills: [skill] }))],
+    { empty: true },
   );
+  await mockUserPreferences(page);
   await page.goto("/customization");
   await page.getByRole("button", { name: "Skills", exact: true }).click();
   await expect(page.getByText("Select a skill")).toBeHidden();
@@ -88,13 +95,15 @@ test("skills desktop: leaving from another tab offers to save skill edits", asyn
 }) => {
   await openSkill(page);
   await instructions(page).fill("Open with dialogue.");
-  let saved: unknown = null;
-  await page.route("**/api/skills/skill-1", (route) => {
-    saved = route.request().postDataJSON();
-    return route.fulfill({
-      json: { ...skill, instructions: "Open with dialogue." },
-    });
-  });
+  let saved: SkillFields | undefined;
+  await mockRpc(page, [
+    on(SkillService.method.updateSkill, (request) => {
+      saved = request.skill;
+      return {
+        skill: { ...skill, ...request.skill, id: request.id },
+      };
+    }),
+  ]);
 
   await page.getByRole("button", { name: "Tools", exact: true }).click();
   await page.getByRole("button", { name: "Back to chat" }).click();
