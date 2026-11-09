@@ -1,82 +1,111 @@
+import type { MessageInitShape } from "@bufbuild/protobuf";
+import { MethodOptions_IdempotencyLevel } from "@bufbuild/protobuf/wkt";
 import { type Page, expect, test } from "@playwright/test";
-import type {
-  UserPreferences,
-  UserPreferencesPatch,
-} from "../../src/schemas/userPreferences";
+import {
+  InputCapability,
+  ModelProvider,
+  ModelService,
+} from "../../src/gen/euler/v1/models_pb";
+import {
+  PreferenceService,
+  type UpdatePreferencesRequestSchema,
+} from "../../src/gen/euler/v1/preferences_pb";
+import {
+  ApiKeyProvider,
+  CatalogFreshness_Status,
+  ProviderService,
+} from "../../src/gen/euler/v1/providers_pb";
+import type { UserPreferences } from "../../src/schemas/userPreferences";
+import {
+  RpcFailure,
+  type RpcMock,
+  mockRpc,
+  on,
+  rpcKey,
+  rpcMethod,
+} from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
-
-type Fulfill = { status?: number; json: unknown };
-type Respond = (path: string, method: string, body: unknown) => Fulfill | null;
-
-const comfyDefaults = {
-  host: "",
-  defaultModel: "",
-  defaultWidth: 1440,
-  defaultHeight: 1440,
-  negativePrompt: "",
-};
 
 const chatGptStatus = (connected: boolean) => ({
   connected,
-  email: connected ? "nick@example.com" : null,
-  name: connected ? "Nick Example" : null,
-  picture: null,
+  email: connected ? "nick@example.com" : undefined,
+  name: connected ? "Nick Example" : undefined,
   planEnabled: connected,
 });
 
-function defaultApi(path: string, body: unknown): unknown {
-  const sent = (body ?? {}) as Record<string, unknown>;
-  if (path.endsWith("/catalog"))
-    return {
-      publishers: [],
-      modelsByPublisher: {},
-      discoveredPublishers: [],
-      catalog: { status: "fresh", fetchedAt: null, error: null },
-    };
-  if (path === "/api/models") return { models: [] };
-  if (path === "/api/sessions") return { sessions: [] };
-  if (path === "/api/settings/environment")
-    return { ollamaHost: false, comfyuiHost: false };
-  if (path === "/api/settings/chatgpt") return chatGptStatus(false);
-  if (path === "/api/settings/openrouter" || path === "/api/settings/brave")
-    return { hasKey: Boolean(sent.apiKey), environmentManaged: false };
-  if (path.endsWith("/test")) return { ok: true, version: "0.9.0" };
-  if (path === "/api/comfyui/models") return { models: ["flux.safetensors"] };
-  if (path.endsWith("/config")) return { host: "", ...sent };
-  return { connected: false };
-}
+/** Reads not marked side-effect free: connection tests and the catalog refresh. */
+const READ_ONLY = new Set([
+  "ProviderService/TestOllamaHost",
+  "ProviderService/TestComfyUiHost",
+  "ProviderService/GetOpenRouterCatalog",
+]);
 
 /**
  * Serves a fresh server with per-user preferences in `preferences`, starting
- * from `initial`, and records
- * every other write the setup makes.
+ * from `initial`, and records every other write the setup makes. `mocks`
+ * answer before the defaults.
  */
 async function routeApi(
   page: Page,
-  respond: Respond = () => null,
+  mocks: RpcMock[] = [],
   preferences = new Map<string, UserPreferences>(),
-  initial: UserPreferencesPatch = {},
+  initial: MessageInitShape<typeof UpdatePreferencesRequestSchema> = {},
 ) {
-  const writes: { path: string; body: unknown }[] = [];
-  await page.route("**/api/**", (route) => {
-    const request = route.request();
-    const path = new URL(request.url()).pathname;
-    return route.fulfill({ json: defaultApi(path, request.postDataJSON()) });
-  });
+  await mockRpc(
+    page,
+    [
+      on(ProviderService.method.getOpenRouterCatalog, () => ({
+        catalog: { status: CatalogFreshness_Status.FRESH },
+        discoveredPublishers: {},
+      })),
+      on(PreferenceService.method.getEnvironment, () => ({
+        ollamaHost: false,
+        comfyuiHost: false,
+      })),
+      on(ProviderService.method.getChatGptStatus, () => ({
+        status: chatGptStatus(false),
+      })),
+      on(ProviderService.method.getApiKey, () => ({
+        state: { hasKey: false, environmentManaged: false },
+      })),
+      on(ProviderService.method.setApiKey, ({ apiKey }) => ({
+        state: { hasKey: Boolean(apiKey), environmentManaged: false },
+      })),
+      on(ProviderService.method.testOllamaHost, () => ({
+        result: { ok: true, version: "0.9.0" },
+      })),
+      on(ProviderService.method.testComfyUiHost, () => ({
+        result: { ok: true, version: "0.9.0" },
+      })),
+      on(ProviderService.method.listComfyUiModels, () => ({
+        models: ["flux.safetensors"],
+      })),
+      on(ProviderService.method.getOllamaConfig, () => ({
+        config: { host: "" },
+      })),
+      on(ProviderService.method.updateOllamaConfig, ({ host }) => ({
+        config: { host },
+      })),
+    ],
+    { empty: true },
+  );
   await mockUserPreferences(page, preferences, initial);
-  // Registered last, so it sees each request before the handlers above.
-  await page.route("**/api/**", (route) => {
-    const request = route.request();
-    const path = new URL(request.url()).pathname;
-    const body = request.postDataJSON() as unknown;
+  // Registered last, so these answer before the defaults above.
+  await mockRpc(page, mocks);
+  const writes: { rpc: string; body: unknown }[] = [];
+  page.on("request", (request) => {
+    const key = rpcKey(request);
+    const method = rpcMethod(request);
     if (
-      request.method() !== "GET" &&
-      !path.endsWith("/test") &&
-      path !== "/api/settings/user"
+      !key ||
+      !method ||
+      method.methodKind !== "unary" ||
+      method.idempotency === MethodOptions_IdempotencyLevel.NO_SIDE_EFFECTS ||
+      READ_ONLY.has(key) ||
+      key.startsWith("PreferenceService/")
     )
-      writes.push({ path, body });
-    const response = respond(path, request.method(), body);
-    return response ? route.fulfill(response) : route.fallback();
+      return;
+    writes.push({ rpc: key, body: request.postDataJSON() });
   });
   return writes;
 }
@@ -112,10 +141,13 @@ for (const device of ["desktop", "mobile"] as const) {
     const preferences = new Map<string, UserPreferences>();
     const writes = await routeApi(
       page,
-      (path, method) =>
-        path === "/api/settings/openrouter" && method === "GET"
-          ? { json: { hasKey: true, environmentManaged: false } }
-          : null,
+      [
+        on(ProviderService.method.getApiKey, ({ provider }) =>
+          provider === ApiKeyProvider.OPENROUTER
+            ? { state: { hasKey: true, environmentManaged: false } }
+            : undefined,
+        ),
+      ],
       preferences,
     );
     try {
@@ -172,7 +204,7 @@ for (const device of ["desktop", "mobile"] as const) {
       ).toBeFocused();
       expect(writes).toEqual([
         {
-          path: "/api/ollama/config",
+          rpc: "ProviderService/UpdateOllamaConfig",
           body: { host: "http://ollama.test:11434" },
         },
       ]);
@@ -195,13 +227,16 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect(page.getByText("Setup complete")).toBeVisible();
       expect(writes.slice(1)).toEqual([
         {
-          path: "/api/comfyui/config",
+          rpc: "ProviderService/UpdateComfyUiConfig",
           body: {
             host: "http://comfy.test:8188",
-            defaultModel: "flux.safetensors",
+            image: { defaultModel: "flux.safetensors" },
           },
         },
-        { path: "/api/settings/brave", body: { apiKey: "brave-secret" } },
+        {
+          rpc: "ProviderService/SetApiKey",
+          body: { provider: "API_KEY_PROVIDER_BRAVE", apiKey: "brave-secret" },
+        },
       ]);
       expect(savedSettings(preferences)).toEqual([
         expect.objectContaining({ name: "Nick", location: "Seattle" }),
@@ -231,39 +266,37 @@ for (const device of ["desktop", "mobile"] as const) {
       .route("https://auth.example.test/**", (route) =>
         route.fulfill({ body: "sign in" }),
       );
-    await routeApi(page, (path, method) => {
+    await routeApi(page, [
       // The account is per user, so it must not need shared settings.
-      if (path === "/api/settings/environment")
-        return {
-          status: 503,
-          json: { error: { code: "INTERNAL_ERROR", message: "Unavailable" } },
-        };
-      if (path === "/api/settings/chatgpt/login")
-        return { json: { authorizationUrl } };
-      if (path === "/api/settings/chatgpt/callback") {
+      on(
+        PreferenceService.method.getEnvironment,
+        () => new RpcFailure("unavailable", "Unavailable", "INTERNAL_ERROR"),
+      ),
+      on(ProviderService.method.startChatGptLogin, () => ({
+        authorizationUrl,
+      })),
+      on(ProviderService.method.finishChatGptLogin, () => {
         connected = true;
-        return { json: chatGptStatus(true) };
-      }
-      if (path === "/api/settings/chatgpt" && method === "GET")
-        return { json: chatGptStatus(connected) };
-      if (path === "/api/models")
-        return {
-          json: {
-            models: connected
-              ? [
-                  {
-                    id: "chatgpt:gpt-5.5",
-                    name: "GPT-5.5",
-                    provider: "chatgpt",
-                    lab: "OpenAI",
-                    inputCapabilities: ["text"],
-                  },
-                ]
-              : [],
-          },
-        };
-      return null;
-    });
+        return { status: chatGptStatus(true) };
+      }),
+      on(ProviderService.method.getChatGptStatus, () => ({
+        status: chatGptStatus(connected),
+      })),
+      on(ModelService.method.listModels, () => ({
+        models: connected
+          ? [
+              {
+                id: "chatgpt:gpt-5.5",
+                name: "GPT-5.5",
+                provider: ModelProvider.CHATGPT,
+                lab: "OpenAI",
+                configured: true,
+                inputCapabilities: [InputCapability.TEXT],
+              },
+            ]
+          : [],
+      })),
+    ]);
     try {
       await page.goto("/");
       for (let step = 0; step < 4; step++) await button(page, "Skip").click();
@@ -314,18 +347,17 @@ test("onboarding desktop: a failed save keeps the step and its draft", async ({
   const preferences = new Map<string, UserPreferences>();
   await routeApi(
     page,
-    (path, method) =>
-      path === "/api/settings/user" && method === "PATCH"
-        ? {
-            status: 503,
-            json: {
-              error: {
-                code: "INTERNAL_ERROR",
-                message: "Settings are unavailable.",
-              },
-            },
-          }
-        : null,
+    [
+      on(
+        PreferenceService.method.updatePreferences,
+        () =>
+          new RpcFailure(
+            "unavailable",
+            "Settings are unavailable.",
+            "INTERNAL_ERROR",
+          ),
+      ),
+    ],
     preferences,
   );
   await page.goto("/dev/onboarding");
@@ -343,7 +375,7 @@ test("onboarding desktop: skipped drafts are discarded and never reach later sav
   page,
 }) => {
   const preferences = new Map<string, UserPreferences>();
-  const writes = await routeApi(page, undefined, preferences, {
+  const writes = await routeApi(page, [], preferences, {
     settings: { defaultModel: "qwen3:8b" },
   });
   await page.goto("/dev/onboarding");
@@ -408,18 +440,19 @@ test.describe("onboarding desktop layout", () => {
   test("onboarding desktop: saved and environment-managed services are not rewritten", async ({
     page,
   }) => {
-    const writes = await routeApi(page, (path, method) => {
-      if (method !== "GET") return null;
-      if (path === "/api/settings/environment")
-        return {
-          json: { ollamaHost: false, comfyuiHost: true },
-        };
-      if (path === "/api/ollama/config")
-        return { json: { host: "http://saved-ollama:11434" } };
-      if (path === "/api/comfyui/config")
-        return { json: { ...comfyDefaults, host: "http://env-comfy:8188" } };
-      return null;
-    });
+    const writes = await routeApi(page, [
+      on(PreferenceService.method.getEnvironment, () => ({
+        ollamaHost: false,
+        comfyuiHost: true,
+      })),
+      on(ProviderService.method.getOllamaConfig, () => ({
+        config: { host: "http://saved-ollama:11434" },
+      })),
+      on(ProviderService.method.getComfyUiConfig, () => ({
+        config: { host: "http://env-comfy:8188" },
+        image: { defaultWidth: 1440, defaultHeight: 1440 },
+      })),
+    ]);
     await page.goto("/");
     for (let step = 0; step < 3; step++) await button(page, "Skip").click();
     await expect(page.getByLabel("Server URL")).toHaveValue(

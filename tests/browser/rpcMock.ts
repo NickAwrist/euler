@@ -220,6 +220,11 @@ export async function mockRpc(
   });
 }
 
+/** The descriptor of the RPC a browser request called. */
+export function rpcMethod(request: Request): DescMethod | undefined {
+  return methods.get(new URL(request.url()).pathname)?.method;
+}
+
 /** The RPC a browser request called, such as "SessionService/ListSessions". */
 export function rpcKey(request: Request): string | undefined {
   return methods.get(new URL(request.url()).pathname)?.key;

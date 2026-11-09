@@ -115,7 +115,9 @@ export async function mockApp(page: Page, fixture: AppFixture = {}) {
       }),
       on(AgentService.method.getRuntime, ({ sessionId }) => runtime(sessionId)),
       on(ModelService.method.listModels, () => ({
-        models: fixture.models ?? [ollamaModel("test")],
+        models: fixture.models ?? [
+          ollamaModel("test", { name: "Test", lab: "Test" }),
+        ],
         providers: { ollama: { connected: true } },
       })),
       on(ProviderService.method.getOllamaHealth, () => ({ connected: true })),
