@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { AttachmentService } from "../../src/gen/euler/v1/attachments_pb";
+import { RpcFailure, mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 // These checks exercise returning users; first-visit setup has its own suite.
@@ -20,17 +22,17 @@ test("attachment image loading defers until after initial scroll and reuses cach
   page,
 }) => {
   const requests: string[] = [];
-  await page.route("**/api/attachments/*", async (route) => {
-    requests.push(route.request().url());
-    await route.fulfill({ contentType: "image/png", body: png });
-  });
+  await mockRpc(page, [
+    on(AttachmentService.method.getAttachmentData, ({ id }) => {
+      requests.push(id);
+      return { mimeType: "image/png", data: png };
+    }),
+  ]);
   await mockUserPreferences(page);
   await page.goto("/dev/images");
   await expect(page.getByAltText("Image 19", { exact: true })).toBeVisible();
   expect(requests.length).toBeLessThan(6);
-  expect(requests.every((url) => Number(url.split("-").at(-1)) >= 17)).toBe(
-    true,
-  );
+  expect(requests.every((id) => Number(id.split("-").at(-1)) >= 17)).toBe(true);
   const image = page.getByAltText("Image 19", { exact: true });
   const bounds = await image.boundingBox();
   expect(bounds?.height).toBe(190);
@@ -49,16 +51,13 @@ test("attachment image loading retries failures without resizing the preview", a
   page,
 }) => {
   let fail = true;
-  await page.route("**/api/attachments/*", async (route) => {
-    await route.fulfill(
+  await mockRpc(page, [
+    on(AttachmentService.method.getAttachmentData, () =>
       fail
-        ? {
-            status: 500,
-            json: { error: { code: "INTERNAL_ERROR", message: "Unavailable" } },
-          }
-        : { contentType: "image/png", body: png },
-    );
-  });
+        ? new RpcFailure("internal", "Unavailable", "INTERNAL_ERROR")
+        : { mimeType: "image/png", data: png },
+    ),
+  ]);
   await mockUserPreferences(page);
   await page.goto("/dev/images");
   const error = page.getByText("Failed to load Image 19", { exact: true });
@@ -86,7 +85,7 @@ test("attachment image loading aborts transfers when previews unmount", async ({
     } = window;
     const originalFetch = target.fetch;
     target.fetch = (input, init) => {
-      if (!String(input).startsWith("/api/attachments/"))
+      if (!String(input).endsWith(".AttachmentService/GetAttachmentData"))
         return originalFetch(input, init);
       const root = document.documentElement;
       root.dataset.downloads = String(Number(root.dataset.downloads ?? 0) + 1);

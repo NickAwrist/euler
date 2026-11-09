@@ -61,10 +61,10 @@ import {
 } from "../models/openRouterPreferences";
 import { OperationError } from "../observability/errors";
 import { logEvent } from "../observability/logger";
+import { imagePatch } from "../preferences/wire";
 import { errorMessage } from "../utils/errors";
 import { ownerOf } from "./context";
 import { inputCapabilities, reasoning } from "./models";
-import { imagePatch } from "./preferences";
 import { optionalMillis } from "./wire";
 
 const API_KEYS = {

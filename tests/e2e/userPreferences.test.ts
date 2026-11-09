@@ -8,7 +8,7 @@ import {
 } from "../../src/db/userPreferences";
 import { ModelProvider } from "../../src/gen/euler/v1/models_pb";
 import { Appearance_Theme } from "../../src/gen/euler/v1/preferences_pb";
-import { preferences as toProto } from "../../src/rpc/preferences";
+import { preferences as toProto } from "../../src/preferences/wire";
 import { userPreferencesSchema } from "../../src/schemas/userPreferences";
 import { Code, rpc, rpcCode } from "../helpers/rpc";
 import { TEST_USER_ID } from "../helpers/server";
