@@ -1,4 +1,10 @@
 import { expect, test } from "@playwright/test";
+import { AgentService } from "../../src/gen/euler/v1/agent_pb";
+import { McpServerService } from "../../src/gen/euler/v1/mcp_pb";
+import { SkillService } from "../../src/gen/euler/v1/skills_pb";
+import { WorkspaceService } from "../../src/gen/euler/v1/workspace_pb";
+import { at, mockApp, ollamaModel } from "./appFixture";
+import { RpcFailure, mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 for (const device of ["desktop", "mobile"] as const) {
@@ -24,126 +30,79 @@ for (const device of ["desktop", "mobile"] as const) {
     const messages: { content: string }[] = [];
     let failFiles = false;
     let failTools = false;
-    await page.route("**/api/**", async (route) => {
-      const url = new URL(route.request().url());
-      const path = url.pathname;
-      if (path === "/api/mcp-servers/tools") {
-        return failTools
-          ? route.fulfill({ status: 500, json: { error: "Failed" } })
-          : route.fulfill({
-              json: {
-                tools: [
-                  {
-                    name: "mcp__test__echo",
-                    description: "Echo text",
-                    icons: [
-                      {
-                        src: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9X0AAAAASUVORK5CYII=",
-                      },
-                    ],
-                  },
-                  {
-                    name: "mcp__test__fail",
-                    description: "Fail",
-                    icons: [{ src: "data:image/png;base64,broken" }],
-                  },
-                ],
-              },
-            });
-      }
-      if (path.endsWith("/workspace/files")) {
-        if (failFiles)
-          return route.fulfill({ status: 500, json: { error: "Failed" } });
-        const query = url.searchParams.get("q")?.toLowerCase() ?? "";
-        return route.fulfill({
-          json: {
-            files: files
-              .filter((path) => path.toLowerCase().includes(query))
-              .map((path) => ({
-                path,
-                name: path.split("/").at(-1),
-                size: 10,
-                modifiedAt: 1,
-              })),
+    await mockApp(page, {
+      sessions: [
+        { id: "files", preview: "Files", createdAt: at(1), updatedAt: at(1) },
+      ],
+      chats: {
+        files: {
+          model: "test",
+          workspace: {
+            kind: {
+              case: "local",
+              value: { path: "/project", label: "project" },
+            },
           },
-        });
-      }
-      if (path.endsWith("/messages") && route.request().method() === "POST") {
-        messages.push(route.request().postDataJSON());
-        return route.fulfill({
-          status: 202,
-          json: { messageId: 1, queued: false },
-        });
-      }
-      if (path === "/api/skills") {
-        return route.fulfill({
-          json: {
-            skills: [
-              {
-                id: "review",
-                name: "review",
-                description: "Review code",
-                instructions: "Review code",
-                user_invocable: true,
-                disable_model_invocation: false,
-                created_at: 1,
-                updated_at: 1,
-              },
-            ],
-          },
-        });
-      }
-      const json =
-        path === "/api/models"
-          ? {
-              models: [
+        },
+      },
+      models: [ollamaModel("test", { name: "Test" })],
+    });
+    await mockRpc(page, [
+      on(McpServerService.method.listTools, () =>
+        failTools
+          ? new RpcFailure("internal", "Failed")
+          : {
+              tools: [
                 {
-                  id: "test",
-                  name: "Test",
-                  lab: "Ollama",
-                  provider: "ollama",
-                  inputCapabilities: ["text"],
-                },
-              ],
-            }
-          : path === "/api/sessions/files"
-            ? {
-                id: "files",
-                model: "test",
-                history: [],
-                expiresAt: null,
-                workspace: {
-                  kind: "local",
-                  path: "/project",
-                  label: "project",
-                },
-              }
-            : path === "/api/sessions"
-              ? {
-                  sessions: [
+                  name: "mcp__test__echo",
+                  description: "Echo text",
+                  icons: [
                     {
-                      id: "files",
-                      preview: "Files",
-                      createdAt: 1,
-                      updatedAt: 1,
-                      expiresAt: null,
+                      src: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9X0AAAAASUVORK5CYII=",
                     },
                   ],
-                }
-              : path.endsWith("/runtime")
-                ? {
-                    agents: [],
-                    activation: null,
-                    queued: [],
-                    held: false,
-                    sequence: 0,
-                    history: [],
-                  }
-                : path.endsWith("/health")
-                  ? { connected: true }
-                  : {};
-      await route.fulfill({ json });
-    });
+                },
+                {
+                  name: "mcp__test__fail",
+                  description: "Fail",
+                  icons: [{ src: "data:image/png;base64,broken" }],
+                },
+              ],
+            },
+      ),
+      on(WorkspaceService.method.listFiles, ({ query }) => {
+        if (failFiles) return new RpcFailure("internal", "Failed");
+        const search = query?.toLowerCase() ?? "";
+        return {
+          files: files
+            .filter((path) => path.toLowerCase().includes(search))
+            .map((path) => ({
+              path,
+              name: path.split("/").at(-1),
+              size: 10n,
+              modifiedAt: at(1),
+            })),
+        };
+      }),
+      on(AgentService.method.sendMessage, ({ content }) => {
+        messages.push({ content });
+        return { messageId: 1n, queued: false };
+      }),
+      on(SkillService.method.listSkills, () => ({
+        skills: [
+          {
+            id: "review",
+            name: "review",
+            description: "Review code",
+            instructions: "Review code",
+            userInvocable: true,
+            disableModelInvocation: false,
+            createdAt: at(1),
+            updatedAt: at(1),
+          },
+        ],
+      })),
+    ]);
     try {
       await mockUserPreferences(page);
       await page.goto("/run/files");
