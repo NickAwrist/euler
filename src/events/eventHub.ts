@@ -36,8 +36,11 @@ const stored = (value: Event): Stored => ({
   bytes: toBinary(EventSchema, value).length,
 });
 
+type Observer = (owner: string, event: AgentEvent) => void;
+
 export class EventHub {
   private users = new Map<string, UserState>();
+  private observers: Observer[] = [];
   constructor(private readonly keepaliveMs = KEEPALIVE_MS) {}
   private user(owner: string) {
     let state = this.users.get(owner);
@@ -58,6 +61,10 @@ export class EventHub {
   /** Whether a client holds a stream open for the owner, as the foreground app does. */
   hasSubscribers(owner: string) {
     return (this.users.get(owner)?.subscribers.size ?? 0) > 0;
+  }
+  /** Calls `observer` with each event published from now on, as push does. */
+  observe(observer: Observer) {
+    this.observers.push(observer);
   }
   publish(owner: string, value: AgentEvent) {
     const state = this.user(owner);
@@ -96,6 +103,7 @@ export class EventHub {
       if (subscriber.bytes > MAX_PENDING_BYTES) subscriber.dropped = true;
       subscriber.wake?.();
     }
+    for (const observer of this.observers) observer(owner, value);
   }
   /**
    * The owner's events after `afterSequence`: the buffered ones, or Resync when

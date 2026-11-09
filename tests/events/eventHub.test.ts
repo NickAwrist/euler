@@ -130,3 +130,15 @@ test("an event that does not fit the contract becomes a resync for its chat", as
   expect(event?.sessionId).toBe("chat-a");
   controller.abort();
 });
+
+test("observers see every published event with its owner", () => {
+  const hub = new EventHub();
+  const seen: [string, AgentEvent["type"]][] = [];
+  hub.observe((owner, event) => seen.push([owner, event.type]));
+  hub.publish("a", queued("chat", "main"));
+  hub.publish("b", queued("other", "main"));
+  expect(seen).toEqual([
+    ["a", "inbox_queued"],
+    ["b", "inbox_queued"],
+  ]);
+});

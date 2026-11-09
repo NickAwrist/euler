@@ -88,6 +88,10 @@ export const envConfig = {
     "BRAVE_SEARCH_API_KEY",
     "EULER_BRAVE_SEARCH_API_KEY",
   ]),
+  /** The APNs .p8 key; push is off unless the key, its ID and team are set. */
+  apnsKeyFile: getEnv("APNS_KEY_FILE"),
+  apnsKeyId: getEnv("APNS_KEY_ID"),
+  apnsTeamId: getEnv("APNS_TEAM_ID"),
 };
 
 /** Only expose ownership flags to the browser, never environment secrets. */
