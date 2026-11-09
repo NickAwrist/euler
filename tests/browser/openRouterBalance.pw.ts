@@ -1,4 +1,10 @@
 import { expect, test } from "@playwright/test";
+import {
+  CatalogFreshness_Status,
+  ProviderService,
+} from "../../src/gen/euler/v1/providers_pb";
+import { at } from "./appFixture";
+import { RpcFailure, mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 for (const device of ["desktop", "mobile"] as const) {
@@ -17,47 +23,39 @@ for (const device of ["desktop", "mobile"] as const) {
     let accountBalance: number | null = 18.75;
     let keyLimit: number | null = 20;
     let reads = 0;
-    await page.route("**/api/**", async (route) => {
-      const path = new URL(route.request().url()).pathname;
-      if (path === "/api/settings/openrouter/balance") {
-        reads++;
-        return route.fulfill(
-          fail
-            ? {
-                status: 500,
-                json: { error: { code: "INTERNAL_ERROR", message: "Failed" } },
-              }
-            : {
-                json: {
-                  accountBalance,
-                  keyLimit,
-                  keyRemaining: keyLimit === null ? null : 7.5,
-                  keyLimitReset: "monthly",
-                  keyUsage: 32.5,
-                },
-              },
-        );
-      }
-      if (path === "/api/settings/openrouter") {
-        if (route.request().method() === "PUT")
-          hasKey = Boolean(route.request().postDataJSON().apiKey);
-        return route.fulfill({ json: { hasKey, environmentManaged: false } });
-      }
-      if (path === "/api/settings/openrouter/catalog")
-        return route.fulfill({
-          json: {
-            catalog: {
-              status: "fresh",
-              lastSuccessfulFetchAt: Date.now(),
-              error: null,
+    await mockRpc(
+      page,
+      [
+        on(ProviderService.method.getOpenRouterBalance, () => {
+          reads++;
+          if (fail)
+            return new RpcFailure("internal", "Failed", "INTERNAL_ERROR");
+          return {
+            accountBalance: accountBalance ?? undefined,
+            keyLimit: keyLimit ?? undefined,
+            keyRemaining: keyLimit === null ? undefined : 7.5,
+            keyLimitReset: "monthly",
+            keyUsage: 32.5,
+          };
+        }),
+        on(ProviderService.method.getApiKey, () => ({
+          state: { hasKey, environmentManaged: false },
+        })),
+        on(ProviderService.method.setApiKey, ({ apiKey }) => {
+          hasKey = Boolean(apiKey);
+          return { state: { hasKey, environmentManaged: false } };
+        }),
+        on(ProviderService.method.getOpenRouterCatalog, () => ({
+          catalog: {
+            freshness: {
+              status: CatalogFreshness_Status.FRESH,
+              lastSuccessfulFetchAt: at(Date.now()),
             },
-            publishers: [],
-            modelsByPublisher: {},
-            discoveredPublishers: [],
           },
-        });
-      return route.fulfill({ json: { ollamaHost: false, comfyuiHost: false } });
-    });
+        })),
+      ],
+      { empty: true },
+    );
     try {
       await mockUserPreferences(page);
       await page.goto("/dev/settings");
