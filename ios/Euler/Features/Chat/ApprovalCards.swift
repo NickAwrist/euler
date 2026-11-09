@@ -99,7 +99,8 @@ private struct ApprovalCard: View {
         }
         .disabled(pending != nil)
         if prominent {
-            button.buttonStyle(.borderedProminent)
+            // The accent is light, as on the web, so prominent labels use the background color.
+            button.buttonStyle(.borderedProminent).foregroundStyle(palette.background)
         } else {
             button.buttonStyle(.bordered)
         }

@@ -111,6 +111,7 @@ private struct UserMessage: View {
                     if chat.rerunDiscards(from: index + 1) { confirming = true } else { Task { await rerun() } }
                 }
                 .buttonStyle(.borderedProminent)
+                .foregroundStyle(palette.background)
                 .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || chat.running)
             }
         }

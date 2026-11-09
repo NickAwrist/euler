@@ -106,7 +106,7 @@ struct ComposerSuggestions: View {
                 }
             }
         case .tool, .command:
-            let commands: [Suggestion] = token.kind == .command && target.chat != nil && !(target.chat?.running ?? false)
+            let commands: [Suggestion] = ComposerToken.command(in: text) != nil && target.chat != nil && !(target.chat?.running ?? false)
                 ? ChatCommand.allCases.filter { $0.rawValue.hasPrefix(token.query) }.map { command in
                     Suggestion(id: "command:\(command.rawValue)", label: "/\(command.rawValue)", detail: command.description, icon: "command") {
                         run(command)

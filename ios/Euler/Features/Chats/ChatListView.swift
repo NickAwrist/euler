@@ -63,6 +63,7 @@ struct ChatListView: View {
             } actions: {
                 Button("New chat") { path = [.newChat] }
                     .buttonStyle(.borderedProminent)
+                    .foregroundStyle(palette.background)
             }
         } else {
             List {
