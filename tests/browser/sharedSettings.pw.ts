@@ -155,3 +155,37 @@ test("settings save desktop: saving a user preference does not rewrite shared pr
     [...preferences.values()].map((saved) => saved.settings.showDebugButton),
   ).toEqual([true]);
 });
+
+test("settings save desktop: Show QR displays the saved user ID", async ({
+  page,
+}, testInfo) => {
+  const user = "12345678-1234-4234-9234-123456789abc";
+  await page.addInitScript((id) => {
+    localStorage.setItem("euler:userUuid", id);
+  }, user);
+  await mockSettings(page);
+  await page.goto("/dev/settings");
+  // An unsaved draft is not what the phone should scan.
+  await page.locator("#userUuid").fill("draft");
+  await page.getByRole("button", { name: "Show QR", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "User ID" });
+  const code = dialog.getByRole("img", { name: `QR code for ${user}` });
+  await expect(code).toBeVisible();
+  const box = (await code.boundingBox())!;
+  expect(box.width).toBeGreaterThan(200);
+  expect(box.height).toBeCloseTo(box.width, 1);
+  await expect(dialog).toContainText(user);
+  await dialog.evaluate((element) =>
+    Promise.all(
+      element
+        .getAnimations({ subtree: true })
+        .map((animation) => animation.finished),
+    ),
+  );
+  await page.screenshot({ path: testInfo.outputPath("user-id-qr.png") });
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Show QR", exact: true }),
+  ).toBeFocused();
+});
