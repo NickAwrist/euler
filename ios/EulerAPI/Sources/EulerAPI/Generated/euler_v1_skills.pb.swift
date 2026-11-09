@@ -63,7 +63,8 @@ public nonisolated struct Euler_V1_Skill: Sendable {
   fileprivate var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
 }
 
-/// A skill's editable fields.
+/// A skill's editable fields. Surrounding whitespace is trimmed. Rules with
+/// "euler." IDs carry the message clients show.
 public nonisolated struct Euler_V1_SkillFields: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for

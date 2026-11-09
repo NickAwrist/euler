@@ -89,7 +89,7 @@ async function ollamaModels(owner: string): Promise<Model[]> {
       favorite: favorites.some(
         (row) => row.provider === "ollama" && row.model_id === model.name,
       ),
-      size: BigInt(model.size),
+      size: Number.isSafeInteger(model.size) ? BigInt(model.size) : undefined,
       modifiedAt: Number.isNaN(modified.getTime())
         ? undefined
         : timestampFromDate(modified),

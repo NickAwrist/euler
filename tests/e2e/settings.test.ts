@@ -1,116 +1,77 @@
 import "../setup";
 import { beforeEach, describe, expect, test } from "bun:test";
+import { toBinary } from "@bufbuild/protobuf";
 import { getOpenRouterApiKey } from "../../src/db";
 import { getDb } from "../../src/db/connection";
-import { startTestServer } from "../helpers/server";
+import {
+  ApiKeyProvider,
+  GetApiKeyResponseSchema,
+} from "../../src/gen/euler/v1/providers_pb";
+import { Code, rpc, rpcCode } from "../helpers/rpc";
+
+const provider = ApiKeyProvider.OPENROUTER;
 
 describe("Settings E2E Tests", () => {
   beforeEach(() => {
-    const db = getDb();
-    db.run("DELETE FROM app_settings");
+    getDb().run("DELETE FROM app_settings");
   });
 
-  test("balance requires a configured key and is never cached", async () => {
-    const { url, close } = await startTestServer();
-    try {
-      const response = await fetch(`${url}/api/settings/openrouter/balance`);
-      expect(response.status).toBe(400);
-      expect(response.headers.get("Cache-Control")).toBe("no-store");
-      expect(await response.json()).toMatchObject({
-        error: { code: "INVALID_REQUEST" },
-      });
-    } finally {
-      await close();
-    }
+  test("balance requires a configured key", async () => {
+    expect(await rpcCode(rpc().providers.getOpenRouterBalance({}))).toBe(
+      Code.InvalidArgument,
+    );
   });
 
-  test("save, retrieve presence/absence, overwrite, clear, whitespace trim, empty payload, SQL injection, and database locks", async () => {
-    const { url, close } = await startTestServer();
-    try {
-      // 1. Retrieve presence/absence (should be false initially because DB was cleared)
-      let getRes = await fetch(`${url}/api/settings/openrouter`);
-      expect(getRes.status).toBe(200);
-      let getData = await getRes.json();
-      expect(getData.hasKey).toBeFalse();
+  test("save, retrieve presence/absence, overwrite, clear, whitespace trim, SQL injection, and database locks", async () => {
+    const { providers } = rpc();
+    const hasKey = async () =>
+      (await providers.getApiKey({ provider })).state?.hasKey;
+    // 1. Absent because the table was cleared.
+    expect(await hasKey()).toBeFalse();
 
-      // 2. Save / Trim whitespace
-      let putRes = await fetch(`${url}/api/settings/openrouter`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: "  sk-or-test-key-12345  " }),
-      });
-      expect(putRes.status).toBe(200);
-      const putData = (await putRes.json()) as { ok?: boolean };
-      expect(putData.ok).toBeTrue();
-      expect(getOpenRouterApiKey()).toBe("sk-or-test-key-12345");
+    // 2. Save, trimming whitespace.
+    const saved = await providers.setApiKey({
+      provider,
+      apiKey: "  sk-or-test-key-12345  ",
+    });
+    expect(saved.state?.hasKey).toBeTrue();
+    expect(getOpenRouterApiKey()).toBe("sk-or-test-key-12345");
 
-      // The secret is never returned by the read endpoint.
-      getRes = await fetch(`${url}/api/settings/openrouter`);
-      expect(JSON.stringify(await getRes.json())).not.toContain(
-        "sk-or-test-key-12345",
-      );
+    // The secret is never returned.
+    const read = await providers.getApiKey({ provider });
+    expect(
+      Buffer.from(toBinary(GetApiKeyResponseSchema, read)).toString(),
+    ).not.toContain("sk-or-test-key-12345");
+    expect(read.state?.hasKey).toBeTrue();
 
-      // Verify presence is now true
-      getRes = await fetch(`${url}/api/settings/openrouter`);
-      expect(getRes.status).toBe(200);
-      getData = await getRes.json();
-      expect(getData.hasKey).toBeTrue();
+    // 3. Overwrite.
+    await providers.setApiKey({ provider, apiKey: "sk-or-new-key-6789" });
+    expect(getOpenRouterApiKey()).toBe("sk-or-new-key-6789");
 
-      // 3. Overwrite key
-      putRes = await fetch(`${url}/api/settings/openrouter`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: "sk-or-new-key-6789" }),
-      });
-      expect(putRes.status).toBe(200);
-      expect(getOpenRouterApiKey()).toBe("sk-or-new-key-6789");
+    // 4. Clear with an empty key.
+    await providers.setApiKey({ provider, apiKey: "" });
+    expect(getOpenRouterApiKey()).toBe("");
+    expect(await hasKey()).toBeFalse();
+    await providers.setApiKey({ provider });
+    expect(getOpenRouterApiKey()).toBe("");
 
-      // 4. Clear key (empty payload / empty string / clear)
-      putRes = await fetch(`${url}/api/settings/openrouter`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: "" }),
-      });
-      expect(putRes.status).toBe(200);
-      expect(getOpenRouterApiKey()).toBe("");
+    // 5. SQL injection is stored as text.
+    const sqlInjection = "' OR '1'='1";
+    await providers.setApiKey({ provider, apiKey: sqlInjection });
+    expect(getOpenRouterApiKey()).toBe(sqlInjection);
 
-      getRes = await fetch(`${url}/api/settings/openrouter`);
-      expect((await getRes.json()).hasKey).toBeFalse();
+    // 6. Concurrent writes all succeed.
+    await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        providers.setApiKey({ provider, apiKey: `concurrent-key-${i}` }),
+      ),
+    );
+    expect(getOpenRouterApiKey()).toStartWith("concurrent-key-");
 
-      // Clear key via empty payload
-      putRes = await fetch(`${url}/api/settings/openrouter`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
-      });
-      expect(putRes.status).toBe(200);
-      expect(getOpenRouterApiKey()).toBe("");
-
-      // 5. SQL Injection Attempt
-      const sqlInjection = "' OR '1'='1";
-      putRes = await fetch(`${url}/api/settings/openrouter`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: sqlInjection }),
-      });
-      expect(putRes.status).toBe(200);
-      expect(getOpenRouterApiKey()).toBe(sqlInjection);
-
-      // 6. Database locks (concurrent writes)
-      const promises = Array.from({ length: 20 }).map((_, i) => {
-        return fetch(`${url}/api/settings/openrouter`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ apiKey: `concurrent-key-${i}` }),
-        });
-      });
-      const responses = await Promise.all(promises);
-      for (const res of responses) {
-        expect(res.status).toBe(200);
-      }
-      expect(getOpenRouterApiKey()).toStartWith("concurrent-key-");
-    } finally {
-      await close();
-    }
+    // An unknown provider and an oversized key are rejected.
+    expect(await rpcCode(providers.getApiKey({}))).toBe(Code.InvalidArgument);
+    expect(
+      await rpcCode(providers.setApiKey({ provider, apiKey: "k".repeat(513) })),
+    ).toBe(Code.InvalidArgument);
   });
 });

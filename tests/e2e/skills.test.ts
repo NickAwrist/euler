@@ -1,94 +1,84 @@
 import "../setup";
 import { expect, test } from "bun:test";
 import { MANAGE_SUBAGENTS_SKILL_NAME } from "../../src/skills/defaults";
-import { startTestServer, userHeaders } from "../helpers/server";
+import { Code, rpc, rpcCode, rpcError } from "../helpers/rpc";
+
+const fields = {
+  name: "release-notes",
+  description: "Draft release notes from merged changes.",
+  instructions: "Group changes by user impact.",
+  userInvocable: true,
+  disableModelInvocation: false,
+};
 
 test("skills CRUD is validated and scoped to the current user", async () => {
-  const { url, close } = await startTestServer();
-  const otherUser = "22222222-2222-4222-8222-222222222222";
-  try {
-    const invalid = await fetch(`${url}/api/skills`, {
-      method: "POST",
-      headers: userHeaders(undefined, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        name: "Bad Skill",
-        description: "Invalid name",
-        instructions: "Do the thing.",
-      }),
-    });
-    expect(invalid.status).toBe(400);
-    expect(await invalid.json()).toMatchObject({
-      error: {
-        code: "INVALID_REQUEST",
-        message:
-          "name must use lowercase letters, numbers, and single hyphens only",
-      },
-    });
-
-    const create = await fetch(`${url}/api/skills`, {
-      method: "POST",
-      headers: userHeaders(undefined, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        name: "release-notes",
-        description: "Draft release notes from merged changes.",
-        instructions: "Group changes by user impact.",
-      }),
-    });
-    expect(create.status).toBe(201);
-    const skill = (await create.json()) as { id: string; name: string };
-    expect(skill).toMatchObject({
-      name: "release-notes",
-      user_invocable: true,
-      disable_model_invocation: false,
-    });
-
-    const ownList = await fetch(`${url}/api/skills`, {
-      headers: userHeaders(),
-    });
-    expect(await ownList.json()).toMatchObject({
-      skills: [
-        { name: MANAGE_SUBAGENTS_SKILL_NAME },
-        { id: skill.id, name: "release-notes" },
-      ],
-    });
-
-    const otherList = await fetch(`${url}/api/skills`, {
-      headers: userHeaders(otherUser),
-    });
-    expect(await otherList.json()).toMatchObject({
-      skills: [{ name: MANAGE_SUBAGENTS_SKILL_NAME }],
-    });
-
-    const update = await fetch(`${url}/api/skills/${skill.id}`, {
-      method: "PUT",
-      headers: userHeaders(undefined, { "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        name: "release-notes",
-        description: "Draft concise release notes.",
-        instructions: "Lead with user-visible changes.",
-        disable_model_invocation: true,
-      }),
-    });
-    expect(update.status).toBe(200);
-    expect(await update.json()).toMatchObject({
-      id: skill.id,
-      instructions: "Lead with user-visible changes.",
-      user_invocable: true,
-      disable_model_invocation: true,
-    });
-
-    const forbiddenDelete = await fetch(`${url}/api/skills/${skill.id}`, {
-      method: "DELETE",
-      headers: userHeaders(otherUser),
-    });
-    expect(forbiddenDelete.status).toBe(404);
-
-    const remove = await fetch(`${url}/api/skills/${skill.id}`, {
-      method: "DELETE",
-      headers: userHeaders(),
-    });
-    expect(remove.status).toBe(200);
-  } finally {
-    await close();
+  const { skills } = rpc();
+  const other = rpc("22222222-2222-4222-8222-222222222222").skills;
+  for (const [skill, message] of [
+    [
+      { ...fields, name: "Bad Skill" },
+      "name must use lowercase letters, numbers, and single hyphens only",
+    ],
+    [{ ...fields, name: " " }, "name is required"],
+    [
+      { ...fields, name: "a".repeat(65) },
+      "name must be 64 characters or fewer",
+    ],
+    [{ ...fields, description: "" }, "description is required"],
+    [
+      { ...fields, description: "a".repeat(501) },
+      "description must be 500 characters or fewer",
+    ],
+    [{ ...fields, instructions: "\n" }, "instructions are required"],
+  ] as const) {
+    const error = await rpcError(skills.createSkill({ skill }));
+    expect(error.code).toBe(Code.InvalidArgument);
+    expect(error.rawMessage).toBe(message);
   }
+
+  const { skill } = await skills.createSkill({
+    skill: { ...fields, name: " release-notes " },
+  });
+  expect(skill).toMatchObject({
+    name: "release-notes",
+    userInvocable: true,
+    disableModelInvocation: false,
+  });
+  expect(await rpcCode(skills.createSkill({ skill: fields }))).toBe(
+    Code.FailedPrecondition,
+  );
+
+  expect((await skills.listSkills({})).skills).toMatchObject([
+    { name: MANAGE_SUBAGENTS_SKILL_NAME },
+    { id: skill!.id, name: "release-notes" },
+  ]);
+  expect((await other.listSkills({})).skills).toMatchObject([
+    { name: MANAGE_SUBAGENTS_SKILL_NAME },
+  ]);
+
+  const updated = await skills.updateSkill({
+    id: skill!.id,
+    skill: {
+      ...fields,
+      description: "Draft concise release notes.",
+      instructions: "Lead with user-visible changes.",
+      disableModelInvocation: true,
+    },
+  });
+  expect(updated.skill).toMatchObject({
+    id: skill!.id,
+    instructions: "Lead with user-visible changes.",
+    userInvocable: true,
+    disableModelInvocation: true,
+  });
+  expect((await skills.getSkill({ id: skill!.id })).skill?.description).toBe(
+    "Draft concise release notes.",
+  );
+
+  expect(await rpcCode(other.deleteSkill({ id: skill!.id }))).toBe(
+    Code.NotFound,
+  );
+  expect(await rpcCode(other.getSkill({ id: skill!.id }))).toBe(Code.NotFound);
+  await skills.deleteSkill({ id: skill!.id });
+  expect(await rpcCode(skills.getSkill({ id: skill!.id }))).toBe(Code.NotFound);
 });

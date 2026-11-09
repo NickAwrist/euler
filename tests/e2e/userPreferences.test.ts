@@ -6,66 +6,66 @@ import {
   getUserPreferences,
   updateUserPreferences,
 } from "../../src/db/userPreferences";
+import { ModelProvider } from "../../src/gen/euler/v1/models_pb";
+import { Appearance_Theme } from "../../src/gen/euler/v1/preferences_pb";
+import { preferences as toProto } from "../../src/rpc/preferences";
 import { userPreferencesSchema } from "../../src/schemas/userPreferences";
-import { TEST_USER_ID, startTestServer, userHeaders } from "../helpers/server";
+import { Code, rpc, rpcCode } from "../helpers/rpc";
+import { TEST_USER_ID } from "../helpers/server";
 
 const other = "22222222-2222-4222-8222-222222222222";
 test("preferences require identity, isolate users, preserve unrelated fields, and reject invalid writes", async () => {
-  const { url, close } = await startTestServer();
-  const request = (owner: string, method = "GET", body?: unknown) =>
-    fetch(`${url}/api/settings/user`, {
-      method,
-      headers: userHeaders(owner, { "Content-Type": "application/json" }),
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-  try {
-    expect((await fetch(`${url}/api/settings/user`)).status).toBe(400);
-    // A user who never saved preferences gets the defaults.
-    expect(await (await request(TEST_USER_ID)).json()).toEqual(
-      userPreferencesSchema.parse({}),
+  const mine = rpc().preferences;
+  const theirs = rpc(other).preferences;
+  expect(await rpcCode(rpc(null).preferences.getPreferences({}))).toBe(
+    Code.InvalidArgument,
+  );
+  // A user who never saved preferences gets the defaults.
+  expect((await mine.getPreferences({})).preferences).toEqual(
+    toProto(userPreferencesSchema.parse({})),
+  );
+  await mine.updatePreferences({
+    settings: { defaultModel: "model-a", name: "Nick" },
+    appearance: { theme: Appearance_Theme.NORD },
+    layout: { sidebarCollapsed: true },
+  });
+  await mine.updatePreferences({ settings: { showDebugButton: true } });
+  const saved = (await mine.getPreferences({})).preferences;
+  expect(saved?.settings).toMatchObject({
+    defaultModel: "model-a",
+    name: "Nick",
+    showDebugButton: true,
+  });
+  expect(saved?.appearance?.theme).toBe(Appearance_Theme.NORD);
+  expect(saved?.layout?.sidebarCollapsed).toBe(true);
+  expect(
+    (await theirs.getPreferences({})).preferences?.settings?.defaultModel,
+  ).toBe("");
+  await theirs.updatePreferences({ settings: { defaultModel: "model-b" } });
+  expect(getUserPreferences(TEST_USER_ID)?.settings.defaultModel).toBe(
+    "model-a",
+  );
+  expect(getUserPreferences(other)?.settings.defaultModel).toBe("model-b");
+  // Clearing the system prompt returns to the default one.
+  await mine.updatePreferences({ settings: { systemPrompt: "Be brief." } });
+  expect(getUserPreferences(TEST_USER_ID)?.settings.systemPrompt).toBe(
+    "Be brief.",
+  );
+  await mine.updatePreferences({ settings: { systemPrompt: "" } });
+  expect(getUserPreferences(TEST_USER_ID)?.settings.systemPrompt).toBeNull();
+  for (const patch of [
+    { appearance: { theme: 99 as Appearance_Theme } },
+    { image: { defaultWidth: 0 } },
+    { layout: { artifactWidth: 100 } },
+    { appearance: { sidebarAnimationMs: 601 } },
+    { settings: { name: "n".repeat(1001) } },
+  ])
+    expect(await rpcCode(mine.updatePreferences(patch))).toBe(
+      Code.InvalidArgument,
     );
-    const initial = {
-      settings: { defaultModel: "model-a", name: "Nick" },
-      appearance: { theme: "nord" },
-      layout: { sidebarCollapsed: true },
-    };
-    expect((await request(TEST_USER_ID, "PATCH", initial)).status).toBe(200);
-    await request(TEST_USER_ID, "PATCH", {
-      settings: { showDebugButton: true },
-    });
-    const saved = userPreferencesSchema.parse(
-      await (await request(TEST_USER_ID)).json(),
-    );
-    expect(saved.settings).toMatchObject({
-      defaultModel: "model-a",
-      name: "Nick",
-      showDebugButton: true,
-    });
-    expect(saved.appearance.theme).toBe("nord");
-    expect(saved.layout.sidebarCollapsed).toBe(true);
-    expect(
-      userPreferencesSchema.parse(await (await request(other)).json()).settings
-        .defaultModel,
-    ).toBe("");
-    await request(other, "PATCH", { settings: { defaultModel: "model-b" } });
-    expect(getUserPreferences(TEST_USER_ID)?.settings.defaultModel).toBe(
-      "model-a",
-    );
-    expect(getUserPreferences(other)?.settings.defaultModel).toBe("model-b");
-    for (const body of [
-      { settings: { defaultModel: 123 } },
-      { appearance: { theme: "invalid" } },
-      { apiKey: "secret" },
-      { image: { defaultWidth: -1 } },
-    ]) {
-      expect((await request(TEST_USER_ID, "PATCH", body)).status).toBe(400);
-    }
-    expect(getUserPreferences(TEST_USER_ID)?.settings.defaultModel).toBe(
-      "model-a",
-    );
-  } finally {
-    await close();
-  }
+  expect(getUserPreferences(TEST_USER_ID)?.settings.defaultModel).toBe(
+    "model-a",
+  );
 });
 
 test("startup schema creation preserves saved preferences", () => {
@@ -73,8 +73,7 @@ test("startup schema creation preserves saved preferences", () => {
     settings: { defaultModel: "persisted" },
   });
   // Re-running startup schema creation must preserve saved preferences.
-  const db = getDb();
-  createSchema(db);
+  createSchema(getDb());
   expect(getUserPreferences(TEST_USER_ID)?.settings.defaultModel).toBe(
     "persisted",
   );
@@ -82,63 +81,45 @@ test("startup schema creation preserves saved preferences", () => {
 
 test("image defaults and model favorites are scoped to the requesting user", async () => {
   setOllamaHost("http://ollama.test");
-  const { url, close } = await startTestServer();
-  try {
-    for (const [owner, model] of [
-      [TEST_USER_ID, "image-a"],
-      [other, "image-b"],
-    ]) {
-      const res = await fetch(`${url}/api/comfyui/config`, {
-        method: "PUT",
-        headers: userHeaders(owner, { "Content-Type": "application/json" }),
-        body: JSON.stringify({
-          defaultModel: model,
-          defaultWidth: 512,
-          defaultHeight: 768,
-        }),
-      });
-      expect(res.status).toBe(200);
-      expect((await res.json()).defaultModel).toBe(model);
-    }
-    const partial = await fetch(`${url}/api/comfyui/config`, {
-      method: "PUT",
-      headers: userHeaders(TEST_USER_ID, {
-        "Content-Type": "application/json",
-      }),
-      body: JSON.stringify({ negativePrompt: "blurry" }),
+  for (const [owner, model] of [
+    [TEST_USER_ID, "image-a"],
+    [other, "image-b"],
+  ] as const) {
+    const saved = await rpc(owner).providers.updateComfyUiConfig({
+      image: { defaultModel: model, defaultWidth: 512, defaultHeight: 768 },
     });
-    expect(await partial.json()).toMatchObject({
-      defaultModel: "image-a",
-      defaultWidth: 512,
-      defaultHeight: 768,
-      negativePrompt: "blurry",
-    });
-    const favorite = await fetch(`${url}/api/settings/models/favorite`, {
-      method: "PUT",
-      headers: userHeaders(TEST_USER_ID, {
-        "Content-Type": "application/json",
-      }),
-      body: JSON.stringify({
-        provider: "ollama",
-        modelId: "llama3:latest",
+    expect(saved.image?.defaultModel).toBe(model);
+  }
+  const partial = await rpc().providers.updateComfyUiConfig({
+    image: { negativePrompt: "blurry" },
+  });
+  expect(partial.image).toMatchObject({
+    defaultModel: "image-a",
+    defaultWidth: 512,
+    defaultHeight: 768,
+    negativePrompt: "blurry",
+  });
+  await rpc().models.setFavorite({
+    provider: ModelProvider.OLLAMA,
+    modelId: "llama3:latest",
+    favorite: true,
+  });
+  for (const [owner, expected] of [
+    [TEST_USER_ID, true],
+    [other, false],
+  ] as const) {
+    const { models } = await rpc(owner).models.listModels({});
+    expect(models.find((model) => model.id === "llama3:latest")?.favorite).toBe(
+      expected,
+    );
+  }
+  expect(
+    await rpcCode(
+      rpc().models.setFavorite({
+        provider: ModelProvider.OPENROUTER,
+        modelId: "openrouter:openai/gpt",
         favorite: true,
       }),
-    });
-    expect(favorite.status).toBe(200);
-    for (const [owner, expected] of [
-      [TEST_USER_ID, true],
-      [other, false],
-    ] as const) {
-      const response = await fetch(`${url}/api/models`, {
-        headers: userHeaders(owner),
-      });
-      expect(
-        (await response.json()).models.find(
-          (model: { id: string }) => model.id === "llama3:latest",
-        ).favorite,
-      ).toBe(expected);
-    }
-  } finally {
-    await close();
-  }
+    ),
+  ).toBe(Code.InvalidArgument);
 });

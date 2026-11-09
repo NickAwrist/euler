@@ -29,19 +29,44 @@ message Skill {
   google.protobuf.Timestamp updated_at = 8;
 }
 
-// A skill's editable fields.
+// A skill's editable fields. Surrounding whitespace is trimmed. Rules with
+// "euler." IDs carry the message clients show.
 message SkillFields {
   // Lowercase letters, numbers and single hyphens.
-  string name = 1 [(buf.validate.field).string = {
-    min_len: 1
-    max_len: 64
-    pattern: "^\\s*[a-z0-9]+(?:-[a-z0-9]+)*\\s*$"
+  string name = 1 [
+    (buf.validate.field).cel = {
+      id: "euler.skill_name_required"
+      message: "name is required"
+      expression: "this.matches(r'\\S')"
+    },
+    (buf.validate.field).cel = {
+      id: "euler.skill_name_length"
+      message: "name must be 64 characters or fewer"
+      expression: "size(this) <= 64 || this.matches(r'^\\s*(?s:.){0,64}\\s*$')"
+    },
+    (buf.validate.field).cel = {
+      id: "euler.skill_name_pattern"
+      message: "name must use lowercase letters, numbers, and single hyphens only"
+      expression: "!this.matches(r'\\S') || this.matches(r'^\\s*[a-z0-9]+(?:-[a-z0-9]+)*\\s*$')"
+    }
+  ];
+  string description = 2 [
+    (buf.validate.field).cel = {
+      id: "euler.skill_description_required"
+      message: "description is required"
+      expression: "this.matches(r'\\S')"
+    },
+    (buf.validate.field).cel = {
+      id: "euler.skill_description_length"
+      message: "description must be 500 characters or fewer"
+      expression: "size(this) <= 500 || this.matches(r'^\\s*(?s:.){0,500}\\s*$')"
+    }
+  ];
+  string instructions = 3 [(buf.validate.field).cel = {
+    id: "euler.skill_instructions_required"
+    message: "instructions are required"
+    expression: "this.matches(r'\\S')"
   }];
-  string description = 2 [(buf.validate.field).string = {
-    max_len: 500
-    pattern: "\\S"
-  }];
-  string instructions = 3 [(buf.validate.field).string.pattern = "\\S"];
   bool user_invocable = 4;
   bool disable_model_invocation = 5;
 }

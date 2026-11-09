@@ -16,176 +16,113 @@ import {
   setOpenRouterModelEnabled,
 } from "../../src/db/openrouter";
 import {
+  InputCapability,
+  ModelProvider,
+  Model_Availability,
+} from "../../src/gen/euler/v1/models_pb";
+import { ApiKeyProvider } from "../../src/gen/euler/v1/providers_pb";
+import { Message_Role } from "../../src/gen/euler/v1/sessions_pb";
+import {
   type CatalogResult,
   normalizeCatalog,
   openRouterCatalog,
 } from "../../src/models/openRouterModels";
 import { setOpenRouterScenario } from "../helpers/mockOpenRouter";
-import { startTestServer, userHeaders } from "../helpers/server";
-
-const runBody = (model: string) => ({
-  content: "Hello",
-  model,
-});
+import { Code, rpc, rpcCode } from "../helpers/rpc";
 
 describe("OpenRouter API integration", () => {
   test("exposes a provider-aware model catalog even when one provider fails", async () => {
     setOllamaHost("http://ollama.test");
     setOpenRouterApiKey("");
-    const { url, close } = await startTestServer();
-    try {
-      let response = await fetch(`${url}/api/models`, {
-        headers: { "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111" },
-      });
-      expect(response.status).toBe(200);
-      let body = (await response.json()) as {
-        models: Array<{
-          id: string;
-          provider: string;
-          configured?: boolean;
-          inputCapabilities?: string[];
-          supportsTools?: boolean;
-        }>;
-      };
-      expect(
-        body.models.find((model) => model.provider === "ollama"),
-      ).toMatchObject({
-        inputCapabilities: ["text", "image"],
-        supportsTools: true,
-      });
-      expect(
-        body.models.some((model) => model.provider === "openrouter"),
-      ).toBeFalse();
+    const { models, providers } = rpc();
+    let listed = await models.listModels({});
+    expect(
+      listed.models.find((model) => model.provider === ModelProvider.OLLAMA),
+    ).toMatchObject({
+      inputCapabilities: [InputCapability.TEXT, InputCapability.IMAGE],
+      supportsTools: true,
+    });
+    expect(
+      listed.models.some(
+        (model) => model.provider === ModelProvider.OPENROUTER,
+      ),
+    ).toBeFalse();
 
-      await fetch(`${url}/api/settings/openrouter`, {
-        method: "PUT",
-        headers: userHeaders(undefined, {
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({ apiKey: "sk-or-api-test" }),
-      });
-      await fetch(`${url}/api/settings/openrouter/catalog`, {
-        headers: { "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111" },
-      });
-      await fetch(`${url}/api/settings/openrouter/models`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111",
-        },
-        body: JSON.stringify({ route: "openai/gpt-5.6-terra", enabled: true }),
-      });
-      response = await fetch(`${url}/api/models`, {
-        headers: { "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111" },
-      });
-      body = await response.json();
-      expect(
-        body.models
-          .filter((model) => model.provider === "openrouter")
-          .every((model) => model.configured === true),
-      ).toBeTrue();
-      expect(
-        body.models.find(
-          (model) => model.id === "openrouter:openai/gpt-5.6-terra",
-        )?.inputCapabilities,
-      ).toEqual(["text", "image"]);
-    } finally {
-      await close();
-    }
+    await providers.setApiKey({
+      provider: ApiKeyProvider.OPENROUTER,
+      apiKey: "sk-or-api-test",
+    });
+    await providers.getOpenRouterCatalog({});
+    await providers.setOpenRouterModelEnabled({
+      route: "openai/gpt-5.6-terra",
+      enabled: true,
+    });
+    listed = await models.listModels({});
+    expect(
+      listed.models
+        .filter((model) => model.provider === ModelProvider.OPENROUTER)
+        .every((model) => model.configured),
+    ).toBeTrue();
+    expect(
+      listed.models.find(
+        (model) => model.id === "openrouter:openai/gpt-5.6-terra",
+      )?.inputCapabilities,
+    ).toEqual([InputCapability.TEXT, InputCapability.IMAGE]);
   });
 
   test("manages activation and independent favorites through settings", async () => {
-    const { url, close } = await startTestServer();
-    const request = (path: string, method: string, body: unknown) =>
-      fetch(`${url}/api/settings/${path}`, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111",
-        },
-        body: JSON.stringify(body),
-      });
-    try {
-      const route = "example/test-model";
-      await fetch(`${url}/api/settings/openrouter/catalog`, {
-        headers: { "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111" },
-      });
-      expect(
-        (
-          await request("models/favorite", "PUT", {
-            provider: "openrouter",
-            modelId: route,
-            favorite: true,
-          })
-        ).status,
-      ).toBe(200);
-      expect(
-        (
-          await request("models/favorite", "PUT", {
-            provider: "openrouter",
-            modelId: `openrouter:${route}`,
-            favorite: true,
-          })
-        ).status,
-      ).toBe(400);
-      expect(listOpenRouterModels()).toHaveLength(0);
-      expect(
-        (await request("openrouter/models", "PATCH", { route, enabled: false }))
-          .status,
-      ).toBe(200);
-      expect(listOpenRouterModels()[0]?.enabled).toBe(0);
-      expect(
-        (await request("openrouter/models", "PATCH", { route, enabled: true }))
-          .status,
-      ).toBe(200);
-      const response = await fetch(
-        `${url}/api/settings/openrouter/publishers/example/models`,
-        {
-          headers: {
-            "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111",
-          },
-        },
-      );
-      expect(await response.json()).toMatchObject({
-        models: [{ route, enabled: true, favorite: true }],
-      });
-      expect(
-        (
-          await request("openrouter/models", "PATCH", {
-            route: "unknown/model",
-            enabled: true,
-          })
-        ).status,
-      ).toBe(400);
-      expect(
-        (
-          await request("openrouter/publishers", "POST", {
-            publisherId: "invented",
-          })
-        ).status,
-      ).toBe(400);
-      const removed = await fetch(
-        `${url}/api/settings/openrouter/publishers/example`,
-        { method: "DELETE" },
-      );
-      expect(removed.status).toBe(200);
-      expect(listOpenRouterModels()[0]?.enabled).toBe(0);
-      expect(
-        listModelFavorites("11111111-1111-4111-8111-111111111111").some(
-          (favorite) => favorite.model_id === route,
-        ),
-      ).toBeTrue();
-      expect(
-        (
-          await request("openrouter/publishers", "POST", {
-            publisherId: "example",
-          })
-        ).status,
-      ).toBe(200);
-      expect(listOpenRouterModels()[0]?.enabled).toBe(0);
-    } finally {
-      await close();
-    }
+    const { models, providers } = rpc();
+    const route = "example/test-model";
+    await providers.getOpenRouterCatalog({});
+    await models.setFavorite({
+      provider: ModelProvider.OPENROUTER,
+      modelId: route,
+      favorite: true,
+    });
+    expect(
+      await rpcCode(
+        models.setFavorite({
+          provider: ModelProvider.OPENROUTER,
+          modelId: `openrouter:${route}`,
+          favorite: true,
+        }),
+      ),
+    ).toBe(Code.InvalidArgument);
+    expect(listOpenRouterModels()).toHaveLength(0);
+    await providers.setOpenRouterModelEnabled({ route, enabled: false });
+    expect(listOpenRouterModels()[0]?.enabled).toBe(0);
+    await providers.setOpenRouterModelEnabled({ route, enabled: true });
+    const catalog = await providers.getOpenRouterCatalog({});
+    expect(catalog.modelsByPublisher.example?.models).toMatchObject([
+      { route, enabled: true, favorite: true },
+    ]);
+    expect(
+      await rpcCode(
+        providers.setOpenRouterModelEnabled({
+          route: "unknown/model",
+          enabled: true,
+        }),
+      ),
+    ).toBe(Code.InvalidArgument);
+    expect(
+      await rpcCode(
+        providers.trackOpenRouterPublisher({ publisherId: "invented" }),
+      ),
+    ).toBe(Code.InvalidArgument);
+    await providers.removeOpenRouterPublisher({ publisherId: "example" });
+    expect(listOpenRouterModels()[0]?.enabled).toBe(0);
+    expect(
+      listModelFavorites(TEST_USER_ID).some(
+        (favorite) => favorite.model_id === route,
+      ),
+    ).toBeTrue();
+    await providers.trackOpenRouterPublisher({ publisherId: "example" });
+    expect(listOpenRouterModels()[0]?.enabled).toBe(0);
+    expect(
+      await rpcCode(
+        providers.removeOpenRouterPublisher({ publisherId: "invented" }),
+      ),
+    ).toBe(Code.NotFound);
   });
 
   test("outages allow local changes and successful removal only affects composer availability", async () => {
@@ -203,12 +140,7 @@ describe("OpenRouter API integration", () => {
       ],
     })[0]!;
     setOpenRouterModelEnabled(model, true);
-    setModelFavorite(
-      "11111111-1111-4111-8111-111111111111",
-      "openrouter",
-      model.route,
-      true,
-    );
+    setModelFavorite(TEST_USER_ID, "openrouter", model.route, true);
     setOpenRouterApiKey("key");
     let catalog: CatalogResult = {
       status: "unavailable",
@@ -222,185 +154,125 @@ describe("OpenRouter API integration", () => {
     const cachedLookup = spyOn(openRouterCatalog, "peek").mockImplementation(
       () => catalog,
     );
-    const { url, close } = await startTestServer();
-    const update = (path: string, method: string, body: unknown) =>
-      fetch(`${url}/api/settings/${path}`, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111",
-        },
-        body: JSON.stringify(body),
-      });
+    const { models, providers } = rpc();
     try {
-      let response = await fetch(`${url}/api/models`, {
-        headers: { "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111" },
-      });
-      let body = (await response.json()) as {
-        models: { id: string; availability?: string }[];
-      };
+      let listed = await models.listModels({});
       expect(
-        body.models.find((m) => m.id === "openrouter:openai/test")
+        listed.models.find((m) => m.id === "openrouter:openai/test")
           ?.availability,
-      ).toBe("unverified");
+      ).toBe(Model_Availability.UNVERIFIED);
       expect(
-        (
-          await update("openrouter/models", "PATCH", {
+        await rpcCode(
+          providers.setOpenRouterModelEnabled({
             route: "unknown/model",
             enabled: true,
-          })
-        ).status,
-      ).toBe(503);
+          }),
+        ),
+      ).toBe(Code.Unavailable);
       lookup.mockClear();
-      expect(
-        (
-          await update("openrouter/models", "PATCH", {
-            route: model.route,
-            enabled: false,
-          })
-        ).status,
-      ).toBe(200);
-      expect(
-        (
-          await update("models/favorite", "PUT", {
-            provider: "openrouter",
-            modelId: model.route,
-            favorite: false,
-          })
-        ).status,
-      ).toBe(200);
+      await providers.setOpenRouterModelEnabled({
+        route: model.route,
+        enabled: false,
+      });
+      await models.setFavorite({
+        provider: ModelProvider.OPENROUTER,
+        modelId: model.route,
+        favorite: false,
+      });
       expect(lookup).not.toHaveBeenCalled();
       setOpenRouterModelEnabled(model, true);
-      setModelFavorite(
-        "11111111-1111-4111-8111-111111111111",
-        "openrouter",
-        model.route,
-        true,
-      );
+      setModelFavorite(TEST_USER_ID, "openrouter", model.route, true);
       catalog = {
         status: "fresh",
         models: [],
         lastSuccessfulFetchAt: Date.now(),
         error: null,
       };
-      response = await fetch(`${url}/api/models`, {
-        headers: { "X-Euler-User-ID": "11111111-1111-4111-8111-111111111111" },
-      });
-      body = await response.json();
+      listed = await models.listModels({});
       expect(
-        body.models.some((m) => m.id === "openrouter:openai/test"),
+        listed.models.some((m) => m.id === "openrouter:openai/test"),
       ).toBeFalse();
       expect(listOpenRouterModels()[0]?.enabled).toBe(1);
-      expect(
-        listModelFavorites("11111111-1111-4111-8111-111111111111"),
-      ).toHaveLength(1);
+      expect(listModelFavorites(TEST_USER_ID)).toHaveLength(1);
       catalog = {
         ...catalog,
         models: [{ ...model, route: "openai/test:batch" }],
       };
       expect(
-        (
-          await update("openrouter/models", "PATCH", {
+        await rpcCode(
+          providers.setOpenRouterModelEnabled({
             route: "openai/test:batch",
             enabled: true,
-          })
-        ).status,
-      ).toBe(400);
+          }),
+        ),
+      ).toBe(Code.InvalidArgument);
     } finally {
       lookup.mockRestore();
       cachedLookup.mockRestore();
-      await close();
     }
   });
 
   test("validates model configuration before enqueueing a turn", async () => {
-    const { url, close } = await startTestServer();
     const id = crypto.randomUUID();
     createSessionRow(TEST_USER_ID, id, Date.now(), null);
+    const { agent } = rpc();
+    const send = (model: string) =>
+      agent.sendMessage({
+        sessionId: id,
+        content: "Hello",
+        settings: { model },
+      });
     try {
-      const post = (model: string) =>
-        fetch(`${url}/api/sessions/${id}/messages`, {
-          method: "POST",
-          headers: userHeaders(undefined, {
-            "Content-Type": "application/json",
-          }),
-          body: JSON.stringify(runBody(model)),
-        });
       setOpenRouterApiKey("");
-      expect((await post("openrouter:openai/gpt-5.6-terra")).status).toBe(400);
+      expect(await rpcCode(send("openrouter:openai/gpt-5.6-terra"))).toBe(
+        Code.InvalidArgument,
+      );
       setOpenRouterApiKey("sk-or-run-test");
-      expect((await post("openrouter:openai/gpt-5.6-terra")).status).toBe(202);
+      await send("openrouter:openai/gpt-5.6-terra");
       const state = await waitForActivation(id);
       expect(state.history?.at(-1)?.content).toBe("Hello from OpenRouter.");
       expect(getOpenRouterApiKey()).toBe("sk-or-run-test");
     } finally {
       await agentRuntime.deleteSession(TEST_USER_ID, id);
-      await close();
     }
   });
 
-  test("finishes and persists a run after its app connection closes", async () => {
+  test("finishes and persists a run after its client goes away", async () => {
     const model = "openrouter:openai/gpt-5.6-terra";
-    const { url, close } = await startTestServer();
-    try {
-      setOpenRouterApiKey("sk-or-background-run-test");
-      setOpenRouterScenario("delayed-stream");
+    setOpenRouterApiKey("sk-or-background-run-test");
+    setOpenRouterScenario("delayed-stream");
+    const { sessions, agent, events } = rpc();
+    const { id: sessionId } = await sessions.createSession({ model });
+    // A client watching the stream disconnects right after sending.
+    const controller = new AbortController();
+    const stream = events.subscribe(
+      { afterSequence: 0n },
+      { signal: controller.signal },
+    );
+    await stream[Symbol.asyncIterator]().next();
+    await agent.sendMessage({
+      sessionId,
+      content: "Keep going in the background",
+      settings: { model },
+    });
+    controller.abort();
 
-      const created = await fetch(`${url}/api/sessions`, {
-        method: "POST",
-        headers: userHeaders(undefined, {
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({ model }),
-      });
-      expect(created.status).toBe(201);
-      const { id: sessionId } = (await created.json()) as { id: string };
-
-      const response = await fetch(
-        `${url}/api/sessions/${sessionId}/messages`,
-        {
-          method: "POST",
-          headers: userHeaders(undefined, {
-            "Content-Type": "application/json",
-          }),
-          body: JSON.stringify({
-            content: "Keep going in the background",
-            model,
-          }),
-        },
-      );
-      expect(response.status).toBe(202);
-      const reader = response.body?.getReader();
-      expect(reader).toBeDefined();
-      await reader?.read();
-      await reader?.cancel();
-
-      const deadline = Date.now() + 2_000;
-      let history: Array<{
-        role: string;
-        content: string;
-        steps?: Array<Record<string, unknown>>;
-      }> = [];
-      while (Date.now() < deadline) {
-        const stored = await fetch(`${url}/api/sessions/${sessionId}`, {
-          headers: userHeaders(),
-        });
-        history = ((await stored.json()) as { history: typeof history })
-          .history;
-        if (history.some((message) => message.role === "assistant")) break;
-        await Bun.sleep(20);
-      }
-
-      expect(history).toMatchObject([
-        { role: "user", content: "Keep going in the background" },
-        {
-          role: "assistant",
-          content: "Hello after closing the app.",
-          steps: expect.any(Array),
-        },
-      ]);
-    } finally {
-      await close();
+    const deadline = Date.now() + 2_000;
+    let history = (await sessions.getSession({ id: sessionId })).session
+      ?.history;
+    while (Date.now() < deadline) {
+      history = (await sessions.getSession({ id: sessionId })).session?.history;
+      if (history?.some((message) => message.role === Message_Role.ASSISTANT))
+        break;
+      await Bun.sleep(20);
     }
+    expect(history).toMatchObject([
+      { role: Message_Role.USER, content: "Keep going in the background" },
+      {
+        role: Message_Role.ASSISTANT,
+        content: "Hello after closing the app.",
+        steps: expect.any(Array),
+      },
+    ]);
   });
 });

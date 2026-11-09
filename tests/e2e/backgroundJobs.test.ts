@@ -4,7 +4,8 @@ import { setOpenRouterApiKey } from "../../src/db";
 import { getDb } from "../../src/db/connection";
 import { getMessagesForSession } from "../../src/db/sessions";
 import { setOpenRouterScenario } from "../helpers/mockOpenRouter";
-import { TEST_USER_ID, startTestServer, userHeaders } from "../helpers/server";
+import { Code, rpc, rpcCode } from "../helpers/rpc";
+import { TEST_USER_ID } from "../helpers/server";
 const model = "openrouter:openai/gpt-5.6-terra";
 async function until(condition: () => boolean, timeout = 15000) {
   const end = Date.now() + timeout;
@@ -16,20 +17,12 @@ async function until(condition: () => boolean, timeout = 15000) {
 test("real Bash job returns immediately, survives idle and wakes agent exactly once with output attachment", async () => {
   setOpenRouterApiKey("test");
   setOpenRouterScenario("background-jobs");
-  const { url, close } = await startTestServer();
-  const headers = userHeaders(undefined, {
-    "Content-Type": "application/json",
-  });
-  const post = (path: string, json: unknown = {}) =>
-    fetch(url + path, { method: "POST", headers, body: JSON.stringify(json) });
-  const { id } = (await (await post("/api/sessions", { model })).json()) as {
-    id: string;
-  };
+  const api = rpc();
+  const send = (sessionId: string, content: string) =>
+    api.agent.sendMessage({ sessionId, content, settings: { model } });
+  const { id } = await api.sessions.createSession({ model });
   try {
-    await post(`/api/sessions/${id}/messages`, {
-      content: "Run the script",
-      model,
-    });
+    await send(id, "Run the script");
     await until(() => getMessagesForSession(TEST_USER_ID, id).length === 2);
     const job = agentRuntime.jobs.list(TEST_USER_ID, id)[0]!;
     expect(job.status).toBe("running");
@@ -37,10 +30,7 @@ test("real Bash job returns immediately, survives idle and wakes agent exactly o
     expect(job.spawnPosition).toBe(1);
     expect(agentRuntime.snapshot(TEST_USER_ID, id).activation).toBeNull();
     expect(agentRuntime.busy(TEST_USER_ID, id)).toBe(true);
-    await post(`/api/sessions/${id}/messages`, {
-      content: "How is it going?",
-      model,
-    });
+    await send(id, "How is it going?");
     await until(() => getMessagesForSession(TEST_USER_ID, id).length === 4);
     await until(
       () => job.status === "succeeded" && !agentRuntime.busy(TEST_USER_ID, id),
@@ -68,40 +58,39 @@ test("real Bash job returns immediately, survives idle and wakes agent exactly o
       .get(job.id)!;
     expect(JSON.parse(stored.payload).status).toBe("succeeded");
     expect(
-      (
-        await fetch(`${url}/api/sessions/${id}/jobs`, {
-          headers: userHeaders("22222222-2222-4222-8222-222222222222"),
-        })
-      ).status,
-    ).toBe(404);
+      await rpcCode(
+        rpc("22222222-2222-4222-8222-222222222222").jobs.listJobs({
+          sessionId: id,
+        }),
+      ),
+    ).toBe(Code.NotFound);
+    const listed = await api.jobs.listJobs({ sessionId: id });
+    expect(listed.jobs.map((entry) => entry.id)).toEqual([job.id]);
+    expect(
+      (await api.jobs.getJob({ sessionId: id, jobId: job.id })).job?.id,
+    ).toBe(job.id);
+    expect(
+      await rpcCode(api.jobs.getJob({ sessionId: id, jobId: "job_missing" })),
+    ).toBe(Code.NotFound);
   } finally {
     await agentRuntime.deleteSession(TEST_USER_ID, id);
-    await close();
   }
 }, 20000);
 
 test("stress: admission, bounded logs, failures, descendant cancellation, rewind and deletion", async () => {
   setOpenRouterApiKey("test");
   setOpenRouterScenario("background-jobs");
-  const { url, close } = await startTestServer();
-  const headers = userHeaders(undefined, {
-    "Content-Type": "application/json",
-  });
-  const post = (path: string, json: unknown = {}) =>
-    fetch(url + path, { method: "POST", headers, body: JSON.stringify(json) });
+  const api = rpc();
+  const send = (sessionId: string, content: string) =>
+    api.agent.sendMessage({ sessionId, content, settings: { model } });
   const sessions: string[] = [];
   const create = async () => {
-    const { id } = (await (await post("/api/sessions", { model })).json()) as {
-      id: string;
-    };
+    const { id } = await api.sessions.createSession({ model });
     sessions.push(id);
     return id;
   };
   const run = async (id: string, command: string, count: number) => {
-    await post(`/api/sessions/${id}/messages`, {
-      content: `command:${command}`,
-      model,
-    });
+    await send(id, `command:${command}`);
     await until(
       () =>
         getMessagesForSession(TEST_USER_ID, id).filter((m) => m.role === "user")
@@ -182,27 +171,18 @@ test("stress: admission, bounded logs, failures, descendant cancellation, rewind
   } finally {
     for (const id of sessions)
       await agentRuntime.deleteSession(TEST_USER_ID, id);
-    await close();
   }
 }, 20000);
 
 test("ephemeral chat jobs persist, survive reply completion, and stop cancels them without waking the agent", async () => {
   setOpenRouterApiKey("test");
   setOpenRouterScenario("background-jobs");
-  const { url, close } = await startTestServer();
-  const headers = userHeaders(undefined, {
-    "Content-Type": "application/json",
-  });
-  const post = (path: string, json: unknown = {}) =>
-    fetch(url + path, { method: "POST", headers, body: JSON.stringify(json) });
-  const { id } = (await (
-    await post("/api/sessions", { model, ephemeral: true })
-  ).json()) as { id: string };
+  const api = rpc();
+  const send = (sessionId: string, content: string) =>
+    api.agent.sendMessage({ sessionId, content, settings: { model } });
+  const { id } = await api.sessions.createSession({ model, ephemeral: true });
   try {
-    await post(`/api/sessions/${id}/messages`, {
-      content: "command:echo START; sleep 30",
-      model,
-    });
+    await send(id, "command:echo START; sleep 30");
     await until(
       () =>
         agentRuntime.jobs.list(TEST_USER_ID, id).length === 1 &&
@@ -216,7 +196,7 @@ test("ephemeral chat jobs persist, survive reply completion, and stop cancels th
         )
         .get(id)?.count,
     ).toBe(1);
-    await post(`/api/sessions/${id}/stop`);
+    await api.agent.stop({ sessionId: id });
     expect(agentRuntime.jobs.list(TEST_USER_ID, id)[0]?.status).toBe(
       "cancelled",
     );
@@ -227,7 +207,6 @@ test("ephemeral chat jobs persist, survive reply completion, and stop cancels th
     ).toHaveLength(0);
   } finally {
     await agentRuntime.deleteSession(TEST_USER_ID, id);
-    await close();
   }
 });
 
@@ -235,17 +214,7 @@ test("restart records one non-waking interruption notification without restartin
   const { AgentRuntime } = await import(
     "../../src/agents/runtime/AgentRuntime"
   );
-  const { url, close } = await startTestServer();
-  const headers = userHeaders(undefined, {
-    "Content-Type": "application/json",
-  });
-  const { id } = (await (
-    await fetch(`${url}/api/sessions`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ model }),
-    })
-  ).json()) as { id: string };
+  const { id } = await rpc().sessions.createSession({ model });
   try {
     const main = agentRuntime.main(TEST_USER_ID, id);
     const job = {
@@ -286,6 +255,5 @@ test("restart records one non-waking interruption notification without restartin
     expect(recovered.snapshot(TEST_USER_ID, id).activation).toBeNull();
   } finally {
     await agentRuntime.deleteSession(TEST_USER_ID, id);
-    await close();
   }
 });

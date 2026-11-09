@@ -31,10 +31,13 @@ function validate<T extends DescMessage>(schema: T, message: MessageShape<T>) {
   if (result.kind === "error") throw result.error;
   const [violation] = result.violations;
   const field = violation?.field.length ? pathToString(violation.field) : "";
+  // Rules with "euler." IDs carry a complete message for people.
+  const custom = violation?.ruleId.startsWith("euler.");
   throw new OperationError("INVALID_REQUEST", {
-    message: field
-      ? `${field}: ${violation?.message}`
-      : (violation?.message ?? "Invalid request"),
+    message:
+      field && !custom
+        ? `${field}: ${violation?.message}`
+        : (violation?.message ?? "Invalid request"),
   });
 }
 

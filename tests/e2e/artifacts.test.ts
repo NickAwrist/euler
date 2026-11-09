@@ -3,83 +3,84 @@ import { join } from "node:path";
 import "../setup";
 import { expect, test } from "bun:test";
 import { getSessionById, patchSessionRow } from "../../src/db";
+import { ArtifactEntry_Kind } from "../../src/gen/euler/v1/workspace_pb";
 import { workspaceService } from "../../src/workspaces/WorkspaceService";
-import { TEST_USER_ID, startTestServer, userHeaders } from "../helpers/server";
-test("artifact API scopes files to their owner", async () => {
-  const { url, close } = await startTestServer();
-  try {
-    const response = await fetch(`${url}/api/sessions`, {
-      method: "POST",
-      headers: userHeaders(undefined, {
-        "Content-Type": "application/json",
-      }),
-      body: "{}",
-    });
-    expect(response.status).toBe(201);
-    const { id } = (await response.json()) as { id: string };
-    const workspace = await workspaceService.resolveSession(
-      getSessionById(TEST_USER_ID, id)!,
-    );
-    await workspaceService.writeFile(workspace, "notes.md", "# Notes");
-    const base = `${url}/api/sessions/${id}/workspace/artifacts`;
-    const tree = await fetch(`${base}/tree`, { headers: userHeaders() });
-    expect(tree.status).toBe(200);
-    expect(await tree.json()).toMatchObject({
-      entries: [{ name: "notes.md", kind: "file" }],
-    });
-    const preview = await fetch(`${base}/preview?path=notes.md`, {
-      headers: userHeaders(),
-    });
-    expect(await preview.json()).toEqual({
-      kind: "text",
-      path: "notes.md",
-      content: "# Notes",
-    });
-    expect(preview.headers.get("cache-control")).toBe("no-store");
-    const file = await fetch(`${base}/download?path=notes.md`, {
-      headers: userHeaders(),
-    });
-    expect(file.status).toBe(200);
-    expect(file.headers.get("content-disposition")).toContain("attachment;");
-    expect(await file.text()).toBe("# Notes");
-    // Downloading preserves binary bytes and works in the selected local directory too.
-    const binary = Buffer.from([0, 255, 128, 1]);
-    await fs.writeFile(join(workspace.hostPath, "file.bin"), binary);
-    patchSessionRow(TEST_USER_ID, id, {
-      workspace_kind: "local",
-      session_directory: workspace.hostPath,
-    });
-    const localFile = await fetch(`${base}/download?path=file.bin`, {
-      headers: userHeaders(),
-    });
-    expect(localFile.status).toBe(200);
-    expect(Buffer.from(await localFile.arrayBuffer())).toEqual(binary);
-    for (const action of [
-      "tree",
-      "preview?path=notes.md",
-      "download?path=notes.md",
-    ]) {
-      const denied = await fetch(`${base}/${action}`, {
-        headers: userHeaders("22222222-2222-4222-8222-222222222222"),
-      });
-      expect(denied.ok).toBeFalse();
-    }
-    const traversal = await fetch(`${base}/preview?path=../outside`, {
-      headers: userHeaders(),
-    });
-    expect(traversal.status).toBe(400);
-    const missing = await fetch(`${base}/preview?path=docs/missing.md`, {
-      headers: userHeaders(),
-    });
-    expect(missing.status).toBe(400);
-    expect(await missing.json()).toMatchObject({
-      error: { message: "Path does not exist: docs/missing.md" },
-    });
-    const invalidDownload = await fetch(`${base}/download?path=../outside`, {
-      headers: userHeaders(),
-    });
-    expect(invalidDownload.status).toBe(400);
-  } finally {
-    await close();
+import { Code, rpc, rpcCode, rpcError } from "../helpers/rpc";
+import { TEST_USER_ID } from "../helpers/server";
+
+/** Collects a DownloadFile stream into its info and bytes. */
+async function download(
+  api: ReturnType<typeof rpc>,
+  sessionId: string,
+  path: string,
+) {
+  let name = "";
+  const chunks: Uint8Array[] = [];
+  for await (const { part } of api.workspace.downloadFile({
+    sessionId,
+    path,
+  })) {
+    if (part.case === "info") name = part.value.name;
+    if (part.case === "chunk") chunks.push(part.value);
   }
+  return { name, bytes: Buffer.concat(chunks) };
+}
+
+test("artifact API scopes files to their owner", async () => {
+  const api = rpc();
+  const other = rpc("22222222-2222-4222-8222-222222222222");
+  const { id } = await api.sessions.createSession({});
+  const workspace = await workspaceService.resolveSession(
+    getSessionById(TEST_USER_ID, id)!,
+  );
+  await workspaceService.writeFile(workspace, "notes.md", "# Notes");
+  const tree = await api.workspace.listArtifacts({ sessionId: id, path: "." });
+  expect(tree.entries).toMatchObject([
+    { name: "notes.md", kind: ArtifactEntry_Kind.FILE },
+  ]);
+  const { preview } = await api.workspace.previewArtifact({
+    sessionId: id,
+    path: "notes.md",
+  });
+  expect(preview).toMatchObject({
+    path: "notes.md",
+    content: { case: "text", value: "# Notes" },
+  });
+  expect(await download(api, id, "notes.md")).toEqual({
+    name: "notes.md",
+    bytes: Buffer.from("# Notes"),
+  });
+  // Downloading preserves binary bytes and works in a local directory too.
+  const binary = Buffer.from([0, 255, 128, 1]);
+  await fs.writeFile(join(workspace.hostPath, "file.bin"), binary);
+  patchSessionRow(TEST_USER_ID, id, {
+    workspace_kind: "local",
+    session_directory: workspace.hostPath,
+  });
+  expect((await download(api, id, "file.bin")).bytes).toEqual(binary);
+  // Files larger than one chunk arrive whole and in order.
+  const large = Buffer.alloc(200 * 1024, 7);
+  large.writeUInt32BE(0xdeadbeef, large.length - 4);
+  await fs.writeFile(join(workspace.hostPath, "large.bin"), large);
+  expect((await download(api, id, "large.bin")).bytes).toEqual(large);
+
+  for (const call of [
+    other.workspace.listArtifacts({ sessionId: id, path: "." }),
+    other.workspace.previewArtifact({ sessionId: id, path: "notes.md" }),
+    download(other, id, "notes.md"),
+  ])
+    expect(await rpcCode(call)).toBe(Code.NotFound);
+  expect(
+    await rpcCode(
+      api.workspace.previewArtifact({ sessionId: id, path: "../outside" }),
+    ),
+  ).toBe(Code.InvalidArgument);
+  const missing = await rpcError(
+    api.workspace.previewArtifact({ sessionId: id, path: "docs/missing.md" }),
+  );
+  expect(missing.code).toBe(Code.InvalidArgument);
+  expect(missing.rawMessage).toBe("Path does not exist: docs/missing.md");
+  expect(await rpcCode(download(api, id, "../outside"))).toBe(
+    Code.InvalidArgument,
+  );
 });

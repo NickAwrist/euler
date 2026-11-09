@@ -1,44 +1,35 @@
 import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
 import { createSchema } from "../../src/db/schema";
-import { startTestServer } from "../helpers/server";
+import { Code, rpc, rpcCode, rpcError } from "../helpers/rpc";
 
-test("ChatGPT routes require a UUID and keep pending sign-ins separate", async () => {
-  const { url, close } = await startTestServer();
-  const headers = { "x-euler-user-id": "33333333-3333-4333-8333-333333333333" };
-  try {
-    expect((await fetch(`${url}/api/settings/chatgpt`)).status).toBe(400);
-    const status = await fetch(`${url}/api/settings/chatgpt`, { headers });
-    expect(status.headers.get("Cache-Control")).toBe("no-store");
-    expect(await status.json()).toEqual({
-      connected: false,
-      email: null,
-      name: null,
-      picture: null,
-      planEnabled: false,
-    });
-    const login = await fetch(`${url}/api/settings/chatgpt/login`, {
-      headers,
-      method: "POST",
-    });
-    const body = (await login.json()) as { authorizationUrl: string };
-    expect(new URL(body.authorizationUrl).hostname).toBe("auth.openai.com");
-    expect(body).not.toHaveProperty("code_verifier");
-    const invalid = await fetch(`${url}/api/settings/chatgpt/callback`, {
-      method: "POST",
-      headers: { ...headers, "Content-Type": "application/json" },
-      body: JSON.stringify({
+const USER = "33333333-3333-4333-8333-333333333333";
+
+test("ChatGPT RPCs require a UUID and keep pending sign-ins separate", async () => {
+  const { providers } = rpc(USER);
+  expect(await rpcCode(rpc(null).providers.getChatGptStatus({}))).toBe(
+    Code.InvalidArgument,
+  );
+  const { status } = await providers.getChatGptStatus({});
+  expect(status).toMatchObject({ connected: false, planEnabled: false });
+  expect([status?.email, status?.name, status?.picture]).toEqual([
+    undefined,
+    undefined,
+    undefined,
+  ]);
+  const login = await providers.startChatGptLogin({});
+  expect(new URL(login.authorizationUrl).hostname).toBe("auth.openai.com");
+  expect(
+    await rpcCode(
+      providers.finishChatGptLogin({
         callbackUrl: "http://127.0.0.1:1455/auth/callback?code=a&state=wrong",
       }),
-    });
-    expect(invalid.status).toBe(400);
-    expect(
-      (await (await fetch(`${url}/api/settings/chatgpt`, { headers })).json())
-        .connected,
-    ).toBe(false);
-  } finally {
-    await close();
-  }
+    ),
+  ).toBe(Code.InvalidArgument);
+  expect(
+    await rpcCode(providers.finishChatGptLogin({ callbackUrl: "no" })),
+  ).toBe(Code.InvalidArgument);
+  expect((await providers.getChatGptStatus({})).status?.connected).toBe(false);
 });
 
 test("favorites migration preserves saved selections and allows ChatGPT", () => {
@@ -67,32 +58,17 @@ test("favorites migration preserves saved selections and allows ChatGPT", () => 
 });
 
 test("sending with a disconnected ChatGPT model fails before starting a run", async () => {
-  const { url, close } = await startTestServer();
-  const headers = {
-    "x-euler-user-id": "33333333-3333-4333-8333-333333333333",
-    "Content-Type": "application/json",
-  };
-  try {
-    const created = await fetch(`${url}/api/sessions`, {
-      method: "POST",
-      headers,
-      body: "{}",
-    });
-    expect(created.status).toBe(201);
-    const session = (await created.json()) as { id: string };
-    const sent = await fetch(`${url}/api/sessions/${session.id}/messages`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ content: "Hello", model: "chatgpt:gpt-example" }),
-    });
-    expect(sent.status).toBe(400);
-    expect(await sent.json()).toMatchObject({
-      error: {
-        code: "INVALID_REQUEST",
-        message: "Connect ChatGPT in Settings before using this model",
-      },
-    });
-  } finally {
-    await close();
-  }
+  const { sessions, agent } = rpc(USER);
+  const { id } = await sessions.createSession({});
+  const error = await rpcError(
+    agent.sendMessage({
+      sessionId: id,
+      content: "Hello",
+      settings: { model: "chatgpt:gpt-example" },
+    }),
+  );
+  expect(error.code).toBe(Code.InvalidArgument);
+  expect(error.rawMessage).toBe(
+    "Connect ChatGPT in Settings before using this model",
+  );
 });

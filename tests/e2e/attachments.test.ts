@@ -1,11 +1,7 @@
 import { waitForActivation } from "../helpers/activation";
 import "../setup";
 import { describe, expect, test } from "bun:test";
-import type {
-  ImageAttachment,
-  MessageAttachment,
-} from "../../src/attachments/types";
-import { startTestServer, userHeaders } from "../helpers/server";
+import { Code, rpc, rpcCode } from "../helpers/rpc";
 
 const OTHER_USER = "22222222-2222-4222-8222-222222222222";
 const PNG_SIGNATURE = new Uint8Array([
@@ -14,76 +10,87 @@ const PNG_SIGNATURE = new Uint8Array([
 
 describe("image attachments", () => {
   test("uploads, sends, persists, and protects an image", async () => {
-    const { url, close } = await startTestServer();
-    try {
-      const created = await fetch(`${url}/api/sessions`, {
-        method: "POST",
-        headers: userHeaders(undefined, {
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({ model: "llama3:latest" }),
-      });
-      const { id: sessionId } = (await created.json()) as { id: string };
+    const api = rpc();
+    const other = rpc(OTHER_USER);
+    const { id: sessionId } = await api.sessions.createSession({
+      model: "llama3:latest",
+    });
 
-      const upload = await fetch(`${url}/api/attachments`, {
-        method: "POST",
-        headers: userHeaders(undefined, {
-          "Content-Type": "image/png",
-          "X-Euler-Session-ID": sessionId,
-          "X-Attachment-Filename": encodeURIComponent("sample.png"),
-        }),
-        body: PNG_SIGNATURE,
-      });
-      expect(upload.status).toBe(201);
-      const { attachment } = (await upload.json()) as {
-        attachment: ImageAttachment;
-      };
-      expect(attachment).toMatchObject({
-        kind: "image",
-        name: "sample.png",
-        mimeType: "image/png",
-        size: PNG_SIGNATURE.byteLength,
-      });
+    const { attachment } = await api.attachments.createAttachment({
+      sessionId,
+      filename: "folder/sample.png",
+      mimeType: "image/png",
+      data: PNG_SIGNATURE,
+    });
+    expect(attachment).toMatchObject({
+      name: "sample.png",
+      mimeType: "image/png",
+      size: PNG_SIGNATURE.byteLength,
+    });
+    const id = attachment!.id;
 
-      const read = await fetch(`${url}/api/attachments/${attachment.id}`, {
-        headers: userHeaders(),
-      });
-      expect(read.status).toBe(200);
-      expect(new Uint8Array(await read.arrayBuffer())).toEqual(PNG_SIGNATURE);
-      expect(
-        (
-          await fetch(`${url}/api/attachments/${attachment.id}`, {
-            headers: userHeaders(OTHER_USER),
-          })
-        ).status,
-      ).toBe(404);
+    const read = await api.attachments.getAttachmentData({ id });
+    expect(read.mimeType).toBe("image/png");
+    expect(read.data).toEqual(PNG_SIGNATURE);
+    expect(await rpcCode(other.attachments.getAttachmentData({ id }))).toBe(
+      Code.NotFound,
+    );
+    expect(await rpcCode(other.attachments.deleteAttachment({ id }))).toBe(
+      Code.NotFound,
+    );
 
-      const run = await fetch(`${url}/api/sessions/${sessionId}/messages`, {
-        method: "POST",
-        headers: userHeaders(undefined, {
-          "Content-Type": "application/json",
+    // The declared type must match the bytes, and another user's chat is unknown.
+    expect(
+      await rpcCode(
+        api.attachments.createAttachment({
+          sessionId,
+          filename: "fake.png",
+          mimeType: "image/png",
+          data: new TextEncoder().encode("not an image"),
         }),
-        body: JSON.stringify({
-          content: "What is in this image?",
-          model: "llama3:latest",
-          attachmentIds: [attachment.id],
+      ),
+    ).toBe(Code.InvalidArgument);
+    expect(
+      await rpcCode(
+        other.attachments.createAttachment({
+          sessionId,
+          filename: "sample.png",
+          mimeType: "image/png",
+          data: PNG_SIGNATURE,
         }),
-      });
-      expect(run.status).toBe(202);
-      await waitForActivation(sessionId);
+      ),
+    ).toBe(Code.NotFound);
+    expect(
+      await rpcCode(
+        api.attachments.createAttachment({
+          sessionId,
+          filename: "huge.png",
+          mimeType: "image/png",
+          data: new Uint8Array(8 * 1024 * 1024 + 1),
+        }),
+      ),
+    ).toBe(Code.InvalidArgument);
 
-      const stored = await fetch(`${url}/api/sessions/${sessionId}`, {
-        headers: userHeaders(),
-      });
-      const body = (await stored.json()) as {
-        history: Array<{ attachments?: MessageAttachment[] }>;
-        modelMessages: Array<Record<string, unknown>>;
-      };
-      expect(body.history[0]?.attachments).toEqual([attachment]);
-      expect(body.modelMessages[0]?.images).toEqual([attachment]);
-      expect(JSON.stringify(body.modelMessages)).not.toContain("iVBOR");
-    } finally {
-      await close();
-    }
+    await api.agent.sendMessage({
+      sessionId,
+      content: "What is in this image?",
+      attachmentIds: [id],
+      settings: { model: "llama3:latest" },
+    });
+    await waitForActivation(sessionId);
+
+    const { session } = await api.sessions.getSession({ id: sessionId });
+    expect(session?.history[0]?.attachments).toMatchObject([
+      { kind: { case: "image", value: attachment } },
+    ]);
+    const domain = {
+      id,
+      kind: "image",
+      name: "sample.png",
+      mimeType: "image/png",
+      size: PNG_SIGNATURE.byteLength,
+    };
+    expect(session?.modelMessages[0]?.images).toEqual([domain]);
+    expect(JSON.stringify(session?.modelMessages)).not.toContain("iVBOR");
   });
 });

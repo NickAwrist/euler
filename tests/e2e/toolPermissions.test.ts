@@ -10,13 +10,16 @@ import {
   updateUserPreferences,
 } from "../../src/db/userPreferences";
 import {
-  ToolApprovalSchema,
-  ToolPermissionsSchema,
-} from "../../src/schemas/toolPermissions";
+  ApprovalDecision,
+  ToolPermissionCondition_Argument_Match,
+  ToolPermissionRule_Action,
+} from "../../src/gen/euler/v1/permissions_pb";
+import { toProtoRule } from "../../src/permissions/wire";
 import { workspaceService } from "../../src/workspaces/WorkspaceService";
 import { getOpenRouterRequests } from "../helpers/mockOpenRouter";
 import { setOpenRouterScenario } from "../helpers/mockOpenRouter";
-import { TEST_USER_ID, startTestServer, userHeaders } from "../helpers/server";
+import { Code, rpc, rpcCode } from "../helpers/rpc";
+import { TEST_USER_ID } from "../helpers/server";
 import { allToolsRule } from "../helpers/toolPermissions";
 
 const model = "openrouter:openai/gpt-5.6-terra";
@@ -34,90 +37,87 @@ test("approval API gates real execution, survives browser reload, and saves matc
   updateUserPreferences(TEST_USER_ID, {
     toolPermissions: { rules: [allToolsRule()] },
   });
-  const { url, close } = await startTestServer();
-  const headers = userHeaders(undefined, {
-    "Content-Type": "application/json",
-  });
-  const post = (path: string, json: unknown = {}, ownerHeaders = headers) =>
-    fetch(url + path, {
-      method: "POST",
-      headers: ownerHeaders,
-      body: JSON.stringify(json),
-    });
-  const session = (await (await post("/api/sessions", { model })).json()) as {
-    id: string;
-  };
-  const root = workspaceService.retainedPath(TEST_USER_ID, session.id);
+  const api = rpc();
+  const { id: sessionId } = await api.sessions.createSession({ model });
+  const root = workspaceService.retainedPath(TEST_USER_ID, sessionId);
+  // A client on the stream sees the approval open and close as typed events.
+  const watching = new AbortController();
+  const seen: string[] = [];
+  const watched = (async () => {
+    for await (const { event } of api.events.subscribe(
+      { afterSequence: 0n },
+      { signal: watching.signal },
+    )) {
+      const kind = event?.payload.case;
+      if (
+        event?.sessionId === sessionId &&
+        (kind === "approvalRequested" || kind === "approvalResolved")
+      )
+        seen.push(kind);
+    }
+  })().catch(() => {});
   try {
     const command = "echo approved >> marker.txt";
-    await post(`/api/sessions/${session.id}/messages`, {
-      content: `command:${command}`,
-      model,
-    });
+    const send = () =>
+      api.agent.sendMessage({
+        sessionId,
+        content: `command:${command}`,
+        settings: { model },
+      });
+    await send();
     await until(
-      () => agentRuntime.approvals.list(TEST_USER_ID, session.id).length === 1,
+      () => agentRuntime.approvals.list(TEST_USER_ID, sessionId).length === 1,
     );
     expect(
       await fs.readFile(`${root}/marker.txt`, "utf8").catch(() => null),
     ).toBeNull();
-    const snapshot = (await (
-      await fetch(`${url}/api/sessions/${session.id}/runtime`, { headers })
-    ).json()) as { approvals: unknown[] };
-    const approval = ToolApprovalSchema.parse(snapshot.approvals[0]);
-    expect(approval.arguments.command).toBe(command);
-    expect(approval.arguments.background === true).toBe(false);
-    const endpoint = `/api/sessions/${session.id}/approvals/${approval.id}`;
+    // A reloaded client finds the pending approval in the runtime snapshot.
+    const [approval] = (await api.agent.getRuntime({ sessionId })).approvals;
+    expect(approval?.arguments?.command).toBe(command);
+    expect(approval?.arguments?.background === true).toBe(false);
+    const respond = (decision: ApprovalDecision, owner = TEST_USER_ID) =>
+      rpc(owner).agent.respondToApproval({
+        sessionId,
+        approvalId: approval!.id,
+        decision,
+      });
     expect(
-      (
-        await post(
-          endpoint,
-          { decision: "allow_once" },
-          userHeaders("22222222-2222-4222-8222-222222222222", {
-            "Content-Type": "application/json",
-          }),
-        )
-      ).status,
-    ).toBe(404);
-    expect(
-      (
-        await post(endpoint, {
-          decision: "allow_once",
-          arguments: { command: "different" },
-        })
-      ).status,
-    ).toBe(400);
-    expect((await post(endpoint, { decision: "allow_matching" })).status).toBe(
-      200,
+      await rpcCode(
+        respond(
+          ApprovalDecision.ALLOW_ONCE,
+          "22222222-2222-4222-8222-222222222222",
+        ),
+      ),
+    ).toBe(Code.NotFound);
+    expect(await rpcCode(respond(ApprovalDecision.UNSPECIFIED))).toBe(
+      Code.InvalidArgument,
     );
-    await until(() => !agentRuntime.busy(TEST_USER_ID, session.id));
+    const answered = await respond(ApprovalDecision.ALLOW_MATCHING);
+    expect(answered.rule?.sessionId).toBe(sessionId);
+    await until(() => !agentRuntime.busy(TEST_USER_ID, sessionId));
     expect(await fs.readFile(`${root}/marker.txt`, "utf8")).toBe("approved\n");
-    expect((await post(endpoint, { decision: "allow_once" })).status).toBe(404);
+    expect(await rpcCode(respond(ApprovalDecision.ALLOW_ONCE))).toBe(
+      Code.NotFound,
+    );
     const saved =
       effectiveUserPreferences(TEST_USER_ID).toolPermissions.rules.at(-1)!;
-    expect(saved.sessionId).toBe(session.id);
-    await post(`/api/sessions/${session.id}/messages`, {
-      content: `command:${command}`,
-      model,
-    });
-    await until(() => !agentRuntime.busy(TEST_USER_ID, session.id));
+    expect(saved.sessionId).toBe(sessionId);
+    expect(saved.id).toBe(answered.rule!.id);
+    await send();
+    await until(() => !agentRuntime.busy(TEST_USER_ID, sessionId));
     expect(await fs.readFile(`${root}/marker.txt`, "utf8")).toBe(
       "approved\napproved\n",
     );
-    expect(agentRuntime.approvals.list(TEST_USER_ID, session.id)).toEqual([]);
-    expect(
-      (
-        await fetch(
-          `${url}/api/settings/user/tool-permission-rules/${saved.id}`,
-          { method: "DELETE", headers },
-        )
-      ).status,
-    ).toBe(200);
+    expect(agentRuntime.approvals.list(TEST_USER_ID, sessionId)).toEqual([]);
+    expect(seen).toEqual(["approvalRequested", "approvalResolved"]);
+    await api.preferences.deletePermissionRule({ ruleId: saved.id });
     expect(
       effectiveUserPreferences(TEST_USER_ID).toolPermissions.rules,
     ).toEqual([allToolsRule()]);
   } finally {
-    await agentRuntime.deleteSession(TEST_USER_ID, session.id);
-    await close();
+    watching.abort();
+    await watched;
+    await agentRuntime.deleteSession(TEST_USER_ID, sessionId);
   }
 });
 
@@ -204,93 +204,61 @@ test("waiting for approval releases scheduler slots and background jobs are admi
 });
 
 test("permission preferences persist and rule CRUD merges current rules with user ownership", async () => {
-  const { url, close } = await startTestServer();
-  const headers = userHeaders(undefined, {
-    "Content-Type": "application/json",
-  });
+  const { preferences } = rpc();
   const ids = [crypto.randomUUID(), crypto.randomUUID()];
-  try {
-    for (const id of ids) {
-      const response = await fetch(
-        `${url}/api/settings/user/tool-permission-rules/${id}`,
-        {
-          method: "PUT",
-          headers,
-          body: JSON.stringify({
-            id,
-            tool: "bash",
-            action: "deny",
-            condition: {
-              kind: "argument",
-              field: "command",
-              match: "regex",
-              value: "^npm\\s+publish\\b",
-            },
-          }),
-        },
-      );
-      expect(response.status).toBe(200);
-    }
-    expect(
-      effectiveUserPreferences(TEST_USER_ID).toolPermissions.rules,
-    ).toHaveLength(2);
-    for (const pattern of ["[", "(?=publish)"]) {
-      const response = await fetch(
-        `${url}/api/settings/user/tool-permission-rules/${ids[0]}`,
-        {
-          method: "PUT",
-          headers,
-          body: JSON.stringify({
-            id: ids[0],
-            tool: "bash",
-            action: "deny",
-            condition: {
-              kind: "argument",
-              field: "command",
-              match: "regex",
-              value: pattern,
-            },
-          }),
-        },
-      );
-      expect(response.status).toBe(400);
-      expect(
-        effectiveUserPreferences(TEST_USER_ID).toolPermissions.rules[0]
-          ?.condition,
-      ).toMatchObject({ match: "regex", value: "^npm\\s+publish\\b" });
-    }
-    await fetch(`${url}/api/settings/user/tool-permission-rules/${ids[0]}`, {
-      method: "DELETE",
-      headers: userHeaders("22222222-2222-4222-8222-222222222222"),
+  const rule = (id: string, pattern: string) =>
+    toProtoRule({
+      id,
+      tool: "bash",
+      action: "deny",
+      condition: {
+        kind: "argument",
+        field: "command",
+        match: "regex",
+        value: pattern,
+      },
     });
-    expect(
-      effectiveUserPreferences(TEST_USER_ID).toolPermissions.rules,
-    ).toHaveLength(2);
-    await fetch(`${url}/api/settings/user`, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify({ toolPermissions: {} }),
+  for (const id of ids)
+    await preferences.putPermissionRule({
+      rule: rule(id, "^npm\\s+publish\\b"),
     });
-    const saved = (await (
-      await fetch(`${url}/api/settings/user`, { headers })
-    ).json()) as { toolPermissions: unknown };
-    expect(ToolPermissionsSchema.parse(saved.toolPermissions)).toMatchObject({
-      rules: [{ id: ids[0] }, { id: ids[1] }],
-    });
+  expect(
+    effectiveUserPreferences(TEST_USER_ID).toolPermissions.rules,
+  ).toHaveLength(2);
+  // RE2 rejects these patterns, which buf.validate cannot check.
+  for (const pattern of ["[", "(?=publish)"]) {
     expect(
-      (
-        await fetch(`${url}/api/settings/user`, {
-          method: "PATCH",
-          headers,
-          body: JSON.stringify({
-            toolPermissions: { defaultAction: "unexpected" },
-          }),
-        })
-      ).status,
-    ).toBe(400);
-  } finally {
-    await close();
+      await rpcCode(
+        preferences.putPermissionRule({ rule: rule(ids[0]!, pattern) }),
+      ),
+    ).toBe(Code.InvalidArgument);
+    expect(
+      effectiveUserPreferences(TEST_USER_ID).toolPermissions.rules[0]
+        ?.condition,
+    ).toMatchObject({ match: "regex", value: "^npm\\s+publish\\b" });
   }
+  // A rule needs an action and a condition.
+  for (const invalid of [
+    { ...rule(ids[0]!, "a"), action: ToolPermissionRule_Action.UNSPECIFIED },
+    { ...rule(ids[0]!, "a"), condition: undefined },
+    { ...rule(ids[0]!, "a"), id: "not-a-uuid" },
+  ])
+    expect(
+      await rpcCode(preferences.putPermissionRule({ rule: invalid })),
+    ).toBe(Code.InvalidArgument);
+  await rpc(
+    "22222222-2222-4222-8222-222222222222",
+  ).preferences.deletePermissionRule({ ruleId: ids[0]! });
+  expect(
+    effectiveUserPreferences(TEST_USER_ID).toolPermissions.rules,
+  ).toHaveLength(2);
+  await preferences.updatePreferences({});
+  const saved = (await preferences.getPreferences({})).preferences;
+  expect(saved?.toolPermissionRules.map((entry) => entry.id)).toEqual(ids);
+  expect(saved?.toolPermissionRules[0]?.condition?.kind).toMatchObject({
+    case: "argument",
+    value: { match: ToolPermissionCondition_Argument_Match.REGEX },
+  });
 });
 
 test("a deny added while an approved call waits for a scheduler slot still prevents execution", async () => {
@@ -480,7 +448,6 @@ test("a blocking parent keeps waiting while its child needs user approval", asyn
 });
 
 test("deleting a chat removes only its scoped permission rules", async () => {
-  const { url, close } = await startTestServer();
   const id = crypto.randomUUID();
   createSessionRow(TEST_USER_ID, id, Date.now(), "test");
   const global = {
@@ -504,16 +471,8 @@ test("deleting a chat removes only its scoped permission rules", async () => {
       ],
     },
   });
-  try {
-    const response = await fetch(`${url}/api/sessions/${id}`, {
-      method: "DELETE",
-      headers: userHeaders(),
-    });
-    expect(response.status).toBe(200);
-    expect(effectiveUserPreferences(TEST_USER_ID).toolPermissions).toEqual({
-      rules: [allToolsRule(), global, other],
-    });
-  } finally {
-    await close();
-  }
+  await rpc().sessions.deleteSession({ id });
+  expect(effectiveUserPreferences(TEST_USER_ID).toolPermissions).toEqual({
+    rules: [allToolsRule(), global, other],
+  });
 });

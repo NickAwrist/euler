@@ -4,24 +4,19 @@ import fs from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, parse } from "node:path";
 import { envConfig } from "../../src/env";
-import { startTestServer, userHeaders } from "../helpers/server";
+import { Code, rpc, rpcCode } from "../helpers/rpc";
 
 test("browses server directories and completes partial paths without reading files", async () => {
-  const { url, close } = await startTestServer();
+  const { directories } = rpc();
   const root = await fs.mkdtemp(join(tmpdir(), "orbis-browse-"));
-  const browse = (path: string) =>
-    fetch(`${url}/api/directories?path=${encodeURIComponent(path)}`, {
-      headers: userHeaders(),
-    });
+  const browse = (path: string) => directories.listDirectory({ path });
   try {
     await fs.mkdir(join(root, "Desktop"));
     await fs.mkdir(join(root, ".hidden"));
     await fs.writeFile(join(root, "secret.txt"), "not returned");
     await fs.symlink(join(root, "Desktop"), join(root, "linked"));
     await fs.symlink(join(root, "missing"), join(root, "broken"));
-    const response = await browse(root);
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
+    expect(await browse(root)).toMatchObject({
       path: await fs.realpath(root),
       exact: true,
       parent: dirname(await fs.realpath(root)),
@@ -30,65 +25,51 @@ test("browses server directories and completes partial paths without reading fil
         path: join(root, name),
       })),
     });
-    expect(await (await browse(join(root, "des"))).json()).toMatchObject({
+    expect(await browse(join(root, "des"))).toMatchObject({
       path: root,
       exact: false,
       directories: [{ name: "Desktop", path: join(root, "Desktop") }],
     });
-    expect(await (await browse(join(root, "Desktop"))).json()).toMatchObject({
+    expect(await browse(join(root, "Desktop"))).toMatchObject({
       parent: root,
       exact: true,
       directories: [],
     });
-    expect(await (await browse("~")).json()).toMatchObject({
+    expect(await browse("~")).toMatchObject({
       path: await fs.realpath(homedir()),
       exact: true,
     });
-    expect(await (await browse(parse(root).root)).json()).toMatchObject({
-      parent: null,
-    });
+    expect((await browse(parse(root).root)).parent).toBeUndefined();
     for (const path of [
       "relative",
       join(root, "secret.txt"),
       join(root, "missing", "nested"),
       "\0",
-    ]) {
-      expect((await browse(path)).status).toBe(400);
-    }
-    expect((await fetch(`${url}/api/directories`)).status).toBe(400);
+    ])
+      expect(await rpcCode(browse(path))).toBe(Code.InvalidArgument);
     expect(
-      (
-        await fetch(`${url}/api/directories?path=a&path=b`, {
-          headers: userHeaders(),
-        })
-      ).status,
-    ).toBe(400);
+      await rpcCode(rpc(null).directories.listDirectory({ path: root })),
+    ).toBe(Code.InvalidArgument);
   } finally {
-    await close();
     await fs.rm(root, { recursive: true, force: true });
   }
 });
 
 test("browses the configured host folder for default and tilde paths", async () => {
-  const { url, close } = await startTestServer();
+  const { directories } = rpc();
   const root = await fs.mkdtemp(join(tmpdir(), "orbis-host-browse-"));
   const previous = envConfig.hostDirectory;
   envConfig.hostDirectory = root;
   try {
     await fs.mkdir(join(root, "projects"));
-    for (const input of ["", "?path=", "?path=~", "?path=~/projects"]) {
-      const response = await fetch(`${url}/api/directories${input}`, {
-        headers: userHeaders(),
-      });
-      expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({
-        path: input.endsWith("/projects") ? join(root, "projects") : root,
+    for (const path of ["", "~", "~/projects"]) {
+      expect(await directories.listDirectory({ path })).toMatchObject({
+        path: path.endsWith("/projects") ? join(root, "projects") : root,
         exact: true,
       });
     }
   } finally {
     envConfig.hostDirectory = previous;
-    await close();
     await fs.rm(root, { recursive: true, force: true });
   }
 });
