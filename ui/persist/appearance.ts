@@ -65,14 +65,30 @@ export const CHAT_MAX_WIDTHS: Record<Appearance_ChatWidth, number> = {
   [Appearance_ChatWidth.FULL]: Number.POSITIVE_INFINITY,
 };
 
+const known = <T extends number>(slugs: Record<T, unknown>, value: T) =>
+  value in slugs ? value : (0 as T);
+
+/** Reads choices this version doesn't offer, such as a newer server's, as defaults. */
+function knownChoices(appearance: Appearance): Appearance {
+  return {
+    ...appearance,
+    theme: known(THEME_SLUGS, appearance.theme),
+    font: known(FONT_SLUGS, appearance.font),
+    codeFont: known(CODE_FONT_SLUGS, appearance.codeFont),
+    chatWidth: known(CHAT_WIDTH_SLUGS, appearance.chatWidth),
+  };
+}
+
 export function loadAppearance(): Appearance {
-  return getUserPreferences().appearance!;
+  return knownChoices(getUserPreferences().appearance!);
 }
 export async function saveAppearance(
   appearance: Partial<Appearance>,
 ): Promise<Appearance> {
   const { $typeName: _type, $unknown: _unknown, ...patch } = appearance;
-  return (await updateUserPreferences({ appearance: patch })).appearance!;
+  return knownChoices(
+    (await updateUserPreferences({ appearance: patch })).appearance!,
+  );
 }
 
 export function applyAppearance(appearance: Appearance): void {
