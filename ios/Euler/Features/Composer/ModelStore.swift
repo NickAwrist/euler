@@ -48,9 +48,14 @@ final class ModelStore {
         // The server takes each provider's own ID: the raw OpenRouter route.
         request.modelID = model.hasRoute ? model.route : model.id
         request.favorite = favorite
-        _ = try await client.setFavorite(request: request, headers: [:]).value()
-        if let index = models.firstIndex(where: { $0.id == model.id }) {
-            models[index].favorite = favorite
+        // Shown at once, as on the web, and put back if the server refuses.
+        let index = models.firstIndex { $0.id == model.id }
+        if let index { models[index].favorite = favorite }
+        do {
+            _ = try await client.setFavorite(request: request, headers: [:]).value()
+        } catch {
+            if let index, models.indices.contains(index), models[index].id == model.id { models[index].favorite = !favorite }
+            throw error
         }
     }
 
@@ -153,14 +158,5 @@ struct ThinkingOption: Hashable, Identifiable {
 extension Euler_V1_Model {
     var acceptsImages: Bool {
         inputCapabilities.contains(.image)
-    }
-
-    var providerName: String {
-        switch provider {
-        case .ollama: "Ollama"
-        case .openrouter: "OpenRouter"
-        case .chatgpt: "ChatGPT"
-        default: "Other"
-        }
     }
 }

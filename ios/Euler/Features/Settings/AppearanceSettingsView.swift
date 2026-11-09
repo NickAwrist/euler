@@ -8,7 +8,7 @@ struct AppearanceSettingsView: View {
 
     var body: some View {
         let appearance = session.preferences.appearance
-        Form {
+        ThemedForm {
             Section {
                 ResponsePreview()
                     .environment(\.palette, Palette(appearance.theme))
@@ -19,7 +19,7 @@ struct AppearanceSettingsView: View {
                 Picker("Theme", selection: binding(\.theme) { $0.theme = $1 }) {
                     ForEach(Self.themes, id: \.0) { theme, name in
                         HStack {
-                            Circle().fill(Palette(theme).accent).frame(width: 14, height: 14)
+                            Circle().fill(Palette(theme).tint).frame(width: 14, height: 14)
                             Text(name)
                         }
                         .tag(theme)

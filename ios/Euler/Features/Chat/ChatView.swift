@@ -9,11 +9,14 @@ struct ChatView: View {
     @Environment(\.palette) private var palette
     @Environment(\.scenePhase) private var scenePhase
     @State private var sheet: ChatSheet?
+    @FocusState private var composerFocused: Bool
 
     var body: some View {
         Group {
             if chat.loaded || !chat.history.isEmpty {
                 TranscriptView(chat: chat, sheet: $sheet)
+                    // Taps elsewhere put the composer's keyboard away, but not an inline editor's.
+                    .simultaneousGesture(TapGesture().onEnded { composerFocused = false })
             } else if let error = chat.loadError {
                 ContentUnavailableView {
                     Label("Can't open this chat", systemImage: "exclamationmark.bubble")
@@ -31,14 +34,27 @@ struct ChatView: View {
             VStack(spacing: 8) {
                 ApprovalCards(chat: chat)
                 QueuedMessages(chat: chat)
-                ComposerView(target: .chat(chat), sheet: $sheet)
+                ComposerView(target: .chat(chat), sheet: $sheet, focused: $composerFocused)
             }
             .padding(.horizontal, 12)
             .padding(.bottom, 6)
+            .padding(.top, 10)
+            // The transcript fades out under the composer, as under the web's frosted dock.
+            .background {
+                LinearGradient(
+                    stops: [.init(color: palette.background.opacity(0), location: 0), .init(color: palette.background, location: 0.35)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+            }
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if let summary = session.sessions.summary(chat.id), summary.hasExpiresAt {
+                ToolbarItem(placement: .principal) { EphemeralTitle(summary: summary) }
+            }
             ToolbarItem(placement: .topBarTrailing) { ChatMenu(chat: chat, sheet: $sheet) }
         }
         .sheet(item: $sheet) { sheet in
@@ -50,6 +66,11 @@ struct ChatView: View {
             await session.sessions.markViewed(chat.id)
             await push.clearDelivered(sessionID: chat.id)
         }
+        .onChange(of: chat.requestedSheet, initial: true) { _, requested in
+            guard let requested else { return }
+            sheet = requested
+            chat.requestedSheet = nil
+        }
         .onDisappear { chat.isVisible = false }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await chat.refresh() } }
@@ -58,6 +79,28 @@ struct ChatView: View {
 
     private var title: String {
         session.sessions.summary(chat.id)?.title ?? "Chat"
+    }
+}
+
+/// An ephemeral chat's title with when it expires, as the web's amber header chip.
+private struct EphemeralTitle: View {
+    let summary: Euler_V1_SessionSummary
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        VStack(spacing: 1) {
+            Text(summary.title)
+                .font(.headline)
+                .foregroundStyle(palette.foreground)
+                .lineLimit(1)
+            TimelineView(.periodic(from: .now, by: 60)) { context in
+                Label(Format.expiresIn(summary.expiresAt.date, now: context.date), systemImage: "eye.slash")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(Palette.ephemeral)
+                    .labelStyle(.titleAndIcon)
+            }
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -117,54 +160,6 @@ private struct ChatMenu: View {
                         Circle().fill(.green).frame(width: 7, height: 7).offset(x: 3, y: -2)
                     }
                 }
-        }
-    }
-}
-
-/// A chat that exists once its first message is sent.
-struct NewChatView: View {
-    @Binding var path: [AppSession.Route]
-    @Environment(AppSession.self) private var session
-    @Environment(\.palette) private var palette
-    @State private var draft = ComposerDraft()
-    @State private var ephemeral = false
-    @State private var sheet: ChatSheet?
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Spacer()
-            Image(systemName: "sparkles")
-                .font(.title)
-                .foregroundStyle(palette.foreground)
-                .frame(width: 56, height: 56)
-                .background(palette.surface, in: .rect(cornerRadius: 14))
-            Text("What are we working on today?")
-                .font(Typography(font: .serif).body(size: 28, relativeTo: .largeTitle))
-                .multilineTextAlignment(.center)
-                .foregroundStyle(palette.foreground)
-            Spacer()
-        }
-        .padding(.horizontal, 24)
-        .frame(maxWidth: .infinity)
-        .background(palette.background)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            ComposerView(target: .new(draft, ephemeral: ephemeral, start: { id in
-                path = [.chat(id)]
-            }), sheet: $sheet)
-            .padding(.horizontal, 12)
-            .padding(.bottom, 6)
-        }
-        .navigationTitle(ephemeral ? "Ephemeral chat" : "New chat")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Toggle(isOn: $ephemeral.animation()) {
-                    Label("Ephemeral", systemImage: ephemeral ? "eye.slash.fill" : "eye.slash")
-                }
-                .toggleStyle(.button)
-                .tint(.yellow)
-                .accessibilityHint("Deleted after it expires")
-            }
         }
     }
 }

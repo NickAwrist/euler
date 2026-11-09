@@ -9,7 +9,7 @@ struct SkillsView: View {
     @State private var importing = false
 
     var body: some View {
-        List {
+        ThemedList {
             if let skills {
                 if skills.isEmpty { Text("No skills yet.").foregroundStyle(.secondary) }
                 ForEach(skills, id: \.id) { skill in
@@ -169,7 +169,7 @@ private struct SkillEditor: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            ThemedForm {
                 Section {
                     TextField("release-notes", text: $fields.name)
                         .font(.body.monospaced())
@@ -260,7 +260,7 @@ private struct ImportSkillSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            ThemedForm {
                 TextEditor(text: $text)
                     .font(.footnote.monospaced())
                     .frame(minHeight: 300)

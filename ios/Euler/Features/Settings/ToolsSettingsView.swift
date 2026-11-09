@@ -7,7 +7,7 @@ struct ToolsSettingsView: View {
     @Environment(AppSession.self) private var session
 
     var body: some View {
-        Form {
+        ThemedForm {
             CapabilitiesSection()
             McpServersSection()
             PermissionRulesSection()
@@ -86,7 +86,7 @@ private struct McpServerView: View {
     @State private var check: Euler_V1_TestServerResponse.OneOf_Result?
 
     var body: some View {
-        Form {
+        ThemedForm {
             Section {
                 LabeledContent("URL", value: server.url)
                 if !server.headerNames.isEmpty {
@@ -167,7 +167,7 @@ private struct AddMcpServersSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            ThemedForm {
                 Section {
                     TextEditor(text: $config)
                         .font(.footnote.monospaced())
@@ -316,7 +316,7 @@ private struct RuleEditor: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            ThemedForm {
                 if exact, let rule {
                     Section("Exact arguments") {
                         Text(rule.condition.arguments.value.prettyJSON).font(.caption.monospaced())

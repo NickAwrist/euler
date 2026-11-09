@@ -48,13 +48,16 @@ final class ChatFlowUITests: XCTestCase {
             alert.buttons["Allow"].tap()
             return true
         }
-        XCTAssertTrue(app.navigationBars["Chats"].waitForExistence(timeout: 10))
+        // The app opens on a new chat, with the chat list behind the Chats button.
+        XCTAssertTrue(app.buttons["Chats"].waitForExistence(timeout: 10))
         app.tap()
     }
 
+    private var message: XCUIElement {
+        app.textViews["Message"].exists ? app.textViews["Message"] : app.textFields["Message"]
+    }
+
     func testSendsAMessageApprovesItsToolCallAndStreamsTheReply() {
-        app.navigationBars["Chats"].buttons["New chat"].tap()
-        let message = app.textViews["Message"].exists ? app.textViews["Message"] : app.textFields["Message"]
         XCTAssertTrue(message.waitForExistence(timeout: 5))
         message.tap()
         message.typeText("command:echo approved")
@@ -70,7 +73,6 @@ final class ChatFlowUITests: XCTestCase {
     }
 
     func testAttachesAPhotoFromTheLibrary() {
-        app.navigationBars["Chats"].buttons["New chat"].tap()
         app.buttons["Attach images"].tap()
         app.buttons["Photo Library"].tap()
         // The system picker runs out of process; its photos are images labeled by date.
@@ -82,7 +84,37 @@ final class ChatFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Remove image"].waitForExistence(timeout: 10), "The photo should wait in the composer")
     }
 
+    func testTappingOffTheComposerPutsTheKeyboardAway() {
+        XCTAssertTrue(message.waitForExistence(timeout: 5))
+        message.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        app.staticTexts["Type / for commands or $ to use a skill."].tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+    }
+
+    func testTheDrawerOpensAChatAndStartsANewOne() {
+        XCTAssertTrue(message.waitForExistence(timeout: 5))
+        message.tap()
+        message.typeText("command:echo hello")
+        app.buttons["Send message"].tap()
+        XCTAssertTrue(app.buttons["New chat"].waitForExistence(timeout: 10), "A sent message opens its chat")
+
+        app.buttons["New chat"].tap()
+        XCTAssertTrue(app.staticTexts["Type / for commands or $ to use a skill."].waitForExistence(timeout: 5))
+
+        app.buttons["Chats"].tap()
+        let row = app.buttons
+            .matching(identifier: "Drawer chat")
+            // The label leads with the chat's status, such as "Agent working".
+            .matching(NSPredicate(format: "label CONTAINS %@", "command:echo hello"))
+            .firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "The drawer lists the new chat")
+        row.tap()
+        XCTAssertFalse(app.staticTexts["Type / for commands or $ to use a skill."].exists)
+    }
+
     func testChangingTheThemeSavesItForTheWebToo() async throws {
+        app.buttons["Chats"].tap()
         app.buttons["Settings"].tap()
         app.buttons["Appearance"].tap()
         app.buttons["Dracula"].tap()

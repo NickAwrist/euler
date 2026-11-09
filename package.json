@@ -17,6 +17,7 @@
     "test:browser": "bunx playwright test",
     "perf:check": "node scripts/performance/check.mjs",
     "proto": "PATH=\"$PWD/node_modules/.bin:$PATH\" buf generate",
+    "ios:icons": "bun scripts/ios-icons.ts",
     "ios:project": "cd ios && xcodegen generate"
   },
   "devDependencies": {

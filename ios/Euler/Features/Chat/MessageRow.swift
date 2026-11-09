@@ -62,7 +62,8 @@ private struct UserMessage: View {
                     .foregroundStyle(palette.foreground)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
-                    .background(palette.surface, in: .rect(cornerRadius: 18))
+                    .background(palette.fill, in: .rect(cornerRadius: 16))
+                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(palette.borderSubtle))
                     .contextMenu { actions }
                 Menu { actions } label: {
                     Image(systemName: "ellipsis")

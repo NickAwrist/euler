@@ -11,7 +11,7 @@ struct WorkspaceSheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            ThemedList {
                 Section("Current") {
                     Label(currentLabel, systemImage: currentIcon)
                 }
@@ -104,7 +104,7 @@ struct DirectoryBrowser: View {
     @State private var error: String?
 
     var body: some View {
-        List {
+        ThemedList {
             if let listing {
                 Section {
                     Button("Use this folder", systemImage: "checkmark.circle") { choose(listing.path) }

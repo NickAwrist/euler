@@ -26,11 +26,14 @@ private struct SignedInView: View {
 
     var body: some View {
         let appearance = session.preferences.appearance
-        ChatListView()
+        let palette = Palette(appearance.theme)
+        HomeView()
             .environment(session)
-            .environment(\.palette, Palette(appearance.theme))
+            .environment(\.palette, palette)
             .environment(\.typography, Typography(font: appearance.font, codeFont: appearance.codeFont))
-            .tint(Palette(appearance.theme).accent)
+            .tint(palette.accent)
+            .toggleStyle(ThemedSwitchStyle())
+            .animation(.easeInOut(duration: 0.25), value: appearance.theme)
             .task {
                 push.backend = session.backend
                 async let preferences: Void = session.preferences.load()

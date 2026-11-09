@@ -14,7 +14,7 @@ struct TraceView: View {
 
     var body: some View {
         let shown = Self.displayed(steps)
-        List {
+        ThemedList {
             Section { TraceSummary(steps: shown) }
             Section("Steps") { TraceSteps(steps: shown) }
         }

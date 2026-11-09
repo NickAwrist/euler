@@ -7,7 +7,7 @@ struct OpenRouterSettingsView: View {
     @State private var store: OpenRouterStore?
 
     var body: some View {
-        Form {
+        ThemedForm {
             ApiKeySection(provider: .openrouter, title: "API key") {
                 await store?.load()
                 await session.models.load()
@@ -169,7 +169,7 @@ private struct PublisherView: View {
         let models = store.models(publisherID).filter {
             search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) || $0.route.localizedCaseInsensitiveContains(search)
         }
-        List {
+        ThemedList {
             if let publisher {
                 Section {
                     Toggle("Auto-enable new models", isOn: Binding(
@@ -266,7 +266,7 @@ private struct AddPublisherSheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            ThemedList {
                 let publishers = (store.catalog?.discoveredPublishers.publishers ?? []).filter {
                     search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) || $0.id.localizedCaseInsensitiveContains(search)
                 }

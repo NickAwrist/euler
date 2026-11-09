@@ -21,7 +21,7 @@ struct UsageView: View {
     }
 
     var body: some View {
-        List {
+        ThemedList {
             Section {
                 Picker("Date range", selection: $days) {
                     Text("24 hours").tag(UInt32(1))

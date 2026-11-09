@@ -73,15 +73,18 @@ struct ComposerSuggestions: View {
                 }
                 .background(palette.surface, in: .rect(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(palette.borderSubtle))
-            } else if token?.kind == .file {
+                .transition(.opacity.combined(with: .offset(y: 6)))
+            } else if token?.kind == .file, target.chat != nil {
                 Text(filesFailed ? "Could not load workspace files" : "No matching files")
                     .font(.footnote)
                     .foregroundStyle(palette.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(12)
                     .background(palette.surface, in: .rect(cornerRadius: 14))
+                    .transition(.opacity.combined(with: .offset(y: 6)))
             }
         }
+        .animation(.snappy(duration: 0.2), value: suggestions.map(\.id))
         .task { await session.completions.loadIfNeeded() }
         .task(id: token?.kind == .file ? token?.query : nil) { await loadFiles() }
     }
@@ -106,8 +109,9 @@ struct ComposerSuggestions: View {
                 }
             }
         case .tool, .command:
-            let commands: [Suggestion] = ComposerToken.command(in: text) != nil && target.chat != nil && !(target.chat?.running ?? false)
-                ? ChatCommand.allCases.filter { $0.rawValue.hasPrefix(token.query) }.map { command in
+            // A new chat works in its own sandbox already, so it has nothing to return to.
+            let commands: [Suggestion] = ComposerToken.command(in: text) != nil && !(target.chat?.running ?? false)
+                ? ChatCommand.allCases.filter { $0.rawValue.hasPrefix(token.query) && ($0 != .sandbox || target.chat != nil) }.map { command in
                     Suggestion(id: "command:\(command.rawValue)", label: "/\(command.rawValue)", detail: command.description, icon: "command") {
                         run(command)
                     }
@@ -142,94 +146,6 @@ struct ComposerSuggestions: View {
             guard !Task.isCancelled else { return }
             files = []
             filesFailed = true
-        }
-    }
-}
-
-/// Every model the user can send to, searchable, favorites first.
-struct ModelPickerSheet: View {
-    let selected: String?
-    let pick: (Euler_V1_Model) -> Void
-    @Environment(AppSession.self) private var session
-    @Environment(\.dismiss) private var dismiss
-    @State private var search = ""
-
-    var body: some View {
-        NavigationStack {
-            List {
-                let models = session.models.selectable.filter {
-                    search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) || $0.id.localizedCaseInsensitiveContains(search)
-                }
-                let favorites = models.filter(\.favorite)
-                if !favorites.isEmpty {
-                    Section("Favorites") { ForEach(favorites, id: \.id) { row($0) } }
-                }
-                ForEach(providers(of: models), id: \.self) { provider in
-                    Section(provider.name) {
-                        ForEach(models.filter { $0.provider == provider }, id: \.id) { row($0) }
-                    }
-                }
-                if session.models.selectable.isEmpty {
-                    ContentUnavailableView(
-                        session.models.error ?? "No models",
-                        systemImage: "cpu",
-                        description: Text("Connect a provider in Settings.")
-                    )
-                }
-            }
-            .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always))
-            .navigationTitle("Choose model")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
-            .refreshable { await session.models.load() }
-        }
-    }
-
-    private func row(_ model: Euler_V1_Model) -> some View {
-        Button {
-            pick(model)
-            Haptics.light()
-            dismiss()
-        } label: {
-            HStack {
-                ProviderIcon(provider: model.provider)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(model.name).foregroundStyle(.primary)
-                    if model.lab != model.providerName {
-                        Text(model.lab).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-                if model.acceptsImages {
-                    Image(systemName: "eye").font(.caption).foregroundStyle(.secondary).accessibilityLabel("Vision")
-                }
-                if model.id == selected {
-                    Image(systemName: "checkmark").foregroundStyle(.tint)
-                }
-            }
-        }
-        .swipeActions {
-            Button(model.favorite ? "Unfavorite" : "Favorite", systemImage: model.favorite ? "star.slash" : "star") {
-                Task { await session.notices.attempt { try await session.models.setFavorite(model, !model.favorite) } }
-            }
-            .tint(.yellow)
-        }
-    }
-
-    private func providers(of models: [Euler_V1_Model]) -> [Euler_V1_ModelProvider] {
-        var seen: [Euler_V1_ModelProvider] = []
-        for model in models where !seen.contains(model.provider) { seen.append(model.provider) }
-        return seen
-    }
-}
-
-extension Euler_V1_ModelProvider {
-    var name: String {
-        switch self {
-        case .ollama: "Ollama"
-        case .openrouter: "OpenRouter"
-        case .chatgpt: "ChatGPT"
-        default: "Other"
         }
     }
 }

@@ -209,6 +209,16 @@ struct MarkdownInline: Equatable {
 
     var segments: [Segment]
 
+    /// Characters shown, counting a formula by its source.
+    var length: Int {
+        segments.reduce(0) { total, segment in
+            switch segment {
+            case .text(let text): total + text.characters.count
+            case .math(let source): total + source.count
+            }
+        }
+    }
+
     var isBlank: Bool {
         segments.allSatisfy { segment in
             if case .text(let text) = segment {

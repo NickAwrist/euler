@@ -22,6 +22,8 @@ final class ChatStore {
     private(set) var loadError: String?
     let live = LiveReply()
     let draft = ComposerDraft()
+    /// A sheet to open once the chat is on screen, for a command run before the chat existed.
+    var requestedSheet: ChatSheet?
     /// Whether the chat is on screen, so a finished turn marks it read.
     @ObservationIgnored var isVisible = false
 

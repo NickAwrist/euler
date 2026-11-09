@@ -89,7 +89,7 @@ struct OnboardingView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            ThemedForm {
                 IdentityFields(draft: $draft)
                 if let error {
                     Section { Text(error).foregroundStyle(.red) }
@@ -136,7 +136,7 @@ struct IdentityEditor: View {
 
     var body: some View {
         NavigationStack {
-            Form {
+            ThemedForm {
                 IdentityFields(draft: $draft)
                 if let error {
                     Section { Text(error).foregroundStyle(.red) }

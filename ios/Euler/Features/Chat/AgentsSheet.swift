@@ -9,7 +9,7 @@ struct AgentsSheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
+            ThemedList {
                 Section("Agents") {
                     if chat.subagents.isEmpty {
                         Text("No background agents in this chat.").foregroundStyle(palette.muted)
@@ -19,7 +19,7 @@ struct AgentsSheet: View {
                             AgentDetailView(chat: chat, agentID: agent.id)
                         } label: {
                             HStack(spacing: 10) {
-                                AgentAvatar(agent: agent)
+                                AgentAvatar(chat: chat, agent: agent)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(agent.title).lineLimit(1)
                                     if !agent.activity.isEmpty {
@@ -72,7 +72,7 @@ struct AgentDetailView: View {
 
     var body: some View {
         let agent = chat.agent(agentID) ?? detail?.agent
-        List {
+        ThemedList {
             if let agent {
                 Section {
                     LabeledContent("Status") { AgentStatusLabel(agent: agent, phase: chat.phases[agent.id]) }
@@ -130,7 +130,7 @@ struct JobDetailView: View {
     @State private var job: Euler_V1_Job?
 
     var body: some View {
-        List {
+        ThemedList {
             if let job {
                 Section {
                     LabeledContent("Status", value: job.statusLabel)

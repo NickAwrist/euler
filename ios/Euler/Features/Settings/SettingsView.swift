@@ -1,37 +1,110 @@
 import EulerAPI
 import SwiftUI
 
+/// The pages Settings can open on.
+enum SettingsPage: Hashable, Identifiable {
+    case root, general, appearance, ollama, openRouter, chatGpt, imageGeneration, webSearch
+    case personalization, skills, tools, usage
+
+    var id: Self { self }
+}
+
+extension EnvironmentValues {
+    /// Opens a Settings page: pushed inside Settings, presented anywhere else.
+    @Entry var openSettings: (SettingsPage) -> Void = { _ in }
+}
+
 /// Settings, Customization and Usage, page for page with the web.
 struct SettingsView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.palette) private var palette
+    @State private var path: [SettingsPage]
+
+    /// Opens on `page`, over the list of pages.
+    init(page: SettingsPage = .root) {
+        _path = State(initialValue: page == .root ? [] : [page])
+    }
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section("Settings") {
-                    NavigationLink { GeneralSettingsView() } label: { Label("General", systemImage: "gearshape") }
-                    NavigationLink { AppearanceSettingsView() } label: { Label("Appearance", systemImage: "paintpalette") }
-                    NavigationLink { OllamaSettingsView() } label: { Label("Ollama", systemImage: "desktopcomputer") }
-                    NavigationLink { OpenRouterSettingsView() } label: { Label("OpenRouter", systemImage: "point.3.filled.connected.trianglepath.dotted") }
-                    NavigationLink { ChatGptSettingsView() } label: { Label("ChatGPT", systemImage: "bubble.left.and.text.bubble.right") }
-                    NavigationLink { ImageGenerationSettingsView() } label: { Label("Image Generation", systemImage: "photo.artframe") }
-                    NavigationLink { WebSearchSettingsView() } label: { Label("Web Search", systemImage: "magnifyingglass") }
+        NavigationStack(path: $path) {
+            ThemedList {
+                Section {
+                    row(.general, "General", .system("gearshape"))
+                    row(.appearance, "Appearance", .system("paintpalette"))
+                    row(.ollama, "Ollama", .provider(.ollama))
+                    row(.openRouter, "OpenRouter", .system("point.3.filled.connected.trianglepath.dotted"))
+                    row(.chatGpt, "ChatGPT", .provider(.codex))
+                    row(.imageGeneration, "Image Generation", .system("photo.artframe"))
+                    row(.webSearch, "Web Search", .system("globe"))
                 }
                 Section("Customization") {
-                    NavigationLink { PersonalizationView() } label: { Label("Personalization", systemImage: "person.text.rectangle") }
-                    NavigationLink { SkillsView() } label: { Label("Skills", systemImage: "book") }
-                    NavigationLink { ToolsSettingsView() } label: { Label("Tools", systemImage: "wrench.and.screwdriver") }
+                    row(.personalization, "Personalization", .system("person.text.rectangle"))
+                    row(.skills, "Skills", .system("book"))
+                    row(.tools, "Tools", .system("wrench.and.screwdriver"))
                 }
                 Section {
-                    NavigationLink { UsageView() } label: { Label("Usage insights", systemImage: "chart.bar.xaxis") }
+                    row(.usage, "Usage insights", .system("chart.line.uptrend.xyaxis"))
                 }
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { done }
+            .navigationDestination(for: SettingsPage.self) { page in
+                destination(page)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { done }
+            }
         }
+        .environment(\.openSettings) { page in path.append(page) }
+        .presentationBackground(palette.background)
         .task { await session.preferences.load() }
+    }
+
+    private var done: some ToolbarContent {
+        ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+    }
+
+    private enum RowIcon {
+        case system(String)
+        case provider(ProviderIconAsset)
+    }
+
+    private func row(_ page: SettingsPage, _ title: String, _ icon: RowIcon) -> some View {
+        NavigationLink(value: page) {
+            HStack(spacing: 12) {
+                Group {
+                    switch icon {
+                    case .system(let name):
+                        Image(systemName: name).font(.system(size: 14, weight: .medium)).foregroundStyle(palette.tint)
+                    case .provider(let asset):
+                        ProviderIcon(icon: asset, size: 16)
+                    }
+                }
+                .frame(width: 30, height: 30)
+                .background(palette.fill, in: .rect(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(palette.borderSubtle))
+                Text(title).foregroundStyle(palette.foreground)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func destination(_ page: SettingsPage) -> some View {
+        switch page {
+        case .root: EmptyView()
+        case .general: GeneralSettingsView()
+        case .appearance: AppearanceSettingsView()
+        case .ollama: OllamaSettingsView()
+        case .openRouter: OpenRouterSettingsView()
+        case .chatGpt: ChatGptSettingsView()
+        case .imageGeneration: ImageGenerationSettingsView()
+        case .webSearch: WebSearchSettingsView()
+        case .personalization: PersonalizationView()
+        case .skills: SkillsView()
+        case .tools: ToolsSettingsView()
+        case .usage: UsageView()
+        }
     }
 }
 
@@ -49,14 +122,16 @@ struct GeneralSettingsView: View {
     @Environment(PushNotifications.self) private var push
     @State private var editingIdentity = false
     @State private var confirmingSignOut = false
+    @State private var choosingDefault = false
+    @Environment(\.palette) private var palette
 
     var body: some View {
-        Form {
+        ThemedForm {
             Section("Connection") {
                 LabeledContent("Server", value: session.backend.baseURL.absoluteString)
                 LabeledContent("Status") {
                     switch session.events.status {
-                    case .connected: Label("Connected", systemImage: "circle.fill").foregroundStyle(.green)
+                    case .connected: Label("Connected", systemImage: "circle.fill").foregroundStyle(Palette.positive).imageScale(.small)
                     case .connecting: Text("Connecting")
                     case .disconnected: Label("Reconnecting", systemImage: "circle").foregroundStyle(.orange)
                     }
@@ -72,16 +147,26 @@ struct GeneralSettingsView: View {
                 Button("Change server or user") { editingIdentity = true }
             }
             Section("Chat Defaults") {
-                Picker("Default model", selection: Binding(
-                    get: { session.preferences.settings.defaultModel },
-                    set: { model in savePreferences(session) { $0.settings.defaultModel = model } }
-                )) {
-                    if session.models.selectable.isEmpty { Text("No models found").tag(session.preferences.settings.defaultModel) }
-                    ForEach(session.models.selectable, id: \.id) { model in
-                        Text(model.name).tag(model.id)
+                let saved = session.preferences.settings.defaultModel
+                let model = session.models.model(saved)
+                let name = model?.name ?? (saved.isEmpty ? "None" : "\(Euler_V1_Model.displayRoute(saved)) (unavailable)")
+                Button { choosingDefault = true } label: {
+                    HStack(spacing: 6) {
+                        Text("Default model").foregroundStyle(palette.foreground).fixedSize()
+                        Spacer(minLength: 8)
+                        if let model {
+                            ProviderIcon(icon: .forModel(model), name: model.lab, size: 16)
+                        } else if !saved.isEmpty {
+                            ProviderIcon(icon: .forModelID(saved), size: 16)
+                        }
+                        Text(name).lineLimit(1).foregroundStyle(palette.muted)
+                        Image(systemName: "chevron.up.chevron.down").font(.caption2).foregroundStyle(palette.muted)
                     }
                 }
-                .pickerStyle(.navigationLink)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Default model")
+                .accessibilityValue(name)
+                .accessibilityAddTraits(.isButton)
             }
             Section("Notifications") {
                 Toggle("Turn results and approvals", isOn: Binding(
@@ -100,6 +185,11 @@ struct GeneralSettingsView: View {
             }
         }
         .navigationTitle("General")
+        .sheet(isPresented: $choosingDefault) {
+            ModelPickerSheet(selected: session.preferences.settings.defaultModel) { picked in
+                savePreferences(session) { $0.settings.defaultModel = picked.id }
+            }
+        }
         .task { await push.refreshAuthorization() }
         .sheet(isPresented: $editingIdentity) { IdentityEditor() }
         .confirmationDialog("Sign out of this user?", isPresented: $confirmingSignOut, titleVisibility: .visible) {

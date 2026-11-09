@@ -24,6 +24,8 @@ enum ComposerTarget {
 struct ComposerView: View {
     let target: ComposerTarget
     @Binding var sheet: ChatSheet?
+    /// Whether the message box has the keyboard; its screen sets it false when tapped elsewhere.
+    var focused: FocusState<Bool>.Binding
     @Environment(AppSession.self) private var session
     @Environment(\.palette) private var palette
     @Environment(\.typography) private var typography
@@ -32,20 +34,12 @@ struct ComposerView: View {
     @State private var pickingPhotos = false
     @State private var photos: [PhotosPickerItem] = []
     @State private var takingPhoto = false
-    @FocusState private var focused: Bool
 
     private var draft: ComposerDraft { target.draft }
 
     var body: some View {
         @Bindable var draft = draft
         VStack(spacing: 8) {
-            ComposerSuggestions(target: target, token: token) { completion in
-                draft.text = completion.text
-                selection = TextSelection(insertionPoint: completion.caret)
-            } run: { command in
-                draft.text = ""
-                run(command)
-            }
             VStack(spacing: 0) {
                 if !draft.images.isEmpty { imageStrip }
                 HStack(alignment: .bottom, spacing: 8) {
@@ -53,24 +47,37 @@ struct ComposerView: View {
                     TextField("Send a message...", text: $draft.text, selection: $selection, axis: .vertical)
                         .font(typography.body())
                         .lineLimit(1...8)
-                        .focused($focused)
+                        .focused(focused)
                         .padding(.vertical, 8)
                         .accessibilityLabel("Message")
                     sendButton
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
-                Divider().overlay(palette.borderSubtle)
-                HStack(spacing: 4) {
+                .padding(.horizontal, 6)
+                .padding(.vertical, 4)
+                Rectangle().fill(palette.borderSubtle).frame(height: 1).padding(.horizontal, 10)
+                HStack(spacing: 2) {
                     ModelButton(model: model, missing: missingModel) { choosingModel = true }
                     ThinkingMenu(model: model)
-                    Spacer()
+                    Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 8)
-                .frame(height: 40)
+                .padding(.horizontal, 6)
+                .frame(height: 42)
             }
-            .background(palette.surface, in: .rect(cornerRadius: 22))
-            .overlay(RoundedRectangle(cornerRadius: 22).stroke(palette.border))
+            .background(palette.surface, in: .rect(cornerRadius: 20))
+            .overlay(RoundedRectangle(cornerRadius: 20).stroke(focused.wrappedValue ? palette.border : palette.borderSubtle))
+            .animation(.easeOut(duration: 0.15), value: focused.wrappedValue)
+            // Floats above the message box, as the web's picker does, so opening it or
+            // filtering it never moves the box or the screen around it.
+            .overlay(alignment: .top) {
+                ComposerSuggestions(target: target, token: token) { completion in
+                    draft.text = completion.text
+                    selection = TextSelection(insertionPoint: completion.caret)
+                } run: { command in
+                    draft.text = ""
+                    run(command)
+                }
+                .alignmentGuide(.top) { $0[.bottom] + 8 }
+            }
             if let error = draft.error {
                 Text(error).font(.footnote).foregroundStyle(.red).frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -148,19 +155,22 @@ struct ComposerView: View {
                 Task { await session.notices.attempt { try await chat.stop() } }
             }
             .labelStyle(.iconOnly)
-            .font(.body.weight(.semibold))
+            .font(.footnote.weight(.bold))
             .frame(width: 36, height: 36)
-            .background(palette.foreground, in: .rect(cornerRadius: 12))
-            .foregroundStyle(palette.background)
+            .background(Color.red.opacity(0.14), in: .rect(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.red.opacity(0.25)))
+            .foregroundStyle(Color(hex: 0xFCA5A5))
         } else {
             Button("Send message", systemImage: "arrow.up") { Task { await send() } }
                 .labelStyle(.iconOnly)
                 .font(.body.weight(.semibold))
                 .frame(width: 36, height: 36)
-                .background(canSend ? palette.foreground : palette.muted.opacity(0.5), in: .rect(cornerRadius: 12))
-                .foregroundStyle(palette.background)
+                .background(palette.accent, in: .rect(cornerRadius: 12))
+                .foregroundStyle(palette.accentForeground)
+                .opacity(canSend || draft.sending ? 1 : 0.4)
                 .disabled(!canSend)
-                .overlay { if draft.sending { ProgressView().tint(palette.background) } }
+                .overlay { if draft.sending { ProgressView().tint(palette.accentForeground) } }
+                .animation(.easeOut(duration: 0.15), value: canSend)
         }
     }
 
@@ -197,18 +207,27 @@ struct ComposerView: View {
 
     private var exactCommand: ChatCommand? {
         let text = draft.trimmedText
-        guard text.hasPrefix("/"), target.chat != nil else { return nil }
+        guard text.hasPrefix("/") else { return nil }
         return ChatCommand(rawValue: String(text.dropFirst()))
     }
 
+    /// Opens the command's sheet; in a new chat it creates the chat first and opens it there, as the web does.
     private func run(_ command: ChatCommand) {
-        guard target.chat != nil else {
-            draft.error = "Send a message first, then choose a workspace."
-            return
-        }
-        switch command {
-        case .directory, .link, .sandbox: sheet = .workspace
-        case .workspace: sheet = .artifacts(path: nil)
+        let opens: ChatSheet = command == .workspace ? .artifacts(path: nil) : .workspace
+        switch target {
+        case .chat:
+            sheet = opens
+        case .new(_, let ephemeral, let start):
+            guard let model else { return }
+            Task {
+                do {
+                    let created = try await session.sessions.create(model: model.id, ephemeral: ephemeral)
+                    session.chat(created.id).requestedSheet = opens
+                    start(created.id)
+                } catch {
+                    draft.error = error.displayMessage
+                }
+            }
         }
     }
 
@@ -224,7 +243,7 @@ struct ComposerView: View {
                 .disabled(!UIPasteboard.general.hasImages)
         } label: {
             Image(systemName: "photo.badge.plus")
-                .font(.title3)
+                .font(.system(size: 19))
                 .foregroundStyle(palette.muted)
                 .frame(width: 36, height: 36)
         }
@@ -276,7 +295,7 @@ struct ComposerView: View {
     }
 }
 
-/// The selected model's name and icon; opens the model picker.
+/// The selected model's provider logo and name; opens the model picker.
 private struct ModelButton: View {
     let model: Euler_V1_Model?
     let missing: String?
@@ -285,12 +304,16 @@ private struct ModelButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
-                ProviderIcon(provider: model?.provider ?? .unspecified)
-                Text(model?.name ?? missing.map { "\($0) (unavailable)" } ?? "Choose model").lineLimit(1)
-                Image(systemName: "chevron.down").font(.caption2)
+            HStack(spacing: 7) {
+                if let model {
+                    ProviderIcon(icon: .forModel(model), name: model.lab, size: 17)
+                } else if let missing {
+                    ProviderIcon(icon: .forModelID(missing), size: 17)
+                }
+                Text(label).lineLimit(1)
+                Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
             }
-            .font(.subheadline)
+            .font(.footnote)
             .foregroundStyle(palette.muted)
             .padding(.horizontal, 8)
             .frame(height: 32)
@@ -299,62 +322,133 @@ private struct ModelButton: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Model: \(model?.name ?? missing.map { "\($0) (unavailable)" } ?? "none")")
     }
+
+    private var label: String {
+        if let model { return model.name }
+        if let missing { return "\(Euler_V1_Model.displayRoute(missing)) (unavailable)" }
+        return "Choose model"
+    }
 }
 
-/// The thinking level for the selected model, when it has a choice.
+/// The thinking level for the selected model, when it has a choice: the web's
+/// Brain Level popover, with icons fuller for more thinking.
 private struct ThinkingMenu: View {
     let model: Euler_V1_Model?
     @Environment(AppSession.self) private var session
     @Environment(\.palette) private var palette
+    @State private var open = false
 
     var body: some View {
         let models = session.models
         let options = models.thinkingOptions(for: model)
         if let model, options.count > 1 {
             let current = models.effort(for: model)
-            Menu {
-                Picker("Thinking", selection: Binding(
-                    get: { current ?? "" },
-                    set: { models.setEffort($0, for: model) }
-                )) {
-                    ForEach(options) { option in
-                        Text(option.label).tag(option.value)
+            let option = options.first { $0.value == current }
+            HStack(spacing: 2) {
+                Rectangle().fill(palette.borderSubtle).frame(width: 1, height: 16).padding(.horizontal, 4)
+                Button { open = true } label: {
+                    HStack(spacing: 6) {
+                        BrainIcon(tier: option?.tier ?? .off, size: 15)
+                        Text(option?.label ?? "Thinking")
+                        Image(systemName: "chevron.down").font(.system(size: 9, weight: .semibold))
                     }
+                    .font(.footnote)
+                    .foregroundStyle(palette.muted)
+                    .padding(.horizontal, 8)
+                    .frame(height: 32)
+                    .contentShape(.rect)
                 }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: current.map { ThinkingOption.tier(of: $0) == .off } == true ? "brain.slash" : "brain")
-                    Text(options.first { $0.value == current }?.label ?? "Thinking")
-                    Image(systemName: "chevron.down").font(.caption2)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Thinking level")
+                .accessibilityValue(option?.label ?? "Default")
+                .popover(isPresented: $open, arrowEdge: .bottom) {
+                    levels(options, current: current, model: model)
+                        .presentationCompactAdaptation(.popover)
+                        .presentationBackground(palette.surface)
                 }
-                .font(.subheadline)
-                .foregroundStyle(palette.muted)
-                .padding(.horizontal, 8)
-                .frame(height: 32)
+                .sensoryFeedback(.selection, trigger: current)
             }
-            .accessibilityLabel("Thinking level")
-            .sensoryFeedback(.selection, trigger: current)
         }
+    }
+
+    private func levels(_ options: [ThinkingOption], current: String?, model: Euler_V1_Model) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Brain Level")
+                .font(.caption2.weight(.semibold))
+                .textCase(.uppercase)
+                .tracking(0.8)
+                .foregroundStyle(palette.muted.opacity(0.75))
+                .padding(.horizontal, 10)
+                .padding(.top, 6)
+                .padding(.bottom, 2)
+            ForEach(options) { option in
+                let selected = option.value == current
+                Button {
+                    session.models.setEffort(option.value, for: model)
+                    open = false
+                } label: {
+                    HStack(spacing: 8) {
+                        BrainIcon(tier: option.tier, size: 16)
+                        Text(option.label)
+                            .fontWeight(selected ? .medium : .regular)
+                            .foregroundStyle(selected ? palette.foreground : palette.muted)
+                        Spacer(minLength: 8)
+                        if option.isDefault {
+                            Text("Default")
+                                .font(.system(size: 10))
+                                .textCase(.uppercase)
+                                .foregroundStyle(palette.muted.opacity(0.6))
+                        }
+                        Image(systemName: "checkmark")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(palette.foreground)
+                            .opacity(selected ? 1 : 0)
+                    }
+                    .font(.subheadline)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 44)
+                    .background(selected ? palette.fill : .clear, in: .rect(cornerRadius: 8))
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(6)
+        .frame(width: 230)
     }
 }
 
-/// The provider's mark, as the web shows beside model names.
-struct ProviderIcon: View {
-    let provider: Euler_V1_ModelProvider
+/// The web's brain icon for a thinking tier (ui/components/ThinkingLevelBar.tsx).
+struct BrainIcon: View {
+    let tier: ThinkingOption.Tier
+    var size: CGFloat = 16
+    @Environment(\.palette) private var palette
 
     var body: some View {
-        Image(systemName: symbol)
-            .font(.footnote)
-            .frame(width: 18, height: 18)
+        Image(asset)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .foregroundStyle(color ?? palette.muted)
+            .opacity(tier == .off ? 0.4 : 1)
             .accessibilityHidden(true)
     }
 
-    private var symbol: String {
-        switch provider {
-        case .ollama: "desktopcomputer"
-        case .openrouter: "point.3.filled.connected.trianglepath.dotted"
-        case .chatgpt: "bubble.left.and.text.bubble.right"
-        default: "cpu"
+    private var asset: String {
+        switch tier {
+        case .off: "brain-off"
+        case .low: "brain-low"
+        case .medium: "brain-medium"
+        case .high, .xhigh, .max: "brain-high"
+        }
+    }
+
+    private var color: Color? {
+        switch tier {
+        case .xhigh: Color(hex: 0xC084FC)
+        case .max: Color(hex: 0xF87171)
+        default: nil
         }
     }
 }

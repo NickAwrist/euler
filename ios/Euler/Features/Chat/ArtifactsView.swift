@@ -31,7 +31,7 @@ private struct ArtifactFolder: View {
     @State private var error: String?
 
     var body: some View {
-        List {
+        ThemedList {
             if let entries {
                 if entries.isEmpty { Text("No files yet.").foregroundStyle(palette.muted) }
                 ForEach(entries, id: \.path) { entry in

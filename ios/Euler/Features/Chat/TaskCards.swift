@@ -36,7 +36,7 @@ struct AgentCard: View {
         HStack(spacing: 4) {
             Button(action: open) {
                 HStack(spacing: 10) {
-                    AgentAvatar(agent: agent)
+                    AgentAvatar(chat: chat, agent: agent)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(agent.title).lineLimit(1)
                         Text(session.models.model(agent.model)?.name ?? agent.model)
@@ -72,21 +72,6 @@ struct AgentCard: View {
         .padding(.trailing, 4)
         .background(palette.surface, in: .rect(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(palette.borderSubtle))
-    }
-}
-
-/// A subagent's initial on a tinted circle.
-struct AgentAvatar: View {
-    let agent: Euler_V1_Agent
-
-    var body: some View {
-        let hue = Double(abs(agent.id.hashValue % 360)) / 360
-        Text(String(agent.title.prefix(1)).uppercased())
-            .font(.caption.weight(.semibold))
-            .frame(width: 24, height: 24)
-            .background(Color(hue: hue, saturation: 0.35, brightness: 0.45), in: .circle)
-            .foregroundStyle(.white)
-            .accessibilityHidden(true)
     }
 }
 

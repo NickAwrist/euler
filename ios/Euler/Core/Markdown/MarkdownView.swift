@@ -180,18 +180,19 @@ private struct TableView: View {
     @Environment(\.typography) private var typography
 
     var body: some View {
+        let widths = columnWidths
         ScrollView(.horizontal, showsIndicators: false) {
             Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
                 GridRow {
                     ForEach(table.head.indices, id: \.self) { column in
-                        cell(table.head[column], column: column, header: true)
+                        cell(table.head[column], column: column, width: widths[column], header: true)
                     }
                 }
                 ForEach(table.rows.indices, id: \.self) { row in
                     Divider().overlay(palette.borderSubtle)
                     GridRow {
                         ForEach(table.rows[row].indices, id: \.self) { column in
-                            cell(table.rows[row][column], column: column, header: false)
+                            cell(table.rows[row][column], column: column, width: widths.indices.contains(column) ? widths[column] : 120, header: false)
                         }
                     }
                 }
@@ -201,17 +202,28 @@ private struct TableView: View {
         }
     }
 
-    private func cell(_ inline: MarkdownInline, column: Int, header: Bool) -> some View {
+    /// Each column's width from its longest cell, so text wraps the same way when the
+    /// grid measures a row and when it draws it. Wrapping at a width the grid
+    /// chose itself let tall rows overlap.
+    private var columnWidths: [CGFloat] {
+        table.head.indices.map { column in
+            let longest = ([table.head[column]] + table.rows.compactMap { $0.indices.contains(column) ? $0[column] : nil }).map(\.length).max() ?? 0
+            return min(260, max(64, CGFloat(longest) * 8.2)) + 20
+        }
+    }
+
+    private func cell(_ inline: MarkdownInline, column: Int, width: CGFloat, header: Bool) -> some View {
         let alignment: Alignment = switch table.alignments.indices.contains(column) ? table.alignments[column] : nil {
         case .center: .center
         case .right: .trailing
         default: .leading
         }
         return InlineText(inline: inline, font: header ? typography.body(size: 15).weight(.semibold) : typography.body(size: 15), size: 15)
-            .frame(maxWidth: 280, alignment: alignment)
-            .fixedSize(horizontal: false, vertical: true)
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
+            .frame(width: width, alignment: alignment)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxHeight: .infinity, alignment: .top)
             .background(header ? palette.surface : .clear)
     }
 }

@@ -10,7 +10,7 @@ struct OllamaSettingsView: View {
 
     var body: some View {
         let managed = session.preferences.environment.ollamaHost
-        Form {
+        ThemedForm {
             HostSection(
                 title: "Server URL",
                 placeholder: "http://127.0.0.1:11434",
@@ -192,7 +192,7 @@ struct ImageGenerationSettingsView: View {
 
     var body: some View {
         let managed = session.preferences.environment.comfyuiHost
-        Form {
+        ThemedForm {
             HostSection(
                 title: "ComfyUI URL",
                 placeholder: "http://127.0.0.1:8188",
@@ -264,7 +264,7 @@ struct ImageGenerationSettingsView: View {
 /// Web Search: the Brave Search API key.
 struct WebSearchSettingsView: View {
     var body: some View {
-        Form {
+        ThemedForm {
             ApiKeySection(provider: .brave, title: "Brave Search")
         }
         .navigationTitle("Web Search")

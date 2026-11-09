@@ -13,8 +13,10 @@ final class AppSession {
     let preferences: PreferenceStore
     let completions: CompletionSources
     let notices = Notices()
-    /// The chat a tapped notification or the chat list asks to show.
+    /// The chat a tapped notification asks to show.
     var route: Route?
+    /// The Settings page to present over the app, from wherever asks for it.
+    var settingsPage: SettingsPage?
 
     /// Chats with a store, so going back and forth keeps their state.
     @ObservationIgnored private var chats: [String: ChatStore] = [:]
@@ -24,7 +26,6 @@ final class AppSession {
 
     enum Route: Hashable {
         case chat(String)
-        case newChat
     }
 
     init(identity: Identity) {

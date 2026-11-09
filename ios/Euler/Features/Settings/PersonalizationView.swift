@@ -13,7 +13,7 @@ struct PersonalizationView: View {
     private var changed: Bool { loaded && draft != saved }
 
     var body: some View {
-        Form {
+        ThemedForm {
             Section {
                 TextEditor(text: Binding(
                     get: { draft.hasSystemPrompt ? draft.systemPrompt : "" },
