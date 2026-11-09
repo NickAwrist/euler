@@ -1,4 +1,13 @@
 import { expect, test } from "@playwright/test";
+import {
+  InputCapability,
+  ModelProvider,
+  ModelService,
+} from "../../src/gen/euler/v1/models_pb";
+import { ProviderService } from "../../src/gen/euler/v1/providers_pb";
+import { openRouterCatalog } from "../../src/models/openRouterWire";
+import { mockApp, ollamaModel, openRouterModel } from "./appFixture";
+import { RpcFailure, mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 for (const device of ["desktop", "mobile"] as const) {
@@ -22,158 +31,129 @@ for (const device of ["desktop", "mobile"] as const) {
     let status: "fresh" | "stale" | "unavailable" = "fresh";
     let available = true;
     let tracked = false;
-    const catalog = () => ({
-      status,
-      lastSuccessfulFetchAt: status === "unavailable" ? null : 1789170000000,
-      error: status === "fresh" ? null : "Refresh failed",
-    });
-    const publisher = () => ({
-      id: "openai",
-      name: "OpenAI",
-      subscribed,
-      subscribedAt: subscribed ? 101 : null,
-      enabledCount: Number(enabled),
-      recentCount: status === "unavailable" ? null : 1,
-    });
     let catalogReads = 0;
+    const model = () => ({
+      route: "openai/test",
+      name: "Test",
+      publisherId: "openai",
+      description: "",
+      created: 1789170000,
+      enabled,
+      favorite,
+      supportsTools: true,
+      availability:
+        status === "unavailable"
+          ? ("unverified" as const)
+          : available
+            ? ("available" as const)
+            : ("unavailable" as const),
+      isNew: true,
+      contextLength: 128000,
+      promptPricePerMillion: 0,
+      completionPricePerMillion: 2,
+      inputCapabilities: ["text" as const, "image" as const],
+      outputCapabilities: ["text"],
+    });
     const snapshot = () => ({
-      catalog: catalog(),
-      publishers: [publisher()],
-      modelsByPublisher: {
-        openai: [
+      catalog: openRouterCatalog({
+        catalog: {
+          status,
+          lastSuccessfulFetchAt:
+            status === "unavailable" ? null : 1789170000000,
+          error: status === "fresh" ? null : "Refresh failed",
+        },
+        publishers: [
           {
-            route: "openai/test",
-            name: "Test",
-            publisherId: "openai",
-            created: 1789170000,
-            enabled,
-            favorite,
-            supportsTools: true,
-            availability:
-              status === "unavailable"
-                ? "unverified"
-                : available
-                  ? "available"
-                  : "unavailable",
-            isNew: true,
-            contextLength: 128000,
-            promptPricePerMillion: 0,
-            completionPricePerMillion: 2,
-            inputCapabilities: ["text", "image"],
+            id: "openai",
+            name: "OpenAI",
+            subscribed,
+            subscribedAt: subscribed ? 101 : null,
+            enabledCount: Number(enabled),
+            recentCount: status === "unavailable" ? null : 1,
           },
         ],
-      },
-      discoveredPublishers:
-        status === "unavailable"
-          ? null
-          : [{ id: "example", name: "Example", tracked }],
+        modelsByPublisher: { openai: [model()] },
+        discoveredPublishers:
+          status === "unavailable"
+            ? null
+            : [{ id: "example", name: "Example", tracked }],
+      }),
     });
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await page.route("**/api/**", async (route) => {
-      const path = new URL(route.request().url()).pathname;
-      const method = route.request().method();
-      if (path === "/api/settings/openrouter/catalog") {
+    // Writes wait for holdWrites and fail while failMutation is set.
+    const saved = async (apply: () => void) => {
+      await holdWrites;
+      if (failMutation)
+        return new RpcFailure(
+          "internal",
+          "Preference could not be saved",
+          "INTERNAL_ERROR",
+        );
+      apply();
+      return {};
+    };
+    await mockApp(page);
+    await mockRpc(page, [
+      on(ProviderService.method.getOpenRouterCatalog, () => {
         catalogReads++;
-        return route.fulfill({ json: snapshot() });
-      }
-      if (method !== "GET" && method !== "HEAD") {
-        await holdWrites;
-        if (failMutation)
-          return route.fulfill({
-            status: 500,
-            json: {
-              error: {
-                code: "INTERNAL_ERROR",
-                message: "Preference could not be saved",
-              },
-            },
-          });
-        const body = route.request().postDataJSON();
-        if (path.endsWith("/favorite")) {
-          if (body.provider === "ollama") localFavorite = body.favorite;
-          else favorite = body.favorite;
-        }
-        if (path.endsWith("/openrouter/models")) enabled = body.enabled;
-        if (path.endsWith("/subscription")) subscribed = body.subscribed;
-        if (path.endsWith("/publishers")) tracked = true;
-        return route.fulfill({
-          json: path.endsWith("/refresh") ? snapshot() : { ok: true },
-        });
-      }
-      const json =
-        path === "/api/models"
-          ? {
-              models: [
-                {
-                  id: "local-model",
-                  name: "Local",
-                  provider: "ollama",
-                  lab: "Ollama",
-                  favorite: localFavorite,
-                  inputCapabilities: ["text"],
-                },
-                ...(enabled && available
-                  ? [
-                      {
-                        id: "openrouter:openai/test",
-                        route: "openai/test",
-                        name: "Test",
-                        provider: "openrouter",
-                        lab: "OpenAI",
-                        publisherId: "openai",
-                        favorite,
-                        configured: true,
-                        inputCapabilities: ["text", "image"],
-                        supportsTools: true,
-                      },
-                    ]
-                  : []),
-              ],
-            }
-          : path.endsWith("/catalog/publishers")
-            ? {
-                catalog: catalog(),
-                publishers:
-                  status === "unavailable"
-                    ? null
-                    : [{ id: "example", name: "Example", tracked }],
-              }
-            : path.endsWith("/publishers/openai/models")
-              ? {
-                  catalog: catalog(),
-                  models: [
-                    {
-                      route: "openai/test",
-                      name: "Test",
-                      publisherId: "openai",
-                      created: 1789170000,
-                      enabled,
-                      favorite,
-                      supportsTools: true,
-                      availability:
-                        status === "unavailable"
-                          ? "unverified"
-                          : available
-                            ? "available"
-                            : "unavailable",
-                      isNew: true,
-                      contextLength: 128000,
-                      promptPricePerMillion: 0,
-                      completionPricePerMillion: 2,
-                      inputCapabilities: ["text", "image"],
-                    },
+        return snapshot();
+      }),
+      on(ProviderService.method.refreshOpenRouterCatalog, async () => {
+        const failure = await saved(() => {});
+        return failure instanceof RpcFailure ? failure : snapshot();
+      }),
+      on(ModelService.method.setFavorite, (request) =>
+        saved(() => {
+          if (request.provider === ModelProvider.OLLAMA)
+            localFavorite = request.favorite;
+          else favorite = request.favorite;
+        }),
+      ),
+      on(ProviderService.method.setOpenRouterModelEnabled, (request) =>
+        saved(() => {
+          enabled = request.enabled;
+        }),
+      ),
+      on(ProviderService.method.setOpenRouterSubscription, (request) =>
+        saved(() => {
+          subscribed = request.subscribed;
+        }),
+      ),
+      on(ProviderService.method.trackOpenRouterPublisher, () =>
+        saved(() => {
+          tracked = true;
+        }),
+      ),
+      on(ProviderService.method.removeOpenRouterPublisher, () =>
+        saved(() => {}),
+      ),
+      on(ProviderService.method.getApiKey, () => ({
+        state: { hasKey: true, environmentManaged: false },
+      })),
+      on(ModelService.method.listModels, () => ({
+        models: [
+          ollamaModel("local-model", {
+            name: "Local",
+            favorite: localFavorite,
+          }),
+          ...(enabled && available
+            ? [
+                openRouterModel("openai/test", {
+                  name: "Test",
+                  lab: "OpenAI",
+                  favorite,
+                  inputCapabilities: [
+                    InputCapability.TEXT,
+                    InputCapability.IMAGE,
                   ],
-                }
-              : path.endsWith("/publishers")
-                ? { catalog: catalog(), publishers: [publisher()] }
-                : path.endsWith("/openrouter")
-                  ? { hasKey: true, environmentManaged: false }
-                  : path.endsWith("/health")
-                    ? { connected: true }
-                    : {};
-      await route.fulfill({ json });
-    });
+                  supportsTools: true,
+                }),
+              ]
+            : []),
+        ],
+      })),
+    ]);
     try {
       await mockUserPreferences(page);
       await page.goto("http://127.0.0.1:5199/dev/models");

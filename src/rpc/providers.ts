@@ -1,4 +1,3 @@
-import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import type { ServiceImpl } from "@connectrpc/connect";
 import { Ollama } from "ollama";
 import {
@@ -28,10 +27,8 @@ import {
   updateUserPreferences,
 } from "../db/userPreferences";
 import { envConfig } from "../env";
-import { Model_Availability } from "../gen/euler/v1/models_pb";
 import {
   ApiKeyProvider,
-  CatalogFreshness_Status,
   type ProviderService,
 } from "../gen/euler/v1/providers_pb";
 import { canEditEnvironmentSetting } from "../http/environmentSettings";
@@ -59,13 +56,12 @@ import {
   getCatalogPreferences,
   savedModelMetadata,
 } from "../models/openRouterPreferences";
+import { openRouterCatalog } from "../models/openRouterWire";
 import { OperationError } from "../observability/errors";
 import { logEvent } from "../observability/logger";
 import { imagePatch } from "../preferences/wire";
 import { errorMessage } from "../utils/errors";
 import { ownerOf } from "./context";
-import { inputCapabilities, reasoning } from "./models";
-import { optionalMillis } from "./wire";
 
 const API_KEYS = {
   [ApiKeyProvider.OPENROUTER]: {
@@ -82,17 +78,6 @@ const API_KEYS = {
 
 const apiKey = (provider: ApiKeyProvider) =>
   API_KEYS[provider as keyof typeof API_KEYS];
-
-const FRESHNESS = {
-  fresh: CatalogFreshness_Status.FRESH,
-  stale: CatalogFreshness_Status.STALE,
-  unavailable: CatalogFreshness_Status.UNAVAILABLE,
-} as const;
-const AVAILABILITY = {
-  available: Model_Availability.AVAILABLE,
-  unavailable: Model_Availability.UNAVAILABLE,
-  unverified: Model_Availability.UNVERIFIED,
-} as const;
 
 function comfyConfig(owner: string) {
   return {
@@ -112,55 +97,8 @@ function chatGpt(owner: string) {
   };
 }
 
-function catalog(result: CatalogResult, owner: string) {
-  const settings = catalogSettings(result, owner);
-  return {
-    freshness: {
-      status: FRESHNESS[settings.catalog.status],
-      lastSuccessfulFetchAt: optionalMillis(
-        settings.catalog.lastSuccessfulFetchAt,
-      ),
-      error: settings.catalog.error ?? undefined,
-    },
-    publishers: settings.publishers.map((publisher) => ({
-      id: publisher.id,
-      name: publisher.name,
-      subscribed: publisher.subscribed,
-      subscribedAt: optionalMillis(publisher.subscribedAt),
-      enabledCount: publisher.enabledCount,
-      recentCount: publisher.recentCount ?? undefined,
-    })),
-    modelsByPublisher: Object.fromEntries(
-      Object.entries(settings.modelsByPublisher).map(([id, models]) => [
-        id,
-        {
-          models: models.map((model) => ({
-            route: model.route,
-            publisherId: model.publisherId,
-            name: model.name,
-            description: model.description,
-            created: timestampFromMs(model.created * 1000),
-            contextLength: model.contextLength ?? undefined,
-            promptPricePerMillion: model.promptPricePerMillion ?? undefined,
-            completionPricePerMillion:
-              model.completionPricePerMillion ?? undefined,
-            inputCapabilities: inputCapabilities(model.inputCapabilities),
-            supportsTools: model.supportsTools,
-            outputCapabilities: model.outputCapabilities,
-            reasoning: reasoning(model.reasoning),
-            enabled: model.enabled,
-            favorite: model.favorite,
-            availability: AVAILABILITY[model.availability],
-            isNew: model.isNew,
-          })),
-        },
-      ]),
-    ),
-    discoveredPublishers: settings.discoveredPublishers
-      ? { publishers: settings.discoveredPublishers }
-      : undefined,
-  };
-}
+const catalog = (result: CatalogResult, owner: string) =>
+  openRouterCatalog(catalogSettings(result, owner));
 
 /** A catalog fetched for a write; the write needs its models. */
 async function requireCatalog() {

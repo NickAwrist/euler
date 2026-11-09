@@ -13,15 +13,10 @@ import {
   ModelProvider,
   ModelSchema,
   type ModelService,
-  Model_Availability,
 } from "../gen/euler/v1/models_pb";
 import { openRouterModelId } from "../llm/index";
 import { ollamaReasoning } from "../llm/ollamaProvider";
 import { chatGptModels, chatGptStatus } from "../models/chatgpt";
-import {
-  InputCapability as DomainInputCapability,
-  type ModelReasoning,
-} from "../models/modelCapabilities";
 import { getOllamaClient } from "../models/ollamaClient";
 import { openRouterRouteSchema } from "../models/openRouterModels";
 import {
@@ -29,43 +24,20 @@ import {
   publisherModels,
 } from "../models/openRouterPreferences";
 import { publisherName } from "../models/openRouterPublishers";
+import {
+  AVAILABILITY,
+  inputCapabilities,
+  reasoning,
+} from "../models/openRouterWire";
 import { OperationError } from "../observability/errors";
 import { errorMessage } from "../utils/errors";
 import { ownerOf } from "./context";
 
-const INPUT_CAPABILITIES: Record<string, InputCapability> = {
-  [DomainInputCapability.Text]: InputCapability.TEXT,
-  [DomainInputCapability.Image]: InputCapability.IMAGE,
-  [DomainInputCapability.File]: InputCapability.FILE,
-  [DomainInputCapability.Audio]: InputCapability.AUDIO,
-  [DomainInputCapability.Video]: InputCapability.VIDEO,
-};
-const AVAILABILITY = {
-  available: Model_Availability.AVAILABLE,
-  unavailable: Model_Availability.UNAVAILABLE,
-  unverified: Model_Availability.UNVERIFIED,
-} as const;
 const PROVIDERS = {
   [ModelProvider.OLLAMA]: "ollama",
   [ModelProvider.OPENROUTER]: "openrouter",
   [ModelProvider.CHATGPT]: "chatgpt",
 } as const;
-
-export const inputCapabilities = (values: readonly string[]) =>
-  values.flatMap((value) => {
-    const capability = INPUT_CAPABILITIES[value];
-    return capability === undefined ? [] : [capability];
-  });
-
-export const reasoning = (value: ModelReasoning | null | undefined) =>
-  value
-    ? {
-        mandatory: value.mandatory,
-        defaultEnabled: value.defaultEnabled,
-        supportedEfforts: value.supportedEfforts,
-        defaultEffort: value.defaultEffort,
-      }
-    : undefined;
 
 async function ollamaModels(owner: string): Promise<Model[]> {
   const favorites = listModelFavorites(owner);
