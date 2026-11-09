@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { DisplayIconSchema } from "./icons";
 
 /** Server names prefix tool names, so they use only characters providers accept. */
 const McpServerNameSchema = z.string().regex(/^[A-Za-z0-9_-]{1,32}$/);
@@ -40,52 +39,3 @@ export const McpConfigSchema = z
   .refine((servers) => servers.length > 0, "config has no mcpServers");
 
 export type McpServerWrite = z.output<typeof McpConfigSchema>[number];
-
-export const McpServerPatchSchema = z.object({ enabled: z.boolean() });
-
-/** Header values hold credentials, so only their names leave the server. */
-export const McpServerSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  url: z.string(),
-  headerNames: z.array(z.string()),
-  enabled: z.boolean(),
-  created_at: z.number(),
-  updated_at: z.number(),
-});
-
-export type McpServerData = z.infer<typeof McpServerSchema>;
-
-export const McpServerListResponseSchema = z.object({
-  servers: z.array(McpServerSchema),
-});
-
-export const McpServerCheckSchema = z.discriminatedUnion("ok", [
-  z.object({
-    ok: z.literal(true),
-    icons: z.array(DisplayIconSchema).optional(),
-    tools: z.array(
-      z.object({
-        name: z.string(),
-        description: z.string().optional(),
-        icons: z.array(DisplayIconSchema).optional(),
-      }),
-    ),
-  }),
-  z.object({ ok: z.literal(false), error: z.string() }),
-]);
-
-export type McpServerCheck = z.infer<typeof McpServerCheckSchema>;
-
-export const McpToolListResponseSchema = z.object({
-  tools: z.array(
-    z.object({
-      name: z.string(),
-      description: z.string(),
-      icons: z.array(DisplayIconSchema).optional(),
-    }),
-  ),
-});
-export type McpToolData = z.infer<
-  typeof McpToolListResponseSchema
->["tools"][number];

@@ -31,10 +31,3 @@ export const RunMetadataSchema = z.object({
   preferredFormats: z.string().optional(),
   includeCurrentDate: z.boolean().optional(),
 });
-
-/** Preview using current configuration, optionally including a draft message. */
-export const DebugPromptBodySchema = z.object({
-  sessionId: z.string().trim().min(1).optional(),
-  metadata: RunMetadataSchema.optional(),
-  message: z.string().optional(),
-});

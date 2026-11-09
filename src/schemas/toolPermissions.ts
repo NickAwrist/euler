@@ -71,16 +71,6 @@ export const ToolPermissionFieldSchema = z.object({
   values: z.array(ToolPermissionValueSchema).optional(),
 });
 export type ToolPermissionField = z.infer<typeof ToolPermissionFieldSchema>;
-export const ToolPermissionToolsSchema = z.object({
-  tools: z.array(
-    z.object({
-      name: z.string(),
-      description: z.string(),
-      fields: z.array(ToolPermissionFieldSchema),
-      icons: z.array(DisplayIconSchema).optional(),
-    }),
-  ),
-});
 export const ToolApprovalSchema = z.object({
   id: z.uuid(),
   sessionId: z.string(),
@@ -94,13 +84,7 @@ export const ToolApprovalSchema = z.object({
   matchingScope: z.string(),
 });
 export type ToolApproval = z.infer<typeof ToolApprovalSchema>;
-export const ToolApprovalResponseSchema = z
-  .object({
-    decision: z.enum(["allow_once", "allow_matching", "deny"]),
-  })
-  .strict();
-export type ToolApprovalResponse = z.infer<typeof ToolApprovalResponseSchema>;
-export const ToolApprovalResultSchema = z.object({
-  ok: z.literal(true),
-  rule: ToolPermissionRuleSchema.optional(),
-});
+/** How the user answered a tool approval. */
+export type ToolApprovalResponse = {
+  decision: "allow_once" | "allow_matching" | "deny";
+};

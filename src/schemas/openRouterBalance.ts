@@ -1,11 +1,8 @@
-import { z } from "zod";
-
-export const openRouterBalanceSchema = z.object({
-  accountBalance: z.number().nullable(),
-  keyLimit: z.number().nullable(),
-  keyRemaining: z.number().nullable(),
-  keyLimitReset: z.string().nullable(),
-  keyUsage: z.number(),
-});
-
-export type OpenRouterBalance = z.infer<typeof openRouterBalanceSchema>;
+/** What an OpenRouter key may spend; null where the key can't read a value. */
+export type OpenRouterBalance = {
+  accountBalance: number | null;
+  keyLimit: number | null;
+  keyRemaining: number | null;
+  keyLimitReset: string | null;
+  keyUsage: number;
+};

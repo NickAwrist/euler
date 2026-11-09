@@ -1,89 +1,12 @@
-import { z } from "zod";
-import { WireMessageSchema } from "./run";
-
-export const SessionWorkspaceSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("sandbox"),
-    /** Present when this chat is linked to another chat's sandbox. */
-    linked: z
-      .object({
-        workspaceId: z.string(),
+/** Where a chat's tools run. */
+export type SessionWorkspace =
+  | {
+      kind: "sandbox";
+      /** Present when this chat is linked to another chat's sandbox. */
+      linked?: {
+        workspaceId: string;
         /** Another chat using the sandbox, preferring the one that created it. */
-        sessionId: z.string().nullable(),
-      })
-      .optional(),
-  }),
-  z.object({
-    kind: z.literal("local"),
-    path: z.string(),
-    label: z.string(),
-  }),
-]);
-
-export type SessionWorkspace = z.infer<typeof SessionWorkspaceSchema>;
-
-export const WorkspaceResponseSchema = z.object({
-  workspace: SessionWorkspaceSchema,
-});
-
-export const SessionSummarySchema = z.object({
-  badge: z.enum(["working", "unread"]).nullable().optional(),
-  id: z.string(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-  customTitle: z.string().nullable().optional(),
-  preview: z.string(),
-  /** When an ephemeral chat is deleted; null for saved chats. */
-  expiresAt: z.number().nullable(),
-});
-
-export type SessionSummary = z.infer<typeof SessionSummarySchema>;
-
-export const SessionSummaryListSchema = z.object({
-  sessions: z.array(SessionSummarySchema),
-});
-
-export const StoredRunSessionSchema = z.object({
-  id: z.string(),
-  createdAt: z.number().default(0),
-  updatedAt: z.number().default(0),
-  customTitle: z.string().nullable().optional(),
-  history: z.array(WireMessageSchema).default([]),
-  modelMessages: z
-    .array(z.record(z.string(), z.unknown()))
-    .nullable()
-    .optional(),
-  model: z.string().nullable().optional(),
-  workspace: SessionWorkspaceSchema.default({ kind: "sandbox" }),
-  expiresAt: z.number().nullable(),
-});
-
-export type StoredRunSession = z.infer<typeof StoredRunSessionSchema>;
-
-export const CreateSessionBodySchema = z.object({
-  model: z.string().trim().nullable().optional(),
-  /** An ephemeral chat is deleted once its lifetime ends. */
-  ephemeral: z.boolean().optional(),
-});
-
-export type CreateSessionBody = z.infer<typeof CreateSessionBodySchema>;
-
-export const CreatedSessionSchema = z.object({
-  id: z.string(),
-  expiresAt: z.number().nullable(),
-});
-
-export type CreatedSession = z.infer<typeof CreatedSessionSchema>;
-
-export const PatchSessionBodySchema = z.strictObject({
-  customTitle: z.string().trim().nullable().optional(),
-  model: z.string().trim().nullable().optional(),
-});
-
-export type PatchSessionBody = z.infer<typeof PatchSessionBodySchema>;
-
-export const RevealFileSchema = z.object({
-  path: z.string().trim().min(1, "path is required"),
-});
-
-export type RevealFileBody = z.infer<typeof RevealFileSchema>;
+        sessionId: string | null;
+      };
+    }
+  | { kind: "local"; path: string; label: string };
