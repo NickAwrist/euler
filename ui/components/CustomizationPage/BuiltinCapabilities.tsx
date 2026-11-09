@@ -1,53 +1,57 @@
 import { useState } from "react";
-import type { Capabilities } from "../../../src/schemas/userPreferences";
+import type { Capabilities } from "../../../src/gen/euler/v1/preferences_pb";
 import {
   getUserPreferences,
   updateUserPreferences,
 } from "../../persist/userPreferences";
 import { eyebrowText } from "../../styles";
+import type { MessageFields } from "../../types";
 import { SwitchField } from "./SwitchField";
 
-const CAPABILITIES: { id: keyof Capabilities; label: string; hint: string }[] =
-  [
-    {
-      id: "web",
-      label: "Web search",
-      hint: "Search the web and read web pages.",
-    },
-    {
-      id: "imageGeneration",
-      label: "Image generation",
-      hint: "Generate images with ComfyUI.",
-    },
-    {
-      id: "shell",
-      label: "Shell",
-      hint: "Run commands in the active workspace.",
-    },
-    {
-      id: "files",
-      label: "Files",
-      hint: "Read, search, create, edit, and delete workspace files.",
-    },
-    {
-      id: "skills",
-      label: "Skill management",
-      hint: "Create, edit, and delete your skills when you ask.",
-    },
-  ];
+const CAPABILITIES: {
+  id: keyof MessageFields<Capabilities>;
+  label: string;
+  hint: string;
+}[] = [
+  {
+    id: "web",
+    label: "Web search",
+    hint: "Search the web and read web pages.",
+  },
+  {
+    id: "imageGeneration",
+    label: "Image generation",
+    hint: "Generate images with ComfyUI.",
+  },
+  {
+    id: "shell",
+    label: "Shell",
+    hint: "Run commands in the active workspace.",
+  },
+  {
+    id: "files",
+    label: "Files",
+    hint: "Read, search, create, edit, and delete workspace files.",
+  },
+  {
+    id: "skills",
+    label: "Skill management",
+    hint: "Create, edit, and delete your skills when you ask.",
+  },
+];
 
 /** Built-in tools agents may use. Turn one off to prefer an MCP server's tool. */
 export function BuiltinCapabilities() {
   const [capabilities, setCapabilities] = useState(
-    () => getUserPreferences().capabilities,
+    () => getUserPreferences().capabilities!,
   );
   const [error, setError] = useState<string | null>(null);
 
-  const toggle = (id: keyof Capabilities, enabled: boolean) => {
+  const toggle = (id: keyof MessageFields<Capabilities>, enabled: boolean) => {
     setError(null);
     setCapabilities((current) => ({ ...current, [id]: enabled }));
     updateUserPreferences({ capabilities: { [id]: enabled } })
-      .then((saved) => setCapabilities(saved.capabilities))
+      .then((saved) => setCapabilities(saved.capabilities!))
       .catch((saveError: unknown) => {
         setCapabilities((current) => ({ ...current, [id]: !enabled }));
         setError(

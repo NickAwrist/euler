@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { whileRunning } from "../../lib/whileRunning";
 import {
-  type SkillData,
+  type Skill,
   type SkillWriteBody,
   createSkillApi,
   deleteSkillApi,
@@ -16,7 +16,7 @@ import {
 } from "./skillsPageUtils";
 
 export function useSkillsPage() {
-  const [skills, setSkills] = useState<SkillData[]>([]);
+  const [skills, setSkills] = useState<Skill[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [editor, setEditor] = useState<SkillWriteBody>(emptySkillEditor);
@@ -25,7 +25,7 @@ export function useSkillsPage() {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<SkillData | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Skill | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -43,7 +43,7 @@ export function useSkillsPage() {
     void load();
   }, [load]);
 
-  const selectSkill = (skill: SkillData) => {
+  const selectSkill = (skill: Skill) => {
     const next = editorFromSkill(skill);
     setSelectedId(skill.id);
     setIsNew(false);

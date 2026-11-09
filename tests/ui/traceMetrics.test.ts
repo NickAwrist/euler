@@ -1,32 +1,34 @@
 import { describe, expect, test } from "bun:test";
+import { type MessageInitShape, create } from "@bufbuild/protobuf";
+import {
+  type LlmMetricsSchema,
+  StepSchema,
+  Step_Kind,
+} from "../../src/gen/euler/v1/steps_pb";
 import {
   formatCost,
   summarizeTraceMetrics,
 } from "../../ui/components/ExecutionTrace/traceMetrics";
-import type { MessageStep } from "../../ui/types";
+
+const llm = (metrics: MessageInitShape<typeof LlmMetricsSchema>) =>
+  create(StepSchema, { kind: Step_Kind.LLM_CALL, metrics });
 
 describe("trace metrics", () => {
   test("aggregates LLM token, speed, and cost metrics", () => {
     const summary = summarizeTraceMetrics([
-      {
-        kind: "llm_call",
-        metrics: {
-          cost: 0.00042,
-          promptTokens: 10,
-          outputTokens: 5,
-          outputDurationMs: 500,
-        },
-      },
-      { kind: "tool_call" },
-      {
-        kind: "llm_call",
-        metrics: {
-          cost: 0.00084,
-          promptTokens: 20,
-          outputTokens: 15,
-          outputDurationMs: 500,
-        },
-      },
+      llm({
+        cost: 0.00042,
+        promptTokens: 10,
+        outputTokens: 5,
+        outputDurationMs: 500,
+      }),
+      create(StepSchema, { kind: Step_Kind.TOOL_CALL }),
+      llm({
+        cost: 0.00084,
+        promptTokens: 20,
+        outputTokens: 15,
+        outputDurationMs: 500,
+      }),
     ]);
 
     expect(summary).toEqual({
@@ -40,10 +42,7 @@ describe("trace metrics", () => {
 
   test("totals the cost split only when every billed call reports one", () => {
     const split = { cachedInput: 0.1, uncachedInput: 0.2, output: 0.3 };
-    const step = (metrics: NonNullable<MessageStep["metrics"]>) => ({
-      kind: "llm_call",
-      metrics,
-    });
+    const step = llm;
 
     const complete = summarizeTraceMetrics([
       step({

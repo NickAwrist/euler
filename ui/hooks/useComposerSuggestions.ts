@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import type { McpToolData } from "../../src/schemas/mcp";
 import {
   collectComposerSuggestions,
   composerSuggestionSources,
@@ -7,8 +6,9 @@ import {
 } from "../components/composerSuggestions";
 import type { RunCommandName } from "../components/runCommands";
 import { findActiveSkillToken } from "../components/skillPicker";
+import type { McpTool } from "../persist/mcpServers";
 import { fetchMcpTools } from "../persist/mcpServers";
-import { type SkillData, fetchSkills } from "../persist/skills";
+import { type Skill, fetchSkills } from "../persist/skills";
 import type { SessionWorkspace } from "../types";
 
 export function useComposerSuggestions({
@@ -28,8 +28,8 @@ export function useComposerSuggestions({
   complete: (completion: { value: string; caret: number }) => void;
   runCommand: (command: RunCommandName) => void;
 }) {
-  const [skills, setSkills] = useState<SkillData[]>([]);
-  const [tools, setTools] = useState<McpToolData[]>([]);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [tools, setTools] = useState<McpTool[]>([]);
   const [toolStatus, setToolStatus] = useState<"loading" | "ready" | "error">(
     "loading",
   );

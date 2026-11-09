@@ -1,82 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  parseInputCapabilities,
-  parseModelReasoning,
-} from "../../../src/models/modelCapabilities";
-import { createApiError } from "../../lib/apiError";
-import { userScopedFetch } from "../../persist/userIdentity";
-import type { ModelOption, ModelReasoning } from "../../types";
+import type { ListModelsResponse } from "../../../src/gen/euler/v1/models_pb";
+import { modelClient, providerClient } from "../../lib/rpc";
+import type { ModelOption } from "../../types";
 import { OLLAMA_HEALTH_POLL_MS } from "./constants";
 
-export function mapModelOptions(value: unknown): ModelOption[] {
-  const raw = Array.isArray(value) ? value : [];
-  return raw
-    .filter(
-      (m): m is Record<string, unknown> => m != null && typeof m === "object",
-    )
-    .filter(
-      (
-        m,
-      ): m is Record<string, unknown> & {
-        id: string;
-        name: string;
-        provider: "ollama" | "openrouter" | "chatgpt";
-        lab: string;
-      } =>
-        typeof m.id === "string" &&
-        typeof m.name === "string" &&
-        (m.provider === "ollama" ||
-          m.provider === "openrouter" ||
-          m.provider === "chatgpt") &&
-        typeof m.lab === "string",
-    )
-    .map((m) => ({
-      id: m.id,
-      name: m.name,
-      provider: m.provider,
-      lab: m.lab,
-      favorite: m.favorite === true,
-      isNew: m.isNew === true,
-      created:
-        typeof m.created === "number" && Number.isFinite(m.created)
-          ? m.created
-          : undefined,
-      ...(typeof m.publisherId === "string"
-        ? { publisherId: m.publisherId }
-        : {}),
-      ...(typeof m.supportsTools === "boolean"
-        ? { supportsTools: m.supportsTools }
-        : {}),
-      contextLength:
-        typeof m.contextLength === "number" ? m.contextLength : null,
-      promptPricePerMillion:
-        typeof m.promptPricePerMillion === "number"
-          ? m.promptPricePerMillion
-          : null,
-      completionPricePerMillion:
-        typeof m.completionPricePerMillion === "number"
-          ? m.completionPricePerMillion
-          : null,
-      ...(m.availability === "available" ||
-      m.availability === "unavailable" ||
-      m.availability === "unverified"
-        ? { availability: m.availability }
-        : {}),
-      ...(typeof m.route === "string" ? { route: m.route } : {}),
-      ...(typeof m.configured === "boolean"
-        ? { configured: m.configured }
-        : {}),
-      inputCapabilities: parseInputCapabilities(m.inputCapabilities),
-      ...(m.reasoning ? { reasoning: parseModelReasoning(m.reasoning) } : {}),
-    }));
-}
-
-function chatgptCatalogErrorOf(
-  providers: { chatgpt?: { error?: unknown } } | undefined,
-): string | null {
-  const error = providers?.chatgpt?.error;
-  return typeof error === "string" ? error : null;
-}
+const chatgptCatalogErrorOf = (data: ListModelsResponse) =>
+  data.providers?.chatgpt?.error ?? null;
 
 export function useOllamaConnection() {
   const [ollamaModels, setOllamaModels] = useState<ModelOption[]>([]);
@@ -90,15 +19,8 @@ export function useOllamaConnection() {
 
   const fetchOllamaHealth = useCallback(async () => {
     try {
-      const res = await fetch("/api/ollama/health");
-      const data = (await res.json().catch(() => ({}))) as {
-        connected?: boolean;
-      };
-      if (!res.ok) {
-        setOllamaConnected(false);
-        return;
-      }
-      setOllamaConnected(data.connected === true);
+      const { connected } = await providerClient.getOllamaHealth({});
+      setOllamaConnected(connected);
     } catch {
       setOllamaConnected(false);
     }
@@ -118,25 +40,12 @@ export function useOllamaConnection() {
   const modelRequestId = useRef(0);
   const refreshOllamaModels = useCallback(async (cached = false) => {
     const requestId = ++modelRequestId.current;
-    const path = cached ? "/api/models?catalog=cached" : "/api/models";
     try {
-      const res = await userScopedFetch(path);
-      if (requestId !== modelRequestId.current) return;
-      if (!res.ok) {
-        setModelsLoadError((await createApiError(res)).message);
-        setOllamaModels([]);
-        setCatalogLoaded(true);
-        return;
-      }
-      const data = (await res.json()) as {
-        models?: unknown;
-        providers?: { chatgpt?: { error?: unknown } };
-      };
+      const data = await modelClient.listModels({ cachedCatalog: cached });
       if (requestId !== modelRequestId.current) return;
       setModelsLoadError(null);
-      setChatgptCatalogError(chatgptCatalogErrorOf(data.providers));
-      const list = mapModelOptions(data.models);
-      setOllamaModels(list);
+      setChatgptCatalogError(chatgptCatalogErrorOf(data));
+      setOllamaModels(data.models);
       setCatalogLoaded(true);
     } catch (e) {
       if (requestId !== modelRequestId.current) return;
@@ -161,10 +70,9 @@ export function useOllamaConnection() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/ollama/config");
-        const data = (await res.json().catch(() => ({}))) as { host?: string };
+        const { config } = await providerClient.getOllamaConfig({});
         if (cancelled) return;
-        if (typeof data.host === "string") setOllamaHost(data.host);
+        if (config) setOllamaHost(config.host);
       } catch {
         /* ignore */
       }

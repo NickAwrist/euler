@@ -1,17 +1,17 @@
 import { ShieldQuestion } from "lucide-react";
 import { memo, useState } from "react";
-import type {
-  ToolApproval,
-  ToolApprovalResponse,
-  ToolPermissionRule,
-} from "../../../src/schemas/toolPermissions";
+import {
+  ApprovalDecision,
+  type ToolApproval,
+  type ToolPermissionRule,
+} from "../../../src/gen/euler/v1/permissions_pb";
 import { whileRunning } from "../../lib/whileRunning";
 import { respondToToolApproval } from "../../persist/agents";
 import { Button } from "../Button";
 import { ToolIcon } from "../ToolIcon";
 import type { SavedRuleNotice } from "./useSavedRuleNotice";
 
-type Decision = ToolApprovalResponse["decision"];
+type Decision = ApprovalDecision;
 
 /** Pending tool calls from this chat's agents, answered above the composer. */
 export const ToolApprovals = memo(function ToolApprovals({
@@ -147,7 +147,7 @@ function ApprovalRequest({
                 <code className="font-mono">{approval.tool}</code>
               </span>
             </h3>
-            {approval.arguments.background === true && (
+            {approval.arguments?.background === true && (
               <span className="rounded bg-muted px-1.5 py-0.5 text-[0.6875rem] text-muted-foreground">
                 Background
               </span>
@@ -220,8 +220,8 @@ function ApprovalRequest({
           variant="secondary"
           size="sm"
           disabled={pending !== null || answered}
-          loading={pending === "deny"}
-          onClick={() => void respond("deny")}
+          loading={pending === ApprovalDecision.DENY}
+          onClick={() => void respond(ApprovalDecision.DENY)}
         >
           Deny
         </Button>
@@ -229,16 +229,16 @@ function ApprovalRequest({
           variant="secondary"
           size="sm"
           disabled={pending !== null || answered}
-          loading={pending === "allow_matching"}
-          onClick={() => void respond("allow_matching")}
+          loading={pending === ApprovalDecision.ALLOW_MATCHING}
+          onClick={() => void respond(ApprovalDecision.ALLOW_MATCHING)}
         >
           Allow matching calls
         </Button>
         <Button
           size="sm"
           disabled={pending !== null || answered}
-          loading={pending === "allow_once"}
-          onClick={() => void respond("allow_once")}
+          loading={pending === ApprovalDecision.ALLOW_ONCE}
+          onClick={() => void respond(ApprovalDecision.ALLOW_ONCE)}
         >
           Allow once
         </Button>

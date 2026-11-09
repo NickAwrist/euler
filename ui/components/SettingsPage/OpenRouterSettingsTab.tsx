@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ApiKeyProvider } from "../../../src/gen/euler/v1/providers_pb";
 import { NEW_MODEL_DAYS } from "../../../src/models/newModels";
 import { whileRunning } from "../../lib/whileRunning";
 import { Button } from "../Button";
@@ -21,7 +22,7 @@ export function OpenRouterSettingsTab({
   /** Reports whether a key is saved once known and after each change. */
   onKeyStatusChange?: (hasKey: boolean) => void;
 }) {
-  const key = useApiKeySetting("openrouter");
+  const key = useApiKeySetting(ApiKeyProvider.OPENROUTER);
   const [keyRevision, setKeyRevision] = useState(0);
   const {
     data: overview,
@@ -93,7 +94,7 @@ export function OpenRouterSettingsTab({
             Choose which models appear in the composer. New marks models added
             to OpenRouter in the last {NEW_MODEL_DAYS} days.
           </p>
-          {overview && <CatalogStatus catalog={overview.catalog} />}
+          {overview?.catalog && <CatalogStatus catalog={overview.catalog} />}
           {loadError && (
             <p role="alert" className="text-sm text-destructive">
               {loadError}
@@ -130,12 +131,12 @@ export function OpenRouterSettingsTab({
                   <span>
                     <span className="flex items-center gap-2">
                       <span className="font-medium">{publisher.name}</span>
-                      {publisher.recentCount !== null &&
+                      {publisher.recentCount !== undefined &&
                         publisher.recentCount > 0 && <NewBadge />}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {publisher.enabledCount} enabled
-                      {publisher.recentCount === null &&
+                      {publisher.recentCount === undefined &&
                         " · Recent count unavailable"}
                       {publisher.subscribed ? " · Subscribed" : ""}
                     </span>

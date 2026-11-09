@@ -69,7 +69,7 @@ test("image previews preserve bytes, use an explicit media type, and enforce the
     kind: "image",
     path: "image.PNG",
     mediaType: "image/png",
-    data: image.toString("base64"),
+    data: new Uint8Array(image),
   });
   await fs.writeFile(
     join(workspace.hostPath, "huge.png"),

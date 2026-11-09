@@ -1,6 +1,7 @@
 import { Download, FolderOpen, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { downloadBlob } from "../lib/downloadBlob";
+import { localWorkspace } from "../lib/workspace";
 import {
   downloadWorkspaceFile,
   fetchWorkspaceFiles,
@@ -22,6 +23,7 @@ export function WorkspaceModal({
   linkedLabel: string | null;
   onClose: () => void;
 }) {
+  const local = localWorkspace(workspace);
   const [files, setFiles] = useState<WorkspaceFile[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,8 +61,8 @@ export function WorkspaceModal({
     <Modal
       title="Workspace files"
       subtitle={
-        workspace.kind === "local"
-          ? workspace.path
+        local
+          ? local.path
           : linkedLabel
             ? `Linked to ${linkedLabel}'s workspace`
             : "Private chat workspace"
@@ -91,23 +93,17 @@ export function WorkspaceModal({
                 {file.path}
               </p>
               <p className="text-xs text-muted-foreground">
-                {formatBytes(file.size)}
+                {formatBytes(Number(file.size))}
               </p>
             </div>
             <IconButton
               size="sm"
               variant="ghost"
-              icon={workspace.kind === "local" ? FolderOpen : Download}
-              title={
-                workspace.kind === "local" ? "Reveal file" : "Download file"
-              }
-              label={
-                workspace.kind === "local" ? "Reveal file" : "Download file"
-              }
+              icon={local ? FolderOpen : Download}
+              title={local ? "Reveal file" : "Download file"}
+              label={local ? "Reveal file" : "Download file"}
               onClick={() =>
-                void (
-                  workspace.kind === "local" ? reveal(file) : download(file)
-                ).catch((cause) =>
+                void (local ? reveal(file) : download(file)).catch((cause) =>
                   setError(
                     cause instanceof Error
                       ? cause.message

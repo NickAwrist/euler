@@ -1,4 +1,6 @@
+import { create } from "@bufbuild/protobuf";
 import { useLayoutEffect, useRef, useState } from "react";
+import { ImageAttachmentSchema } from "../../src/gen/euler/v1/attachments_pb";
 import { AttachmentImage } from "../components/MessageItem/AttachmentImage";
 
 function Images() {
@@ -17,13 +19,12 @@ function Images() {
         <AttachmentImage
           // biome-ignore lint/suspicious/noArrayIndexKey: static fixture order
           key={index}
-          attachment={{
+          attachment={create(ImageAttachmentSchema, {
             id: `image-${index}`,
-            kind: "image",
             name: `Image ${index}`,
             mimeType: "image/png",
             size: 100,
-          }}
+          })}
         />
       ))}
     </div>

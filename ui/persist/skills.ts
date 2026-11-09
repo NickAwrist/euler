@@ -1,37 +1,32 @@
-import type { SkillData, SkillWriteBody } from "../../src/schemas/skills";
-import { apiJson, apiVoid } from "../lib/api";
+import type { Skill } from "../../src/gen/euler/v1/skills_pb";
+import type { SkillWriteBody } from "../../src/schemas/skills";
+import { skillClient } from "../lib/rpc";
 
-export type { SkillData, SkillWriteBody };
+export type { Skill, SkillWriteBody };
 
-export async function fetchSkills(): Promise<SkillData[]> {
-  const data = await apiJson<{ skills?: SkillData[] }>("/api/skills", {
-    errorMessage: "Failed to fetch skills",
-  });
-  return data.skills ?? [];
+const fields = (body: SkillWriteBody) => ({
+  name: body.name,
+  description: body.description,
+  instructions: body.instructions,
+  userInvocable: body.user_invocable,
+  disableModelInvocation: body.disable_model_invocation,
+});
+
+export async function fetchSkills(): Promise<Skill[]> {
+  return (await skillClient.listSkills({})).skills;
 }
 
-export function createSkillApi(body: SkillWriteBody): Promise<SkillData> {
-  return apiJson<SkillData>("/api/skills", {
-    method: "POST",
-    json: body,
-    errorMessage: "Failed to create skill",
-  });
+export async function createSkillApi(body: SkillWriteBody): Promise<Skill> {
+  return (await skillClient.createSkill({ skill: fields(body) })).skill!;
 }
 
-export function updateSkillApi(
+export async function updateSkillApi(
   id: string,
   body: SkillWriteBody,
-): Promise<SkillData> {
-  return apiJson<SkillData>(`/api/skills/${id}`, {
-    method: "PUT",
-    json: body,
-    errorMessage: "Failed to update skill",
-  });
+): Promise<Skill> {
+  return (await skillClient.updateSkill({ id, skill: fields(body) })).skill!;
 }
 
-export function deleteSkillApi(id: string): Promise<void> {
-  return apiVoid(`/api/skills/${id}`, {
-    method: "DELETE",
-    errorMessage: "Failed to delete skill",
-  });
+export async function deleteSkillApi(id: string): Promise<void> {
+  await skillClient.deleteSkill({ id });
 }

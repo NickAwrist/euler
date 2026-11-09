@@ -1,0 +1,344 @@
+syntax = "proto3";
+
+package euler.v1;
+
+import "buf/validate/validate.proto";
+import "euler/v1/models.proto";
+import "euler/v1/preferences.proto";
+import "google/protobuf/timestamp.proto";
+
+// Model and tool providers: Ollama, ComfyUI, OpenRouter, ChatGPT and Brave
+// Search. Addresses and keys are server-wide; ComfyUI image defaults and the
+// ChatGPT connection belong to the user.
+service ProviderService {
+  rpc GetOllamaConfig(GetOllamaConfigRequest) returns (GetOllamaConfigResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc UpdateOllamaConfig(UpdateOllamaConfigRequest) returns (UpdateOllamaConfigResponse);
+  rpc GetOllamaHealth(GetOllamaHealthRequest) returns (GetOllamaHealthResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Tests an unsaved address.
+  rpc TestOllamaHost(TestOllamaHostRequest) returns (TestOllamaHostResponse);
+
+  rpc GetComfyUiConfig(GetComfyUiConfigRequest) returns (GetComfyUiConfigResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc UpdateComfyUiConfig(UpdateComfyUiConfigRequest) returns (UpdateComfyUiConfigResponse);
+  rpc GetComfyUiHealth(GetComfyUiHealthRequest) returns (GetComfyUiHealthResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc TestComfyUiHost(TestComfyUiHostRequest) returns (TestComfyUiHostResponse);
+  rpc ListComfyUiModels(ListComfyUiModelsRequest) returns (ListComfyUiModelsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+
+  rpc GetApiKey(GetApiKeyRequest) returns (GetApiKeyResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Saves a key; an empty key removes it.
+  rpc SetApiKey(SetApiKeyRequest) returns (SetApiKeyResponse);
+
+  rpc GetOpenRouterBalance(GetOpenRouterBalanceRequest) returns (GetOpenRouterBalanceResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Publishers, their models, and the user's choices among them.
+  rpc GetOpenRouterCatalog(GetOpenRouterCatalogRequest) returns (GetOpenRouterCatalogResponse);
+  rpc SetOpenRouterModelEnabled(SetOpenRouterModelEnabledRequest) returns (SetOpenRouterModelEnabledResponse);
+  rpc TrackOpenRouterPublisher(TrackOpenRouterPublisherRequest) returns (TrackOpenRouterPublisherResponse);
+  rpc RemoveOpenRouterPublisher(RemoveOpenRouterPublisherRequest) returns (RemoveOpenRouterPublisherResponse);
+  // A subscribed publisher's new models are enabled as they appear.
+  rpc SetOpenRouterSubscription(SetOpenRouterSubscriptionRequest) returns (SetOpenRouterSubscriptionResponse);
+
+  rpc GetChatGptStatus(GetChatGptStatusRequest) returns (GetChatGptStatusResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // The sign-in page to open. Its redirect to a loopback address fails to
+  // load; the user pastes that address into FinishChatGptLogin.
+  rpc StartChatGptLogin(StartChatGptLoginRequest) returns (StartChatGptLoginResponse);
+  rpc FinishChatGptLogin(FinishChatGptLoginRequest) returns (FinishChatGptLoginResponse);
+  rpc DisconnectChatGpt(DisconnectChatGptRequest) returns (DisconnectChatGptResponse);
+}
+
+// A provider address: the saved one, and the one in effect.
+message HostConfig {
+  // Empty when none is saved.
+  string host = 1;
+  string effective_host = 2;
+}
+
+message HostTest {
+  bool ok = 1;
+  optional string version = 2;
+  optional string error = 3;
+}
+
+message GetOllamaConfigRequest {}
+
+message GetOllamaConfigResponse {
+  HostConfig config = 1;
+}
+
+message UpdateOllamaConfigRequest {
+  // Empty uses the default address.
+  string host = 1 [(buf.validate.field).string.max_len = 2048];
+}
+
+message UpdateOllamaConfigResponse {
+  HostConfig config = 1;
+}
+
+message GetOllamaHealthRequest {}
+
+message GetOllamaHealthResponse {
+  bool connected = 1;
+  optional string error = 2;
+}
+
+message TestOllamaHostRequest {
+  // Empty tests the default address.
+  string host = 1 [(buf.validate.field).string.max_len = 2048];
+}
+
+message TestOllamaHostResponse {
+  HostTest result = 1;
+}
+
+message GetComfyUiConfigRequest {}
+
+message GetComfyUiConfigResponse {
+  HostConfig config = 1;
+  ImagePreferences image = 2;
+}
+
+message UpdateComfyUiConfigRequest {
+  // Set to change the server-wide address; empty uses the default.
+  optional string host = 1 [(buf.validate.field).string.max_len = 2048];
+  UpdatePreferencesRequest.ImagePatch image = 2;
+}
+
+message UpdateComfyUiConfigResponse {
+  HostConfig config = 1;
+  ImagePreferences image = 2;
+}
+
+message GetComfyUiHealthRequest {}
+
+message GetComfyUiHealthResponse {
+  bool connected = 1;
+  optional string error = 2;
+}
+
+message TestComfyUiHostRequest {
+  // Empty tests the saved address.
+  string host = 1 [(buf.validate.field).string.max_len = 2048];
+}
+
+message TestComfyUiHostResponse {
+  HostTest result = 1;
+}
+
+message ListComfyUiModelsRequest {}
+
+message ListComfyUiModelsResponse {
+  repeated string models = 1;
+  // Why the list is empty when ComfyUI could not be reached.
+  optional string error = 2;
+}
+
+enum ApiKeyProvider {
+  API_KEY_PROVIDER_UNSPECIFIED = 0;
+  API_KEY_PROVIDER_OPENROUTER = 1;
+  API_KEY_PROVIDER_BRAVE = 2;
+}
+
+// Whether a key exists, never the key itself.
+message ApiKeyState {
+  bool has_key = 1;
+  // The server's environment sets the key, so it cannot be changed here.
+  bool environment_managed = 2;
+}
+
+message GetApiKeyRequest {
+  ApiKeyProvider provider = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+
+message GetApiKeyResponse {
+  ApiKeyState state = 1;
+}
+
+message SetApiKeyRequest {
+  ApiKeyProvider provider = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string api_key = 2 [(buf.validate.field).string.max_len = 512];
+}
+
+message SetApiKeyResponse {
+  ApiKeyState state = 1;
+}
+
+message GetOpenRouterBalanceRequest {}
+
+message GetOpenRouterBalanceResponse {
+  // Credits minus usage, when the key may read them.
+  optional double account_balance = 1;
+  optional double key_limit = 2;
+  optional double key_remaining = 3;
+  optional string key_limit_reset = 4;
+  double key_usage = 5;
+}
+
+message CatalogFreshness {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_FRESH = 1;
+    STATUS_STALE = 2;
+    STATUS_UNAVAILABLE = 3;
+  }
+  Status status = 1;
+  optional google.protobuf.Timestamp last_successful_fetch_at = 2;
+  optional string error = 3;
+}
+
+message OpenRouterPublisher {
+  string id = 1;
+  string name = 2;
+  bool subscribed = 3;
+  optional google.protobuf.Timestamp subscribed_at = 4;
+  uint32 enabled_count = 5;
+  // New models in the catalog; absent without a catalog.
+  optional uint32 recent_count = 6;
+}
+
+message DiscoveredPublisher {
+  string id = 1;
+  string name = 2;
+  bool tracked = 3;
+}
+
+// A catalog model with the user's choices.
+message OpenRouterModel {
+  string route = 1;
+  string publisher_id = 2;
+  string name = 3;
+  string description = 4;
+  google.protobuf.Timestamp created = 5;
+  optional uint32 context_length = 6;
+  optional double prompt_price_per_million = 7;
+  optional double completion_price_per_million = 8;
+  repeated InputCapability input_capabilities = 9;
+  bool supports_tools = 10;
+  repeated string output_capabilities = 11;
+  optional ModelReasoning reasoning = 12;
+  bool enabled = 13;
+  bool favorite = 14;
+  Model.Availability availability = 15;
+  bool is_new = 16;
+}
+
+message PublisherModels {
+  repeated OpenRouterModel models = 1;
+}
+
+message GetOpenRouterCatalogRequest {
+  // Fetch the catalog again instead of using the cached copy.
+  bool refresh = 1;
+}
+
+message GetOpenRouterCatalogResponse {
+  CatalogFreshness catalog = 1;
+  repeated OpenRouterPublisher publishers = 2;
+  map<string, PublisherModels> models_by_publisher = 3;
+  // Every publisher with an interactive model; absent without a catalog.
+  optional DiscoveredPublishers discovered_publishers = 4;
+}
+
+message DiscoveredPublishers {
+  repeated DiscoveredPublisher publishers = 1;
+}
+
+message SetOpenRouterModelEnabledRequest {
+  string route = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 200
+  }];
+  bool enabled = 2;
+}
+
+message SetOpenRouterModelEnabledResponse {}
+
+message TrackOpenRouterPublisherRequest {
+  string publisher_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 200
+  }];
+}
+
+message TrackOpenRouterPublisherResponse {}
+
+message RemoveOpenRouterPublisherRequest {
+  string publisher_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 200
+  }];
+}
+
+message RemoveOpenRouterPublisherResponse {}
+
+message SetOpenRouterSubscriptionRequest {
+  string publisher_id = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 200
+  }];
+  bool subscribed = 2;
+}
+
+message SetOpenRouterSubscriptionResponse {}
+
+message ChatGptStatus {
+  bool connected = 1;
+  optional string email = 2;
+  // The account's plan includes Codex models.
+  bool plan_enabled = 3;
+  optional string name = 4;
+  // An https URL.
+  optional string picture = 5;
+}
+
+message GetChatGptStatusRequest {}
+
+message GetChatGptStatusResponse {
+  ChatGptStatus status = 1;
+}
+
+message StartChatGptLoginRequest {
+  // Ask for an account instead of reusing the browser's sign-in.
+  bool new_account = 1;
+}
+
+message StartChatGptLoginResponse {
+  string authorization_url = 1;
+}
+
+message FinishChatGptLoginRequest {
+  string callback_url = 1 [(buf.validate.field).string = {
+    uri: true
+    max_len: 16384
+  }];
+}
+
+message FinishChatGptLoginResponse {
+  ChatGptStatus status = 1;
+}
+
+message DisconnectChatGptRequest {}
+
+message DisconnectChatGptResponse {
+  // Whether ChatGPT confirmed the token was revoked.
+  bool revoked = 1;
+}

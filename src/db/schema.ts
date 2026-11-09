@@ -146,6 +146,14 @@ CREATE TABLE IF NOT EXISTS jobs (
   session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
   owner_uuid TEXT NOT NULL,
   payload TEXT NOT NULL
+);
+-- iPhones that receive push notifications; a token belongs to one user at a time.
+CREATE TABLE IF NOT EXISTS devices (
+  token TEXT PRIMARY KEY,
+  owner_uuid TEXT NOT NULL,
+  environment TEXT NOT NULL CHECK (environment IN ('sandbox', 'production')),
+  bundle_id TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
 );`;
 
 const INDEXES = `
@@ -161,7 +169,8 @@ CREATE INDEX IF NOT EXISTS idx_agent_messages_waking
   ON agent_messages(held, wakes, agent_id, id) WHERE delivered_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_agent_messages_undelivered
   ON agent_messages(agent_id, id) WHERE delivered_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_jobs_session ON jobs(session_id, owner_uuid);`;
+CREATE INDEX IF NOT EXISTS idx_jobs_session ON jobs(session_id, owner_uuid);
+CREATE INDEX IF NOT EXISTS idx_devices_owner ON devices(owner_uuid);`;
 
 /** Creates any missing tables and offers the popular publishers once. */
 export function createSchema(db: Database) {

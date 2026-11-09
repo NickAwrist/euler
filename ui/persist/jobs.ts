@@ -1,24 +1,13 @@
-import { JobSchema } from "../../src/schemas/jobs";
-import { apiJson } from "../lib/api";
-import { runtimePath } from "./agents";
-export async function cancelJob(id: string, jobId: string) {
-  return JobSchema.parse(
-    await apiJson(
-      `${runtimePath(id)}/jobs/${encodeURIComponent(jobId)}/cancel`,
-      {
-        method: "POST",
-      },
-    ),
-  );
+import { jobClient } from "../lib/rpc";
+
+export async function cancelJob(sessionId: string, jobId: string) {
+  return (await jobClient.cancelJob({ sessionId, jobId })).job!;
 }
+
 export async function fetchJob(
-  id: string,
+  sessionId: string,
   jobId: string,
   signal?: AbortSignal,
 ) {
-  return JobSchema.parse(
-    await apiJson(`${runtimePath(id)}/jobs/${encodeURIComponent(jobId)}`, {
-      signal,
-    }),
-  );
+  return (await jobClient.getJob({ sessionId, jobId }, { signal })).job!;
 }

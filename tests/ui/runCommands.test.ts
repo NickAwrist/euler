@@ -1,16 +1,24 @@
 import { describe, expect, test } from "bun:test";
+import { create } from "@bufbuild/protobuf";
+import { SessionWorkspaceSchema } from "../../src/gen/euler/v1/sessions_pb";
 import {
   exactRunCommand,
   matchingRunCommands,
 } from "../../ui/components/runCommands";
 import type { SessionWorkspace } from "../../ui/types";
 
-const sandbox: SessionWorkspace = { kind: "sandbox" };
-const local: SessionWorkspace = { kind: "local", path: "/tmp/a", label: "a" };
-const linked: SessionWorkspace = {
-  kind: "sandbox",
-  linked: { workspaceId: "chat-a", sessionId: "chat-a" },
-};
+const sandbox = create(SessionWorkspaceSchema, {
+  kind: { case: "sandbox", value: {} },
+});
+const local = create(SessionWorkspaceSchema, {
+  kind: { case: "local", value: { path: "/tmp/a", label: "a" } },
+});
+const linked = create(SessionWorkspaceSchema, {
+  kind: {
+    case: "sandbox",
+    value: { linked: { workspaceId: "chat-a", sessionId: "chat-a" } },
+  },
+});
 const names = (workspace: SessionWorkspace) =>
   matchingRunCommands("/", workspace).map((command) => command.name);
 

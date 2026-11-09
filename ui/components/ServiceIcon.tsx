@@ -1,6 +1,10 @@
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
-import { type DisplayIcon, DisplayIconSchema } from "../../src/schemas/icons";
+import {
+  type DisplayIcon,
+  DisplayIcon_Theme,
+} from "../../src/gen/euler/v1/common_pb";
+import { isSafeIconSource } from "../../src/schemas/icons";
 import { cx } from "../styles";
 
 /** Native icon selection, validation, and image failure handling live here. */
@@ -10,18 +14,19 @@ export function ServiceIcon({
   size = 14,
   className,
 }: {
-  icons?: readonly DisplayIcon[];
+  icons?: readonly Pick<DisplayIcon, "src" | "theme">[];
   fallback: LucideIcon;
   size?: number;
   className?: string;
 }) {
   const [failedUrl, setFailedUrl] = useState<string>();
   // Validate at display time too, since historical traces can predate the contract.
-  const validIcons =
-    DisplayIconSchema.array().safeParse(icons ?? []).data ?? [];
+  const validIcons = (icons ?? []).filter((value) =>
+    isSafeIconSource(value.src),
+  );
   // All current application themes use dark backgrounds.
   const icon =
-    validIcons.find((value) => value.theme === "dark") ??
+    validIcons.find((value) => value.theme === DisplayIcon_Theme.DARK) ??
     validIcons.find((value) => !value.theme) ??
     validIcons[0];
   const src = icon?.src;

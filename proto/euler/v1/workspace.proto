@@ -1,0 +1,161 @@
+syntax = "proto3";
+
+package euler.v1;
+
+import "buf/validate/validate.proto";
+import "euler/v1/sessions.proto";
+import "google/protobuf/timestamp.proto";
+
+// The folder a chat's agents work in: its private sandbox, another chat's
+// sandbox, or a directory on the server.
+service WorkspaceService {
+  // Works in a directory on the server. The chat must be idle.
+  rpc SelectDirectory(SelectDirectoryRequest) returns (SelectDirectoryResponse);
+  // Returns to the chat's private sandbox. The chat must be idle.
+  rpc UseSandbox(UseSandboxRequest) returns (UseSandboxResponse);
+  // Shares another chat's sandbox. The chat must be idle.
+  rpc LinkWorkspace(LinkWorkspaceRequest) returns (LinkWorkspaceResponse);
+  // Files in the workspace, most recently modified first, at most 200.
+  rpc ListFiles(ListFilesRequest) returns (ListFilesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // The file's name, type and size, then its contents in chunks of 64 KiB.
+  rpc DownloadFile(DownloadFileRequest) returns (stream DownloadFileResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Shows a local workspace file in the server's file manager. Only callers on
+  // the server's own machine may use it.
+  rpc RevealFile(RevealFileRequest) returns (RevealFileResponse);
+  // One directory level of the artifact tree.
+  rpc ListArtifacts(ListArtifactsRequest) returns (ListArtifactsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc PreviewArtifact(PreviewArtifactRequest) returns (PreviewArtifactResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message WorkspaceFile {
+  // Relative to the workspace root.
+  string path = 1;
+  string name = 2;
+  uint64 size = 3;
+  google.protobuf.Timestamp modified_at = 4;
+}
+
+message ArtifactEntry {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_DIRECTORY = 1;
+    KIND_FILE = 2;
+  }
+  string name = 1;
+  string path = 2;
+  Kind kind = 3;
+}
+
+message ArtifactPreview {
+  message Image {
+    string media_type = 1;
+    bytes data = 2;
+  }
+  string path = 1;
+  oneof content {
+    string text = 2;
+    Image image = 3;
+  }
+}
+
+message SelectDirectoryRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  // An absolute path on the server; ~ expands to the configured home.
+  string path = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+  }];
+}
+
+message SelectDirectoryResponse {
+  SessionWorkspace workspace = 1;
+}
+
+message UseSandboxRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message UseSandboxResponse {
+  SessionWorkspace workspace = 1;
+}
+
+message LinkWorkspaceRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  // The chat whose sandbox to share.
+  string source_session_id = 2 [(buf.validate.field).string.min_len = 1];
+}
+
+message LinkWorkspaceResponse {
+  SessionWorkspace workspace = 1;
+}
+
+message ListFilesRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  // Keeps files whose path contains this text, ignoring case.
+  optional string query = 2 [(buf.validate.field).string.max_len = 1000];
+}
+
+message ListFilesResponse {
+  repeated WorkspaceFile files = 1;
+}
+
+message DownloadFileRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  string path = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+  }];
+}
+
+message DownloadFileResponse {
+  message Info {
+    string name = 1;
+    string media_type = 2;
+    uint64 size = 3;
+  }
+  oneof part {
+    // Always the first message.
+    Info info = 1;
+    bytes chunk = 2;
+  }
+}
+
+message RevealFileRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  string path = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+  }];
+}
+
+message RevealFileResponse {}
+
+message ListArtifactsRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  // A directory relative to the workspace root; "." for the root.
+  string path = 2 [(buf.validate.field).string.max_len = 4096];
+}
+
+message ListArtifactsResponse {
+  repeated ArtifactEntry entries = 1;
+}
+
+message PreviewArtifactRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  string path = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+  }];
+}
+
+message PreviewArtifactResponse {
+  ArtifactPreview preview = 1;
+}

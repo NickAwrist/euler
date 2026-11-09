@@ -6,6 +6,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { useState } from "react";
+import { toMillis } from "../../lib/timestamps";
 import { eyebrowText } from "../../styles";
 import { Button } from "../Button";
 import { SessionListItem } from "./SessionListItem";
@@ -77,7 +78,7 @@ export function Sidebar({
                   <SessionListItem
                     key={session.id}
                     session={session}
-                    time={formatSessionTime(session.updatedAt, now)}
+                    time={formatSessionTime(toMillis(session.updatedAt), now)}
                     active={session.id === activeSessionId}
                     openMenu={openMenu}
                     setOpenMenu={setOpenMenu}

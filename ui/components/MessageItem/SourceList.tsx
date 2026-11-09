@@ -1,6 +1,6 @@
 import { ChevronRight, Globe } from "lucide-react";
 import { useId, useState } from "react";
-import type { WebSourceAttachment } from "../../../src/attachments/types";
+import type { WebSourceAttachment } from "../../../src/gen/euler/v1/attachments_pb";
 import { cx } from "../../styles";
 
 const previewCount = 3;

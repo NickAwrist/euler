@@ -1,6 +1,8 @@
 import { Download, Loader2, MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { memo, useState } from "react";
+import { SessionSummary_Badge } from "../../../src/gen/euler/v1/sessions_pb";
 import { sessionLabel } from "../../lib/sessionLabel";
+import { toMillis } from "../../lib/timestamps";
 import { whileRunning } from "../../lib/whileRunning";
 import { cx } from "../../styles";
 import type { SessionSummary } from "../../types";
@@ -51,14 +53,14 @@ export const SessionListItem = memo(function SessionListItem({
       >
         <div className="min-w-0">
           <div className="overflow-hidden text-[0.8125rem] leading-[1.35] text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
-            {session.badge === "working" && (
+            {session.badge === SessionSummary_Badge.WORKING && (
               <Loader2
                 size={12}
                 className="mr-1 inline animate-spin"
                 aria-label="Agent working"
               />
             )}
-            {session.badge === "unread" && (
+            {session.badge === SessionSummary_Badge.UNREAD && (
               <span
                 className="mr-1 inline-block size-2 rounded-full bg-accent"
                 role="img"
@@ -69,16 +71,16 @@ export const SessionListItem = memo(function SessionListItem({
           </div>
           <div className="mt-0.5 flex gap-1 text-[0.6875rem] text-muted-foreground">
             <time
-              dateTime={new Date(session.updatedAt).toISOString()}
-              title={new Date(session.updatedAt).toLocaleString()}
+              dateTime={new Date(toMillis(session.updatedAt)).toISOString()}
+              title={new Date(toMillis(session.updatedAt)).toLocaleString()}
             >
               {time}
             </time>
-            {session.expiresAt !== null && (
+            {session.expiresAt && (
               <>
                 <span aria-hidden="true">·</span>
                 <ExpiresIn
-                  expiresAt={session.expiresAt}
+                  expiresAt={toMillis(session.expiresAt)}
                   className="text-amber-400/80"
                 />
               </>

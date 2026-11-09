@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, spyOn, test } from "bun:test";
+import { sessionClient } from "../../ui/lib/rpc";
 import {
   USER_ID_HEADER,
   USER_ID_STORAGE_KEY,
@@ -7,7 +8,6 @@ import {
   normalizeUserId,
   resetFallbackUserIdForTests,
   switchUserId,
-  userScopedFetch,
 } from "../../ui/persist/userIdentity";
 
 const storageDescriptor = Object.getOwnPropertyDescriptor(
@@ -101,7 +101,7 @@ test("getOrCreateUserId returns the same in-memory ID across repeated calls when
   expect(setCalls).toBe(1);
 });
 
-test("userScopedFetch attaches consistent header with fallback ID when localStorage throws", async () => {
+test("RPC calls attach a consistent header with the fallback ID when localStorage throws", async () => {
   Object.defineProperty(globalThis, "localStorage", {
     configurable: true,
     value: {
@@ -121,12 +121,12 @@ test("userScopedFetch attaches consistent header with fallback ID when localStor
   const fetchSpy = spyOn(fetchTarget, "fetch");
   fetchSpy.mockImplementation(async (_input, init) => {
     capturedHeaders.push(new Headers(init?.headers));
-    return new Response(JSON.stringify({ ok: true }));
+    return Response.json({ sessions: [] });
   });
 
   try {
-    await userScopedFetch("/api/test-route-1");
-    await userScopedFetch("/api/test-route-2");
+    await sessionClient.listSessions({});
+    await sessionClient.listSessions({});
 
     expect(capturedHeaders).toHaveLength(2);
     const id1 = capturedHeaders[0]!.get(USER_ID_HEADER);

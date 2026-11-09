@@ -1,4 +1,5 @@
 import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { Message_Role } from "../../../src/gen/euler/v1/sessions_pb";
 import { copyTextToClipboard } from "../../lib/copyTextToClipboard";
 import type { Message } from "../../types";
 import { AssistantMessageBubble } from "./AssistantMessageBubble";
@@ -38,10 +39,12 @@ export function MessageItem({
   };
   const versionIndex = viewState.versionIndex;
   const viewed = versions[versionIndex];
-  const shown: Message = viewed ? { role: message.role, ...viewed } : message;
+  const shown: Message = viewed
+    ? { ...message, ...viewed, $typeName: message.$typeName }
+    : message;
 
   const isEditingUser =
-    message.role === "user" && editingUserIndex === messageIndex;
+    message.role === Message_Role.USER && editingUserIndex === messageIndex;
 
   useEffect(() => {
     if (isEditingUser) setDraft(message.content);
@@ -62,7 +65,7 @@ export function MessageItem({
     onStartEditUser(messageIndex);
   };
 
-  if (message.role === "event") {
+  if (message.role === Message_Role.EVENT) {
     return (
       <div
         className="flex items-center gap-3 py-2 text-xs text-muted-foreground"
@@ -75,7 +78,7 @@ export function MessageItem({
     );
   }
 
-  if (message.role === "user") {
+  if (message.role === Message_Role.USER) {
     return (
       <UserMessageBubble
         message={message}

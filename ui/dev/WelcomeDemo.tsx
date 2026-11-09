@@ -1,6 +1,13 @@
+import { create } from "@bufbuild/protobuf";
 import { useState } from "react";
+import {
+  InputCapability,
+  ModelProvider,
+  ModelSchema,
+} from "../../src/gen/euler/v1/models_pb";
 import { RunInputDock } from "../components/RunInputDock";
 import { WelcomeHome } from "../components/WelcomeHome";
+import { sandboxWorkspace } from "../lib/workspace";
 
 const noop = () => {};
 
@@ -31,13 +38,14 @@ export default function WelcomeDemo() {
       <RunInputDock
         centered
         ollamaModels={[
-          {
+          create(ModelSchema, {
             id: "example",
             name: "Claude Sonnet",
             lab: "Anthropic",
-            provider: "openrouter",
-            inputCapabilities: ["text"],
-          },
+            provider: ModelProvider.OPENROUTER,
+            configured: true,
+            inputCapabilities: [InputCapability.TEXT],
+          }),
         ]}
         ollamaConnected={true}
         modelsLoadError={null}
@@ -58,7 +66,7 @@ export default function WelcomeDemo() {
         canAttachImages={false}
         attachmentsSendReady
         linkedLabel={null}
-        workspace={{ kind: "sandbox" }}
+        workspace={sandboxWorkspace()}
         onRunCommand={noop}
         onFooterHeightChange={setComposerHeight}
       />

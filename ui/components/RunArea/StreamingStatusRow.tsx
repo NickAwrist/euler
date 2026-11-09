@@ -1,10 +1,11 @@
-import type { MessageStep, TraceModalOpenPayload } from "../../types";
+import { Step_Kind } from "../../../src/gen/euler/v1/steps_pb";
+import type { Step, TraceModalOpenPayload } from "../../types";
 import { ToolIcon } from "../ToolIcon";
 import { getLiveStepMeta } from "./liveStepMeta";
 
 type Props = {
-  streamingStep: MessageStep | null;
-  streamingSteps: MessageStep[];
+  streamingStep: Step | null;
+  streamingSteps: Step[];
   streamingContent: string;
   streamingThinking: string;
   onViewSteps: (payload: TraceModalOpenPayload) => void;
@@ -40,7 +41,7 @@ export function StreamingStatusRow({
           <span className="font-medium text-foreground">{liveMeta.label}</span>
           {liveMeta.detail && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-border-subtle bg-transparent px-2 py-[3px] text-[0.6875rem] font-medium text-foreground">
-              {streamingStep?.kind === "tool_call" && (
+              {streamingStep?.kind === Step_Kind.TOOL_CALL && (
                 <ToolIcon
                   name={streamingStep.toolName}
                   icons={streamingStep.toolIcons}
@@ -60,7 +61,7 @@ export function StreamingStatusRow({
           <span className="font-medium">{liveMeta.label}</span>
           {liveMeta.detail && (
             <span className="inline-flex items-center gap-1.5 rounded-md border border-border-subtle bg-transparent px-2 py-[3px] text-[0.6875rem] font-medium text-foreground">
-              {streamingStep?.kind === "tool_call" && (
+              {streamingStep?.kind === Step_Kind.TOOL_CALL && (
                 <ToolIcon
                   name={streamingStep.toolName}
                   icons={streamingStep.toolIcons}

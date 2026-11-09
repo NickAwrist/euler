@@ -83,12 +83,3 @@ export function switchUserId(value: string): boolean {
 export function resetFallbackUserIdForTests(): void {
   fallbackUserId = null;
 }
-
-export function userScopedFetch(
-  input: RequestInfo | URL,
-  init: RequestInit = {},
-): Promise<Response> {
-  const headers = new Headers(init.headers);
-  headers.set(USER_ID_HEADER, getOrCreateUserId());
-  return fetch(input, { ...init, headers });
-}

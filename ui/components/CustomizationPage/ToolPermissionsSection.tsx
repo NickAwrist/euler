@@ -1,5 +1,6 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { fromProtoRule, toProtoRule } from "../../../src/permissions/wire";
 import {
   type ToolPermissionField,
   type ToolPermissionRule,
@@ -57,9 +58,9 @@ const toolLabel = (tool: string) =>
 
 /** Per-tool rules that allow, ask, or deny calls. */
 export function ToolPermissionsSection() {
-  const [permissions, setPermissions] = useState<ToolPermissions>(
-    () => getUserPreferences().toolPermissions,
-  );
+  const [permissions, setPermissions] = useState<ToolPermissions>(() => ({
+    rules: getUserPreferences().toolPermissionRules.map(fromProtoRule),
+  }));
   const [drafts, setDrafts] = useState<ToolPermissionRule[]>([]);
   const [tools, setTools] = useState<ToolPermissionTool[] | null>(null);
   const [toolsError, setToolsError] = useState<string | null>(null);
@@ -84,8 +85,8 @@ export function ToolPermissionsSection() {
   useEffect(loadTools, [loadTools]);
 
   const save = async (rule: ToolPermissionRule) => {
-    const saved = await saveToolPermissionRule(rule);
-    setPermissions(saved.toolPermissions);
+    const saved = await saveToolPermissionRule(toProtoRule(rule));
+    setPermissions({ rules: saved.toolPermissionRules.map(fromProtoRule) });
     setDrafts((current) => current.filter((draft) => draft.id !== rule.id));
   };
 
@@ -95,7 +96,7 @@ export function ToolPermissionsSection() {
       return;
     }
     const saved = await deleteToolPermissionRule(id);
-    setPermissions(saved.toolPermissions);
+    setPermissions({ rules: saved.toolPermissionRules.map(fromProtoRule) });
   };
 
   const rules = [...permissions.rules, ...drafts];

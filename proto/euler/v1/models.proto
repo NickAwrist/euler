@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package euler.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+// The models a user can chat with, across providers.
+service ModelService {
+  rpc ListModels(ListModelsRequest) returns (ListModelsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc SetFavorite(SetFavoriteRequest) returns (SetFavoriteResponse);
+}
+
+enum ModelProvider {
+  MODEL_PROVIDER_UNSPECIFIED = 0;
+  MODEL_PROVIDER_OLLAMA = 1;
+  MODEL_PROVIDER_OPENROUTER = 2;
+  MODEL_PROVIDER_CHATGPT = 3;
+}
+
+enum InputCapability {
+  INPUT_CAPABILITY_UNSPECIFIED = 0;
+  INPUT_CAPABILITY_TEXT = 1;
+  INPUT_CAPABILITY_IMAGE = 2;
+  INPUT_CAPABILITY_FILE = 3;
+  INPUT_CAPABILITY_AUDIO = 4;
+  INPUT_CAPABILITY_VIDEO = 5;
+}
+
+// How a model thinks before answering.
+message ModelReasoning {
+  // Reasoning cannot be turned off.
+  bool mandatory = 1;
+  bool default_enabled = 2;
+  // Effort levels such as "low" or "high"; empty when reasoning is only on or off.
+  repeated string supported_efforts = 3;
+  optional string default_effort = 4;
+}
+
+message Model {
+  enum Availability {
+    AVAILABILITY_UNSPECIFIED = 0;
+    AVAILABILITY_AVAILABLE = 1;
+    AVAILABILITY_UNAVAILABLE = 2;
+    AVAILABILITY_UNVERIFIED = 3;
+  }
+  // The ID turns and settings use, such as "openrouter:anthropic/claude".
+  string id = 1;
+  string name = 2;
+  ModelProvider provider = 3;
+  // The lab or publisher that made it.
+  string lab = 4;
+  // The raw OpenRouter route.
+  optional string route = 5;
+  optional string publisher_id = 6;
+  bool favorite = 7;
+  bool is_new = 8;
+  // When OpenRouter listed it.
+  optional google.protobuf.Timestamp created = 9;
+  bool supports_tools = 10;
+  optional uint32 context_length = 11;
+  optional double prompt_price_per_million = 12;
+  optional double completion_price_per_million = 13;
+  Availability availability = 14;
+  bool configured = 15;
+  // Ollama's size on disk in bytes.
+  optional uint64 size = 16;
+  optional google.protobuf.Timestamp modified_at = 17;
+  optional string digest = 18;
+  repeated InputCapability input_capabilities = 19;
+  optional ModelReasoning reasoning = 20;
+}
+
+message ProviderStates {
+  message ChatGpt {
+    bool configured = 1;
+    optional string error = 2;
+  }
+  message Ollama {
+    bool connected = 1;
+    optional string error = 2;
+  }
+  message OpenRouter {
+    bool configured = 1;
+  }
+  ChatGpt chatgpt = 1;
+  Ollama ollama = 2;
+  OpenRouter openrouter = 3;
+}
+
+message ListModelsRequest {
+  // Use the cached OpenRouter catalog instead of refreshing it.
+  bool cached_catalog = 1;
+}
+
+message ListModelsResponse {
+  repeated Model models = 1;
+  ProviderStates providers = 2;
+}
+
+message SetFavoriteRequest {
+  ModelProvider provider = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // The provider's own ID: a raw OpenRouter route, an Ollama name, or a ChatGPT slug.
+  string model_id = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 200
+  }];
+  bool favorite = 3;
+}
+
+message SetFavoriteResponse {}

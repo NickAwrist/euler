@@ -7,6 +7,7 @@ import {
   loadAppearance,
   saveAppearance,
 } from "../../persist/appearance";
+import type { MessageFields } from "../../types";
 
 const APPEARANCE_FIELDS = [
   ["theme", "Color theme"],
@@ -16,7 +17,10 @@ const APPEARANCE_FIELDS = [
   ["shiftForChatList", "Make room for the chat list"],
   ["shiftForArtifacts", "Make room for artifacts"],
   ["sidebarAnimationMs", "Sidebar animation"],
-] as const satisfies readonly (readonly [keyof Appearance, string])[];
+] as const satisfies readonly (readonly [
+  keyof MessageFields<Appearance>,
+  string,
+])[];
 
 /** Unsaved appearance choices; they apply to the page only once saved. */
 export function useAppearanceDraft() {

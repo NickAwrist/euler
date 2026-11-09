@@ -1,5 +1,5 @@
 import type { SessionLoadState } from "../../hooks/run/runTypes";
-import type { Message, MessageStep, TraceModalOpenPayload } from "../../types";
+import type { Message, Step, TraceModalOpenPayload } from "../../types";
 
 export type RunAreaProps = {
   messages: Message[];
@@ -7,8 +7,8 @@ export type RunAreaProps = {
   sessionError: string | null;
   sessionSendReady: boolean;
   onRetryLoad: () => void;
-  streamingSteps: MessageStep[];
-  streamingStep: MessageStep | null;
+  streamingSteps: Step[];
+  streamingStep: Step | null;
   streamingContent: string;
   streamingThinking: string;
   runPending: boolean;

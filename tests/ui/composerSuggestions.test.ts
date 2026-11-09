@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test";
+import { create } from "@bufbuild/protobuf";
+import { McpToolSchema } from "../../src/gen/euler/v1/mcp_pb";
 import {
   type ComposerSuggestionContext,
   collectComposerSuggestions,
@@ -6,6 +8,7 @@ import {
   composerSuggestionSources,
   findActiveToolToken,
 } from "../../ui/components/composerSuggestions";
+import { sandboxWorkspace } from "../../ui/lib/workspace";
 
 test("tool references work inline without completing paths or URLs", () => {
   expect(findActiveToolToken("Use /echo", 9)).toEqual({
@@ -44,10 +47,15 @@ test("sources share a picker while keeping command and tool selection separate",
   const commands: string[] = [];
   const context: ComposerSuggestionContext = {
     input: "/",
-    workspace: { kind: "sandbox" },
+    workspace: sandboxWorkspace(),
     busy: false,
     skills: [],
-    tools: [{ name: "mcp__test__echo", description: "Echo text" }],
+    tools: [
+      create(McpToolSchema, {
+        name: "mcp__test__echo",
+        description: "Echo text",
+      }),
+    ],
     skillToken: null,
     toolToken: findActiveToolToken("/", 1),
     complete: ({ value }) => completions.push(value),

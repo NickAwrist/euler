@@ -1,9 +1,10 @@
+import { ApiKeyProvider } from "../../../src/gen/euler/v1/providers_pb";
 import { ApiKeySettingsCard } from "./ApiKeySettingsCard";
 import { hintClass } from "./constants";
 import { useApiKeySetting } from "./useApiKeySetting";
 
 export function WebSearchTab() {
-  const key = useApiKeySetting("brave");
+  const key = useApiKeySetting(ApiKeyProvider.BRAVE);
   return (
     <div className="space-y-4">
       <ApiKeySettingsCard

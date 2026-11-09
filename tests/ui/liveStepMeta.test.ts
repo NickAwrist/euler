@@ -1,12 +1,18 @@
 import { describe, expect, test } from "bun:test";
+import { create } from "@bufbuild/protobuf";
 import { MAIN_AGENT_NAME, SUBAGENT_NAME } from "../../src/agents/agentNames";
+import {
+  StepSchema,
+  Step_Kind,
+  Step_Status,
+} from "../../src/gen/euler/v1/steps_pb";
 import { getLiveStepMeta } from "../../ui/components/RunArea/liveStepMeta";
 
-const llmStep = {
-  kind: "llm_call",
-  status: "running",
+const llmStep = create(StepSchema, {
+  kind: Step_Kind.LLM_CALL,
+  status: Step_Status.RUNNING,
   agentName: MAIN_AGENT_NAME,
-};
+});
 
 describe("live step metadata", () => {
   test("distinguishes model initialization, reasoning, and response streaming", () => {

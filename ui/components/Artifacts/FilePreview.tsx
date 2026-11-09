@@ -1,6 +1,6 @@
 import { ArrowLeft, Code, Download, Eye } from "lucide-react";
 import { type ComponentType, useEffect, useRef, useState } from "react";
-import type { FilePreview as Preview } from "../../../src/schemas/artifacts";
+import type { ArtifactPreview as Preview } from "../../../src/gen/euler/v1/workspace_pb";
 import { downloadBlob } from "../../lib/downloadBlob";
 import { HighlightedCode } from "../HighlightedCode";
 import { IconButton } from "../IconButton";
@@ -18,7 +18,18 @@ type FileRenderer = {
 };
 function ImagePreview({ preview }: RendererProps) {
   const [failed, setFailed] = useState<Preview | null>(null);
-  if (preview.kind !== "image") return null;
+  const [src, setSrc] = useState<string | null>(null);
+  const image =
+    preview.content.case === "image" ? preview.content.value : undefined;
+  useEffect(() => {
+    if (!image) return;
+    const url = URL.createObjectURL(
+      new Blob([new Uint8Array(image.data)], { type: image.mediaType }),
+    );
+    setSrc(url);
+    return () => URL.revokeObjectURL(url);
+  }, [image]);
+  if (!image || !src) return null;
   if (failed === preview)
     return (
       <p role="alert" className="text-sm text-red-300">
@@ -28,7 +39,7 @@ function ImagePreview({ preview }: RendererProps) {
   // SVG is displayed only as an image, never inserted into the document.
   return (
     <img
-      src={`data:${preview.mediaType};base64,${preview.data}`}
+      src={src}
       alt={preview.path.split("/").pop() ?? preview.path}
       onError={() => setFailed(preview)}
       className="mx-auto max-h-[calc(100dvh-8rem)] max-w-full rounded object-contain"
@@ -36,29 +47,32 @@ function ImagePreview({ preview }: RendererProps) {
   );
 }
 const renderers: readonly FileRenderer[] = [
-  { matches: (preview) => preview.kind === "image", component: ImagePreview },
+  {
+    matches: (preview) => preview.content.case === "image",
+    component: ImagePreview,
+  },
   {
     matches: (preview) =>
-      preview.kind === "text" && /\.html?$/i.test(preview.path),
+      preview.content.case === "text" && /\.html?$/i.test(preview.path),
     component: ({ preview }) =>
-      preview.kind === "text" ? (
+      preview.content.case === "text" ? (
         <iframe
           title={`HTML preview: ${preview.path}`}
           sandbox=""
           referrerPolicy="no-referrer"
           // Apply policy before any artifact markup. Keep styles inside the
           // frame and prevent resource requests to the app or external sites.
-          srcDoc={`<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'">${preview.content}`}
+          srcDoc={`<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'">${preview.content.value}`}
           className="block h-full min-h-80 w-full border-0 bg-white"
         />
       ) : null,
   },
   {
     matches: (preview) =>
-      preview.kind === "text" && /\.(md|markdown)$/i.test(preview.path),
+      preview.content.case === "text" && /\.(md|markdown)$/i.test(preview.path),
     component: ({ preview }) =>
-      preview.kind === "text" ? (
-        <MarkdownMessage>{preview.content}</MarkdownMessage>
+      preview.content.case === "text" ? (
+        <MarkdownMessage>{preview.content.value}</MarkdownMessage>
       ) : null,
   },
 ];
@@ -141,7 +155,7 @@ export function FilePreview({
         <span className="min-w-0 flex-1 truncate text-xs" title={path}>
           {path}
         </span>
-        {Renderer && preview?.kind === "text" && (
+        {Renderer && preview?.content.case === "text" && (
           <IconButton
             icon={raw ? Eye : Code}
             label={raw ? "Show rendered preview" : "Show source"}
@@ -185,10 +199,10 @@ export function FilePreview({
           <ArtifactContext.Provider value={null}>
             <Renderer preview={preview} />
           </ArtifactContext.Provider>
-        ) : preview.kind === "text" ? (
+        ) : preview.content.case === "text" ? (
           <pre className="font-mono text-xs leading-relaxed">
             <HighlightedCode
-              code={preview.content}
+              code={preview.content.value}
               language={fileLanguage(path)}
             />
           </pre>

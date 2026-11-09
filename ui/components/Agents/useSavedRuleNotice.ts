@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { ToolPermissionRule } from "../../../src/schemas/toolPermissions";
+import type { ToolPermissionRule } from "../../../src/gen/euler/v1/permissions_pb";
 import { whileRunning } from "../../lib/whileRunning";
 import {
   deleteToolPermissionRule,

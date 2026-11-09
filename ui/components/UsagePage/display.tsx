@@ -1,14 +1,14 @@
 import { ProviderIcon } from "../ModelSelectBar";
 import { modelProviderId as provider, providerIcons } from "../modelProviders";
-export const number = (n: number | null) =>
-  n === null
+export const number = (n: number | null | undefined) =>
+  n == null
     ? "Not reported"
     : Intl.NumberFormat("en", {
         notation: "compact",
         maximumSignificantDigits: 3,
       }).format(n);
-export const money = (n: number | null) =>
-  n === null
+export const money = (n: number | null | undefined) =>
+  n == null
     ? "Not reported"
     : Intl.NumberFormat("en-US", {
         style: "currency",

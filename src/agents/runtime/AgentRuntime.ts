@@ -11,7 +11,8 @@ import {
   truncateSessionMessages,
 } from "../../db/sessions";
 import { envConfig } from "../../env";
-import { type Unsequenced, eventHub } from "../../events/eventHub";
+import { eventHub } from "../../events/eventHub";
+import type { Activation, AgentEvent } from "../../events/types";
 import { JobManager } from "../../jobs/JobManager";
 import { OperationError } from "../../observability/errors";
 import { logEvent, withBackgroundLogContext } from "../../observability/logger";
@@ -25,7 +26,6 @@ import {
   isFinalAgent,
   isWorkingAgent,
 } from "../../schemas/agents";
-import type { Activation } from "../../schemas/events";
 import type { DisplayIcon } from "../../schemas/icons";
 import type { WireMessageInput } from "../../schemas/run";
 import type { BaseTool } from "../../tools/BaseTool";
@@ -64,9 +64,22 @@ export class AgentRuntime {
     private readonly maxRunningPerOwner = envConfig.maxRunningAgents,
   ) {}
   readonly store = new AgentStore();
-  readonly approvals = new ToolApprovalCoordinator((owner, sessionId) =>
-    this.resync(owner, sessionId),
-  );
+  readonly approvals = new ToolApprovalCoordinator({
+    requested: (owner, approval) =>
+      this.emit(owner, {
+        type: "approval_requested",
+        sessionId: approval.sessionId,
+        agentId: approval.agentId,
+        approval,
+      }),
+    resolved: (owner, approval) =>
+      this.emit(owner, {
+        type: "approval_resolved",
+        sessionId: approval.sessionId,
+        agentId: approval.agentId,
+        approvalId: approval.id,
+      }),
+  });
   readonly jobs = new JobManager({
     position: (id) => this.transcriptLength(id),
     blocked: (id) => this.isChanging(id),
@@ -175,7 +188,7 @@ export class AgentRuntime {
   private atomically<T>(sessionId: string, write: () => T): T {
     return this.transactions.run(write, this.store.checkpoint(sessionId));
   }
-  private emit(owner: string, event: Unsequenced) {
+  private emit(owner: string, event: AgentEvent) {
     const snapshot = structuredClone(event);
     this.transactions.defer(() => eventHub.publish(owner, snapshot));
   }

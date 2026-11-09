@@ -1,5 +1,6 @@
 import { ArrowLeft } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { ApiKeyProvider } from "../../src/gen/euler/v1/providers_pb";
 import { useSavedDraft } from "../hooks/useSavedDraft";
 import { changedFields } from "../lib/changedFields";
 import { effectiveDefaultRunModel } from "../lib/defaultModel";
@@ -90,7 +91,7 @@ export function Onboarding({
   const ollamaDraft = useOllamaDraft(ollama.host, ollama.connected);
   const defaultModel = useSavedDraft(settings.defaultModel);
   const comfy = useComfyUIDraft(comfyui, comfyui.connected);
-  const braveKey = useApiKeySetting("brave");
+  const braveKey = useApiKeySetting(ApiKeyProvider.BRAVE);
   useEffect(() => {
     heading.current?.focus();
   }, [step]);

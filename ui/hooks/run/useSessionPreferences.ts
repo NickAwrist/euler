@@ -9,6 +9,7 @@ import {
 } from "react";
 import { effectiveDefaultRunModel } from "../../lib/defaultModel";
 import { whileRunning } from "../../lib/whileRunning";
+import { sandboxWorkspace } from "../../lib/workspace";
 import {
   fetchSession,
   linkSessionWorkspace,
@@ -49,9 +50,8 @@ export function useSessionPreferences({
   const thinkingEffort = Object.hasOwn(thinkingPreferences, selectedModel)
     ? (thinkingPreferences[selectedModel] ?? null)
     : null;
-  const [workspace, setWorkspace] = useState<SessionWorkspace>({
-    kind: "sandbox",
-  });
+  const [workspace, setWorkspace] =
+    useState<SessionWorkspace>(sandboxWorkspace);
   const returningToSandboxRef = useRef(false);
 
   useEffect(() => {

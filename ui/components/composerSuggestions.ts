@@ -1,7 +1,7 @@
 import { BookOpen, Command, type LucideIcon, Plug } from "lucide-react";
-import type { DisplayIcon } from "../../src/schemas/icons";
-import type { McpToolData } from "../../src/schemas/mcp";
-import type { SkillData } from "../persist/skills";
+import type { DisplayIcon } from "../../src/gen/euler/v1/common_pb";
+import type { McpTool } from "../persist/mcpServers";
+import type { Skill } from "../persist/skills";
 import type { SessionWorkspace } from "../types";
 import { type RunCommandName, matchingRunCommands } from "./runCommands";
 import { type ActiveSkillToken, completeSkillToken } from "./skillPicker";
@@ -20,8 +20,8 @@ export interface ComposerSuggestionContext {
   input: string;
   workspace: SessionWorkspace;
   busy: boolean;
-  skills: readonly SkillData[];
-  tools: readonly McpToolData[];
+  skills: readonly Skill[];
+  tools: readonly McpTool[];
   skillToken: ActiveSkillToken | null;
   toolToken: ReturnType<typeof findActiveToolToken>;
   complete: (completion: { value: string; caret: number }) => void;
@@ -53,7 +53,7 @@ export const composerSuggestionSources: readonly ComposerSuggestionSource[] = [
         ? skills
             .filter(
               (skill) =>
-                skill.user_invocable && skill.name.startsWith(skillToken.query),
+                skill.userInvocable && skill.name.startsWith(skillToken.query),
             )
             .slice(0, 8)
             .map((skill) => ({

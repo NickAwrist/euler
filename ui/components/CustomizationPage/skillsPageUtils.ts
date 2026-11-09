@@ -3,7 +3,7 @@ import {
   SkillWriteSchema,
   normalizeSkillName,
 } from "../../../src/schemas/skills";
-import type { SkillData, SkillWriteBody } from "../../persist/skills";
+import type { Skill, SkillWriteBody } from "../../persist/skills";
 
 export type SkillEditorErrors = Partial<Record<keyof SkillWriteBody, string>>;
 
@@ -17,13 +17,13 @@ export function emptySkillEditor(): SkillWriteBody {
   };
 }
 
-export function editorFromSkill(skill: SkillData): SkillWriteBody {
+export function editorFromSkill(skill: Skill): SkillWriteBody {
   return {
     name: skill.name,
     description: skill.description,
     instructions: skill.instructions,
-    user_invocable: skill.user_invocable,
-    disable_model_invocation: skill.disable_model_invocation,
+    user_invocable: skill.userInvocable,
+    disable_model_invocation: skill.disableModelInvocation,
   };
 }
 

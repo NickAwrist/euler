@@ -1,5 +1,4 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
-import type { ComfyUIConfigResponse } from "../../../src/schemas/comfyui";
 import { saveComfyUIConfig } from "../../persist/comfyui";
 import { saveOllamaConfig } from "../../persist/services";
 import {
@@ -7,14 +6,18 @@ import {
   loadUserSettings,
   updateUserSettings,
 } from "../../persist/userSettings";
-import type { ComfyUIConfigPayload, Personalization } from "../../types";
+import type {
+  ComfyUIConfigPayload,
+  ComfyUIConfigState,
+  Personalization,
+} from "../../types";
 
 export function useSettings(
   setOllamaHost: (host: string) => void,
   fetchOllamaHealth: () => Promise<void>,
   refreshOllamaModels: () => Promise<void>,
   fetchComfyUIHealth: () => Promise<void>,
-  applyComfyConfigResponse: (data: ComfyUIConfigResponse) => void,
+  applyComfyConfigResponse: (data: ComfyUIConfigState) => void,
 ) {
   const [userSettings, setUserSettings] = useState<UserSettings>(() =>
     loadUserSettings(),

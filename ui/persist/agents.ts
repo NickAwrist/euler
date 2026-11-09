@@ -1,67 +1,85 @@
-import { z } from "zod";
-import { AgentSchema, InboxMessageSchema } from "../../src/schemas/agents";
-import { ActivationSchema } from "../../src/schemas/events";
-import { JobSchema } from "../../src/schemas/jobs";
-import { WireMessageSchema, WireStepSchema } from "../../src/schemas/run";
-import {
-  type ToolApprovalResponse,
-  ToolApprovalResultSchema,
-  ToolApprovalSchema,
-} from "../../src/schemas/toolPermissions";
-import { apiJson, apiVoid } from "../lib/api";
-export const runtimePath = (id: string) =>
-  `/api/sessions/${encodeURIComponent(id)}`;
-export const RuntimeSnapshotSchema = z.object({
-  sequence: z.number(),
-  agents: z.array(AgentSchema),
-  jobs: z.array(JobSchema).default([]),
-  activation: ActivationSchema.nullable(),
-  queued: z.array(InboxMessageSchema),
-  held: z.boolean(),
-  history: z.array(WireMessageSchema).optional(),
-  approvals: z.array(ToolApprovalSchema).default([]),
-});
-export type RuntimeSnapshot = z.infer<typeof RuntimeSnapshotSchema>;
-export async function fetchRuntime(id: string) {
-  return RuntimeSnapshotSchema.parse(
-    await apiJson(`${runtimePath(id)}/runtime`),
-  );
+import type { MessageInitShape } from "@bufbuild/protobuf";
+import type {
+  GetRuntimeResponse,
+  TurnSettingsSchema,
+} from "../../src/gen/euler/v1/agent_pb";
+import type { ApprovalDecision } from "../../src/gen/euler/v1/permissions_pb";
+import type { MessageVersion } from "../../src/gen/euler/v1/sessions_pb";
+import { agentClient, sessionClient } from "../lib/rpc";
+import type { MessageFields } from "../types";
+
+/** A chat's live state, as of the event sequence it carries. */
+export type RuntimeSnapshot = MessageFields<GetRuntimeResponse>;
+export type TurnSettings = MessageInitShape<typeof TurnSettingsSchema>;
+
+export async function fetchRuntime(
+  sessionId: string,
+): Promise<RuntimeSnapshot> {
+  return agentClient.getRuntime({ sessionId });
 }
-export function agentAction(id: string, action: string, json: unknown = {}) {
-  return apiVoid(`${runtimePath(id)}/${action}`, {
-    method: "POST",
-    json,
-  });
-}
-export async function fetchAgent(id: string, agentId: string) {
-  return z
-    .object({
-      agent: AgentSchema,
-      steps: z.array(WireStepSchema),
-      messages: z.array(InboxMessageSchema),
-    })
-    .parse(
-      await apiJson(`${runtimePath(id)}/agents/${encodeURIComponent(agentId)}`),
-    );
-}
-export function cancelAgent(id: string, agentId: string) {
-  return agentAction(id, `agents/${encodeURIComponent(agentId)}/cancel`);
-}
-export function removeQueuedMessage(id: string, messageId: number) {
-  return apiVoid(`${runtimePath(id)}/messages/${messageId}`, {
-    method: "DELETE",
+
+export async function sendMessage(
+  sessionId: string,
+  content: string,
+  attachmentIds: string[],
+  settings: TurnSettings,
+) {
+  await agentClient.sendMessage({
+    sessionId,
+    content,
+    attachmentIds,
+    settings,
   });
 }
 
-export async function respondToToolApproval(
-  id: string,
-  approvalId: string,
-  decision: ToolApprovalResponse["decision"],
+/** Runs the user message at `position` again, keeping earlier replies as versions. */
+export async function rewindTo(
+  sessionId: string,
+  position: number,
+  content: string,
+  versions: MessageVersion[] | undefined,
+  settings: TurnSettings,
 ) {
-  return ToolApprovalResultSchema.parse(
-    await apiJson(
-      `${runtimePath(id)}/approvals/${encodeURIComponent(approvalId)}`,
-      { method: "POST", json: { decision } },
-    ),
-  );
+  await agentClient.rewind({
+    sessionId,
+    position,
+    content,
+    versions,
+    settings,
+  });
+}
+
+export async function stopTurn(sessionId: string) {
+  await agentClient.stop({ sessionId });
+}
+
+export async function deliverQueued(sessionId: string) {
+  await agentClient.deliver({ sessionId });
+}
+
+export async function markSessionViewed(sessionId: string) {
+  await sessionClient.markViewed({ id: sessionId });
+}
+
+export async function fetchAgent(sessionId: string, agentId: string) {
+  return agentClient.getAgent({ sessionId, agentId });
+}
+
+export async function cancelAgent(sessionId: string, agentId: string) {
+  await agentClient.cancelAgent({ sessionId, agentId });
+}
+
+export async function removeQueuedMessage(
+  sessionId: string,
+  messageId: bigint,
+) {
+  await agentClient.removeQueued({ sessionId, messageId });
+}
+
+export async function respondToToolApproval(
+  sessionId: string,
+  approvalId: string,
+  decision: ApprovalDecision,
+) {
+  return agentClient.respondToApproval({ sessionId, approvalId, decision });
 }

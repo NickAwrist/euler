@@ -1,44 +1,26 @@
-import {
-  type CreateSessionBody,
-  type CreatedSession,
-  CreatedSessionSchema,
-  type StoredRunSession as SchemaStoredRunSession,
-  type SessionSummary,
-  SessionSummaryListSchema,
-  type SessionWorkspace,
-  StoredRunSessionSchema,
-  WorkspaceResponseSchema,
-} from "../../src/schemas/sessions";
-import { WorkspaceFilesResponseSchema } from "../../src/schemas/workspace";
-import { apiBlob, apiJson, apiVoid } from "../lib/api";
-import type { Message, WorkspaceFile } from "../types";
+import type {
+  CreateSessionResponse,
+  Session,
+  SessionSummary,
+  SessionWorkspace,
+} from "../../src/gen/euler/v1/sessions_pb";
+import type { WorkspaceFile } from "../../src/gen/euler/v1/workspace_pb";
+import { isNotFound, sessionClient, workspaceClient } from "../lib/rpc";
 
-export type StoredRunSession = Omit<
-  SchemaStoredRunSession,
-  "history" | "workspace"
-> & {
-  history: Message[];
-  workspace?: SessionWorkspace;
-};
-export type { SessionSummary, SessionWorkspace };
+export type { Session, SessionSummary, SessionWorkspace };
 
+/** The user's chats, most recently updated first. */
 export async function fetchSessionSummaries(): Promise<SessionSummary[]> {
-  const data = await apiJson<unknown>("/api/sessions");
-  const parsed = SessionSummaryListSchema.safeParse(data);
-  if (!parsed.success) return [];
-  return [...parsed.data.sessions].sort((a, b) => b.updatedAt - a.updatedAt);
+  return (await sessionClient.listSessions({})).sessions;
 }
 
-const inFlightSessionFetches = new Map<
-  string,
-  Promise<StoredRunSession | null>
->();
+const inFlightSessionFetches = new Map<string, Promise<Session | null>>();
 
 // Stream completion must bypass any navigation snapshot requested before the run finished.
 export function fetchSession(
   id: string,
   options?: { fresh?: boolean },
-): Promise<StoredRunSession | null> {
+): Promise<Session | null> {
   const pending = inFlightSessionFetches.get(id);
   if (pending && !options?.fresh) return pending;
   const request = fetchSessionData(id).finally(() => {
@@ -49,140 +31,99 @@ export function fetchSession(
   return request;
 }
 
-async function fetchSessionData(id: string): Promise<StoredRunSession | null> {
-  const s = await apiJson<unknown>(`/api/sessions/${encodeURIComponent(id)}`, {
-    notFound: "null",
-  });
-  if (!s) return null;
-  const parsed = StoredRunSessionSchema.safeParse(s);
-  if (parsed.success) return parsed.data as StoredRunSession;
-  if (typeof s === "object" && s !== null) {
-    const raw = s as Record<string, unknown>;
-    return {
-      id: String(raw.id ?? ""),
-      createdAt: Number(raw.createdAt) || 0,
-      updatedAt: Number(raw.updatedAt) || 0,
-      customTitle: raw.customTitle == null ? null : String(raw.customTitle),
-      history: Array.isArray(raw.history) ? (raw.history as Message[]) : [],
-      modelMessages:
-        raw.modelMessages === null || raw.modelMessages === undefined
-          ? null
-          : Array.isArray(raw.modelMessages)
-            ? (raw.modelMessages as Array<Record<string, unknown>>)
-            : null,
-      model: raw.model == null ? null : String(raw.model),
-      workspace:
-        raw.workspace &&
-        typeof raw.workspace === "object" &&
-        (raw.workspace as { kind?: unknown }).kind === "local"
-          ? {
-              kind: "local",
-              path: String((raw.workspace as { path?: unknown }).path ?? ""),
-              label: String((raw.workspace as { label?: unknown }).label ?? ""),
-            }
-          : { kind: "sandbox" },
-      expiresAt: typeof raw.expiresAt === "number" ? raw.expiresAt : null,
-    };
+async function fetchSessionData(id: string): Promise<Session | null> {
+  try {
+    return (await sessionClient.getSession({ id })).session ?? null;
+  } catch (error) {
+    if (isNotFound(error)) return null;
+    throw error;
   }
-  return null;
 }
 
 export async function createSessionApi(opts: {
   model?: string | null;
   ephemeral?: boolean;
-}): Promise<CreatedSession> {
-  const body: CreateSessionBody = {};
-  if (opts.model?.trim()) body.model = opts.model.trim();
-  if (opts.ephemeral) body.ephemeral = true;
-  return CreatedSessionSchema.parse(
-    await apiJson<unknown>("/api/sessions", {
-      method: "POST",
-      json: body,
-    }),
-  );
+}): Promise<CreateSessionResponse> {
+  return sessionClient.createSession({
+    model: opts.model?.trim() || undefined,
+    ephemeral: opts.ephemeral ?? false,
+  });
 }
 
-export function patchSessionApi(
+/** Renames the chat or changes its model; an empty value clears it. */
+export async function patchSessionApi(
   id: string,
-  body: Record<string, unknown>,
+  patch: { customTitle?: string | null; model?: string | null },
 ): Promise<void> {
-  return apiVoid(`/api/sessions/${encodeURIComponent(id)}`, {
-    method: "PATCH",
-    json: body,
+  await sessionClient.updateSession({
+    id,
+    ...(patch.customTitle === undefined
+      ? {}
+      : { customTitle: patch.customTitle ?? "" }),
+    ...(patch.model === undefined ? {} : { model: patch.model ?? "" }),
   });
 }
 
-export function deleteSessionApi(id: string): Promise<void> {
-  return apiVoid(`/api/sessions/${encodeURIComponent(id)}`, {
-    method: "DELETE",
-    notFound: "null",
-  });
+export async function deleteSessionApi(id: string): Promise<void> {
+  try {
+    await sessionClient.deleteSession({ id });
+  } catch (error) {
+    if (!isNotFound(error)) throw error;
+  }
 }
-
-const workspacePath = (id: string) =>
-  `/api/sessions/${encodeURIComponent(id)}/workspace`;
 
 export async function selectSessionDirectory(
-  id: string,
+  sessionId: string,
   path: string,
 ): Promise<SessionWorkspace> {
-  return WorkspaceResponseSchema.parse(
-    await apiJson(`${workspacePath(id)}/select-directory`, {
-      method: "POST",
-      json: { path },
-    }),
-  ).workspace;
+  return (await workspaceClient.selectDirectory({ sessionId, path }))
+    .workspace!;
 }
 
 export async function linkSessionWorkspace(
-  id: string,
+  sessionId: string,
   sourceSessionId: string,
 ): Promise<SessionWorkspace> {
-  return WorkspaceResponseSchema.parse(
-    await apiJson(`${workspacePath(id)}/link`, {
-      method: "POST",
-      json: { sessionId: sourceSessionId },
-    }),
-  ).workspace;
+  return (await workspaceClient.linkWorkspace({ sessionId, sourceSessionId }))
+    .workspace!;
 }
 
 export async function switchSessionToSandbox(
-  id: string,
+  sessionId: string,
 ): Promise<SessionWorkspace> {
-  await apiVoid(`${workspacePath(id)}/use-sandbox`, {
-    method: "POST",
-  });
-  return { kind: "sandbox" };
+  return (await workspaceClient.useSandbox({ sessionId })).workspace!;
 }
 
 export async function fetchWorkspaceFiles(
-  id: string,
+  sessionId: string,
   query?: string,
   signal?: AbortSignal,
 ): Promise<WorkspaceFile[]> {
-  return WorkspaceFilesResponseSchema.parse(
-    await apiJson(
-      `${workspacePath(id)}/files${query === undefined ? "" : `?q=${encodeURIComponent(query)}`}`,
-      { signal },
-    ),
-  ).files;
+  return (await workspaceClient.listFiles({ sessionId, query }, { signal }))
+    .files;
 }
 
+/** Assembles a streamed workspace file into a Blob. */
 export async function downloadWorkspaceFile(
   sessionId: string,
-  filePath: string,
+  path: string,
+  signal?: AbortSignal,
 ): Promise<Blob> {
-  return apiBlob(
-    `${workspacePath(sessionId)}/file?path=${encodeURIComponent(filePath)}`,
-  );
+  const parts: Uint8Array<ArrayBuffer>[] = [];
+  let type = "application/octet-stream";
+  for await (const { part } of workspaceClient.downloadFile(
+    { sessionId, path },
+    { signal },
+  )) {
+    if (part.case === "info") type = part.value.mediaType || type;
+    if (part.case === "chunk") parts.push(new Uint8Array(part.value));
+  }
+  return new Blob(parts, { type });
 }
 
-export function revealWorkspaceFile(
+export async function revealWorkspaceFile(
   sessionId: string,
-  filePath: string,
+  path: string,
 ): Promise<void> {
-  return apiVoid(`${workspacePath(sessionId)}/reveal`, {
-    method: "POST",
-    json: { path: filePath },
-  });
+  await workspaceClient.revealFile({ sessionId, path });
 }

@@ -1,13 +1,15 @@
 import { CircleAlert } from "lucide-react";
-import { type Agent, isFinalAgent } from "../../../src/schemas/agents";
+import { type Agent, Agent_Status } from "../../../src/gen/euler/v1/agent_pb";
+import { isFinalAgent } from "../../lib/agentStatus";
 
-const STATUS_LABELS: Record<Agent["status"], string> = {
-  queued: "Queued",
-  running: "Working",
-  waiting: "Waiting for parent",
-  idle: "Ready",
-  completed: "Done",
-  cancelled: "Stopped",
+const STATUS_LABELS: Record<Agent_Status, string> = {
+  [Agent_Status.UNSPECIFIED]: "",
+  [Agent_Status.QUEUED]: "Queued",
+  [Agent_Status.RUNNING]: "Working",
+  [Agent_Status.WAITING]: "Waiting for parent",
+  [Agent_Status.IDLE]: "Ready",
+  [Agent_Status.COMPLETED]: "Done",
+  [Agent_Status.CANCELLED]: "Stopped",
 };
 
 export function AgentStatus({ agent }: { agent: Agent }) {

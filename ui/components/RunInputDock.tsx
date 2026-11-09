@@ -20,8 +20,9 @@ import { useComposerSuggestions } from "../hooks/useComposerSuggestions";
 import { useListNavigation } from "../hooks/useListNavigation";
 import { useWorkspaceFileSuggestions } from "../hooks/useWorkspaceFileSuggestions";
 import { hasConfigurableThinking } from "../lib/thinkingLevel";
+import { localWorkspace } from "../lib/workspace";
 import { cx } from "../styles";
-import type { MessageStep, ModelOption, SessionWorkspace } from "../types";
+import type { ModelOption, SessionWorkspace, Step } from "../types";
 import { IconButton } from "./IconButton";
 import { ModelSelectBar } from "./ModelSelectBar";
 import { FilePicker } from "./RunArea/FilePicker";
@@ -85,8 +86,8 @@ export function RunInputDock({
   onSendMessage: (e: React.FormEvent) => void;
   onStopGeneration: () => void;
   runPending: boolean;
-  streamingStep: MessageStep | null;
-  streamingSteps: MessageStep[];
+  streamingStep: Step | null;
+  streamingSteps: Step[];
   modelSendReady: boolean;
   pendingImages: Array<{ id: string; file: File; previewUrl: string }>;
   imageError: string | null;
@@ -121,6 +122,7 @@ export function RunInputDock({
     (model) => model.id === selectedModel,
   );
   const canSend = modelSendReady && attachmentsSendReady;
+  const local = localWorkspace(workspace);
   const activeFileToken = filePickerDismissed
     ? null
     : findActiveFileToken(input, caretIndex);
@@ -223,11 +225,11 @@ export function RunInputDock({
           : "bottom-0 border-border-subtle/60 bg-background/[0.16] shadow-[0_-1px_0_0_rgba(255,255,255,0.03)] backdrop-blur-xl backdrop-saturate-125",
       )}
     >
-      {workspace.kind === "local" && (
+      {local && (
         <div className="pointer-events-auto flex w-full max-w-[var(--chat-width)] items-center gap-2 px-1 text-xs text-muted-foreground">
           <Folder size={13} />
-          <span className="min-w-0 truncate" title={workspace.path}>
-            Working in {workspace.label}
+          <span className="min-w-0 truncate" title={local.path}>
+            Working in {local.label}
           </span>
         </div>
       )}

@@ -1,81 +1,119 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { isWorkingAgent } from "../../../src/schemas/agents";
-import type { AgentEvent } from "../../../src/schemas/events";
-import type { ToolApproval } from "../../../src/schemas/toolPermissions";
+import {
+  Agent_Kind,
+  InboxMessage_Kind,
+} from "../../../src/gen/euler/v1/agent_pb";
+import type { Event } from "../../../src/gen/euler/v1/events_pb";
+import type { ToolApproval } from "../../../src/gen/euler/v1/permissions_pb";
+import { Message_Role } from "../../../src/gen/euler/v1/sessions_pb";
+import { Step_Kind, Step_Status } from "../../../src/gen/euler/v1/steps_pb";
+import { isWorkingAgent } from "../../lib/agentStatus";
 import {
   type RuntimeSnapshot,
-  agentAction,
   fetchRuntime,
+  markSessionViewed,
 } from "../../persist/agents";
 import { subscribeEvents } from "../../persist/events";
-import type { Message, MessageStep } from "../../types";
+import type { Message } from "../../types";
 import { type AgentPhases, nextAgentPhases } from "./agentPhases";
 
 const empty = (): RuntimeSnapshot => ({
   agents: [],
   jobs: [],
-  activation: null,
+  activation: undefined,
   queued: [],
   held: false,
   history: [],
   approvals: [],
-  sequence: 0,
+  sequence: 0n,
 });
-// Snapshots parse a fresh empty list; one shared value keeps the approvals prop stable.
+// Snapshots decode a fresh empty list; one shared value keeps the approvals prop stable.
 const noApprovals: ToolApproval[] = [];
-function applyEvent(
+export function applyEvent(
   state: RuntimeSnapshot,
-  event: AgentEvent,
+  event: Event,
 ): RuntimeSnapshot {
   if (event.sequence <= state.sequence) return state;
   const next = { ...state, sequence: event.sequence };
-  const main = state.agents.find((a) => a.kind === "main");
-  if (event.type === "agent_status") {
-    next.agents = [
-      ...state.agents.filter((a) => a.id !== event.agent.id),
-      event.agent,
-    ];
-    if (event.agent.kind === "main") next.held = event.agent.held;
-  }
-  if (event.type === "activation_started" && event.agentId === main?.id)
-    next.activation = event.activation;
-  if (event.type === "delta" && event.activationId === state.activation?.id)
-    next.activation = {
-      ...state.activation,
-      content: state.activation.content + event.contentDelta,
-      thinking: state.activation.thinking + event.thinkingDelta,
-    };
-  if (event.type === "step" && event.activationId === state.activation?.id) {
-    const steps = [...state.activation.steps];
-    steps[event.position] = event.step;
-    next.activation = {
-      ...state.activation,
-      steps,
-      ...(event.step.kind === "llm_call" && event.step.status === "running"
-        ? { content: "", thinking: "" }
-        : {}),
-    };
-  }
-  if (
-    event.type === "activation_ended" &&
-    event.activationId === state.activation?.id
-  )
-    next.activation = null;
-  if (event.type === "inbox_queued" && event.agentId === main?.id)
-    next.queued = [
-      ...state.queued,
-      ...event.messages.filter((m) => m.kind === "user"),
-    ];
-  if (event.type === "transcript_appended") {
-    next.history = [...(state.history ?? []), event.message];
-    if (event.message.role === "user") next.queued = state.queued.slice(1);
-    if (state.activation)
+  const main = state.agents.find((a) => a.kind === Agent_Kind.MAIN);
+  const { payload } = event;
+  const activation = state.activation;
+  switch (payload.case) {
+    case "agentStatus": {
+      const agent = payload.value.agent;
+      if (!agent) break;
+      next.agents = [...state.agents.filter((a) => a.id !== agent.id), agent];
+      if (agent.kind === Agent_Kind.MAIN) next.held = agent.held;
+      break;
+    }
+    case "activationStarted":
+      if (event.agentId === main?.id)
+        next.activation = payload.value.activation;
+      break;
+    case "delta":
+      if (activation && payload.value.activationId === activation.id)
+        next.activation = {
+          ...activation,
+          content: activation.content + payload.value.contentDelta,
+          thinking: activation.thinking + payload.value.thinkingDelta,
+        };
+      break;
+    case "step": {
+      const { step, position } = payload.value;
+      if (!activation || !step || payload.value.activationId !== activation.id)
+        break;
+      const steps = [...activation.steps];
+      steps[position] = step;
       next.activation = {
-        ...state.activation,
-        content: "",
-        thinking: "",
-        steps: [],
+        ...activation,
+        steps,
+        ...(step.kind === Step_Kind.LLM_CALL &&
+        step.status === Step_Status.RUNNING
+          ? { content: "", thinking: "" }
+          : {}),
       };
+      break;
+    }
+    case "activationEnded":
+      if (payload.value.activationId === activation?.id)
+        next.activation = undefined;
+      break;
+    case "inboxQueued":
+      if (event.agentId === main?.id)
+        next.queued = [
+          ...state.queued,
+          ...payload.value.messages.filter(
+            (m) => m.kind === InboxMessage_Kind.USER,
+          ),
+        ];
+      break;
+    case "transcriptAppended": {
+      const message = payload.value.message;
+      if (!message) break;
+      next.history = [...state.history, message];
+      if (message.role === Message_Role.USER)
+        next.queued = state.queued.slice(1);
+      if (activation)
+        next.activation = {
+          ...activation,
+          content: "",
+          thinking: "",
+          steps: [],
+        };
+      break;
+    }
+    case "approvalRequested": {
+      const approval = payload.value.approval;
+      if (approval && !state.approvals.some((a) => a.id === approval.id))
+        next.approvals = [...state.approvals, approval];
+      break;
+    }
+    case "approvalResolved":
+      if (state.approvals.some((a) => a.id === payload.value.approvalId))
+        next.approvals = state.approvals.filter(
+          (a) => a.id !== payload.value.approvalId,
+        );
+      break;
   }
   return next;
 }
@@ -89,7 +127,7 @@ export function useAgentEvents(
   const [phases, setPhases] = useState<AgentPhases>({});
   const current = useRef({ sessionId, setMessages, refreshSessions });
   const views = useRef(new Map<string, RuntimeSnapshot>());
-  const recent = useRef<AgentEvent[]>([]);
+  const recent = useRef<Event[]>([]);
   const publish = (id: string, value: RuntimeSnapshot) => {
     const previous = views.current.get(id);
     views.current.set(id, value);
@@ -112,9 +150,9 @@ export function useAgentEvents(
       !previous.activation === !value.activation
     )
       return;
-    current.current.setMessages((value.history ?? []) as Message[]);
+    current.current.setMessages(value.history);
     if (document.visibilityState === "visible" && !value.activation)
-      void agentAction(id, "viewed")
+      void markSessionViewed(id)
         .then(current.current.refreshSessions)
         .catch(console.error);
   };
@@ -142,7 +180,7 @@ export function useAgentEvents(
   useEffect(() => {
     const controller = new AbortController();
     void subscribeEvents(controller.signal, (event) => {
-      if (event.type === "resync") {
+      if (event.payload.case === "resync") {
         views.current.clear();
         recent.current = [];
         setPhases({});
@@ -159,10 +197,13 @@ export function useAgentEvents(
         void refreshRef.current().catch(console.error);
       // The session list only shows whether a chat has working agents.
       const before = view?.agents.find((a) => a.id === event.agentId);
+      const { payload } = event;
       if (
-        event.type === "activation_ended" ||
-        (event.type === "agent_status" &&
-          (!before || isWorkingAgent(before) !== isWorkingAgent(event.agent)))
+        payload.case === "activationEnded" ||
+        (payload.case === "agentStatus" &&
+          payload.value.agent &&
+          (!before ||
+            isWorkingAgent(before) !== isWorkingAgent(payload.value.agent)))
       )
         void current.current.refreshSessions();
     });
@@ -176,10 +217,8 @@ export function useAgentEvents(
     document.addEventListener("visibilitychange", visible);
     return () => document.removeEventListener("visibilitychange", visible);
   }, []);
-  const steps = (state.activation?.steps ?? []).filter(
-    (step): step is Record<string, unknown> & MessageStep =>
-      typeof step?.kind === "string",
-  );
+  // A step event can fill a later position first, leaving holes until the rest arrive.
+  const steps = (state.activation?.steps ?? []).filter(Boolean);
   return {
     agents: state.agents,
     jobs: state.jobs,
@@ -188,7 +227,7 @@ export function useAgentEvents(
     held: state.held,
     approvals: state.approvals.length ? state.approvals : noApprovals,
     refresh,
-    runPending: state.activation !== null,
+    runPending: state.activation !== undefined,
     streamingContent: state.activation?.content ?? "",
     streamingThinking: state.activation?.thinking ?? "",
     streamingSteps: steps,

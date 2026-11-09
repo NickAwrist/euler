@@ -10,16 +10,20 @@
     "dev:ui": "vite",
     "build": "vite build",
     "start": "bun run src/server.ts",
-    "lint": "biome check .",
+    "lint": "biome check . && bun scripts/proto-check.ts",
     "format": "biome format --write .",
     "check": "biome check --write .",
     "test": "bun test",
     "test:browser": "bunx playwright test",
-    "perf:check": "node scripts/performance/check.mjs"
+    "perf:check": "node scripts/performance/check.mjs",
+    "proto": "PATH=\"$PWD/node_modules/.bin:$PATH\" buf generate",
+    "ios:project": "cd ios && xcodegen generate"
   },
   "devDependencies": {
     "@babel/core": "^7",
     "@biomejs/biome": "^1.9.4",
+    "@bufbuild/buf": "1.74.0",
+    "@bufbuild/protoc-gen-es": "2.16.0",
     "@playwright/test": "^1.63.0",
     "@rolldown/plugin-babel": "^0.2.4",
     "@tailwindcss/vite": "^4.2.2",
@@ -37,6 +41,12 @@
     "vite": "^8.0.8"
   },
   "dependencies": {
+    "@bufbuild/protobuf": "2.16.0",
+    "@bufbuild/protovalidate": "1.3.0",
+    "@connectrpc/connect": "2.2.0",
+    "@connectrpc/connect-express": "2.2.0",
+    "@connectrpc/connect-node": "2.2.0",
+    "@connectrpc/connect-web": "2.2.0",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "@tanstack/react-virtual": "^3.14.14",
     "cors": "^2.8.6",

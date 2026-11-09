@@ -17,7 +17,7 @@ export function AddMcpServersModal({
   onAdd,
   onClose,
 }: {
-  onAdd: (config: unknown) => Promise<void>;
+  onAdd: (config: string) => Promise<void>;
   onClose: () => void;
 }) {
   const [text, setText] = useState("");
@@ -26,9 +26,8 @@ export function AddMcpServersModal({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const submit = async () => {
-    let config: unknown;
     try {
-      config = JSON.parse(text);
+      JSON.parse(text);
     } catch {
       setError("Config is not valid JSON");
       return;
@@ -36,7 +35,7 @@ export function AddMcpServersModal({
     await whileRunning(setSaving, async () => {
       setError(null);
       try {
-        await onAdd(config);
+        await onAdd(text);
         onClose();
       } catch (addError: unknown) {
         setError(

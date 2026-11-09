@@ -1,107 +1,13 @@
 import { Readable } from "node:stream";
 import { Router } from "express";
-import {
-  ComfyUIClient,
-  getComfyUIClient,
-  getComfyUIHostConfig,
-  getResolvedComfyUIHost,
-  invalidateComfyUIClient,
-} from "../comfyui/client";
-import { setComfyUIHost } from "../db/index";
-import {
-  effectiveUserPreferences,
-  updateUserPreferences,
-} from "../db/userPreferences";
-import { envConfig } from "../env";
+import { getComfyUIClient } from "../comfyui/client";
 import { asyncRoute } from "../http/asyncRoute";
-import { canEditEnvironmentSetting } from "../http/environmentSettings";
-import { withContainerLoopbackHint } from "../models/containerNetworkHint";
 import { sendError, sendValidationError } from "../observability/http";
 import { logEvent } from "../observability/logger";
-import {
-  ComfyUIConfigPutSchema,
-  ComfyUITestBodySchema,
-  ComfyUIViewQuerySchema,
-} from "../schemas/comfyui";
-import { requireUserId } from "../userIdentity";
-import { errorMessage } from "../utils/errors";
+import { ComfyUIViewQuerySchema } from "../schemas/comfyui";
 
+/** Generated images, loaded by URL from Markdown, so they stay plain GETs. */
 const router = Router();
-
-// Checking the health of the ComfyUI server.
-router.get("/health", async (_req, res) => {
-  try {
-    const client = getComfyUIClient();
-    const result = await client.healthCheck();
-    res.json({ connected: result.ok, error: result.error });
-  } catch (e) {
-    logEvent("warn", "comfyui.unavailable", { stage: "health" }, e);
-    res.json({
-      connected: false,
-      error: errorMessage(e),
-    });
-  }
-});
-
-// Getting the user's comfyUI configuration.
-router.get("/config", (req, res) => {
-  const owner = requireUserId(req, res);
-  if (!owner) return;
-  const image = effectiveUserPreferences(owner).image;
-  res.json({ ...getComfyUIHostConfig(), ...image });
-});
-
-// Updating the user's comfyUI configuration.
-router.put("/config", (req, res) => {
-  const owner = requireUserId(req, res);
-  if (!owner) return;
-  const parsed = ComfyUIConfigPutSchema.safeParse(req.body);
-  if (!parsed.success) {
-    sendValidationError(res, parsed.error);
-    return;
-  }
-  const body = parsed.data;
-  if (body.host !== undefined) {
-    if (canEditEnvironmentSetting(envConfig.comfyuiHost, body.host)) {
-      setComfyUIHost(body.host);
-    }
-    invalidateComfyUIClient();
-  }
-  const { host: _host, ...image } = body;
-  const saved = updateUserPreferences(owner, { image });
-  res.json({ ...getComfyUIHostConfig(), ...saved.image });
-});
-
-// Testing the connection to the ComfyUI server.
-router.post("/test", async (req, res) => {
-  const parsed = ComfyUITestBodySchema.safeParse(req.body);
-  if (!parsed.success) {
-    sendValidationError(res, parsed.error);
-    return;
-  }
-  const raw = parsed.data.host?.trim() ?? "";
-  const url = raw || getResolvedComfyUIHost();
-  const client = new ComfyUIClient(url);
-  const result = await client.healthCheck();
-  res.json({
-    ok: result.ok,
-    error: result.error
-      ? withContainerLoopbackHint(result.error, url)
-      : undefined,
-  });
-});
-
-// Getting the available models from the ComfyUI server.
-router.get("/models", async (_req, res) => {
-  try {
-    const client = getComfyUIClient();
-    const models = await client.getModels();
-    res.json({ models });
-  } catch (e) {
-    logEvent("warn", "comfyui.unavailable", { stage: "models" }, e);
-    res.json({ models: [], error: errorMessage(e) });
-  }
-});
 
 // Viewing a generated image from the ComfyUI server.
 router.get(

@@ -1,5 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { InputCapability } from "../../src/models/modelCapabilities";
+import { create } from "@bufbuild/protobuf";
+import {
+  InputCapability,
+  ModelProvider,
+  ModelSchema,
+} from "../../src/gen/euler/v1/models_pb";
 import { groupModelProviders } from "../../ui/components/modelProviders";
 import type { ModelOption } from "../../ui/types";
 
@@ -9,14 +14,16 @@ describe("groupModelProviders icon mapping", () => {
     lab: string,
     route?: string,
     name = "Test Model",
-  ): ModelOption => ({
-    id: `${provider}:${route ?? lab}`,
-    name,
-    provider,
-    lab,
-    route,
-    inputCapabilities: [InputCapability.Text],
-  });
+  ): ModelOption =>
+    create(ModelSchema, {
+      id: `${provider}:${route ?? lab}`,
+      name,
+      provider:
+        provider === "ollama" ? ModelProvider.OLLAMA : ModelProvider.OPENROUTER,
+      lab,
+      route,
+      inputCapabilities: [InputCapability.TEXT],
+    });
 
   test("uses Claude icon for Anthropic", () => {
     const providers = groupModelProviders([

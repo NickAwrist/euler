@@ -1,3 +1,4 @@
+import { create } from "@bufbuild/protobuf";
 import {
   type Dispatch,
   type FormEvent,
@@ -6,9 +7,19 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ImageAttachment } from "../../../src/attachments/types";
+import { Agent_Kind } from "../../../src/gen/euler/v1/agent_pb";
+import type { ImageAttachment } from "../../../src/gen/euler/v1/attachments_pb";
+import {
+  MessageVersionSchema,
+  Message_Role,
+} from "../../../src/gen/euler/v1/sessions_pb";
+import { attachmentsOfKind } from "../../lib/attachments";
 import { whileRunning } from "../../lib/whileRunning";
-import { agentAction } from "../../persist/agents";
+import {
+  rewindTo,
+  sendMessage as sendTurn,
+  stopTurn,
+} from "../../persist/agents";
 import { buildRunMetadata } from "../../persist/userSettings";
 import type { UserSettings } from "../../persist/userSettings";
 import { useAgentEvents } from "./useAgentEvents";
@@ -16,7 +27,6 @@ import { useAgentEvents } from "./useAgentEvents";
 import type {
   DebugData,
   Message,
-  MessageStep,
   MessageVersion,
   TruncateConfirmState,
 } from "../../types";
@@ -75,18 +85,20 @@ export function useRunStreaming(p: Args) {
     };
     try {
       if (options.rewind) {
-        await agentAction(sessionId, "rewind", {
-          ...settings,
-          position: priorMessages.length,
-          content: message,
-          versions: options.versions,
-        });
+        await rewindTo(
+          sessionId,
+          priorMessages.length,
+          message,
+          options.versions,
+          settings,
+        );
       } else {
-        await agentAction(sessionId, "messages", {
-          ...settings,
-          content: message,
-          attachmentIds: attachments.map((a) => a.id),
-        });
+        await sendTurn(
+          sessionId,
+          message,
+          attachments.map((a) => a.id),
+          settings,
+        );
       }
       void events.refresh().catch(console.error);
       return true;
@@ -99,7 +111,7 @@ export function useRunStreaming(p: Args) {
   };
   const stopGeneration = () => {
     if (p.activeSessionId)
-      void agentAction(p.activeSessionId, "stop")
+      void stopTurn(p.activeSessionId)
         .then(events.refresh)
         .catch(console.error);
   };
@@ -146,16 +158,14 @@ export function useRunStreaming(p: Args) {
   ) => {
     const sessionId = p.activeSessionId;
     const row = p.messages[userIndex];
-    if (!sessionId || !p.modelSendReady || row?.role !== "user") return;
+    if (!sessionId || !p.modelSendReady || row?.role !== Message_Role.USER)
+      return;
     if (!message.trim()) return;
     return runTurn(
       sessionId,
       p.messages.slice(0, userIndex),
       message,
-      row.attachments?.filter(
-        (attachment): attachment is ImageAttachment =>
-          attachment.kind === "image",
-      ) ?? [],
+      attachmentsOfKind(row.attachments, "image"),
       { rewind: true, versions },
     );
   };
@@ -163,14 +173,15 @@ export function useRunStreaming(p: Args) {
   /** Reruns the user message before a reply and keeps the reply as a version. */
   const regenerate = async (assistantIndex: number) => {
     const reply = p.messages[assistantIndex];
-    if (reply?.role !== "assistant") return;
+    if (reply?.role !== Message_Role.ASSISTANT) return;
     const userIndex = p.messages.findLastIndex(
-      (message, index) => index < assistantIndex && message.role === "user",
+      (message, index) =>
+        index < assistantIndex && message.role === Message_Role.USER,
     );
-    const { content, steps, attachments, versions = [] } = reply;
+    const { content, steps, attachments, versions } = reply;
     await rerunFrom(userIndex, p.messages[userIndex]?.content ?? "", [
       ...versions,
-      { content, steps, attachments },
+      create(MessageVersionSchema, { content, steps, attachments }),
     ]);
   };
 
@@ -180,7 +191,8 @@ export function useRunStreaming(p: Args) {
       assistantIndex < p.messages.length - 1 ||
       events.agents.some(
         (agent) =>
-          agent.kind !== "main" && agent.spawnPosition >= assistantIndex,
+          agent.kind !== Agent_Kind.MAIN &&
+          agent.spawnPosition >= assistantIndex,
       )
     ) {
       p.setTruncateConfirm({ kind: "regenerate", assistantIndex });

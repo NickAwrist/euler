@@ -1,8 +1,11 @@
 import { Check, ChevronDown, Search, Star } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { compareModels } from "../../src/models/modelSort";
-import { modelSettingsRequest } from "../lib/modelSettingsRequest";
+import {
+  Model_Availability,
+  ModelProvider as Provider,
+} from "../../src/gen/euler/v1/models_pb";
 import { navigate } from "../lib/navigation";
+import { modelClient } from "../lib/rpc";
 import { setKeyPending, whileRunning } from "../lib/whileRunning";
 import { cx } from "../styles";
 import type { ModelOption } from "../types";
@@ -15,6 +18,7 @@ import {
 import { FavoriteButton, NewBadge } from "./ModelPreferenceControls";
 import {
   type ModelProvider,
+  compareModelOptions,
   groupModelProviders,
   modelRoute,
 } from "./modelProviders";
@@ -31,8 +35,8 @@ function isMonochromeProviderIcon(url: string): boolean {
 
 function modelDetails(model: ModelOption): string {
   const details: string[] = [];
-  const unverified = model.availability === "unverified";
-  if (model.configured === false) details.push("Setup required");
+  const unverified = model.availability === Model_Availability.UNVERIFIED;
+  if (!model.configured) details.push("Setup required");
   if (unverified) details.push("Availability unverified");
   if (model.contextLength)
     details.push(formatContextLength(model.contextLength));
@@ -43,7 +47,7 @@ function modelDetails(model: ModelOption): string {
 }
 
 function isUnconfigured(model: ModelOption): boolean {
-  return model.provider === "openrouter" && model.configured === false;
+  return model.provider === Provider.OPENROUTER && !model.configured;
 }
 
 export function ProviderIcon({ provider }: { provider: ModelProvider }) {
@@ -123,8 +127,8 @@ export function ModelSelectBar({
         id: "favorites",
         name: "Favorites",
         models: displayModels
-          .filter((model) => model.favorite && model.configured !== false)
-          .sort(compareModels),
+          .filter((model) => model.favorite && model.configured)
+          .sort(compareModelOptions),
       },
       ...groupModelProviders(displayModels),
     ],
@@ -389,7 +393,7 @@ export function ModelSelectBar({
                         [model.id]: !model.favorite,
                       }));
                       const modelId =
-                        model.provider === "ollama"
+                        model.provider === Provider.OLLAMA
                           ? model.id
                           : (model.route ?? modelRoute(model.id));
                       const favorite = !model.favorite;
@@ -397,11 +401,11 @@ export function ModelSelectBar({
                         setKeyPending(setFavoritePending, model.id),
                         async () => {
                           try {
-                            await modelSettingsRequest(
-                              "models/favorite",
-                              "PUT",
-                              { provider: model.provider, modelId, favorite },
-                            );
+                            await modelClient.setFavorite({
+                              provider: model.provider,
+                              modelId,
+                              favorite,
+                            });
                             window.dispatchEvent(
                               new Event("model-preferences-changed"),
                             );

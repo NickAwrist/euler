@@ -1,111 +1,132 @@
 import { expect, test } from "bun:test";
-import { EventEmitter } from "node:events";
-import type { Response } from "express";
-import { EventHub, type Unsequenced } from "../../src/events/eventHub";
-const queued = (sessionId: string, agentId: string): Unsequenced => ({
+import { EventHub } from "../../src/events/eventHub";
+import type { AgentEvent } from "../../src/events/types";
+import type { Event } from "../../src/gen/euler/v1/events_pb";
+
+const queued = (sessionId: string, agentId: string): AgentEvent => ({
   type: "inbox_queued",
   sessionId,
   agentId,
   messages: [],
 });
-class Client extends EventEmitter {
-  chunks: string[] = [];
-  writableEnded = false;
-  destroyed = false;
-  writableLength = 0;
-  setHeader() {}
-  flushHeaders() {}
-  write(chunk: string) {
-    if (this.writableEnded) throw new Error("write after end");
-    this.chunks.push(chunk);
-    return true;
+
+/** Reads `count` events from a subscription, then leaves it open. */
+async function take(stream: AsyncGenerator<Event>, count: number) {
+  const events: Event[] = [];
+  while (events.length < count) {
+    const next = await stream.next();
+    if (next.done) break;
+    events.push(next.value);
   }
-  end() {
-    this.writableEnded = true;
-    this.emit("close");
-  }
-  response() {
-    return this as unknown as Response;
-  }
+  return events;
 }
-test("event replay is ordered, owner scoped, and requests resync for an expired cursor", () => {
+
+test("replay is ordered, owner scoped, and resyncs an expired cursor", async () => {
   const hub = new EventHub();
   const cursor = hub.sequence("a");
   hub.publish("a", queued("chat-a", "main-a"));
   hub.publish("b", queued("chat-b", "main-b"));
   hub.publish("a", queued("chat-a", "child-a"));
-  const client = new Client();
-  hub.attach("a", client.response(), cursor);
-  expect(client.chunks).toHaveLength(2);
-  expect(client.chunks.join("")).not.toContain("chat-b");
-  expect(client.chunks[0]).toContain(`id: ${cursor + 1}`);
-  expect(client.chunks[1]).toContain(`id: ${cursor + 2}`);
-  client.end();
+  const controller = new AbortController();
+  const events = await take(hub.subscribe("a", cursor, controller.signal), 2);
+  expect(events.map((event) => event.sessionId)).toEqual(["chat-a", "chat-a"]);
+  expect(events.map((event) => Number(event.sequence))).toEqual([
+    cursor + 1,
+    cursor + 2,
+  ]);
+  expect(events[0]?.payload.case).toBe("inboxQueued");
+  controller.abort();
   for (let i = 0; i < 2001; i++) hub.publish("a", queued("chat-a", "main-a"));
-  const stale = new Client();
-  hub.attach("a", stale.response(), cursor);
-  expect(stale.chunks).toHaveLength(1);
-  expect(stale.chunks[0]).toContain('"type":"resync"');
-  stale.end();
+  const stale = new AbortController();
+  const [resync] = await take(hub.subscribe("a", cursor, stale.signal), 1);
+  expect(resync?.payload.case).toBe("resync");
+  expect(Number(resync?.sequence)).toBe(hub.sequence("a"));
+  stale.abort();
 });
 
-test("a slow client stays connected until its buffer overflows, then publishing skips it", () => {
+test("a first connection starts with a resync at the current sequence", async () => {
   const hub = new EventHub();
-  const client = new Client();
-  hub.attach("a", client.response());
-  // Backpressure alone keeps the client; "close" arrives after end.
-  client.write = (chunk: string) => {
-    if (client.writableEnded) throw new Error("write after end");
-    client.writableLength += chunk.length;
-    return false;
-  };
-  client.end = () => {
-    client.writableEnded = true;
-  };
-  const event = queued("chat-a", "main-a");
-  hub.publish("a", event);
-  expect(client.writableEnded).toBe(false);
-  client.writableLength = 1024 * 1024;
-  hub.publish("a", event);
-  expect(client.writableEnded).toBe(true);
-  expect(() => hub.publish("a", event)).not.toThrow();
+  hub.publish("a", queued("chat-a", "main-a"));
+  const controller = new AbortController();
+  const [first] = await take(hub.subscribe("a", 0, controller.signal), 1);
+  expect(first?.payload.case).toBe("resync");
+  expect(Number(first?.sequence)).toBe(hub.sequence("a"));
+  controller.abort();
 });
 
-test("a throwing client cannot interrupt delivery to healthy clients", () => {
-  const hub = new EventHub();
-  const broken = new Client();
-  const healthy = new Client();
-  hub.attach("owner", broken.response());
-  hub.attach("owner", healthy.response());
-  broken.write = () => {
-    throw new Error("socket closed");
-  };
-  Object.assign(broken, {
-    destroy: () => {
-      broken.destroyed = true;
-      broken.emit("close");
-    },
-  });
-  expect(() =>
-    hub.publish("owner", { type: "resync", sessionId: "chat", agentId: "" }),
-  ).not.toThrow();
-  expect(broken.destroyed).toBe(true);
-  expect(healthy.chunks).toHaveLength(2);
-  healthy.end();
+test("live events follow replay, and idle streams send keepalives", async () => {
+  const hub = new EventHub(20);
+  const controller = new AbortController();
+  const stream = hub.subscribe("a", hub.sequence("a"), controller.signal);
+  const pending = take(stream, 2);
+  hub.publish("a", queued("chat-a", "main-a"));
+  const [live, keepalive] = await pending;
+  expect(live?.payload.case).toBe("inboxQueued");
+  expect(keepalive?.payload.case).toBe("keepalive");
+  expect(keepalive?.sequence).toBe(0n);
+  controller.abort();
 });
 
-test("replay is bounded by size so large step events cannot grow it without limit", () => {
+test("aborting a stream unsubscribes it, even while it waits", async () => {
+  const hub = new EventHub(60_000);
+  const controller = new AbortController();
+  const stream = hub.subscribe("a", hub.sequence("a"), controller.signal);
+  const next = stream.next();
+  await Bun.sleep(0);
+  expect(hub.hasSubscribers("a")).toBe(true);
+  controller.abort();
+  expect(hub.hasSubscribers("a")).toBe(false);
+  expect((await next).done).toBe(true);
+  expect(() => hub.publish("a", queued("chat-a", "main-a"))).not.toThrow();
+});
+
+test("a slow subscriber is dropped once its pending events overflow", async () => {
+  const hub = new EventHub(60_000);
+  const controller = new AbortController();
+  const stream = hub.subscribe("a", hub.sequence("a"), controller.signal);
+  const first = stream.next();
+  hub.publish("a", queued("chat-a", "main-a"));
+  expect((await first).value?.payload.case).toBe("inboxQueued");
+  // The client stops reading while events keep arriving.
+  const large = queued("chat-a", "x".repeat(300 * 1024));
+  for (let i = 0; i < 4; i++) hub.publish("a", large);
+  // The stream ends instead of delivering, so the client reconnects with its sequence.
+  expect((await stream.next()).done).toBe(true);
+  expect(hub.hasSubscribers("a")).toBe(false);
+});
+
+test("replay is bounded by size so large step events cannot grow it without limit", async () => {
   const hub = new EventHub();
   const cursor = hub.sequence("a");
   const large = queued("chat-a", "x".repeat(1024 * 1024));
   for (let i = 0; i < 5; i++) hub.publish("a", large);
-  const stale = new Client();
-  hub.attach("a", stale.response(), cursor);
-  expect(stale.chunks).toHaveLength(1);
-  expect(stale.chunks[0]).toContain('"type":"resync"');
-  stale.end();
-  const recent = new Client();
-  hub.attach("a", recent.response(), cursor + 3);
-  expect(recent.chunks).toHaveLength(2);
-  recent.end();
+  const stale = new AbortController();
+  const [resync] = await take(hub.subscribe("a", cursor, stale.signal), 1);
+  expect(resync?.payload.case).toBe("resync");
+  stale.abort();
+  const recent = new AbortController();
+  const events = await take(hub.subscribe("a", cursor + 3, recent.signal), 2);
+  expect(events.map((event) => Number(event.sequence))).toEqual([
+    cursor + 4,
+    cursor + 5,
+  ]);
+  recent.abort();
+});
+
+test("an event that does not fit the contract becomes a resync for its chat", async () => {
+  const hub = new EventHub();
+  const cursor = hub.sequence("a");
+  hub.publish("a", {
+    type: "step",
+    sessionId: "chat-a",
+    agentId: "main-a",
+    activationId: "activation",
+    position: 0,
+    step: { kind: "unknown", status: "done", startedAt: "" },
+  });
+  const controller = new AbortController();
+  const [event] = await take(hub.subscribe("a", cursor, controller.signal), 1);
+  expect(event?.payload.case).toBe("resync");
+  expect(event?.sessionId).toBe("chat-a");
+  controller.abort();
 });

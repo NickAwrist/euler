@@ -1,4 +1,5 @@
 import { Brain, Eye, type LucideIcon, Wrench } from "lucide-react";
+import { InputCapability } from "../../src/gen/euler/v1/models_pb";
 import { cx } from "../styles";
 import type { ModelOption } from "../types";
 
@@ -17,7 +18,8 @@ const CAPABILITY_ICONS: Record<ModelCapability, LucideIcon> = {
 
 export function modelCapabilities(model: CapabilityModel): ModelCapability[] {
   const capabilities: ModelCapability[] = [];
-  if (model.inputCapabilities.includes("image")) capabilities.push("Vision");
+  if (model.inputCapabilities.includes(InputCapability.IMAGE))
+    capabilities.push("Vision");
   if (model.supportsTools) capabilities.push("Tools");
   if (model.reasoning) capabilities.push("Thinking");
   return capabilities;

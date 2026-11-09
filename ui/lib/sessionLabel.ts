@@ -1,4 +1,5 @@
 import type { SessionSummary, SessionWorkspace } from "../types";
+import { linkedWorkspace } from "./workspace";
 
 /** The name a chat is listed under. */
 export function sessionLabel(session: SessionSummary): string {
@@ -10,8 +11,9 @@ export function linkedChatLabel(
   workspace: SessionWorkspace,
   sessions: SessionSummary[],
 ): string | null {
-  if (workspace.kind !== "sandbox" || !workspace.linked) return null;
-  const { sessionId } = workspace.linked;
+  const linked = linkedWorkspace(workspace);
+  if (!linked) return null;
+  const { sessionId } = linked;
   const chat = sessions.find((session) => session.id === sessionId);
   return chat ? sessionLabel(chat) : "a deleted chat";
 }

@@ -1,5 +1,9 @@
 import { expect, test } from "bun:test";
-import type { FilePreview } from "../../src/schemas/artifacts";
+import { create } from "@bufbuild/protobuf";
+import {
+  ArtifactPreviewSchema,
+  type ArtifactPreview as FilePreview,
+} from "../../src/gen/euler/v1/workspace_pb";
 import type { ArtifactSource } from "../../ui/components/Artifacts/api";
 import { ArtifactPreviewCache } from "../../ui/components/Artifacts/previewCache";
 
@@ -20,11 +24,11 @@ function fixture() {
   };
   return { cache: new ArtifactPreviewCache(source), requests };
 }
-const value = (path: string, content = path): FilePreview => ({
-  kind: "text",
-  path,
-  content,
-});
+const value = (path: string, content = path): FilePreview =>
+  create(ArtifactPreviewSchema, {
+    path,
+    content: { case: "text", value: content },
+  });
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 test("preview requests share in-flight prefetch and cache the result", async () => {

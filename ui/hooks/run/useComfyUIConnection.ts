@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import type { ComfyUIConfigResponse } from "../../../src/schemas/comfyui";
+import { providerClient } from "../../lib/rpc";
 import { fetchComfyUIConfig } from "../../persist/comfyui";
+import type { ComfyUIConfigState } from "../../types";
 
 export function useComfyUIConnection() {
   const [comfyuiHost, setComfyuiHost] = useState("");
@@ -14,30 +15,24 @@ export function useComfyUIConnection() {
 
   const fetchComfyUIHealth = useCallback(async () => {
     try {
-      const res = await fetch("/api/comfyui/health");
-      const data = (await res.json().catch(() => ({}))) as {
-        connected?: boolean;
-      };
-      setComfyuiConnected(data.connected === true);
+      const { connected } = await providerClient.getComfyUiHealth({});
+      setComfyuiConnected(connected);
     } catch {
       setComfyuiConnected(false);
     }
   }, []);
 
-  const applyComfyConfigResponse = useCallback(
-    (data: ComfyUIConfigResponse) => {
-      if (typeof data.host === "string") setComfyuiHost(data.host);
-      if (typeof data.defaultModel === "string")
-        setComfyuiDefaultModel(data.defaultModel);
-      if (typeof data.defaultWidth === "number")
-        setComfyuiDefaultWidth(data.defaultWidth);
-      if (typeof data.defaultHeight === "number")
-        setComfyuiDefaultHeight(data.defaultHeight);
-      if (typeof data.negativePrompt === "string")
-        setComfyuiNegativePrompt(data.negativePrompt);
-    },
-    [],
-  );
+  const applyComfyConfigResponse = useCallback((data: ComfyUIConfigState) => {
+    if (typeof data.host === "string") setComfyuiHost(data.host);
+    if (typeof data.defaultModel === "string")
+      setComfyuiDefaultModel(data.defaultModel);
+    if (typeof data.defaultWidth === "number")
+      setComfyuiDefaultWidth(data.defaultWidth);
+    if (typeof data.defaultHeight === "number")
+      setComfyuiDefaultHeight(data.defaultHeight);
+    if (typeof data.negativePrompt === "string")
+      setComfyuiNegativePrompt(data.negativePrompt);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

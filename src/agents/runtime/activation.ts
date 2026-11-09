@@ -7,13 +7,13 @@ import type { AgentRecord, AgentStore } from "../../db/agents";
 import { getAttachment } from "../../db/attachments";
 import { getSessionById } from "../../db/sessions";
 import { effectiveUserPreferences } from "../../db/userPreferences";
-import type { Unsequenced } from "../../events/eventHub";
+
+import type { Activation, AgentEvent } from "../../events/types";
 import type { LlmMessage } from "../../llm";
 import { type McpToolSet, openUserMcpTools } from "../../mcp/userTools";
 import { logEvent } from "../../observability/logger";
 import { permissionService } from "../../permissions/PermissionService";
 import { isFinalAgent } from "../../schemas/agents";
-import type { Activation } from "../../schemas/events";
 import type { DisplayIcon } from "../../schemas/icons";
 import type { WireMessageInput } from "../../schemas/run";
 import type { BaseTool } from "../../tools/BaseTool";
@@ -39,7 +39,7 @@ export interface ActivationHost {
   jobs: import("../../jobs/JobManager").JobManager;
   store: AgentStore;
   status(agent: AgentRecord): void;
-  emit(owner: string, event: Unsequenced): void;
+  emit(owner: string, event: AgentEvent): void;
   append(agent: AgentRecord, message: WireMessageInput): void;
   atomically(sessionId: string, write: () => void): void;
   isDeleting(sessionId: string): boolean;

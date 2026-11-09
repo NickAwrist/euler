@@ -1,5 +1,9 @@
 import { useRef, useState } from "react";
-import { InputCapability } from "../../src/models/modelCapabilities";
+import { Agent_Kind } from "../../src/gen/euler/v1/agent_pb";
+import {
+  InputCapability,
+  ModelProvider,
+} from "../../src/gen/euler/v1/models_pb";
 import { traceStepsForModal } from "../components/ExecutionTrace";
 import { linkedChatLabel } from "../lib/sessionLabel";
 import { resolveEffectiveThinkingEffort } from "../lib/thinkingLevel";
@@ -57,17 +61,18 @@ export function useRunApp() {
     (model) => model.id === sessions.selectedModel,
   );
   const modelSendReady =
-    selectedModelOption?.provider === "openrouter"
-      ? selectedModelOption.configured === true
-      : selectedModelOption?.provider === "chatgpt" ||
-        (selectedModelOption?.provider === "ollama" && ollama.ollamaReady);
+    selectedModelOption?.provider === ModelProvider.OPENROUTER
+      ? selectedModelOption.configured
+      : selectedModelOption?.provider === ModelProvider.CHATGPT ||
+        (selectedModelOption?.provider === ModelProvider.OLLAMA &&
+          ollama.ollamaReady);
   const remoteProviderReady = ollama.ollamaModels.some(
     (model) =>
-      model.provider === "chatgpt" ||
-      (model.provider === "openrouter" && model.configured === true),
+      model.provider === ModelProvider.CHATGPT ||
+      (model.provider === ModelProvider.OPENROUTER && model.configured),
   );
   const supportsImageInput =
-    selectedModelOption?.inputCapabilities.includes(InputCapability.Image) ===
+    selectedModelOption?.inputCapabilities.includes(InputCapability.IMAGE) ===
     true;
   const noProviderAvailable =
     ollama.catalogLoaded &&
@@ -147,7 +152,7 @@ export function useRunApp() {
       ? stream.agents
           .filter(
             (agent) =>
-              agent.kind !== "main" &&
+              agent.kind !== Agent_Kind.MAIN &&
               agent.spawnPosition >=
                 (truncateConfirm.kind === "edit"
                   ? truncateConfirm.userIndex
