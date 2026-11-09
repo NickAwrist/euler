@@ -1,5 +1,16 @@
 import { type Page, expect, test } from "@playwright/test";
+import { AgentService } from "../../src/gen/euler/v1/agent_pb";
+import { ModelProvider, ModelService } from "../../src/gen/euler/v1/models_pb";
+import { SessionService } from "../../src/gen/euler/v1/sessions_pb";
 import type { UserPreferences } from "../../src/schemas/userPreferences";
+import {
+  type ModelInit,
+  at,
+  mockApp as mockChatApp,
+  ollamaModel,
+  openRouterModel,
+} from "./appFixture";
+import { mockRpc, on, rpcKey, rpcRequest } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 // These checks exercise returning users; first-visit setup has its own suite.
@@ -12,79 +23,48 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-const models = [
-  {
-    id: "local",
-    name: "Local",
-    provider: "ollama",
-    lab: "Ollama",
-    inputCapabilities: ["text"],
-  },
-  {
-    id: "openrouter:test/remote",
-    name: "Remote",
-    provider: "openrouter",
-    lab: "Test",
-    configured: true,
-    inputCapabilities: ["text"],
-  },
+const models: ModelInit[] = [
+  ollamaModel("local", { name: "Local" }),
+  openRouterModel("test/remote", { name: "Remote", lab: "Test" }),
 ];
 
 async function mockApp(
   page: Page,
   saved: string,
-  catalog: () => Promise<typeof models>,
+  catalog: () => Promise<ModelInit[]>,
   store?: Map<string, UserPreferences>,
 ) {
   await page.setViewportSize({ width: 1280, height: 900 });
   const created: Array<{ model?: string; ephemeral?: boolean }> = [];
-  let sessionModel: string | null = null;
-  await page.route("**/api/**", async (route) => {
-    const path = new URL(route.request().url()).pathname;
-    const method = route.request().method();
-    if (path === "/api/models")
-      return route.fulfill({ json: { models: await catalog() } });
-    if (path === "/api/sessions" && method === "POST") {
-      const body = route.request().postDataJSON() as {
-        model?: string;
-        ephemeral?: boolean;
-      };
-      created.push(body);
-      if (body.ephemeral)
-        return route.fulfill({
-          json: { id: "ephemeral", expiresAt: Date.now() + 5.5 * 3_600_000 },
-        });
-      sessionModel = body.model ?? null;
-      return route.fulfill({ json: { id: "new", expiresAt: null } });
-    }
-    if (path === "/api/sessions/new" && method === "PATCH") {
-      sessionModel = (route.request().postDataJSON() as { model: string })
-        .model;
-    }
-    const json =
-      path === "/api/sessions"
-        ? { sessions: [] }
-        : path === "/api/sessions/new"
-          ? { id: "new", model: sessionModel, history: [], expiresAt: null }
-          : path.endsWith("/runtime")
-            ? {
-                agents: [],
-                activation: null,
-                queued: [],
-                held: false,
-                sequence: 0,
-                history: [],
-              }
-            : path.endsWith("/health")
-              ? { connected: true }
-              : path === "/api/settings/environment"
-                ? {
-                    ollamaHost: false,
-                    comfyuiHost: false,
-                  }
-                : {};
-    return route.fulfill({ json });
-  });
+  let sessionModel: string | undefined;
+  await mockChatApp(page);
+  await mockRpc(page, [
+    on(ModelService.method.listModels, async () => ({
+      models: await catalog(),
+    })),
+    on(SessionService.method.createSession, ({ model, ephemeral }) => {
+      created.push({
+        ...(model === undefined ? {} : { model }),
+        ...(ephemeral ? { ephemeral } : {}),
+      });
+      if (ephemeral)
+        return {
+          id: "ephemeral",
+          expiresAt: at(Date.now() + 5.5 * 3_600_000),
+        };
+      sessionModel = model;
+      return { id: "new" };
+    }),
+    on(SessionService.method.updateSession, ({ id, model }) => {
+      if (id === "new" && model !== undefined) sessionModel = model;
+      return {};
+    }),
+    on(SessionService.method.getSession, ({ id }) =>
+      id === "new"
+        ? { session: { id: "new", model: sessionModel } }
+        : undefined,
+    ),
+  ]);
   await mockUserPreferences(page, store, {
     settings: { defaultModel: saved },
   });
@@ -146,10 +126,15 @@ test("model defaults desktop: thinking preferences survive model changes, reload
   await expect(thinking).toHaveAccessibleName("Thinking level: High");
 
   const submissions: unknown[] = [];
-  await page.route("**/api/sessions/new/messages", async (route) => {
-    submissions.push(route.request().postDataJSON());
-    await route.fulfill({ status: 202, json: { messageId: 1, queued: false } });
-  });
+  await mockRpc(page, [
+    on(AgentService.method.sendMessage, ({ settings }) => {
+      submissions.push({
+        model: settings?.model,
+        reasoningEffort: settings?.reasoningEffort,
+      });
+      return { messageId: 1n };
+    }),
+  ]);
   await page.getByPlaceholder("Send a message...").fill("Use my preference");
   await page.getByRole("button", { name: "Send message" }).click();
   await expect
@@ -167,9 +152,9 @@ for (const device of ["desktop", "mobile"] as const) {
       {
         id: "chatgpt:gpt-example",
         name: "GPT Example",
-        provider: "chatgpt",
+        provider: ModelProvider.CHATGPT,
         lab: "OpenAI",
-        inputCapabilities: ["text"],
+        configured: true,
         reasoning: {
           mandatory: true,
           defaultEnabled: true,
@@ -195,13 +180,15 @@ for (const device of ["desktop", "mobile"] as const) {
     await expect(thinking).toHaveAccessibleName("Thinking level: Extra High");
 
     const submissions: unknown[] = [];
-    await page.route("**/api/sessions/new/messages", async (route) => {
-      submissions.push(route.request().postDataJSON());
-      await route.fulfill({
-        status: 202,
-        json: { messageId: 1, queued: false },
-      });
-    });
+    await mockRpc(page, [
+      on(AgentService.method.sendMessage, ({ settings }) => {
+        submissions.push({
+          model: settings?.model,
+          reasoningEffort: settings?.reasoningEffort,
+        });
+        return { messageId: 1n };
+      }),
+    ]);
     await page
       .getByPlaceholder("Send a message...")
       .fill("Use extra high reasoning");
@@ -316,8 +303,8 @@ test("model defaults desktop: unavailable preference matches settings, new chats
   const created = await mockApp(page, "removed", async () => models);
   const deleted: string[] = [];
   page.on("request", (request) => {
-    if (request.method() === "DELETE")
-      deleted.push(new URL(request.url()).pathname);
+    const removed = rpcRequest(request, SessionService.method.deleteSession);
+    if (removed) deleted.push(removed.id);
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
@@ -367,7 +354,7 @@ test("model defaults desktop: unavailable preference matches settings, new chats
   await expect(page.getByPlaceholder("Send a message...")).toHaveValue(
     "Ephemeral draft",
   );
-  expect(deleted).not.toContain("/api/sessions/ephemeral");
+  expect(deleted).not.toContain("ephemeral");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await page.getByRole("button", { name: "Model: Local", exact: true }).click();
   await page.getByRole("tab", { name: "Test" }).click();
@@ -386,7 +373,7 @@ test("model defaults desktop: unavailable preference matches settings, new chats
   await expect(page.getByPlaceholder("Send a message...")).toHaveValue(
     "Ephemeral draft",
   );
-  expect(deleted).not.toContain("/api/sessions/ephemeral");
+  expect(deleted).not.toContain("ephemeral");
   await page
     .getByRole("button", { name: "New chat", exact: true })
     .first()
@@ -492,11 +479,17 @@ test("model defaults desktop: reset icon clears and saves the explicit preferenc
     page.getByRole("button", { name: "Save settings", exact: true }),
   ).toBeHidden();
   expect(
-    await page.evaluate(
-      async () =>
-        (await (await fetch("/api/settings/user")).json()).settings
-          .defaultModel,
-    ),
+    await page.evaluate(async () => {
+      const response = await fetch(
+        "/api/rpc/euler.v1.PreferenceService/GetPreferences",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        },
+      );
+      return (await response.json()).preferences.settings.defaultModel ?? "";
+    }),
   ).toBe("");
 });
 

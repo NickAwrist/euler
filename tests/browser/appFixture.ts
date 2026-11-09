@@ -1,4 +1,4 @@
-import type { MessageInitShape } from "@bufbuild/protobuf";
+import type { DescMessage, MessageInitShape } from "@bufbuild/protobuf";
 import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import type { Page } from "@playwright/test";
 import {
@@ -25,14 +25,16 @@ import {
 } from "../../src/gen/euler/v1/sessions_pb";
 import { mockRpc, on } from "./rpcMock";
 
-export type SummaryInit = MessageInitShape<typeof SessionSummarySchema>;
-export type SessionInit = Exclude<
-  MessageInitShape<typeof SessionSchema>,
+/** A message's init object, as fixtures write it. */
+export type Init<S extends DescMessage> = Exclude<
+  MessageInitShape<S>,
   { $typeName: string }
 >;
-export type MessageInit = MessageInitShape<typeof MessageSchema>;
-export type ModelInit = MessageInitShape<typeof ModelSchema>;
-export type RuntimeInit = MessageInitShape<typeof GetRuntimeResponseSchema>;
+export type SummaryInit = Init<typeof SessionSummarySchema>;
+export type SessionInit = Init<typeof SessionSchema>;
+export type MessageInit = Init<typeof MessageSchema>;
+export type ModelInit = Init<typeof ModelSchema>;
+export type RuntimeInit = Init<typeof GetRuntimeResponseSchema>;
 
 export const at = timestampFromMs;
 export const sandbox = { kind: { case: "sandbox" as const, value: {} } };
