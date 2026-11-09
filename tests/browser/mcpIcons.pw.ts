@@ -66,7 +66,7 @@ for (const device of ["desktop", "mobile"] as const) {
       })),
       on(McpServerService.method.testServer, () => ({
         result: {
-          case: "connected",
+          case: "connected" as const,
           value: {
             icons,
             tools: [

@@ -94,7 +94,9 @@ export function OpenRouterSettingsTab({
             Choose which models appear in the composer. New marks models added
             to OpenRouter in the last {NEW_MODEL_DAYS} days.
           </p>
-          {overview?.catalog && <CatalogStatus catalog={overview.catalog} />}
+          {overview?.freshness && (
+            <CatalogStatus catalog={overview.freshness} />
+          )}
           {loadError && (
             <p role="alert" className="text-sm text-destructive">
               {loadError}

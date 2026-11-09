@@ -99,9 +99,7 @@ test("skills desktop: leaving from another tab offers to save skill edits", asyn
   await mockRpc(page, [
     on(SkillService.method.updateSkill, (request) => {
       saved = request.skill;
-      return {
-        skill: { ...skill, ...request.skill, id: request.id },
-      };
+      return { skill: { ...skill, instructions: request.skill?.instructions } };
     }),
   ]);
 

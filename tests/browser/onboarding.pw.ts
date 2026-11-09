@@ -33,11 +33,10 @@ const chatGptStatus = (connected: boolean) => ({
   planEnabled: connected,
 });
 
-/** Reads not marked side-effect free: connection tests and the catalog refresh. */
+/** Reads not marked side-effect free: connection tests. */
 const READ_ONLY = new Set([
   "ProviderService/TestOllamaHost",
   "ProviderService/TestComfyUiHost",
-  "ProviderService/GetOpenRouterCatalog",
 ]);
 
 /**
@@ -55,8 +54,10 @@ async function routeApi(
     page,
     [
       on(ProviderService.method.getOpenRouterCatalog, () => ({
-        catalog: { status: CatalogFreshness_Status.FRESH },
-        discoveredPublishers: {},
+        catalog: {
+          freshness: { status: CatalogFreshness_Status.FRESH },
+          discoveredPublishers: {},
+        },
       })),
       on(PreferenceService.method.getEnvironment, () => ({
         ollamaHost: false,

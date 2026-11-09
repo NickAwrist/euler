@@ -115,7 +115,7 @@ function chatGpt(owner: string) {
 function catalog(result: CatalogResult, owner: string) {
   const settings = catalogSettings(result, owner);
   return {
-    catalog: {
+    freshness: {
       status: FRESHNESS[settings.catalog.status],
       lastSuccessfulFetchAt: optionalMillis(
         settings.catalog.lastSuccessfulFetchAt,
@@ -291,9 +291,13 @@ export const providerService: ServiceImpl<typeof ProviderService> = {
       keyUsage: balance.keyUsage,
     };
   },
-  async getOpenRouterCatalog(request, context) {
+  async getOpenRouterCatalog(_request, context) {
     const owner = ownerOf(context);
-    return catalog(await getCatalogPreferences(request.refresh), owner);
+    return { catalog: catalog(await getCatalogPreferences(false), owner) };
+  },
+  async refreshOpenRouterCatalog(_request, context) {
+    const owner = ownerOf(context);
+    return { catalog: catalog(await getCatalogPreferences(true), owner) };
   },
   async setOpenRouterModelEnabled(request) {
     if (!openRouterRouteSchema.safeParse(request.route).success)

@@ -5,7 +5,7 @@ import {
   Model_Availability,
 } from "../../../src/gen/euler/v1/models_pb";
 import {
-  type GetOpenRouterCatalogResponse,
+  type OpenRouterCatalog,
   type OpenRouterModel,
   type OpenRouterPublisher,
   OpenRouterPublisherSchema,
@@ -13,7 +13,7 @@ import {
 } from "../../../src/gen/euler/v1/providers_pb";
 import { modelClient, providerClient } from "../../lib/rpc";
 
-export type CatalogSettings = GetOpenRouterCatalogResponse;
+export type CatalogSettings = OpenRouterCatalog;
 export type Publisher = OpenRouterPublisher;
 export type PublisherModel = OpenRouterModel;
 export type PreferenceChange =
@@ -135,7 +135,10 @@ export function useOpenRouterCatalog(onModelsChanged: () => Promise<void>) {
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(async (force = false) => {
     setError(null);
-    setData(await providerClient.getOpenRouterCatalog({ refresh: force }));
+    const { catalog } = force
+      ? await providerClient.refreshOpenRouterCatalog({})
+      : await providerClient.getOpenRouterCatalog({});
+    setData(catalog ?? null);
   }, []);
   useEffect(() => {
     void load()

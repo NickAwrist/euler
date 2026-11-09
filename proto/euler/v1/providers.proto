@@ -43,7 +43,11 @@ service ProviderService {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   // Publishers, their models, and the user's choices among them.
-  rpc GetOpenRouterCatalog(GetOpenRouterCatalogRequest) returns (GetOpenRouterCatalogResponse);
+  rpc GetOpenRouterCatalog(GetOpenRouterCatalogRequest) returns (GetOpenRouterCatalogResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Fetches the catalog again instead of using the cached copy.
+  rpc RefreshOpenRouterCatalog(RefreshOpenRouterCatalogRequest) returns (RefreshOpenRouterCatalogResponse);
   rpc SetOpenRouterModelEnabled(SetOpenRouterModelEnabledRequest) returns (SetOpenRouterModelEnabledResponse);
   rpc TrackOpenRouterPublisher(TrackOpenRouterPublisherRequest) returns (TrackOpenRouterPublisherResponse);
   rpc RemoveOpenRouterPublisher(RemoveOpenRouterPublisherRequest) returns (RemoveOpenRouterPublisherResponse);
@@ -245,17 +249,25 @@ message PublisherModels {
   repeated OpenRouterModel models = 1;
 }
 
-message GetOpenRouterCatalogRequest {
-  // Fetch the catalog again instead of using the cached copy.
-  bool refresh = 1;
-}
-
-message GetOpenRouterCatalogResponse {
-  CatalogFreshness catalog = 1;
+// Publishers, their models, and the user's choices among them.
+message OpenRouterCatalog {
+  CatalogFreshness freshness = 1;
   repeated OpenRouterPublisher publishers = 2;
   map<string, PublisherModels> models_by_publisher = 3;
   // Every publisher with an interactive model; absent without a catalog.
   optional DiscoveredPublishers discovered_publishers = 4;
+}
+
+message GetOpenRouterCatalogRequest {}
+
+message GetOpenRouterCatalogResponse {
+  OpenRouterCatalog catalog = 1;
+}
+
+message RefreshOpenRouterCatalogRequest {}
+
+message RefreshOpenRouterCatalogResponse {
+  OpenRouterCatalog catalog = 1;
 }
 
 message DiscoveredPublishers {

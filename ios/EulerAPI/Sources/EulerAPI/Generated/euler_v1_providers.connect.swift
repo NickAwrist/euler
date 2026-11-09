@@ -56,6 +56,10 @@ public protocol Euler_V1_ProviderServiceClientInterface: Sendable {
     @available(iOS 13, *)
     func `getOpenRouterCatalog`(request: Euler_V1_GetOpenRouterCatalogRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_GetOpenRouterCatalogResponse>
 
+    /// Fetches the catalog again instead of using the cached copy.
+    @available(iOS 13, *)
+    func `refreshOpenRouterCatalog`(request: Euler_V1_RefreshOpenRouterCatalogRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_RefreshOpenRouterCatalogResponse>
+
     @available(iOS 13, *)
     func `setOpenRouterModelEnabled`(request: Euler_V1_SetOpenRouterModelEnabledRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_SetOpenRouterModelEnabledResponse>
 
@@ -154,7 +158,12 @@ public final class Euler_V1_ProviderServiceClient: Euler_V1_ProviderServiceClien
 
     @available(iOS 13, *)
     public func `getOpenRouterCatalog`(request: Euler_V1_GetOpenRouterCatalogRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_GetOpenRouterCatalogResponse> {
-        return await self.client.unary(path: "/euler.v1.ProviderService/GetOpenRouterCatalog", idempotencyLevel: .unknown, request: request, headers: headers)
+        return await self.client.unary(path: "/euler.v1.ProviderService/GetOpenRouterCatalog", idempotencyLevel: .noSideEffects, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `refreshOpenRouterCatalog`(request: Euler_V1_RefreshOpenRouterCatalogRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_RefreshOpenRouterCatalogResponse> {
+        return await self.client.unary(path: "/euler.v1.ProviderService/RefreshOpenRouterCatalog", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
@@ -212,6 +221,7 @@ public final class Euler_V1_ProviderServiceClient: Euler_V1_ProviderServiceClien
             public static let setApiKey = Connect.MethodSpec(name: "SetApiKey", service: "euler.v1.ProviderService", type: .unary)
             public static let getOpenRouterBalance = Connect.MethodSpec(name: "GetOpenRouterBalance", service: "euler.v1.ProviderService", type: .unary)
             public static let getOpenRouterCatalog = Connect.MethodSpec(name: "GetOpenRouterCatalog", service: "euler.v1.ProviderService", type: .unary)
+            public static let refreshOpenRouterCatalog = Connect.MethodSpec(name: "RefreshOpenRouterCatalog", service: "euler.v1.ProviderService", type: .unary)
             public static let setOpenRouterModelEnabled = Connect.MethodSpec(name: "SetOpenRouterModelEnabled", service: "euler.v1.ProviderService", type: .unary)
             public static let trackOpenRouterPublisher = Connect.MethodSpec(name: "TrackOpenRouterPublisher", service: "euler.v1.ProviderService", type: .unary)
             public static let removeOpenRouterPublisher = Connect.MethodSpec(name: "RemoveOpenRouterPublisher", service: "euler.v1.ProviderService", type: .unary)

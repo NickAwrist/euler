@@ -70,6 +70,20 @@ describe("OpenRouter API integration", () => {
     ).toEqual([InputCapability.TEXT, InputCapability.IMAGE]);
   });
 
+  test("reads the cached catalog and refreshes only on request", async () => {
+    const lookup = spyOn(openRouterCatalog, "get");
+    const { providers } = rpc();
+    try {
+      await providers.getOpenRouterCatalog({});
+      expect(lookup).toHaveBeenLastCalledWith(false);
+      const refreshed = await providers.refreshOpenRouterCatalog({});
+      expect(lookup).toHaveBeenLastCalledWith(true);
+      expect(refreshed.catalog?.publishers.length).toBeGreaterThan(0);
+    } finally {
+      lookup.mockRestore();
+    }
+  });
+
   test("manages activation and independent favorites through settings", async () => {
     const { models, providers } = rpc();
     const route = "example/test-model";
@@ -93,7 +107,7 @@ describe("OpenRouter API integration", () => {
     expect(listOpenRouterModels()[0]?.enabled).toBe(0);
     await providers.setOpenRouterModelEnabled({ route, enabled: true });
     const catalog = await providers.getOpenRouterCatalog({});
-    expect(catalog.modelsByPublisher.example?.models).toMatchObject([
+    expect(catalog.catalog?.modelsByPublisher.example?.models).toMatchObject([
       { route, enabled: true, favorite: true },
     ]);
     expect(

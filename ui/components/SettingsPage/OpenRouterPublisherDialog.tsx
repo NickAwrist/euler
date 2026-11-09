@@ -219,9 +219,9 @@ export function PublisherDialog({
               : "Search model name or route..."
           }
         />
-        {data.catalog &&
-          data.catalog.status !== CatalogFreshness_Status.FRESH && (
-            <CatalogStatus catalog={data.catalog} />
+        {data.freshness &&
+          data.freshness.status !== CatalogFreshness_Status.FRESH && (
+            <CatalogStatus catalog={data.freshness} />
           )}
         {publisher !== "add" && (
           <p className="text-xs text-muted-foreground">
@@ -260,7 +260,7 @@ export function PublisherDialog({
             ))}
             {publishers.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                {data.catalog?.status === CatalogFreshness_Status.UNAVAILABLE
+                {data.freshness?.status === CatalogFreshness_Status.UNAVAILABLE
                   ? "Publishers unavailable. Refresh the catalog from settings."
                   : "No matching publishers."}
               </p>
@@ -324,7 +324,7 @@ export function PublisherDialog({
             ))}
             {visible.length === 0 && (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                {data.catalog?.status === CatalogFreshness_Status.UNAVAILABLE
+                {data.freshness?.status === CatalogFreshness_Status.UNAVAILABLE
                   ? "Catalog unavailable. No saved selections for this publisher."
                   : "No matching interactive models."}
               </p>
