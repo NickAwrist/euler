@@ -1,25 +1,24 @@
+import { MethodOptions_IdempotencyLevel } from "@bufbuild/protobuf/wkt";
 import { expect, test } from "@playwright/test";
+import { PreferenceService } from "../../src/gen/euler/v1/preferences_pb";
+import { DEFAULT_SYSTEM_PROMPT } from "../../src/prompts/systemPrompt";
+import type { UserPreferences } from "../../src/schemas/userPreferences";
+import { RpcFailure, mockRpc, on, rpcKey, rpcMethod } from "./rpcMock";
+import { mockUserPreferences } from "./userPreferencesFixture";
+
+const USER = "12345678-1234-4234-9234-123456789abc";
 
 // These checks exercise returning users; first-visit setup has its own suite.
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      "euler:userUuid",
-      "12345678-1234-4234-9234-123456789abc",
-    );
-  });
+  await page.addInitScript((user) => {
+    localStorage.setItem("euler:userUuid", user);
+  }, USER);
 });
-import { DEFAULT_SYSTEM_PROMPT } from "../../src/prompts/systemPrompt";
-import { mockUserPreferences } from "./userPreferencesFixture";
 
 test("system prompt settings desktop: customize, save, and reset to default", async ({
   page,
 }) => {
-  await page.route("**/api/**", (route) =>
-    route.fulfill({
-      json: { ollamaHost: false, comfyuiHost: false },
-    }),
-  );
+  await mockRpc(page, [], { empty: true });
   await mockUserPreferences(page);
   await page.goto("/customization");
 
@@ -54,13 +53,20 @@ for (const device of ["desktop", "mobile"] as const) {
         ? { width: 1280, height: 900 }
         : { width: 390, height: 844 },
     );
+    // Saving settings writes preferences and nothing else.
     const writes: string[] = [];
-    await page.route("**/api/**", (route) => {
-      if (route.request().method() === "PUT")
-        writes.push(route.request().url());
-      return route.fulfill({ json: { skills: [] } });
+    page.on("request", (request) => {
+      const method = rpcMethod(request);
+      if (
+        method?.methodKind === "unary" &&
+        method.parent.typeName !== PreferenceService.typeName &&
+        method.idempotency !== MethodOptions_IdempotencyLevel.NO_SIDE_EFFECTS
+      )
+        writes.push(rpcKey(request)!);
     });
-    await mockUserPreferences(page, undefined, {
+    const store = new Map<string, UserPreferences>();
+    await mockRpc(page, [], { empty: true });
+    await mockUserPreferences(page, store, {
       settings: { defaultModel: "saved-model", showDebugButton: true },
     });
     await page.goto("/customization");
@@ -102,11 +108,7 @@ for (const device of ["desktop", "mobile"] as const) {
       .click();
     await save.click();
     await expect(save).toBeHidden();
-    expect(
-      await page.evaluate(
-        async () => (await (await fetch("/api/settings/user")).json()).settings,
-      ),
-    ).toMatchObject({
+    expect(store.get(USER)?.settings).toMatchObject({
       name: "Ada",
       defaultModel: "saved-model",
       showDebugButton: true,
@@ -114,19 +116,17 @@ for (const device of ["desktop", "mobile"] as const) {
     expect(writes).toEqual([]);
 
     await name.fill("Unsaved");
-    await page.route("**/api/settings/user", (route) =>
-      route.request().method() === "PATCH"
-        ? route.fulfill({
-            status: 503,
-            json: {
-              error: {
-                code: "INTERNAL_ERROR",
-                message: "Could not save settings",
-              },
-            },
-          })
-        : route.fallback(),
-    );
+    await mockRpc(page, [
+      on(
+        PreferenceService.method.updatePreferences,
+        () =>
+          new RpcFailure(
+            "internal",
+            "Could not save settings",
+            "INTERNAL_ERROR",
+          ),
+      ),
+    ]);
     await page.getByRole("button", { name: "Back to chat" }).click();
     const dialog = page.getByRole("dialog", { name: "Leave customization?" });
     await dialog.getByRole("button", { name: "Save & leave" }).click();
