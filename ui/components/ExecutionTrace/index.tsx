@@ -1,4 +1,4 @@
-import type { MessageStep } from "../../types";
+import type { Step } from "../../types";
 import { TraceStepBody } from "./TraceNodes";
 import { traceStepsForDisplay } from "./normalizeTrace";
 import { traceTimeline } from "./traceDisplay";
@@ -15,10 +15,10 @@ export {
   shouldShowStepsModal,
 };
 
-function traceStepKey(step: MessageStep): string {
+function traceStepKey(step: Step): string {
   return [
-    step.kind,
-    step.status,
+    String(step.kind),
+    String(step.status),
     step.toolName,
     step.agentName,
     step.result,
@@ -33,7 +33,7 @@ export function ExecutionTraceList({
   steps,
   streamingThinking,
 }: {
-  steps: MessageStep[];
+  steps: Step[];
   streamingThinking?: string;
 }) {
   const displaySteps = traceStepsForDisplay(steps ?? []);

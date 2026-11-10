@@ -1,7 +1,7 @@
 import { type Dispatch, type SetStateAction, useState } from "react";
-import type { InboxMessage } from "../../../src/schemas/agents";
+import type { InboxMessage } from "../../../src/gen/euler/v1/agent_pb";
 import { whileRunning } from "../../lib/whileRunning";
-import { agentAction, removeQueuedMessage } from "../../persist/agents";
+import { deliverQueued, removeQueuedMessage } from "../../persist/agents";
 import { Button } from "../Button";
 export function QueuedMessages({
   sessionId,
@@ -34,7 +34,7 @@ export function QueuedMessages({
     <div className="space-y-2">
       {messages.map((message) => (
         <div
-          key={message.id}
+          key={String(message.id)}
           className="flex items-center justify-between gap-2 rounded-lg bg-muted p-2 text-sm"
         >
           <span className="min-w-0 flex-1 truncate">
@@ -77,7 +77,7 @@ export function QueuedMessages({
             variant="ghost"
             size="sm"
             disabled={pending}
-            onClick={() => void act(() => agentAction(sessionId, "deliver"))}
+            onClick={() => void act(() => deliverQueued(sessionId))}
           >
             Deliver
           </Button>

@@ -1,17 +1,26 @@
+import { create } from "@bufbuild/protobuf";
 import { useCallback, useState } from "react";
+import {
+  MessageVersionSchema,
+  Message_Role,
+} from "../../src/gen/euler/v1/sessions_pb";
+import { Step_Kind, Step_Status } from "../../src/gen/euler/v1/steps_pb";
 import { RunArea } from "../components/RunArea";
-import type { Message, MessageStep } from "../types";
+import type { Message, Step } from "../types";
+import { fixtureMessage, fixtureStep } from "./fixtures";
 
-const steps: MessageStep[] = [
-  {
-    kind: "llm_call",
-    status: "completed",
+const steps: Step[] = [
+  fixtureStep({
+    kind: Step_Kind.LLM_CALL,
+    status: Step_Status.DONE,
     result: "Finished",
     thinking: "Reasoning for this reply",
-  },
+  }),
 ];
+// Built by hand rather than with create(), which would read content up front.
 const history: Message[] = Array.from({ length: 300 }, (_, index) => ({
-  role: index % 2 === 0 ? "user" : "assistant",
+  $typeName: "euler.v1.Message" as const,
+  role: index % 2 === 0 ? Message_Role.USER : Message_Role.ASSISTANT,
   get content() {
     // Measure history work without relying on machine-dependent frame timings.
     performance.mark("history-read");
@@ -19,12 +28,20 @@ const history: Message[] = Array.from({ length: 300 }, (_, index) => ({
       ? `Question ${index}`
       : `Reply ${index}\n\n${"A paragraph with **bold**, [a link](https://example.com), and `inline code`.\n\n".repeat(6)}\n| Name | Value |\n| --- | --- |\n| Example | 42 |`;
   },
-  steps: index % 2 === 0 ? undefined : steps,
+  steps: index % 2 === 0 ? [] : steps,
+  attachments: [],
   versions:
-    index === 1 ? [{ content: "Earlier reply version", steps }] : undefined,
+    index === 1
+      ? [
+          create(MessageVersionSchema, {
+            content: "Earlier reply version",
+            steps,
+          }),
+        ]
+      : [],
 }));
 const noOp = () => {};
-const noSteps: MessageStep[] = [];
+const noSteps: Step[] = [];
 
 export default function LongThreadDemo() {
   const [messages, setMessages] = useState(history);
@@ -87,7 +104,10 @@ export default function LongThreadDemo() {
         <button
           type="button"
           onClick={() => {
-            setMessages((value) => [...value, { role: "assistant", content }]);
+            setMessages((value) => [
+              ...value,
+              fixtureMessage("assistant", content),
+            ]);
             setContent("");
           }}
         >

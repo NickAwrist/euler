@@ -1,7 +1,7 @@
 import { Check, Copy, Waypoints } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { copyTextToClipboard } from "../lib/copyTextToClipboard";
-import type { MessageStep } from "../types";
+import type { Step } from "../types";
 import {
   ExecutionTraceList,
   formatTraceResultsForCopy,
@@ -20,7 +20,7 @@ export function StepsModal({
   children,
   onClose,
 }: {
-  steps: MessageStep[];
+  steps: Step[];
   streamingThinking?: string;
   title?: string;
   subtitle?: ReactNode;

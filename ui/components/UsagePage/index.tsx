@@ -1,7 +1,14 @@
+import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { ArrowUp } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { UsageDashboard } from "../../../src/usage";
-import { userScopedFetch } from "../../persist/userIdentity";
+import {
+  type GetUsageResponse,
+  UsageGrouping,
+  UsageSortRule_Column,
+} from "../../../src/gen/euler/v1/usage_pb";
+import type { SortColumn } from "../../../src/usage";
+import { usageClient } from "../../lib/rpc";
+import { toMillis } from "../../lib/timestamps";
 import { BackToChatButton } from "../BackToChatButton";
 import { ModelLabel } from "../ModelLabel";
 import { RefreshButton } from "../RefreshButton";
@@ -12,9 +19,18 @@ import { ProviderLabel, color, money, number, providerColor } from "./display";
 import { type SortRule, changeSorting } from "./sorting";
 import "./usage.css";
 
+const SORT_COLUMNS: Record<SortColumn, UsageSortRule_Column> = {
+  name: UsageSortRule_Column.NAME,
+  tokens: UsageSortRule_Column.TOKENS,
+  share: UsageSortRule_Column.SHARE,
+  spend: UsageSortRule_Column.SPEND,
+  cached: UsageSortRule_Column.CACHED,
+  savings: UsageSortRule_Column.SAVINGS,
+};
+
 export function UsagePage({ onBack }: { onBack: () => void }) {
   const [days, setDays] = useState(7);
-  const [data, setData] = useState<UsageDashboard | null>(null);
+  const [data, setData] = useState<GetUsageResponse | null>(null);
   const [page, setPage] = useState(0);
   const [asOf, setAsOf] = useState(Date.now);
   const [loading, setLoading] = useState(true);
@@ -31,25 +47,26 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
     const controller = new AbortController();
     setLoading(true);
     setError("");
-    const params = new URLSearchParams({
-      days: String(days),
-      grouping,
-      sorting: JSON.stringify(sorting),
-      page: String(page),
-      asOf: String(asOf),
-    });
-    for (const provider of selected) params.append("providers", provider);
-    const request = userScopedFetch(`/api/usage?${params}`, {
-      signal: controller.signal,
-    }).then(async (response) => {
-      if (!response.ok) throw new Error("Could not load usage. Try again.");
-      return response.json() as Promise<UsageDashboard>;
-    });
-    request
+    usageClient
+      .getUsage(
+        {
+          days,
+          grouping:
+            grouping === "hour" ? UsageGrouping.HOUR : UsageGrouping.MODEL,
+          sorting: sorting.map((rule) => ({
+            column: SORT_COLUMNS[rule.column],
+            descending: rule.direction === "descending",
+          })),
+          page,
+          asOf: timestampFromMs(asOf),
+          providers: selected,
+        },
+        { signal: controller.signal },
+      )
       .then((result) => {
         if (!controller.signal.aborted) {
           setData(result);
-          setAsOf(result.asOf);
+          setAsOf(toMillis(result.asOf));
           setLoading(false);
         }
       })
@@ -68,8 +85,10 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
     setAsOf(Date.now());
   };
   const totals = data?.totals;
+  const chart = data?.chart;
+  const breakdown = data?.breakdown;
   const series =
-    data?.chart.series.map((item) => ({
+    chart?.series.map((item) => ({
       model: item.model,
       values: metric === "tokens" ? item.tokens : item.spend,
     })) ?? [];
@@ -89,7 +108,7 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
         ] as const
       ).flatMap(([name, value, format]) =>
         // Hide metrics no provider reported rather than filling tiles with gaps.
-        value === null ? [] : [{ name, value: format(value) }],
+        value === undefined ? [] : [{ name, value: format(value) }],
       )
     : [];
   return (
@@ -134,7 +153,7 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
               Retry
             </button>
           </p>
-        ) : data && totals ? (
+        ) : data && totals && chart && breakdown ? (
           <>
             <section className="usage-overview">
               <div>
@@ -185,13 +204,14 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
                           <small>
                             {item.modelCount}{" "}
                             {item.modelCount === 1 ? "model" : "models"} ·{" "}
-                            {item.calls} calls · {money(item.cost)}
+                            {item.totals?.calls} calls ·{" "}
+                            {money(item.totals?.cost)}
                           </small>
                         </span>
                         <strong>
                           {metric === "tokens"
-                            ? number(item.tokens)
-                            : money(item.cost)}
+                            ? number(item.totals?.tokens)
+                            : money(item.totals?.cost)}
                         </strong>
                       </button>
                     );
@@ -220,9 +240,9 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
                 {totals.calls ? (
                   <UsageChart
                     series={series}
-                    buckets={data.chart.buckets}
+                    buckets={chart.buckets.map(toMillis)}
                     metric={metric}
-                    intervalMs={data.chart.intervalMs}
+                    intervalMs={chart.intervalMs}
                   />
                 ) : (
                   <div className="usage-empty">
@@ -266,7 +286,9 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
                         [
                           [
                             "name",
-                            data.grouping === "model" ? "Model" : "Hour",
+                            data.grouping === UsageGrouping.HOUR
+                              ? "Hour"
+                              : "Model",
                           ],
                           ["spend", "Spend"],
                           ["share", "Share of total tokens"],
@@ -340,15 +362,16 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
                     </tr>
                   </thead>
                   <tbody>
-                    {data.breakdown.rows.map((item) => {
-                      const { key, tokens } = item;
+                    {breakdown.rows.map((item) => {
+                      const { key } = item;
+                      const totals = item.totals;
                       return (
                         <tr key={key}>
                           <td>
-                            {data.grouping === "model" ? (
+                            {data.grouping !== UsageGrouping.HOUR ? (
                               <ModelLabel model={key} className="usage-model" />
                             ) : (
-                              new Date(item.timestamp).toLocaleString(
+                              new Date(toMillis(item.hour)).toLocaleString(
                                 undefined,
                                 {
                                   month: "short",
@@ -358,14 +381,14 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
                               )
                             )}
                           </td>
-                          <td>{money(item.cost)}</td>
+                          <td>{money(totals?.cost)}</td>
                           <td>
                             <span className="usage-share">
                               <span
                                 style={{
                                   width: `${item.tokenShare}%`,
                                   background:
-                                    data.grouping === "model"
+                                    data.grouping !== UsageGrouping.HOUR
                                       ? color(key)
                                       : "#999",
                                 }}
@@ -373,29 +396,29 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
                             </span>
                             {item.tokenShare.toFixed(1)}%
                           </td>
-                          <td>{number(tokens)}</td>
-                          <td>{number(item.cached)}</td>
-                          <td>{money(item.savings)}</td>
+                          <td>{number(totals?.tokens)}</td>
+                          <td>{number(totals?.cached)}</td>
+                          <td>{money(totals?.savings)}</td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
               </div>
-              {data.breakdown.totalRows > data.breakdown.pageSize && (
+              {breakdown.totalRows > breakdown.pageSize && (
                 <nav className="usage-pagination" aria-label="Breakdown pages">
                   <span>
-                    {data.breakdown.page * data.breakdown.pageSize + 1}–
+                    {breakdown.page * breakdown.pageSize + 1}–
                     {Math.min(
-                      (data.breakdown.page + 1) * data.breakdown.pageSize,
-                      data.breakdown.totalRows,
+                      (breakdown.page + 1) * breakdown.pageSize,
+                      breakdown.totalRows,
                     )}{" "}
-                    of {data.breakdown.totalRows}
+                    of {breakdown.totalRows}
                   </span>
                   <button
                     type="button"
-                    disabled={loading || data.breakdown.page === 0}
-                    onClick={() => setPage(data.breakdown.page - 1)}
+                    disabled={loading || breakdown.page === 0}
+                    onClick={() => setPage(breakdown.page - 1)}
                   >
                     Previous
                   </button>
@@ -403,10 +426,10 @@ export function UsagePage({ onBack }: { onBack: () => void }) {
                     type="button"
                     disabled={
                       loading ||
-                      (data.breakdown.page + 1) * data.breakdown.pageSize >=
-                        data.breakdown.totalRows
+                      (breakdown.page + 1) * breakdown.pageSize >=
+                        breakdown.totalRows
                     }
-                    onClick={() => setPage(data.breakdown.page + 1)}
+                    onClick={() => setPage(breakdown.page + 1)}
                   >
                     Next
                   </button>

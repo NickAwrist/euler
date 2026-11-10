@@ -2,9 +2,11 @@ import { ChevronRight } from "lucide-react";
 import { useId, useState } from "react";
 import {
   type Agent,
-  isFinalAgent,
-  isWorkingAgent,
-} from "../../../src/schemas/agents";
+  Agent_Kind,
+  Agent_Status,
+} from "../../../src/gen/euler/v1/agent_pb";
+import { isFinalAgent, isWorkingAgent } from "../../lib/agentStatus";
+import { toMillis } from "../../lib/timestamps";
 import { cx, eyebrowText } from "../../styles";
 import { useAgents } from "./AgentContext";
 import { AgentTaskCard } from "./AgentTaskCard";
@@ -73,8 +75,8 @@ function AgentSection({
 export function AgentsList() {
   const { agents } = useAgents();
   const list = agents
-    .filter((a) => a.kind !== "main")
-    .sort((a, b) => b.createdAt - a.createdAt);
+    .filter((a) => a.kind !== Agent_Kind.MAIN)
+    .sort((a, b) => toMillis(b.createdAt) - toMillis(a.createdAt));
   return (
     <div className="min-h-0 flex-1 overflow-auto px-3 pb-3" aria-label="Agents">
       {list.length ? (
@@ -82,7 +84,7 @@ export function AgentsList() {
           <AgentSection label="Active" agents={list.filter(isWorkingAgent)} />
           <AgentSection
             label="Ready"
-            agents={list.filter((a) => a.status === "idle")}
+            agents={list.filter((a) => a.status === Agent_Status.IDLE)}
           />
           <AgentSection
             label="Ended"

@@ -1,18 +1,11 @@
-import { apiJson } from "../lib/api";
+import type { ListDirectoryResponse } from "../../src/gen/euler/v1/directories_pb";
+import { directoryClient } from "../lib/rpc";
 
-export type DirectoryListing = {
-  path: string;
-  exact: boolean;
-  parent: string | null;
-  directories: { name: string; path: string }[];
-};
+export type DirectoryListing = ListDirectoryResponse;
 
 export function fetchDirectories(
   path: string,
   signal: AbortSignal,
 ): Promise<DirectoryListing> {
-  return apiJson<DirectoryListing>(
-    `/api/directories?path=${encodeURIComponent(path)}`,
-    { signal },
-  );
+  return directoryClient.listDirectory({ path }, { signal });
 }

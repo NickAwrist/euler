@@ -1,7 +1,8 @@
 import { Activity, ChevronRight, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { type Job, activeJob } from "../../../src/schemas/jobs";
+import type { Job } from "../../../src/gen/euler/v1/jobs_pb";
 import type { Diagnostic } from "../../../src/schemas/observability";
+import { JOB_STATUS_LABELS, activeJob } from "../../lib/agentStatus";
 import { toDiagnostic } from "../../lib/apiError";
 import { chipSurface, cx } from "../../styles";
 import { Button } from "../Button";
@@ -63,7 +64,7 @@ export function JobTaskCard({
         />
         <span className="min-w-0">
           <span className="block text-xs">
-            {job.tool} · {job.status}
+            {job.tool} · {JOB_STATUS_LABELS[job.status]}
           </span>
           <span
             className="block truncate font-mono text-xs text-muted-foreground"

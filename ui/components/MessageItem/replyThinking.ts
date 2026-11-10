@@ -1,11 +1,12 @@
-import type { MessageStep } from "../../types";
+import { Step_Kind } from "../../../src/gen/euler/v1/steps_pb";
+import type { Step } from "../../types";
 
 /** The main agent's reasoning across a reply's model calls, with its total thinking time. */
 export function replyThinking(
-  steps: MessageStep[] | undefined,
+  steps: Step[] | undefined,
 ): { text: string; durationMs?: number } | null {
   const calls = (steps ?? []).filter(
-    (step) => step.kind === "llm_call" && step.thinking?.trim(),
+    (step) => step.kind === Step_Kind.LLM_CALL && step.thinking?.trim(),
   );
   if (calls.length === 0) return null;
   const durations = calls.flatMap((step) =>

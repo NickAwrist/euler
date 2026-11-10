@@ -1,11 +1,8 @@
 import { ChevronRight, Square, X } from "lucide-react";
 import { useState } from "react";
-import {
-  type Agent,
-  isFinalAgent,
-  isWorkingAgent,
-} from "../../../src/schemas/agents";
+import { type Agent, Agent_Kind } from "../../../src/gen/euler/v1/agent_pb";
 import type { Diagnostic } from "../../../src/schemas/observability";
+import { isFinalAgent, isWorkingAgent } from "../../lib/agentStatus";
 import { toDiagnostic } from "../../lib/apiError";
 import { chipSurface, cx } from "../../styles";
 import { ErrorNotice } from "../ErrorNotice";
@@ -95,7 +92,7 @@ export function AgentTaskCard({
 export function AgentRows({ position }: { position: number }) {
   const { agents } = useAgents();
   return agents
-    .filter((a) => a.kind !== "main" && a.spawnPosition === position)
+    .filter((a) => a.kind !== Agent_Kind.MAIN && a.spawnPosition === position)
     .map((agent) => (
       <AgentTaskCard key={agent.id} agent={agent} variant="inline" />
     ));

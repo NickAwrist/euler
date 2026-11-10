@@ -31,6 +31,8 @@ const COMPOSER = "Send a message...";
 const TIMING_RUNS = 3;
 // Roughly a mid-range phone; applies to the reported timings only.
 const TIMING_CPU_SLOWDOWN = 4;
+const RPC = "/api/rpc/euler.v1.";
+const EVENT_STREAM = `${RPC}EventService/Subscribe`;
 
 const update = process.argv.includes("--update");
 
@@ -176,7 +178,7 @@ function trackRequests(page) {
     const { pathname } = new URL(request.url());
     if (
       pathname.startsWith("/api/") &&
-      pathname !== "/api/events" &&
+      pathname !== EVENT_STREAM &&
       !pollName(request.url())
     )
       requestsInFlight.add(request);
@@ -252,7 +254,7 @@ async function countRenders(page, action) {
 }
 
 /** The app's timer-driven requests, by path. They render on their own schedule. */
-const POLLS = { health: "/api/ollama/health" };
+const POLLS = { health: `${RPC}ProviderService/GetOllamaHealth` };
 const pollsInFlight = new Map();
 
 function pollName(url) {
@@ -310,6 +312,36 @@ async function holdPolls(page, names, action) {
   } finally {
     release();
     await Promise.all(continued);
+    await page.unroute(matches, handler);
+  }
+}
+
+/**
+ * Answers the app's calls one at a time for the duration of `action`, in the
+ * order it sent them, each after the page has rendered the one before. Calls
+ * sent together otherwise race, and React renders their answers in one commit
+ * or two depending on which arrives first.
+ */
+async function answerInTurn(page, action) {
+  let previous = Promise.resolve();
+  const matches = (url) =>
+    url.pathname.startsWith(RPC) &&
+    url.pathname !== EVENT_STREAM &&
+    !pollName(url.href);
+  const handler = (route) => {
+    previous = previous
+      .then(async () => {
+        await route.fulfill({ response: await route.fetch() });
+        await nextFrames(page);
+      })
+      .catch(() => {});
+    return previous;
+  };
+  await page.route(matches, handler);
+  try {
+    return await action();
+  } finally {
+    await previous;
     await page.unroute(matches, handler);
   }
 }
@@ -377,10 +409,17 @@ async function bundleSizes(loadedScripts) {
   return sizes;
 }
 
-async function responseBytes(fixture, path) {
-  const response = await fetch(`${fixture.url}${path}`, {
-    headers: { "X-Euler-User-ID": fixture.userId },
+/** The size of an RPC's JSON response, the format the web app asks for. */
+async function responseBytes(fixture, method, request) {
+  const response = await fetch(`${fixture.url}${RPC}${method}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Euler-User-ID": fixture.userId,
+    },
+    body: JSON.stringify(request),
   });
+  if (!response.ok) throw new Error(`${method} returned ${response.status}`);
   return (await response.arrayBuffer()).byteLength;
 }
 
@@ -442,7 +481,7 @@ async function measureCounts(page, fixture) {
   await composer.fill("");
   let fileRequests = 0;
   const countFileRequest = (request) => {
-    if (new URL(request.url()).pathname.endsWith("/workspace/files"))
+    if (new URL(request.url()).pathname === `${RPC}WorkspaceService/ListFiles`)
       fileRequests++;
   };
   page.on("request", countFileRequest);
@@ -477,26 +516,32 @@ async function measureCounts(page, fixture) {
     ),
   );
   metrics["finishReply.renders"] = await holdPolls(page, ["health"], () =>
-    countRenders(page, () => finishReply(page, fixture)),
+    answerInTurn(page, () =>
+      countRenders(page, () => finishReply(page, fixture)),
+    ),
   );
 
   await page.getByRole("button", { name: "Toggle chats" }).click();
   await settle(page);
   metrics["openChat.renders"] = await holdPolls(page, ["health"], () =>
-    countRenders(page, async () => {
-      await page.getByRole("button", { name: "Session 98" }).click();
-      await page.waitForURL(`**/run/${fixture.longSessions[1]}`);
-      await waitForText(page, `Reply ${WORKLOAD.longSessionMessages - 1}`);
-    }),
+    answerInTurn(page, () =>
+      countRenders(page, async () => {
+        await page.getByRole("button", { name: "Session 98" }).click();
+        await page.waitForURL(`**/run/${fixture.longSessions[1]}`);
+        await waitForText(page, `Reply ${WORKLOAD.longSessionMessages - 1}`);
+      }),
+    ),
   );
 
   metrics["api.sessionResponseBytes"] = await responseBytes(
     fixture,
-    `/api/sessions/${fixture.longSessions[0]}`,
+    "SessionService/GetSession",
+    { id: fixture.longSessions[0] },
   );
   metrics["api.sessionsResponseBytes"] = await responseBytes(
     fixture,
-    "/api/sessions",
+    "SessionService/ListSessions",
+    {},
   );
   return { metrics, scrollSamples };
 }

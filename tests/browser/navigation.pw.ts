@@ -1,4 +1,11 @@
 import { type Page, expect, test } from "@playwright/test";
+import { AgentService } from "../../src/gen/euler/v1/agent_pb";
+import { PreferenceService } from "../../src/gen/euler/v1/preferences_pb";
+import { ProviderService } from "../../src/gen/euler/v1/providers_pb";
+import { SessionService } from "../../src/gen/euler/v1/sessions_pb";
+import { UsageService } from "../../src/gen/euler/v1/usage_pb";
+import { at, message, mockApp as mockChatApp } from "./appFixture";
+import { RpcFailure, mockRpc, on, rpcKey } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 // These checks exercise returning users; first-visit setup has its own suite.
@@ -13,83 +20,44 @@ test.beforeEach(async ({ page }) => {
 
 async function mockApp(page: Page) {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.route("**/api/**", async (route) => {
-    const path = new URL(route.request().url()).pathname;
-    if (path === "/api/settings/environment") {
-      await route.fulfill({
-        json: {
-          ollamaHost: false,
-          comfyuiHost: false,
-          openrouterApiKey: false,
-        },
-      });
-      return;
-    }
-    if (path === "/api/usage" || path === "/api/settings/openrouter/catalog") {
-      await route.fulfill({
-        status: 503,
-        json: { error: "Usage unavailable" },
-      });
-      return;
-    }
-    const json =
-      path === "/api/sessions"
-        ? {
-            sessions: ["a", "b"].map((id) => ({
-              id,
-              preview: `Conversation ${id}`,
-              createdAt: 1,
-              updatedAt: 1,
-              expiresAt: null,
-            })),
-          }
-        : /^\/api\/sessions\/[ab]$/.test(path)
-          ? {
-              id: path.split("/").at(-1),
-              model: "test",
-              history: [
-                { role: "user", content: `Stored ${path.split("/").at(-1)}` },
-              ],
-            }
-          : path === "/api/models"
-            ? {
-                models: [
-                  {
-                    id: "test",
-                    name: "Test",
-                    lab: "Test",
-                    provider: "ollama",
-                    inputCapabilities: ["text"],
-                  },
-                ],
-              }
-            : path.endsWith("/health")
-              ? { connected: true }
-              : path.endsWith("/runtime")
-                ? {
-                    agents: [],
-                    activation: null,
-                    queued: [],
-                    held: false,
-                    sequence: 0,
-                    history: [
-                      {
-                        role: "user",
-                        content: `Stored ${path.split("/").at(-2)}`,
-                      },
-                    ],
-                  }
-                : path === "/api/skills"
-                  ? { skills: [] }
-                  : path === "/api/settings/openrouter"
-                    ? {
-                        apiKeyConfigured: false,
-                        enabledModels: [],
-                        favoriteModels: [],
-                        ignoredPublishers: [],
-                      }
-                    : {};
-    await route.fulfill({ json });
+  await mockChatApp(page, {
+    sessions: ["a", "b"].map((id) => ({
+      id,
+      preview: `Conversation ${id}`,
+      updatedAt: at(1),
+    })),
+    chats: Object.fromEntries(
+      ["a", "b"].map((id) => [
+        id,
+        { model: "test", history: [message("user", `Stored ${id}`)] },
+      ]),
+    ),
+  });
+  await mockRpc(page, [
+    on(
+      UsageService.method.getUsage,
+      () => new RpcFailure("unavailable", "Usage unavailable"),
+    ),
+    on(
+      ProviderService.method.getOpenRouterCatalog,
+      () => new RpcFailure("unavailable", "Catalog unavailable"),
+    ),
+  ]);
+}
+
+/** The saved sidebar preference, read the way the app reads it. */
+function savedSidebarCollapsed(page: Page) {
+  return page.evaluate(async () => {
+    const response = await fetch(
+      "/api/rpc/euler.v1.PreferenceService/GetPreferences",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      },
+    );
+    const { preferences } = await response.json();
+    return String(preferences.layout?.sidebarCollapsed ?? false);
   });
 }
 
@@ -146,14 +114,7 @@ test("view navigation desktop preserves Back, Forward, reload, tabs and sidebar 
       page.getByRole("complementary", { name: "Chats" }),
     ).toBeVisible();
   }
-  expect(
-    await page.evaluate(async () =>
-      String(
-        (await (await fetch("/api/settings/user")).json()).layout
-          .sidebarCollapsed,
-      ),
-    ),
-  ).not.toBe("true");
+  expect(await savedSidebarCollapsed(page)).not.toBe("true");
 });
 
 test("view navigation desktop keeps unsaved customization on Back and resumes approved departure", async ({
@@ -217,12 +178,12 @@ test("view navigation desktop keeps settings open when Save and leave fails", as
   page,
 }) => {
   await mockApp(page);
-  await page.route("**/api/ollama/config", (route) =>
-    route.fulfill({
-      status: 500,
-      json: { error: { code: "INTERNAL_ERROR", message: "Unavailable" } },
-    }),
-  );
+  await mockRpc(page, [
+    on(
+      ProviderService.method.updateOllamaConfig,
+      () => new RpcFailure("internal", "Unavailable", "INTERNAL_ERROR"),
+    ),
+  ]);
   await mockUserPreferences(page);
   await page.goto("/run/a");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
@@ -268,38 +229,28 @@ test("view navigation desktop remembers General after Choose models and preserve
   await expect(
     page.getByRole("button", { name: "Toggle chats" }),
   ).toHaveAttribute("aria-expanded", "false");
-  expect(
-    await page.evaluate(async () =>
-      String(
-        (await (await fetch("/api/settings/user")).json()).layout
-          .sidebarCollapsed,
-      ),
-    ),
-  ).toBe("true");
+  expect(await savedSidebarCollapsed(page)).toBe("true");
 });
 
 test("view navigation desktop stays in Customization when a chat sent from Home is saved", async ({
   page,
 }) => {
   await mockApp(page);
-  await page.route("**/api/sessions/b/runtime", (route) =>
-    route.fulfill({
-      json: {
-        sequence: Date.now(),
-        agents: [],
-        activation: null,
-        queued: [],
-        held: false,
-        history: [{ role: "user", content: "Stored b" }],
-      },
-    }),
-  );
   const created = Promise.withResolvers<void>();
-  await page.route("**/api/sessions", async (route) => {
-    if (route.request().method() !== "POST") return route.fallback();
-    await created.promise;
-    await route.fulfill({ json: { id: "b", expiresAt: null } });
-  });
+  await mockRpc(page, [
+    on(AgentService.method.getRuntime, ({ sessionId }) =>
+      sessionId === "b"
+        ? {
+            sequence: BigInt(Date.now()),
+            history: [message("user", "Stored b")],
+          }
+        : undefined,
+    ),
+    on(SessionService.method.createSession, async () => {
+      await created.promise;
+      return { id: "b" };
+    }),
+  ]);
   await mockUserPreferences(page);
   await page.goto("/");
   await page.getByPlaceholder("Send a message...").fill("First message");
@@ -309,7 +260,9 @@ test("view navigation desktop stays in Customization when a chat sent from Home 
     .click();
   await page.getByPlaceholder("Enter your name").fill("Keep this draft");
   const started = page.waitForRequest(
-    (request) => new URL(request.url()).pathname === "/api/sessions/b/messages",
+    (request) =>
+      rpcKey(request) === "AgentService/SendMessage" &&
+      request.postDataJSON().sessionId === "b",
   );
   created.resolve();
   await started;
@@ -328,24 +281,18 @@ test("view navigation desktop deletes an empty chat left with Back", async ({
 }) => {
   await mockApp(page);
   const deleted: string[] = [];
-  await page.route(/\/api\/sessions\/b(?:\/runtime)?$/, (route) => {
-    if (route.request().method() === "DELETE") {
-      deleted.push(route.request().url());
-      return route.fulfill({ json: { ok: true } });
-    }
-    return route.fulfill({
-      json: {
-        id: "b",
-        model: "test",
-        history: [],
-        agents: [],
-        activation: null,
-        queued: [],
-        held: false,
-        sequence: 0,
-      },
-    });
-  });
+  await mockRpc(page, [
+    on(SessionService.method.deleteSession, ({ id }) => {
+      deleted.push(id);
+      return {};
+    }),
+    on(SessionService.method.getSession, ({ id }) =>
+      id === "b" ? { session: { id: "b", model: "test" } } : undefined,
+    ),
+    on(AgentService.method.getRuntime, ({ sessionId }) =>
+      sessionId === "b" ? {} : undefined,
+    ),
+  ]);
   await mockUserPreferences(page);
   await page.goto("/run/a");
   await page.getByRole("button", { name: /Conversation b/ }).click();
@@ -361,25 +308,19 @@ test("view navigation desktop protects dirty settings after a markdown footnote 
   page,
 }) => {
   await mockApp(page);
-  await page.route(/\/api\/sessions\/a(?:\/runtime)?$/, (route) =>
-    route.fulfill({
-      json: {
-        id: "a",
-        agents: [],
-        activation: null,
-        queued: [],
-        held: false,
-        sequence: 0,
-        model: "test",
-        history: [
-          {
-            role: "assistant",
-            content: "A note[^1].\n\n[^1]: Footnote content.",
-          },
-        ],
-      },
-    }),
-  );
+  const footnote = [
+    message("assistant", "A note[^1].\n\n[^1]: Footnote content."),
+  ];
+  await mockRpc(page, [
+    on(SessionService.method.getSession, ({ id }) =>
+      id === "a"
+        ? { session: { id: "a", model: "test", history: footnote } }
+        : undefined,
+    ),
+    on(AgentService.method.getRuntime, ({ sessionId }) =>
+      sessionId === "a" ? { history: footnote } : undefined,
+    ),
+  ]);
   await mockUserPreferences(page);
   await page.goto("/run/a");
   await page.getByRole("link", { name: "1", exact: true }).click();
@@ -428,62 +369,60 @@ test("view navigation desktop keeps an ephemeral chat at its URL and counts down
   await mockApp(page);
   const created: unknown[] = [];
   const deleted: string[] = [];
-  let history: { role: string; content: string }[] = [];
-  await page.route("**/api/sessions", (route) => {
-    if (route.request().method() === "POST") {
-      created.push(route.request().postDataJSON());
-      return route.fulfill({ json: { id: "e", expiresAt } });
-    }
-    return route.fulfill({
-      json: {
-        sessions: [
-          ...(created.length
-            ? [
-                {
-                  id: "e",
-                  preview: history[0]?.content ?? "",
-                  createdAt: now,
-                  updatedAt: now,
-                  expiresAt,
-                },
-              ]
-            : []),
-          ...["a", "b"].map((id) => ({
-            id,
-            preview: `Conversation ${id}`,
-            createdAt: 1,
-            updatedAt: 1,
-            expiresAt: null,
-          })),
-        ],
-      },
-    });
-  });
-  await page.route(/\/api\/sessions\/e(?:\/\w+)?$/, (route) => {
-    const path = new URL(route.request().url()).pathname;
-    if (route.request().method() === "DELETE") {
-      deleted.push(path);
-      return route.fulfill({ json: { ok: true } });
-    }
-    if (path.endsWith("/messages"))
+  let history: ReturnType<typeof message>[] = [];
+  await mockRpc(page, [
+    on(SessionService.method.createSession, ({ ephemeral }) => {
+      created.push({ ephemeral });
+      return { id: "e", expiresAt: at(expiresAt) };
+    }),
+    on(SessionService.method.listSessions, () => ({
+      sessions: [
+        ...(created.length
+          ? [
+              {
+                id: "e",
+                preview: history[0]?.content ?? "",
+                updatedAt: at(now),
+                expiresAt: at(expiresAt),
+              },
+            ]
+          : []),
+        ...["a", "b"].map((id) => ({
+          id,
+          preview: `Conversation ${id}`,
+          updatedAt: at(1),
+        })),
+      ],
+    })),
+    on(SessionService.method.deleteSession, ({ id }) => {
+      if (id !== "e") return undefined;
+      deleted.push(id);
+      return {};
+    }),
+    on(AgentService.method.sendMessage, ({ sessionId, content }) => {
+      if (sessionId !== "e") return undefined;
       history = [
-        { role: "user", content: route.request().postDataJSON().content },
-        { role: "assistant", content: "Ephemeral reply" },
+        message("user", content),
+        message("assistant", "Ephemeral reply"),
       ];
-    return route.fulfill({
-      json: {
-        id: "e",
-        model: "test",
-        history,
-        expiresAt,
-        sequence: Date.now(),
-        agents: [],
-        activation: null,
-        queued: [],
-        held: false,
-      },
-    });
-  });
+      return {};
+    }),
+    on(SessionService.method.getSession, ({ id }) =>
+      id === "e"
+        ? {
+            session: {
+              id: "e",
+              model: "test",
+              history,
+              expiresAt: at(expiresAt),
+            },
+          }
+        : undefined,
+    ),
+    on(AgentService.method.getRuntime, ({ sessionId }) =>
+      sessionId === "e" ? { history, sequence: BigInt(Date.now()) } : undefined,
+    ),
+  ]);
   const badge = page.getByTitle(
     "Messages and files are deleted when this chat expires.",
   );
@@ -680,16 +619,12 @@ test("view navigation desktop returns to a failed customization draft when leavi
     .getByRole("button", { name: "Tools", exact: true })
     .click();
   await expect(page).toHaveURL(/\/customization\/tools$/);
-  await page.route("**/api/settings/user", (route) =>
-    route.request().method() === "PATCH"
-      ? route.fulfill({
-          status: 503,
-          json: {
-            error: { code: "INTERNAL_ERROR", message: "Save unavailable" },
-          },
-        })
-      : route.fallback(),
-  );
+  await mockRpc(page, [
+    on(
+      PreferenceService.method.updatePreferences,
+      () => new RpcFailure("unavailable", "Save unavailable", "INTERNAL_ERROR"),
+    ),
+  ]);
   await page.getByRole("button", { name: "Back to chat" }).click();
   await page.getByRole("button", { name: "Save & leave", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);

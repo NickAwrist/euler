@@ -54,7 +54,11 @@ finite CSS animations finished, and renders and scroll geometry unchanged
 across three two-frame samples. This lets image load, intersection, and resize
 callbacks finish before the next action. Streaming waits for each token to
 render before sending the next, so a slower machine cannot batch tokens into
-fewer commits. The scroll count traverses the thread from bottom to top in
+fewer commits. Finishing a reply and opening a chat each send several calls
+at once: three chat list refreshes, or `GetSession` with `GetRuntime`. React
+renders two answers in one commit or two depending on which arrives first, so
+those two windows answer the app's calls one at a time, each after the page
+has rendered the one before (`answerInTurn`). The scroll count traverses the thread from bottom to top in
 200 settled steps. Timing samples use a 40-step traversal
 without those settling waits. The count gate covers small scroll steps, not
 remount work during large jumps; the 40-step timing pass reports
@@ -93,6 +97,10 @@ bunx playwright install chromium
 bun run build
 bun run perf:check
 ```
+
+The check needs Linux, because the file suggestions read a sandbox workspace.
+To see whether a count depends on machine speed, run it on two cores with
+`taskset -c 0,1 bun run perf:check`.
 
 ## Coverage
 

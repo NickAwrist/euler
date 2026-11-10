@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { type Job, activeJob } from "../../../src/schemas/jobs";
+import type { Job } from "../../../src/gen/euler/v1/jobs_pb";
 import type { Diagnostic } from "../../../src/schemas/observability";
-import { toDiagnostic } from "../../lib/apiError";
+import { activeJob } from "../../lib/agentStatus";
+import { diagnosticFromDetail, toDiagnostic } from "../../lib/apiError";
+import { optionalMillis, toMillis } from "../../lib/timestamps";
 import { fetchJob } from "../../persist/jobs";
 import { ErrorNotice } from "../ErrorNotice";
 import { Modal } from "../Modal";
@@ -42,6 +44,9 @@ export function JobTraceModal({
   }, [sessionId, job.id, job.status]);
   const current = detail ?? job;
   const running = activeJob(current);
+  const createdAt = toMillis(current.createdAt);
+  const endedAt = optionalMillis(current.endedAt);
+  const failure = current.error && diagnosticFromDetail(current.error);
   return (
     <Modal
       title="Job details"
@@ -60,8 +65,8 @@ export function JobTraceModal({
             <div>
               <dt className="text-xs text-muted-foreground">Started</dt>
               <dd className="mt-1 text-xs">
-                <time dateTime={new Date(current.createdAt).toISOString()}>
-                  {new Date(current.createdAt).toLocaleString(undefined, {
+                <time dateTime={new Date(createdAt).toISOString()}>
+                  {new Date(createdAt).toLocaleString(undefined, {
                     dateStyle: "medium",
                     timeStyle: "long",
                   })}
@@ -71,9 +76,9 @@ export function JobTraceModal({
             <div>
               <dt className="text-xs text-muted-foreground">Finished</dt>
               <dd className="mt-1 text-xs">
-                {current.endedAt !== null ? (
-                  <time dateTime={new Date(current.endedAt).toISOString()}>
-                    {new Date(current.endedAt).toLocaleString(undefined, {
+                {endedAt !== null ? (
+                  <time dateTime={new Date(endedAt).toISOString()}>
+                    {new Date(endedAt).toLocaleString(undefined, {
                       dateStyle: "medium",
                       timeStyle: "long",
                     })}
@@ -97,7 +102,7 @@ export function JobTraceModal({
           <h3 className="mb-2 text-xs font-semibold text-muted-foreground">
             Input
           </h3>
-          <ToolContentView content={current.input} />
+          {current.input && <ToolContentView content={current.input} />}
         </section>
         {running && current.progress && current.progress.blocks.length > 0 && (
           <section aria-label="Job progress">
@@ -137,7 +142,7 @@ export function JobTraceModal({
             </div>
           </details>
         )}
-        {current.error && <ErrorNotice error={current.error} />}
+        {failure && <ErrorNotice error={failure} />}
       </div>
     </Modal>
   );

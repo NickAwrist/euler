@@ -1,4 +1,5 @@
 import { expect, test } from "bun:test";
+import { fixtureMessage } from "../../ui/dev/fixtures";
 import {
   formatRunTranscript,
   transcriptFileName,
@@ -7,9 +8,9 @@ import {
 test("transcript has a metadata header and labels workspace events separately", () => {
   const transcript = formatRunTranscript(
     [
-      { role: "user", content: "Hi" },
-      { role: "event", content: "Working directory changed to /tmp/ux-dir" },
-      { role: "assistant", content: "Hello" },
+      fixtureMessage("user", "Hi"),
+      fixtureMessage("event", "Working directory changed to /tmp/ux-dir"),
+      fixtureMessage("assistant", "Hello"),
     ],
     {
       title: "Greeting",

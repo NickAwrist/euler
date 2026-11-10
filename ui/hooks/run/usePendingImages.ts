@@ -6,11 +6,11 @@ import {
   useState,
 } from "react";
 import {
-  type ImageAttachment,
   ImageMimeTypeSchema,
   MAX_IMAGES_PER_MESSAGE,
   MAX_IMAGE_BYTES,
 } from "../../../src/attachments/types";
+import type { ImageAttachment } from "../../../src/gen/euler/v1/attachments_pb";
 import { whileRunning } from "../../lib/whileRunning";
 import { uploadImageAttachment } from "../../persist/attachments";
 import { createBrowserUuid } from "../../persist/userIdentity";

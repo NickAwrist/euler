@@ -1,3 +1,4 @@
+import { linkedWorkspace } from "../lib/workspace";
 import type { SessionWorkspace } from "../types";
 
 export type RunCommandName = "directory" | "link" | "sandbox" | "workspace";
@@ -30,7 +31,8 @@ export function matchingRunCommands(
     return [];
   }
   const query = trimmed.slice(1).toLowerCase();
-  const privateSandbox = workspace.kind === "sandbox" && !workspace.linked;
+  const privateSandbox =
+    workspace.kind.case === "sandbox" && !linkedWorkspace(workspace);
   return RUN_COMMANDS.filter(
     (command) =>
       command.name.startsWith(query) &&

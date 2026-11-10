@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { whileRunning } from "../../lib/whileRunning";
 import {
-  type McpServerData,
+  type McpServer,
   addMcpServersApi,
   deleteMcpServerApi,
   fetchMcpServers,
@@ -13,11 +13,9 @@ function message(error: unknown, fallback: string): string {
 }
 
 export function useMcpServers() {
-  const [servers, setServers] = useState<McpServerData[]>([]);
+  const [servers, setServers] = useState<McpServer[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<McpServerData | null>(
-    null,
-  );
+  const [pendingDelete, setPendingDelete] = useState<McpServer | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
@@ -33,12 +31,12 @@ export function useMcpServers() {
   }, [load]);
 
   /** Throws so the add form can show the reason next to the pasted config. */
-  const add = async (config: unknown) => {
+  const add = async (config: string) => {
     const added = await addMcpServersApi(config);
     setServers((current) => [...current, ...added]);
   };
 
-  const setEnabled = async (server: McpServerData, enabled: boolean) => {
+  const setEnabled = async (server: McpServer, enabled: boolean) => {
     setError(null);
     try {
       const updated = await setMcpServerEnabledApi(server.id, enabled);

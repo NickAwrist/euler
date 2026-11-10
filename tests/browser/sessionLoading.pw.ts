@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { startAsyncBackend } from "./asyncBackend";
+import { AgentService } from "../../src/gen/euler/v1/agent_pb";
+import { FIXTURE_MODEL, startAsyncBackend, useBackend } from "./asyncBackend";
+import { RpcFailure, mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 // These checks exercise returning users; first-visit setup has its own suite.
@@ -22,28 +24,9 @@ test("session loading: async agents continue across chat messages and browser re
   page,
 }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.route("**/api/**", async (route) => {
-    const url = new URL(route.request().url());
-    if (url.pathname === "/api/models")
-      return route.fulfill({
-        json: {
-          models: [
-            {
-              id: "openrouter:openai/gpt-5.6-terra",
-              name: "Fixture",
-              provider: "openrouter",
-              lab: "Test",
-              configured: true,
-              inputCapabilities: ["text"],
-            },
-          ],
-        },
-      });
-    url.port = "5198";
-    return route.continue({ url: url.toString() });
-  });
+  await useBackend(page, server.url);
   await mockUserPreferences(page, undefined, {
-    settings: { defaultModel: "openrouter:openai/gpt-5.6-terra" },
+    settings: { defaultModel: FIXTURE_MODEL },
   });
   await page.goto("/");
   const input = page.getByPlaceholder("Send a message...");
@@ -127,12 +110,17 @@ test("session loading: async agents continue across chat messages and browser re
   await page.keyboard.press("Escape");
   await expect(trace).toHaveCount(0);
   await page.keyboard.press("Escape");
-  await page.route("**/api/sessions/*/messages", (route) =>
-    route.fulfill({
-      status: 400,
-      json: { error: { code: "INVALID_REQUEST", message: "Message rejected" } },
-    }),
-  );
+  await mockRpc(page, [
+    on(
+      AgentService.method.sendMessage,
+      () =>
+        new RpcFailure(
+          "invalid_argument",
+          "Message rejected",
+          "INVALID_REQUEST",
+        ),
+    ),
+  ]);
   await input.fill("Retain this draft");
   await page.getByRole("button", { name: "Send message" }).click();
   await expect(

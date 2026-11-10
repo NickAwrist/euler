@@ -1,6 +1,7 @@
 import { EyeOff, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { safeStorage } from "../lib/safeStorage";
+import { toMillis } from "../lib/timestamps";
 import type { SessionSummary } from "../types";
 import {
   WELCOME_QUESTION_KEY,
@@ -101,7 +102,7 @@ export function WelcomeHome({
                           {s.preview || "Chat"}
                         </span>
                         <span className="shrink-0 text-[0.75rem] text-muted-foreground">
-                          {new Date(s.updatedAt).toLocaleDateString()}
+                          {new Date(toMillis(s.updatedAt)).toLocaleDateString()}
                         </span>
                       </button>
                     </li>

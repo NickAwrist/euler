@@ -1,4 +1,6 @@
-import type { ModelReasoning } from "../types";
+import type { MessageFields, ModelReasoning as Reasoning } from "../types";
+
+type ModelReasoning = MessageFields<Reasoning>;
 
 export type ThinkingTier = "off" | "low" | "medium" | "high" | "xhigh" | "max";
 

@@ -5,28 +5,15 @@ import express from "express";
 import { agentRuntime } from "./agents/runtime/AgentRuntime";
 import { getDb } from "./db/index";
 import { envConfig } from "./env";
-import { eventHub } from "./events/eventHub";
 import {
   errorHandler,
   requestObservability,
   sendError,
 } from "./observability/http";
-import attachmentsRoutes from "./routes/attachments";
-import chatGptRoutes from "./routes/chatgpt";
 import comfyuiRoutes from "./routes/comfyui";
-import debugPromptRoutes from "./routes/debugPrompt";
-import directoriesRoutes from "./routes/directories";
 import faviconsRoutes from "./routes/favicons";
-import mcpServersRoutes from "./routes/mcpServers";
-import modelsRoutes from "./routes/models";
-import ollamaRoutes from "./routes/ollama";
-import openRouterRoutes from "./routes/openrouter";
-import sessionRoutes from "./routes/sessions";
-import settingsRoutes from "./routes/settings";
-import skillsRoutes from "./routes/skills";
-import usageRoutes from "./routes/usage";
+import { rpcMiddleware } from "./rpc/routes";
 import { startSessionExpiry } from "./sessions/lifecycle";
-import { requireUserId } from "./userIdentity";
 import { workspaceService } from "./workspaces/WorkspaceService";
 
 getDb();
@@ -50,32 +37,18 @@ app.use(
   cors({
     origin: allowedOrigins,
     credentials: false,
+    allowedHeaders: [
+      "Content-Type",
+      "X-Euler-User-ID",
+      "Connect-Protocol-Version",
+      "Connect-Timeout-Ms",
+    ],
+    exposedHeaders: ["Grpc-Status", "Grpc-Message", "X-Request-Id"],
   }),
 );
-app.use(express.json({ limit: "10mb" }));
-app.use("/api/usage", usageRoutes);
-app.use("/api/directories", directoriesRoutes);
-app.use("/api/settings/openrouter", openRouterRoutes);
-app.use("/api/settings/chatgpt", chatGptRoutes);
-app.use("/api/settings", settingsRoutes);
-app.use("/api/skills", skillsRoutes);
-app.use("/api/mcp-servers", mcpServersRoutes);
-app.use("/api/attachments", attachmentsRoutes);
+app.use(rpcMiddleware());
 app.use("/api/comfyui", comfyuiRoutes);
 app.use("/api/favicons", faviconsRoutes);
-app.use("/api/ollama", ollamaRoutes);
-app.use("/api/models", modelsRoutes);
-app.use("/api/sessions", debugPromptRoutes);
-app.use("/api/sessions", sessionRoutes);
-app.get("/api/events", (req, res) => {
-  const owner = requireUserId(req, res);
-  if (owner)
-    eventHub.attach(
-      owner,
-      res,
-      Number(req.headers["last-event-id"]) || undefined,
-    );
-});
 
 const distPath = join(process.cwd(), "dist");
 const indexPath = join(distPath, "index.html");

@@ -1,4 +1,6 @@
 import { expect, test } from "@playwright/test";
+import { ProviderService } from "../../src/gen/euler/v1/providers_pb";
+import { RpcFailure, mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 const authorizationUrl = "https://auth.example.test/authorize?state=abc";
@@ -36,46 +38,42 @@ for (const device of ["desktop", "mobile"] as const) {
       .route(pictureUrl, (route) =>
         route.fulfill({ contentType: "image/png", body: pixel }),
       );
-    await page.route("**/api/**", async (route) => {
-      const path = new URL(route.request().url()).pathname;
-      const method = route.request().method();
-      const status = () => ({
-        connected,
-        email: connected ? "nick@example.com" : null,
-        name: connected ? "Nick Example" : null,
-        picture: connected ? pictureUrl : null,
-        planEnabled: connected,
-      });
-      if (path === "/api/settings/chatgpt/login") {
-        logins.push(route.request().postDataJSON());
-        return route.fulfill({ json: { authorizationUrl } });
-      }
-      if (path === "/api/settings/chatgpt/callback") {
-        const body = route.request().postDataJSON() as { callbackUrl: string };
-        callbacks.push(body);
-        if (!body.callbackUrl.includes("code="))
-          return route.fulfill({
-            status: 400,
-            json: {
-              error: {
-                code: "INVALID_REQUEST",
-                message: "ChatGPT sign-in failed.",
-              },
-            },
-          });
-        connected = true;
-        return route.fulfill({ json: status() });
-      }
-      if (path === "/api/settings/chatgpt") {
-        if (method === "DELETE") {
-          connected = false;
-          return route.fulfill({ json: { revoked: false } });
-        }
-        statusLoads += 1;
-        return route.fulfill({ json: status() });
-      }
-      return route.fulfill({ json: { ollamaHost: false, comfyuiHost: false } });
+    const status = () => ({
+      connected,
+      email: connected ? "nick@example.com" : undefined,
+      name: connected ? "Nick Example" : undefined,
+      picture: connected ? pictureUrl : undefined,
+      planEnabled: connected,
     });
+    await mockRpc(
+      page,
+      [
+        on(ProviderService.method.startChatGptLogin, ({ newAccount }) => {
+          logins.push({ newAccount });
+          return { authorizationUrl };
+        }),
+        on(ProviderService.method.finishChatGptLogin, ({ callbackUrl }) => {
+          callbacks.push({ callbackUrl });
+          if (!callbackUrl.includes("code="))
+            return new RpcFailure(
+              "invalid_argument",
+              "ChatGPT sign-in failed.",
+              "INVALID_REQUEST",
+            );
+          connected = true;
+          return { status: status() };
+        }),
+        on(ProviderService.method.disconnectChatGpt, () => {
+          connected = false;
+          return { revoked: false };
+        }),
+        on(ProviderService.method.getChatGptStatus, () => {
+          statusLoads += 1;
+          return { status: status() };
+        }),
+      ],
+      { empty: true },
+    );
     try {
       await mockUserPreferences(page);
       await page.goto("/dev/settings");
@@ -182,20 +180,20 @@ test("settings save desktop: ChatGPT account without name or working picture", a
   await page
     .context()
     .route(brokenPicture, (route) => route.fulfill({ status: 404 }));
-  await page.route("**/api/**", (route) => {
-    const path = new URL(route.request().url()).pathname;
-    if (path === "/api/settings/chatgpt")
-      return route.fulfill({
-        json: {
+  await mockRpc(
+    page,
+    [
+      on(ProviderService.method.getChatGptStatus, () => ({
+        status: {
           connected: true,
           email: "nick@example.com",
-          name: null,
           picture: brokenPicture,
           planEnabled: true,
         },
-      });
-    return route.fulfill({ json: { ollamaHost: false, comfyuiHost: false } });
-  });
+      })),
+    ],
+    { empty: true },
+  );
   try {
     await mockUserPreferences(page);
     await page.goto("/dev/settings");

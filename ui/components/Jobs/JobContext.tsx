@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { Job } from "../../../src/schemas/jobs";
+import type { Job } from "../../../src/gen/euler/v1/jobs_pb";
 export const JobContext = createContext<{
   jobs: Job[];
   open: (id: string) => void;

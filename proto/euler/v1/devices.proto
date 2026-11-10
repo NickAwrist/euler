@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package euler.v1;
+
+import "buf/validate/validate.proto";
+
+// iPhones that receive push notifications for the user's chats.
+service DeviceService {
+  rpc RegisterDevice(RegisterDeviceRequest) returns (RegisterDeviceResponse);
+  rpc UnregisterDevice(UnregisterDeviceRequest) returns (UnregisterDeviceResponse);
+}
+
+enum ApnsEnvironment {
+  APNS_ENVIRONMENT_UNSPECIFIED = 0;
+  // Builds run from Xcode.
+  APNS_ENVIRONMENT_SANDBOX = 1;
+  // TestFlight and App Store builds.
+  APNS_ENVIRONMENT_PRODUCTION = 2;
+}
+
+message RegisterDeviceRequest {
+  // The APNs device token, hex encoded.
+  string token = 1 [(buf.validate.field).string.pattern = "^[0-9a-fA-F]{32,200}$"];
+  ApnsEnvironment environment = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // The app's bundle ID, which APNs uses as the topic.
+  string bundle_id = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 200
+  }];
+}
+
+message RegisterDeviceResponse {}
+
+message UnregisterDeviceRequest {
+  string token = 1 [(buf.validate.field).string.pattern = "^[0-9a-fA-F]{32,200}$"];
+}
+
+message UnregisterDeviceResponse {}

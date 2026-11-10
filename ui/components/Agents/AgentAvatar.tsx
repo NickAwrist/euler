@@ -6,7 +6,12 @@ import {
   useRef,
   useState,
 } from "react";
-import type { Agent } from "../../../src/schemas/agents";
+import {
+  type Agent,
+  Agent_Kind,
+  Agent_Status,
+} from "../../../src/gen/euler/v1/agent_pb";
+import { toMillis } from "../../lib/timestamps";
 import type { AgentPhase } from "../../types";
 import { useAgents } from "./AgentContext";
 
@@ -225,12 +230,18 @@ export function AgentAvatar({
     svg,
     agent.id,
     pattern,
-    agent.status === "running" ? (phases[agent.id] ?? "thinking") : null,
+    agent.status === Agent_Status.RUNNING
+      ? (phases[agent.id] ?? "thinking")
+      : null,
   );
   // Colors follow spawn order so the first agents in a session never share one.
   const order = agents
-    .filter((a) => a.kind !== "main")
-    .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
+    .filter((a) => a.kind !== Agent_Kind.MAIN)
+    .sort(
+      (a, b) =>
+        toMillis(a.createdAt) - toMillis(b.createdAt) ||
+        a.id.localeCompare(b.id),
+    )
     .findIndex((a) => a.id === agent.id);
   return (
     <svg

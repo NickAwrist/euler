@@ -1,5 +1,4 @@
 import { posix } from "node:path";
-import type { FilePreview } from "../schemas/artifacts";
 import {
   type Workspace,
   WorkspaceError,
@@ -8,10 +7,25 @@ import {
 
 const MAX_TEXT_BYTES = 1024 * 1024;
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const imageTypes: Record<
-  string,
-  Extract<FilePreview, { kind: "image" }>["mediaType"]
-> = {
+type ImageMediaType =
+  | "image/png"
+  | "image/jpeg"
+  | "image/gif"
+  | "image/webp"
+  | "image/avif"
+  | "image/svg+xml";
+
+/** A workspace file's contents, read for display. */
+export type FilePreview =
+  | { kind: "text"; path: string; content: string }
+  | {
+      kind: "image";
+      path: string;
+      mediaType: ImageMediaType;
+      data: Uint8Array;
+    };
+
+const imageTypes: Record<string, ImageMediaType> = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
@@ -73,7 +87,7 @@ export async function readArtifactPreview(
     if (length > limit) throw new WorkspaceError(limitMessage);
     const bytes = buffer.subarray(0, length);
     if (mediaType)
-      return { kind: "image", path, mediaType, data: bytes.toString("base64") };
+      return { kind: "image", path, mediaType, data: new Uint8Array(bytes) };
     if (bytes.includes(0))
       throw new WorkspaceError("This binary file cannot be previewed as text");
     let content: string;

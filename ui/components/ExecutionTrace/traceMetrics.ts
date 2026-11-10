@@ -1,4 +1,7 @@
-import type { CostBreakdown, MessageStep } from "../../types";
+import { Step_Kind } from "../../../src/gen/euler/v1/steps_pb";
+import type { Step, CostBreakdown as StepCostBreakdown } from "../../types";
+
+type CostBreakdown = Omit<StepCostBreakdown, "$typeName">;
 
 export type TraceMetricsSummary = {
   calls: number;
@@ -19,17 +22,18 @@ function finiteNumber(value: unknown): number | undefined {
 }
 
 function collectLlmMetrics(
-  steps: MessageStep[] | undefined,
-  out: NonNullable<MessageStep["metrics"]>[] = [],
-): NonNullable<MessageStep["metrics"]>[] {
+  steps: Step[] | undefined,
+  out: NonNullable<Step["metrics"]>[] = [],
+): NonNullable<Step["metrics"]>[] {
   for (const step of steps ?? []) {
-    if (step.kind === "llm_call" && step.metrics) out.push(step.metrics);
+    if (step.kind === Step_Kind.LLM_CALL && step.metrics)
+      out.push(step.metrics);
   }
   return out;
 }
 
 export function summarizeTraceMetrics(
-  steps: MessageStep[] | undefined,
+  steps: Step[] | undefined,
 ): TraceMetricsSummary | null {
   const metrics = collectLlmMetrics(steps);
   if (metrics.length === 0) return null;

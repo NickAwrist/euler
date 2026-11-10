@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { modelSettingsRequest } from "../../lib/modelSettingsRequest";
+import type { ApiKeyProvider } from "../../../src/gen/euler/v1/providers_pb";
+import { providerClient } from "../../lib/rpc";
 
 /** Reads and updates a server-held API key without exposing its value. */
-export function useApiKeySetting(path: string) {
+export function useApiKeySetting(provider: ApiKeyProvider) {
   const [environmentManaged, setEnvironmentManaged] = useState<boolean>();
   const [hasKey, setHasKey] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -10,13 +11,12 @@ export function useApiKeySetting(path: string) {
 
   useEffect(() => {
     let active = true;
-    void modelSettingsRequest<{ hasKey: boolean; environmentManaged: boolean }>(
-      path,
-    )
-      .then((key) => {
+    void providerClient
+      .getApiKey({ provider })
+      .then(({ state }) => {
         if (!active) return;
-        setHasKey(key.hasKey);
-        setEnvironmentManaged(key.environmentManaged);
+        setHasKey(state?.hasKey ?? false);
+        setEnvironmentManaged(state?.environmentManaged ?? false);
       })
       .catch(() => {
         if (active) setLoadError("Could not load API key settings.");
@@ -27,18 +27,14 @@ export function useApiKeySetting(path: string) {
     return () => {
       active = false;
     };
-  }, [path]);
+  }, [provider]);
 
   const save = useCallback(
     async (apiKey: string) => {
-      const result = await modelSettingsRequest<{ hasKey: boolean }>(
-        path,
-        "PUT",
-        { apiKey },
-      );
-      setHasKey(result.hasKey);
+      const { state } = await providerClient.setApiKey({ provider, apiKey });
+      setHasKey(state?.hasKey ?? false);
     },
-    [path],
+    [provider],
   );
 
   return { environmentManaged, hasKey, loading, loadError, save };

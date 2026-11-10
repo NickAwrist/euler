@@ -36,16 +36,3 @@ export const SkillWriteSchema = z.object({
 });
 
 export type SkillWriteBody = z.infer<typeof SkillWriteSchema>;
-
-export const SkillSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  description: z.string(),
-  instructions: z.string(),
-  user_invocable: z.boolean(),
-  disable_model_invocation: z.boolean(),
-  created_at: z.number(),
-  updated_at: z.number(),
-});
-
-export type SkillData = z.infer<typeof SkillSchema>;

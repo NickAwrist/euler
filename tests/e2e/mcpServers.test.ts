@@ -1,132 +1,93 @@
 import "../setup";
 import { expect, test } from "bun:test";
+import { toBinary } from "@bufbuild/protobuf";
+import { CreateServersResponseSchema } from "../../src/gen/euler/v1/mcp_pb";
 import { MCP_TEST_TOKEN, startMcpTestServer } from "../helpers/mcpServer";
-import { startTestServer, userHeaders } from "../helpers/server";
-
-const jsonHeaders = (ownerUuid?: string) =>
-  userHeaders(ownerUuid, { "Content-Type": "application/json" });
+import { Code, rpc, rpcCode, rpcError } from "../helpers/rpc";
 
 test("MCP server configs are validated, user scoped, and never return header values", async () => {
-  const { url, close } = await startTestServer();
   const mcp = startMcpTestServer();
-  const otherUser = "22222222-2222-4222-8222-222222222222";
+  const api = rpc().mcp;
+  const other = rpc("22222222-2222-4222-8222-222222222222").mcp;
   try {
-    const local = await fetch(`${url}/api/mcp-servers`, {
-      method: "POST",
-      headers: jsonHeaders(),
-      body: JSON.stringify({
-        mcpServers: { files: { command: "npx", args: ["server"] } },
+    const local = await rpcError(
+      api.createServers({
+        config: JSON.stringify({
+          mcpServers: { files: { command: "npx", args: ["server"] } },
+        }),
+      }),
+    );
+    expect(local.code).toBe(Code.InvalidArgument);
+    expect(local.rawMessage).toBe(
+      "local (command) servers are not supported; use a remote server url",
+    );
+    expect(await rpcCode(api.createServers({ config: "{not json" }))).toBe(
+      Code.InvalidArgument,
+    );
+
+    const created = await api.createServers({
+      config: JSON.stringify({
+        mcpServers: {
+          test: {
+            url: mcp.url,
+            headers: { Authorization: `Bearer ${MCP_TEST_TOKEN}` },
+          },
+          wrong: { url: mcp.url, headers: { Authorization: "Bearer nope" } },
+        },
       }),
     });
-    expect(local.status).toBe(400);
-    expect(await local.json()).toMatchObject({
-      error: {
-        message:
-          "local (command) servers are not supported; use a remote server url",
-      },
-    });
-
-    const config = {
-      mcpServers: {
-        test: {
-          url: mcp.url,
-          headers: { Authorization: `Bearer ${MCP_TEST_TOKEN}` },
-        },
-        wrong: { url: mcp.url, headers: { Authorization: "Bearer nope" } },
-      },
-    };
-    const create = await fetch(`${url}/api/mcp-servers`, {
-      method: "POST",
-      headers: jsonHeaders(),
-      body: JSON.stringify(config),
-    });
-    expect(create.status).toBe(201);
-    const body = await create.text();
-    expect(body).not.toContain(MCP_TEST_TOKEN);
-    const { servers } = JSON.parse(body) as {
-      servers: { id: string; name: string }[];
-    };
-    expect(servers).toMatchObject([
+    expect(
+      Buffer.from(toBinary(CreateServersResponseSchema, created)).toString(),
+    ).not.toContain(MCP_TEST_TOKEN);
+    expect(created.servers).toMatchObject([
       { name: "test", headerNames: ["Authorization"], enabled: true },
       { name: "wrong" },
     ]);
-    const [good, bad] = servers;
+    const [good, bad] = created.servers;
     if (!good || !bad) throw new Error("expected two servers");
 
-    const duplicate = await fetch(`${url}/api/mcp-servers`, {
-      method: "POST",
-      headers: jsonHeaders(),
-      body: JSON.stringify({ mcpServers: { test: { url: mcp.url } } }),
-    });
-    expect(duplicate.status).toBe(409);
+    expect(
+      await rpcCode(
+        api.createServers({
+          config: JSON.stringify({ mcpServers: { test: { url: mcp.url } } }),
+        }),
+      ),
+    ).toBe(Code.FailedPrecondition);
 
-    const otherList = await fetch(`${url}/api/mcp-servers`, {
-      headers: userHeaders(otherUser),
-    });
-    expect(await otherList.json()).toEqual({ servers: [] });
-    const otherCheck = await fetch(`${url}/api/mcp-servers/${good.id}/check`, {
-      method: "POST",
-      headers: userHeaders(otherUser),
-    });
-    expect(otherCheck.status).toBe(404);
+    expect((await other.listServers({})).servers).toEqual([]);
+    expect(await rpcCode(other.testServer({ id: good.id }))).toBe(
+      Code.NotFound,
+    );
 
-    const check = await fetch(`${url}/api/mcp-servers/${good.id}/check`, {
-      method: "POST",
-      headers: userHeaders(),
+    const check = await api.testServer({ id: good.id });
+    expect(check.result).toMatchObject({
+      case: "connected",
+      value: {
+        icons: [],
+        tools: [
+          { name: "echo", description: "Echo text.", icons: [] },
+          { name: "fail", description: "Always fails.", icons: [] },
+        ],
+      },
     });
-    expect(await check.json()).toEqual({
-      ok: true,
-      icons: [],
-      tools: [
-        { name: "echo", description: "Echo text.", icons: [] },
-        { name: "fail", description: "Always fails.", icons: [] },
-      ],
-    });
-    const failedCheck = await fetch(`${url}/api/mcp-servers/${bad.id}/check`, {
-      method: "POST",
-      headers: userHeaders(),
-    });
-    expect(await failedCheck.json()).toMatchObject({ ok: false });
+    expect((await api.testServer({ id: bad.id })).result.case).toBe("error");
 
-    const toolList = await fetch(`${url}/api/mcp-servers/tools`, {
-      headers: userHeaders(),
-    });
-    expect(await toolList.json()).toEqual({
-      tools: [
-        { name: "mcp__test__echo", description: "Echo text.", icons: [] },
-        { name: "mcp__test__fail", description: "Always fails.", icons: [] },
-      ],
-    });
-    const otherTools = await fetch(`${url}/api/mcp-servers/tools`, {
-      headers: userHeaders(otherUser),
-    });
-    expect(await otherTools.json()).toEqual({ tools: [] });
+    expect((await api.listTools({})).tools).toMatchObject([
+      { name: "mcp__test__echo", description: "Echo text.", icons: [] },
+      { name: "mcp__test__fail", description: "Always fails.", icons: [] },
+    ]);
+    expect((await other.listTools({})).tools).toEqual([]);
 
-    const disable = await fetch(`${url}/api/mcp-servers/${good.id}`, {
-      method: "PATCH",
-      headers: jsonHeaders(),
-      body: JSON.stringify({ enabled: false }),
-    });
-    expect(await disable.json()).toMatchObject({ enabled: false });
+    const disabled = await api.updateServer({ id: good.id, enabled: false });
+    expect(disabled.server).toMatchObject({ enabled: false });
+    expect((await api.listTools({})).tools).toEqual([]);
 
-    const disabledTools = await fetch(`${url}/api/mcp-servers/tools`, {
-      headers: userHeaders(),
-    });
-    expect(await disabledTools.json()).toEqual({ tools: [] });
-
-    const remove = await fetch(`${url}/api/mcp-servers/${bad.id}`, {
-      method: "DELETE",
-      headers: userHeaders(),
-    });
-    expect(remove.status).toBe(200);
-    const list = await fetch(`${url}/api/mcp-servers`, {
-      headers: userHeaders(),
-    });
-    expect(await list.json()).toMatchObject({
-      servers: [{ id: good.id, enabled: false }],
-    });
+    await api.deleteServer({ id: bad.id });
+    expect((await api.listServers({})).servers).toMatchObject([
+      { id: good.id, enabled: false },
+    ]);
+    expect(await rpcCode(api.deleteServer({ id: bad.id }))).toBe(Code.NotFound);
   } finally {
     mcp.close();
-    await close();
   }
 });

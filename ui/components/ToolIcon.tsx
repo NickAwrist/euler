@@ -1,5 +1,5 @@
 import { Plug, Wrench } from "lucide-react";
-import type { DisplayIcon } from "../../src/schemas/icons";
+import type { DisplayIcon } from "../../src/gen/euler/v1/common_pb";
 import { ServiceIcon } from "./ServiceIcon";
 
 export function ToolIcon({
@@ -9,7 +9,7 @@ export function ToolIcon({
   className,
 }: {
   name?: string;
-  icons?: readonly DisplayIcon[];
+  icons?: readonly Pick<DisplayIcon, "src" | "theme">[];
   size?: number;
   className?: string;
 }) {

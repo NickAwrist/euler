@@ -1,4 +1,4 @@
-import type { FilePreview } from "../../../src/schemas/artifacts";
+import type { ArtifactPreview as FilePreview } from "../../../src/gen/euler/v1/workspace_pb";
 import type { ArtifactSource } from "./api";
 
 const MAX_BYTES = 16 * 1024 * 1024;
@@ -73,10 +73,11 @@ export class ArtifactPreviewCache implements ArtifactSource {
       .preview(path, controller.signal)
       .then((preview) => {
         controller.signal.throwIfAborted();
+        const { content } = preview;
         const bytes =
-          (preview.kind === "text"
-            ? preview.content.length
-            : preview.data.length) * 2;
+          content.case === "text"
+            ? content.value.length * 2
+            : (content.value?.data.length ?? 0);
         if (bytes <= MAX_BYTES) {
           this.remove(path);
           while (

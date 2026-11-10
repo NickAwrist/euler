@@ -71,6 +71,8 @@ export default defineConfig(({ mode }) => {
         "/api": {
           target: apiTarget,
           changeOrigin: true,
+          // Names the browser's address, so loopback-only RPCs stay local.
+          xfwd: true,
         },
       },
     },
@@ -79,6 +81,8 @@ export default defineConfig(({ mode }) => {
         "/api": {
           target: apiTarget,
           changeOrigin: true,
+          // Names the browser's address, so loopback-only RPCs stay local.
+          xfwd: true,
         },
       },
     },

@@ -1,4 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { McpServerService } from "../../src/gen/euler/v1/mcp_pb";
+import { Step_Kind, Step_Status } from "../../src/gen/euler/v1/steps_pb";
+import { at, message, mockApp, ollamaModel } from "./appFixture";
+import { mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 const src =
@@ -20,109 +24,65 @@ for (const device of ["desktop", "mobile"] as const) {
         "12345678-1234-4234-9234-123456789abc",
       ),
     );
-    const history = [
-      {
-        role: "assistant",
-        content: "Echoed hello.",
-        steps: [
+    const step = (toolName: string, result: string, toolIcons = icons) => ({
+      kind: Step_Kind.TOOL_CALL,
+      status: Step_Status.DONE,
+      toolName,
+      toolIcons,
+      result,
+    });
+    await mockApp(page, {
+      sessions: [
+        { id: "icons", preview: "Icons", createdAt: at(1), updatedAt: at(1) },
+      ],
+      chats: {
+        icons: {
+          model: "test",
+          history: [
+            message("assistant", "Echoed hello.", {
+              steps: [
+                step("mcp__removed__echo", "hello"),
+                step("mcp__old__echo", "Legacy MCP call", []),
+                step("bash", "Built-in call", []),
+              ],
+            }),
+          ],
+        },
+      },
+      models: [ollamaModel("test", { name: "Test" })],
+    });
+    await mockRpc(page, [
+      on(McpServerService.method.listServers, () => ({
+        servers: [
           {
-            kind: "tool_call",
-            status: "done",
-            toolName: "mcp__removed__echo",
-            toolIcons: icons,
-            result: "hello",
-          },
-          {
-            kind: "tool_call",
-            status: "done",
-            toolName: "mcp__old__echo",
-            result: "Legacy MCP call",
-          },
-          {
-            kind: "tool_call",
-            status: "done",
-            toolName: "bash",
-            result: "Built-in call",
+            id: "test",
+            name: "test",
+            url: "https://mcp.example",
+            enabled: true,
+            createdAt: at(1),
+            updatedAt: at(1),
           },
         ],
-      },
-    ];
-    await page.route("**/api/**", (route) => {
-      const path = new URL(route.request().url()).pathname;
-      let json: unknown = {};
-      if (path === "/api/mcp-servers")
-        json = {
-          servers: [
-            {
-              id: "test",
-              name: "test",
-              url: "https://mcp.example",
-              headerNames: [],
-              enabled: true,
-              created_at: 1,
-              updated_at: 1,
-            },
-          ],
-        };
-      if (path === "/api/mcp-servers/test/check")
-        json = {
-          ok: true,
-          icons,
-          tools: [
-            { name: "echo", icons },
-            {
-              name: "broken",
-              icons: [{ src: "data:image/png;base64,broken" }],
-            },
-          ],
-        };
-      if (path === "/api/mcp-servers/tools")
-        json = {
-          tools: [{ name: "mcp__test__echo", description: "Echo text", icons }],
-        };
-      if (path === "/api/sessions/icons")
-        json = {
-          id: "icons",
-          model: "test",
-          expiresAt: null,
-          history,
-        };
-      if (path === "/api/sessions")
-        json = {
-          sessions: [
-            {
-              id: "icons",
-              preview: "Icons",
-              createdAt: 1,
-              updatedAt: 1,
-              expiresAt: null,
-            },
-          ],
-        };
-      if (path.endsWith("/health")) json = { connected: true };
-      if (path === "/api/models")
-        json = {
-          models: [
-            {
-              id: "test",
-              name: "Test",
-              lab: "Ollama",
-              provider: "ollama",
-              inputCapabilities: ["text"],
-            },
-          ],
-        };
-      if (path.endsWith("/runtime"))
-        json = {
-          agents: [],
-          activation: null,
-          queued: [],
-          held: false,
-          sequence: 0,
-          history,
-        };
-      return route.fulfill({ json });
-    });
+      })),
+      on(McpServerService.method.testServer, () => ({
+        result: {
+          case: "connected" as const,
+          value: {
+            icons,
+            tools: [
+              { name: "echo", icons },
+              {
+                name: "broken",
+                icons: [{ src: "data:image/png;base64,broken" }],
+              },
+            ],
+          },
+        },
+      })),
+      on(McpServerService.method.listTools, () => ({
+        tools: [{ name: "mcp__test__echo", description: "Echo text", icons }],
+      })),
+    ]);
     await mockUserPreferences(page);
     await page.goto("/customization/tools");
     const tools = page.locator("section[aria-labelledby='mcp-servers']");

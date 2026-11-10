@@ -1,0 +1,248 @@
+syntax = "proto3";
+
+package euler.v1;
+
+import "buf/validate/validate.proto";
+import "euler/v1/common.proto";
+import "euler/v1/permissions.proto";
+import "google/protobuf/struct.proto";
+
+// The user's settings and customization, shared by every client.
+service PreferenceService {
+  rpc GetPreferences(GetPreferencesRequest) returns (GetPreferencesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Changes the fields that are set and returns the saved preferences.
+  rpc UpdatePreferences(UpdatePreferencesRequest) returns (UpdatePreferencesResponse);
+  // Adds or replaces one tool permission rule.
+  rpc PutPermissionRule(PutPermissionRuleRequest) returns (PutPermissionRuleResponse);
+  rpc DeletePermissionRule(DeletePermissionRuleRequest) returns (DeletePermissionRuleResponse);
+  // The tools agents can call, for rule pickers.
+  rpc ListPermissionTools(ListPermissionToolsRequest) returns (ListPermissionToolsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Which provider addresses the server's environment sets; those are read-only.
+  rpc GetEnvironment(GetEnvironmentRequest) returns (GetEnvironmentResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message UserPreferences {
+  repeated ToolPermissionRule tool_permission_rules = 1;
+  ImagePreferences image = 2;
+  UserSettings settings = 3;
+  Appearance appearance = 4;
+  Layout layout = 5;
+  Capabilities capabilities = 6;
+}
+
+message ImagePreferences {
+  string default_model = 1;
+  uint32 default_width = 2;
+  uint32 default_height = 3;
+  string negative_prompt = 4;
+}
+
+message UserSettings {
+  // Absent uses Euler's default system prompt.
+  optional string system_prompt = 1;
+  string name = 2;
+  string preferred_formats = 3;
+  string location = 4;
+  string default_model = 5;
+  bool include_current_date = 6;
+  bool show_debug_button = 7;
+}
+
+message Appearance {
+  enum Theme {
+    THEME_UNSPECIFIED = 0;
+    THEME_DEFAULT = 1;
+    THEME_ONE_DARK = 2;
+    THEME_DRACULA = 3;
+    THEME_NORD = 4;
+    THEME_CATPPUCCIN = 5;
+    THEME_GITHUB = 6;
+  }
+  enum Font {
+    FONT_UNSPECIFIED = 0;
+    FONT_DEFAULT = 1;
+    FONT_SERIF = 2;
+    FONT_SYSTEM = 3;
+    FONT_GEIST = 4;
+    FONT_SOURCE_SANS = 5;
+    FONT_ATKINSON = 6;
+    FONT_OPENDYSLEXIC = 7;
+  }
+  enum ChatWidth {
+    CHAT_WIDTH_UNSPECIFIED = 0;
+    CHAT_WIDTH_STANDARD = 1;
+    CHAT_WIDTH_COMFORTABLE = 2;
+    CHAT_WIDTH_WIDE = 3;
+    CHAT_WIDTH_FULL = 4;
+  }
+  enum CodeFont {
+    CODE_FONT_UNSPECIFIED = 0;
+    CODE_FONT_DEFAULT = 1;
+    CODE_FONT_GEIST_MONO = 2;
+    CODE_FONT_JETBRAINS_MONO = 3;
+    CODE_FONT_SOURCE_CODE = 4;
+  }
+  Theme theme = 1;
+  Font font = 2;
+  ChatWidth chat_width = 3;
+  CodeFont code_font = 4;
+  bool shift_for_chat_list = 5;
+  bool shift_for_artifacts = 6;
+  uint32 sidebar_animation_ms = 7;
+}
+
+// The web app's panel layout.
+message Layout {
+  message ArtifactState {
+    bool open = 1;
+    string workspace = 2;
+    optional string path = 3;
+  }
+  bool sidebar_collapsed = 1;
+  // Absent uses the default width.
+  optional double artifact_width = 2;
+  ArtifactState artifact_state = 3;
+}
+
+// Built-in agent capabilities a user can turn off, e.g. in favor of an MCP server.
+message Capabilities {
+  bool web = 1;
+  bool image_generation = 2;
+  bool shell = 3;
+  bool files = 4;
+  bool skills = 5;
+}
+
+message GetPreferencesRequest {}
+
+message GetPreferencesResponse {
+  UserPreferences preferences = 1;
+}
+
+message UpdatePreferencesRequest {
+  message ImagePatch {
+    optional string default_model = 1 [(buf.validate.field).string.max_len = 1000];
+    optional uint32 default_width = 2 [(buf.validate.field).uint32 = {
+      gte: 1
+      lte: 16384
+    }];
+    optional uint32 default_height = 3 [(buf.validate.field).uint32 = {
+      gte: 1
+      lte: 16384
+    }];
+    optional string negative_prompt = 4 [(buf.validate.field).string.max_len = 100000];
+  }
+  message SettingsPatch {
+    // Empty restores the default system prompt.
+    optional string system_prompt = 1 [(buf.validate.field).string.max_len = 100000];
+    optional string name = 2 [(buf.validate.field).string.max_len = 1000];
+    optional string preferred_formats = 3 [(buf.validate.field).string.max_len = 10000];
+    optional string location = 4 [(buf.validate.field).string.max_len = 1000];
+    optional string default_model = 5 [(buf.validate.field).string.max_len = 200];
+    optional bool include_current_date = 6;
+    optional bool show_debug_button = 7;
+  }
+  message AppearancePatch {
+    optional Appearance.Theme theme = 1 [(buf.validate.field).enum = {
+      defined_only: true
+      not_in: [0]
+    }];
+    optional Appearance.Font font = 2 [(buf.validate.field).enum = {
+      defined_only: true
+      not_in: [0]
+    }];
+    optional Appearance.ChatWidth chat_width = 3 [(buf.validate.field).enum = {
+      defined_only: true
+      not_in: [0]
+    }];
+    optional Appearance.CodeFont code_font = 4 [(buf.validate.field).enum = {
+      defined_only: true
+      not_in: [0]
+    }];
+    optional bool shift_for_chat_list = 5;
+    optional bool shift_for_artifacts = 6;
+    optional uint32 sidebar_animation_ms = 7 [(buf.validate.field).uint32.lte = 600];
+  }
+  message LayoutPatch {
+    optional bool sidebar_collapsed = 1;
+    // Zero restores the default width.
+    optional double artifact_width = 2 [(buf.validate.field).double = {
+      gte: 0
+      finite: true
+    }];
+    optional Layout.ArtifactState artifact_state = 3;
+  }
+  message CapabilitiesPatch {
+    optional bool web = 1;
+    optional bool image_generation = 2;
+    optional bool shell = 3;
+    optional bool files = 4;
+    optional bool skills = 5;
+  }
+  optional ImagePatch image = 1;
+  optional SettingsPatch settings = 2;
+  optional AppearancePatch appearance = 3;
+  optional LayoutPatch layout = 4;
+  optional CapabilitiesPatch capabilities = 5;
+}
+
+message UpdatePreferencesResponse {
+  UserPreferences preferences = 1;
+}
+
+message PutPermissionRuleRequest {
+  ToolPermissionRule rule = 1 [(buf.validate.field).required = true];
+}
+
+message PutPermissionRuleResponse {
+  UserPreferences preferences = 1;
+}
+
+message DeletePermissionRuleRequest {
+  string rule_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message DeletePermissionRuleResponse {
+  UserPreferences preferences = 1;
+}
+
+// An argument a rule can match.
+message PermissionField {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    TYPE_STRING = 1;
+    TYPE_NUMBER = 2;
+    TYPE_BOOLEAN = 3;
+  }
+  string path = 1;
+  Type type = 2;
+  optional string description = 3;
+  // The values an enum argument takes.
+  repeated google.protobuf.Value values = 4;
+}
+
+message PermissionTool {
+  string name = 1;
+  string description = 2;
+  repeated PermissionField fields = 3;
+  repeated DisplayIcon icons = 4;
+}
+
+message ListPermissionToolsRequest {}
+
+message ListPermissionToolsResponse {
+  repeated PermissionTool tools = 1;
+}
+
+message GetEnvironmentRequest {}
+
+message GetEnvironmentResponse {
+  bool ollama_host = 1;
+  bool comfyui_host = 2;
+}

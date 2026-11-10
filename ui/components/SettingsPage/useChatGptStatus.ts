@@ -1,9 +1,6 @@
 import { useEffect, useState } from "react";
-import type { z } from "zod";
-import type { chatGptStatusSchema } from "../../../src/schemas/chatgpt";
+import type { ChatGptStatus as Status } from "../../../src/gen/euler/v1/providers_pb";
 import { loadChatGptStatus } from "../../persist/chatgpt";
-
-type Status = z.infer<typeof chatGptStatusSchema>;
 
 /** Keeps account data for the settings or onboarding page, across tab changes. */
 export function useChatGptStatus() {

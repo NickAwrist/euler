@@ -1,25 +1,24 @@
-import { type AgentEvent, AgentEventSchema } from "../../src/schemas/events";
-import { userApiFetch } from "../lib/api";
-import { readSseBlocks } from "../lib/readSseBlocks";
+import type { Event } from "../../src/gen/euler/v1/events_pb";
+import { eventClient } from "../lib/rpc";
+
+/** Keeps one event stream open, resuming after the last event on reconnect. */
 export async function subscribeEvents(
   signal: AbortSignal,
-  receive: (event: AgentEvent) => void,
+  receive: (event: Event) => void,
 ) {
-  let sequence = 0;
+  let sequence = 0n;
   while (!signal.aborted) {
     try {
-      const response = await userApiFetch("/api/events", {
-        signal,
-        headers: sequence ? { "Last-Event-ID": String(sequence) } : {},
-      });
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("Missing event stream");
-      await readSseBlocks(reader, (value) => {
-        const event = AgentEventSchema.parse(value);
-        if (event.type !== "resync" && event.sequence <= sequence) return;
+      for await (const { event } of eventClient.subscribe(
+        { afterSequence: sequence },
+        { signal },
+      )) {
+        const payload = event?.payload;
+        if (!event || !payload?.case || payload.case === "keepalive") continue;
+        if (payload.case !== "resync" && event.sequence <= sequence) continue;
         sequence = event.sequence;
         receive(event);
-      });
+      }
     } catch (error) {
       if (!signal.aborted) console.error("Event stream disconnected", error);
     }

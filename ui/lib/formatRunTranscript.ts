@@ -1,17 +1,16 @@
+import { Message_Role } from "../../src/gen/euler/v1/sessions_pb";
 import type { Message } from "../types";
 
 const SEP = "\n\n";
 
-const ROLE_LABELS = {
-  user: "USER",
-  assistant: "MODEL",
-  event: "EVENT",
-} as const satisfies Record<Message["role"], string>;
+const ROLE_LABELS: Record<Message_Role, string> = {
+  [Message_Role.UNSPECIFIED]: "EVENT",
+  [Message_Role.USER]: "USER",
+  [Message_Role.ASSISTANT]: "MODEL",
+  [Message_Role.EVENT]: "EVENT",
+};
 
-function block(
-  roleLabel: (typeof ROLE_LABELS)[Message["role"]],
-  content: string,
-): string {
+function block(roleLabel: string, content: string): string {
   return `${roleLabel}\n===\n${content}`;
 }
 
@@ -34,7 +33,8 @@ export function formatRunTranscript(
   const parts = [`# ${options.title}`, meta.join("\n")];
   for (const m of messages) parts.push(block(ROLE_LABELS[m.role], m.content));
   const stream = options.streamingAssistant;
-  if (stream?.trim()) parts.push(block(ROLE_LABELS.assistant, stream));
+  if (stream?.trim())
+    parts.push(block(ROLE_LABELS[Message_Role.ASSISTANT], stream));
   return parts.join(SEP);
 }
 

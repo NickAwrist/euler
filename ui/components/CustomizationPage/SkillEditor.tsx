@@ -1,7 +1,7 @@
 import { ArrowLeft, Save, Trash2 } from "lucide-react";
 import type { Dispatch, ReactNode, SetStateAction } from "react";
 import { normalizeSkillName } from "../../../src/schemas/skills";
-import type { SkillData, SkillWriteBody } from "../../persist/skills";
+import type { Skill, SkillWriteBody } from "../../persist/skills";
 import { cx, textareaClass } from "../../styles";
 import { Button } from "../Button";
 import { SwitchField } from "./SwitchField";
@@ -9,7 +9,7 @@ import type { SkillEditorErrors } from "./skillsPageUtils";
 
 type Props = {
   isNew: boolean;
-  skill: SkillData | null;
+  skill: Skill | null;
   editor: SkillWriteBody;
   setEditor: Dispatch<SetStateAction<SkillWriteBody>>;
   errors: SkillEditorErrors | null;
@@ -18,7 +18,7 @@ type Props = {
   saveDisabled: boolean;
   onSave: () => void;
   onCancel: () => void;
-  onDelete: (skill: SkillData) => void;
+  onDelete: (skill: Skill) => void;
   /** Shown on mobile, where the editor replaces the skill list. */
   onBack?: () => void;
 };

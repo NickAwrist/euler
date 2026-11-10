@@ -1,42 +1,52 @@
-import type { Appearance } from "../../persist/appearance";
+import {
+  type Appearance,
+  Appearance_ChatWidth,
+  Appearance_CodeFont,
+  Appearance_Font,
+  Appearance_Theme,
+  CHAT_WIDTH_SLUGS,
+  CODE_FONT_SLUGS,
+  FONT_SLUGS,
+  THEME_SLUGS,
+} from "../../persist/appearance";
 import { cx, eyebrowText } from "../../styles";
 import { MarkdownMessage } from "../MarkdownMessage";
 import { EnableSwitch } from "../ModelPreferenceControls";
 import { hintClass, labelClass, selectClass } from "./constants";
 
-type Option<T extends string> = { id: T; name: string };
+type Option<T extends number> = { id: T; name: string };
 
-export const themes: Option<Appearance["theme"]>[] = [
-  { id: "default", name: "Default" },
-  { id: "one-dark", name: "One Dark" },
-  { id: "dracula", name: "Dracula" },
-  { id: "nord", name: "Nord" },
-  { id: "catppuccin", name: "Catppuccin" },
-  { id: "github", name: "GitHub" },
+export const themes: Option<Appearance_Theme>[] = [
+  { id: Appearance_Theme.DEFAULT, name: "Default" },
+  { id: Appearance_Theme.ONE_DARK, name: "One Dark" },
+  { id: Appearance_Theme.DRACULA, name: "Dracula" },
+  { id: Appearance_Theme.NORD, name: "Nord" },
+  { id: Appearance_Theme.CATPPUCCIN, name: "Catppuccin" },
+  { id: Appearance_Theme.GITHUB, name: "GitHub" },
 ];
 
-const fonts: Option<Appearance["font"]>[] = [
-  { id: "default", name: "Default" },
-  { id: "serif", name: "Literary · Source Serif 4" },
-  { id: "geist", name: "Geist Sans" },
-  { id: "source-sans", name: "Source Sans 3" },
-  { id: "atkinson", name: "Atkinson Hyperlegible Next" },
-  { id: "opendyslexic", name: "OpenDyslexic" },
-  { id: "system", name: "System" },
+const fonts: Option<Appearance_Font>[] = [
+  { id: Appearance_Font.DEFAULT, name: "Default" },
+  { id: Appearance_Font.SERIF, name: "Literary · Source Serif 4" },
+  { id: Appearance_Font.GEIST, name: "Geist Sans" },
+  { id: Appearance_Font.SOURCE_SANS, name: "Source Sans 3" },
+  { id: Appearance_Font.ATKINSON, name: "Atkinson Hyperlegible Next" },
+  { id: Appearance_Font.OPENDYSLEXIC, name: "OpenDyslexic" },
+  { id: Appearance_Font.SYSTEM, name: "System" },
 ];
 
-const codeFonts: Option<Appearance["codeFont"]>[] = [
-  { id: "default", name: "Default" },
-  { id: "geist-mono", name: "Geist Mono" },
-  { id: "jetbrains-mono", name: "JetBrains Mono" },
-  { id: "source-code", name: "Source Code Pro" },
+const codeFonts: Option<Appearance_CodeFont>[] = [
+  { id: Appearance_CodeFont.DEFAULT, name: "Default" },
+  { id: Appearance_CodeFont.GEIST_MONO, name: "Geist Mono" },
+  { id: Appearance_CodeFont.JETBRAINS_MONO, name: "JetBrains Mono" },
+  { id: Appearance_CodeFont.SOURCE_CODE, name: "Source Code Pro" },
 ];
 
-const chatWidths: Option<Appearance["chatWidth"]>[] = [
-  { id: "standard", name: "Standard" },
-  { id: "comfortable", name: "Comfortable" },
-  { id: "wide", name: "Wide" },
-  { id: "full", name: "Full width" },
+const chatWidths: Option<Appearance_ChatWidth>[] = [
+  { id: Appearance_ChatWidth.STANDARD, name: "Standard" },
+  { id: Appearance_ChatWidth.COMFORTABLE, name: "Comfortable" },
+  { id: Appearance_ChatWidth.WIDE, name: "Wide" },
+  { id: Appearance_ChatWidth.FULL, name: "Full width" },
 ];
 
 const responsePreview = [
@@ -55,17 +65,19 @@ const responsePreview = [
   "An empty list returns **0**, so you can use it without a separate check.",
 ].join("\n");
 
-function OptionSelect<T extends string>({
+function OptionSelect<T extends number>({
   id,
   label,
   value,
   options,
+  slugs,
   onChange,
 }: {
   id: string;
   label: string;
   value: T;
   options: readonly Option<T>[];
+  slugs: Record<T, string>;
   onChange: (value: T) => void;
 }) {
   return (
@@ -76,16 +88,16 @@ function OptionSelect<T extends string>({
       <select
         id={id}
         className={selectClass}
-        value={value}
+        value={slugs[value]}
         onChange={(event) => {
           const option = options.find(
-            (candidate) => candidate.id === event.target.value,
+            (candidate) => slugs[candidate.id] === event.target.value,
           );
           if (option) onChange(option.id);
         }}
       >
         {options.map((option) => (
-          <option key={option.id} value={option.id}>
+          <option key={option.id} value={slugs[option.id]}>
             {option.name}
           </option>
         ))}
@@ -144,14 +156,14 @@ export function AppearanceSettingsTab({
               <input
                 type="radio"
                 name="color-theme"
-                value={theme.id}
+                value={THEME_SLUGS[theme.id]}
                 checked={appearance.theme === theme.id}
                 onChange={() => onChange({ ...appearance, theme: theme.id })}
                 className="peer sr-only"
               />
               <div className="h-full rounded-lg border border-border-subtle p-3 peer-checked:border-foreground peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-foreground">
                 <div
-                  data-theme={theme.id}
+                  data-theme={THEME_SLUGS[theme.id]}
                   aria-hidden="true"
                   className="mb-3 flex h-20 overflow-hidden rounded-md border border-border-subtle bg-background"
                 >
@@ -179,6 +191,7 @@ export function AppearanceSettingsTab({
             label="Font style"
             value={appearance.font}
             options={fonts}
+            slugs={FONT_SLUGS}
             onChange={(font) => onChange({ ...appearance, font })}
           />
           <OptionSelect
@@ -186,14 +199,15 @@ export function AppearanceSettingsTab({
             label="Code block font"
             value={appearance.codeFont}
             options={codeFonts}
+            slugs={CODE_FONT_SLUGS}
             onChange={(codeFont) => onChange({ ...appearance, codeFont })}
           />
         </div>
         <section
           aria-label="Response preview"
-          data-theme={appearance.theme}
-          data-font={appearance.font}
-          data-code-font={appearance.codeFont}
+          data-theme={THEME_SLUGS[appearance.theme]}
+          data-font={FONT_SLUGS[appearance.font]}
+          data-code-font={CODE_FONT_SLUGS[appearance.codeFont]}
           className="rounded-lg border border-border-subtle bg-background p-4 font-sans sm:p-5"
         >
           <h3 className="mb-3 text-xs font-medium text-muted-foreground">
@@ -216,6 +230,7 @@ export function AppearanceSettingsTab({
               label="Chat width"
               value={appearance.chatWidth}
               options={chatWidths}
+              slugs={CHAT_WIDTH_SLUGS}
               onChange={(chatWidth) => onChange({ ...appearance, chatWidth })}
             />
             <ShiftSwitch

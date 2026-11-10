@@ -1,8 +1,24 @@
+import type { MessageInitShape } from "@bufbuild/protobuf";
 import { type Page, expect, test } from "@playwright/test";
+import { WorkspaceFileAttachment_WorkspaceKind } from "../../src/gen/euler/v1/attachments_pb";
+import { DirectoryService } from "../../src/gen/euler/v1/directories_pb";
 import {
-  type Appearance,
-  userPreferencesSchema,
-} from "../../src/schemas/userPreferences";
+  Appearance_ChatWidth,
+  type UpdatePreferencesRequest_AppearancePatchSchema,
+} from "../../src/gen/euler/v1/preferences_pb";
+import { SessionService } from "../../src/gen/euler/v1/sessions_pb";
+import {
+  ArtifactEntry_Kind,
+  WorkspaceService,
+} from "../../src/gen/euler/v1/workspace_pb";
+import { userPreferencesSchema } from "../../src/schemas/userPreferences";
+import {
+  type MessageInit,
+  at,
+  message,
+  mockApp as mockChatApp,
+} from "./appFixture";
+import { mockRpc, on, rpcKey } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 // These checks exercise returning users; first-visit setup has its own suite.
@@ -15,63 +31,43 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-async function mockApp(page: Page) {
-  await page.route("**/api/**", async (route) => {
-    const path = new URL(route.request().url()).pathname;
-    const json =
-      path === "/api/sessions"
-        ? {
-            sessions: [
-              {
-                id: "sidebar-test",
-                preview: "Sidebar test chat",
-                createdAt: 1,
-                updatedAt: 1,
-                expiresAt: null,
-              },
-            ],
-          }
-        : path === "/api/sessions/sidebar-test"
-          ? {
-              id: "sidebar-test",
-              model: "test",
-              workspace: { kind: "sandbox" },
-              history: [
-                { role: "user", content: "Check the sidebar controls." },
-              ],
-            }
-          : path === "/api/models"
-            ? {
-                models: [
-                  {
-                    id: "test",
-                    name: "Test",
-                    lab: "Test",
-                    provider: "ollama",
-                    inputCapabilities: ["text"],
-                  },
-                ],
-              }
-            : path.endsWith("/health")
-              ? { connected: true }
-              : path.endsWith("/runtime")
-                ? {
-                    agents: [],
-                    activation: null,
-                    queued: [],
-                    held: false,
-                    sequence: 0,
-                    history: [
-                      { role: "user", content: "Check the sidebar controls." },
-                    ],
-                  }
-                : path.endsWith("/artifacts/tree")
-                  ? { entries: [] }
-                  : path === "/api/settings/environment"
-                    ? { ollamaHost: false, comfyuiHost: false }
-                    : {};
-    await route.fulfill({ json });
+const chat = (
+  history: MessageInit[] = [message("user", "Check the sidebar controls.")],
+) => ({
+  "sidebar-test": { model: "test", history },
+});
+
+async function mockApp(page: Page, history?: MessageInit[]) {
+  await mockChatApp(page, {
+    sessions: [
+      { id: "sidebar-test", preview: "Sidebar test chat", updatedAt: at(1) },
+    ],
+    chats: chat(history),
   });
+}
+
+/** Serves one artifact folder level per path. */
+function artifacts(
+  entries: (
+    path: string,
+  ) => { name: string; path: string; directory?: boolean }[],
+) {
+  return on(WorkspaceService.method.listArtifacts, ({ path }) => ({
+    entries: entries(path).map((entry) => ({
+      name: entry.name,
+      path: entry.path,
+      kind: entry.directory
+        ? ArtifactEntry_Kind.DIRECTORY
+        : ArtifactEntry_Kind.FILE,
+    })),
+  }));
+}
+
+/** A text preview for any path. */
+function preview(content: (path: string) => string) {
+  return on(WorkspaceService.method.previewArtifact, ({ path }) => ({
+    preview: { path, content: { case: "text" as const, value: content(path) } },
+  }));
 }
 
 for (const width of [320, 390, 1024, 1440]) {
@@ -197,19 +193,15 @@ for (const width of [320, 390]) {
   }) => {
     await page.setViewportSize({ width, height: 664 });
     await mockApp(page);
-    await page.route("**/api/sessions", (route) =>
-      route.fulfill({
-        json: {
-          sessions: Array.from({ length: 40 }, (_, i) => ({
-            id: `scroll-${i}`,
-            preview: `Conversation ${i + 1}`,
-            createdAt: Date.now(),
-            updatedAt: Date.now() - i * 1000,
-            expiresAt: null,
-          })),
-        },
-      }),
-    );
+    await mockRpc(page, [
+      on(SessionService.method.listSessions, () => ({
+        sessions: Array.from({ length: 40 }, (_, i) => ({
+          id: `scroll-${i}`,
+          preview: `Conversation ${i + 1}`,
+          updatedAt: at(Date.now() - i * 1000),
+        })),
+      })),
+    ]);
     await mockUserPreferences(page);
     await page.goto("/");
     const toggle = page.getByRole("button", {
@@ -271,82 +263,69 @@ test("chat sidebar desktop workspace changes refresh open artifacts without remo
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await mockApp(page);
-  let local = false;
-  let previews = 0;
-  await page.route(/\/api\/sessions\/sidebar-test(?:\/runtime)?$/, (route) =>
-    route.fulfill({
-      json: {
-        id: "sidebar-test",
-        agents: [],
-        activation: null,
-        queued: [],
-        held: false,
-        sequence: 0,
-        model: "test",
-        workspace: { kind: "sandbox" },
-        history: [
+  await mockApp(page, [
+    message(
+      "assistant",
+      "Open [notes](docs/notes.md). These are code: `foo.bar`, `v1.2`, `a/b`.",
+      {
+        attachments: [
           {
-            role: "assistant",
-            content:
-              "Open [notes](docs/notes.md). These are code: `foo.bar`, `v1.2`, `a/b`.",
-            attachments: [
-              {
+            kind: {
+              case: "file",
+              value: {
                 id: "30a14710-74b8-4aa0-aa40-90e9b5ac606e",
-                kind: "file",
                 name: "fib.py",
                 path: "fib.py",
-                size: 10,
+                size: 10n,
                 sessionId: "sidebar-test",
-                workspaceKind: "sandbox",
+                workspaceKind: WorkspaceFileAttachment_WorkspaceKind.SANDBOX,
               },
-            ],
+            },
           },
         ],
       },
+    ),
+  ]);
+  let local = false;
+  let previews = 0;
+  await mockRpc(page, [
+    on(DirectoryService.method.listDirectory, () => ({
+      path: "/demo/local",
+      exact: true,
+      directories: [
+        { name: ".cache", path: "/demo/local/.cache" },
+        { name: "src", path: "/demo/local/src" },
+      ],
+    })),
+    on(WorkspaceService.method.selectDirectory, () => {
+      local = true;
+      return {
+        workspace: {
+          kind: {
+            case: "local" as const,
+            value: { path: "/demo/local", label: "local" },
+          },
+        },
+      };
     }),
-  );
-  await page.route("**/api/directories?*", (route) =>
-    route.fulfill({
-      json: {
-        path: "/demo/local",
-        exact: true,
-        parent: null,
-        directories: [
-          { name: ".cache", path: "/demo/local/.cache" },
-          { name: "src", path: "/demo/local/src" },
-        ],
-      },
+    artifacts((path) =>
+      path === "."
+        ? [{ name: "docs", path: "docs", directory: true }]
+        : [{ name: "notes.md", path: "docs/notes.md" }],
+    ),
+    on(WorkspaceService.method.previewArtifact, () => {
+      previews++;
+      return {
+        preview: {
+          path: "docs/notes.md",
+          content: {
+            case: "text" as const,
+            value: local ? "# Local notes" : "# Sandbox notes",
+          },
+        },
+      };
     }),
-  );
-  await page.route("**/workspace/select-directory", (route) => {
-    local = true;
-    return route.fulfill({
-      json: {
-        workspace: { kind: "local", path: "/demo/local", label: "local" },
-      },
-    });
-  });
-  await page.route("**/artifacts/tree?*", (route) =>
-    route.fulfill({
-      json: {
-        entries:
-          new URL(route.request().url()).searchParams.get("path") === "."
-            ? [{ name: "docs", path: "docs", kind: "directory" }]
-            : [{ name: "notes.md", path: "docs/notes.md", kind: "file" }],
-      },
-    }),
-  );
-  await page.route("**/artifacts/preview?*", (route) => {
-    previews++;
-    return route.fulfill({
-      json: {
-        kind: "text",
-        path: "docs/notes.md",
-        content: local ? "# Local notes" : "# Sandbox notes",
-      },
-    });
-  });
+  ]);
   await mockUserPreferences(page);
   await page.goto("/run/sidebar-test");
   for (const code of ["foo.bar", "v1.2", "a/b"]) {
@@ -359,7 +338,10 @@ test("chat sidebar desktop workspace changes refresh open artifacts without remo
   const originalComposer = await composer.elementHandle();
   const toggle = page.getByRole("button", { name: "Toggle artifacts" });
   await toggle.click();
-  const prefetched = page.waitForResponse("**/artifacts/preview?*");
+  const prefetched = page.waitForResponse(
+    (response) =>
+      rpcKey(response.request()) === "WorkspaceService/PreviewArtifact",
+  );
   await page.getByRole("button", { name: "docs", exact: true }).click();
   await (await prefetched).finished();
   // Observe the rendered result, including a loading placeholder too brief for a locator assertion.
@@ -429,39 +411,25 @@ test("chat sidebar desktop links another chat's workspace", async ({
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockApp(page);
   const linkRequests: unknown[] = [];
-  await page.route("**/api/sessions", (route) =>
-    route.fulfill({
-      json: {
-        sessions: [
-          {
-            id: "sidebar-test",
-            preview: "Sidebar test chat",
-            createdAt: 1,
-            updatedAt: 2,
-            expiresAt: null,
-          },
-          {
-            id: "builder",
-            preview: "Builder chat",
-            createdAt: 1,
-            updatedAt: 1,
-            expiresAt: null,
-          },
-        ],
-      },
-    }),
-  );
-  await page.route("**/workspace/link", (route) => {
-    linkRequests.push(route.request().postDataJSON());
-    return route.fulfill({
-      json: {
+  await mockRpc(page, [
+    on(SessionService.method.listSessions, () => ({
+      sessions: [
+        { id: "sidebar-test", preview: "Sidebar test chat", updatedAt: at(2) },
+        { id: "builder", preview: "Builder chat", updatedAt: at(1) },
+      ],
+    })),
+    on(WorkspaceService.method.linkWorkspace, ({ sourceSessionId }) => {
+      linkRequests.push({ sourceSessionId });
+      return {
         workspace: {
-          kind: "sandbox",
-          linked: { workspaceId: "builder", sessionId: "builder" },
+          kind: {
+            case: "sandbox" as const,
+            value: { linked: { workspaceId: "builder", sessionId: "builder" } },
+          },
         },
-      },
-    });
-  });
+      };
+    }),
+  ]);
   await mockUserPreferences(page);
   await page.goto("/run/sidebar-test");
   const composer = page.getByPlaceholder("Send a message...");
@@ -476,7 +444,7 @@ test("chat sidebar desktop links another chat's workspace", async ({
   await expect(dialog.getByText("Sidebar test chat")).toHaveCount(0);
   await dialog.getByRole("button", { name: "Builder chat" }).click();
   await expect(dialog).toBeHidden();
-  expect(linkRequests).toEqual([{ sessionId: "builder" }]);
+  expect(linkRequests).toEqual([{ sourceSessionId: "builder" }]);
   await expect(
     page.getByText("Linked to Builder chat's workspace"),
   ).toBeVisible();
@@ -511,22 +479,10 @@ test("chat sidebar desktop restores artifact preview and width on reload", async
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockApp(page);
-  await page.route("**/artifacts/tree?*", (route) =>
-    route.fulfill({
-      json: {
-        entries: [{ name: "notes.md", path: "notes.md", kind: "file" }],
-      },
-    }),
-  );
-  await page.route("**/artifacts/preview?*", (route) =>
-    route.fulfill({
-      json: {
-        kind: "text",
-        path: "notes.md",
-        content: "# Saved preview",
-      },
-    }),
-  );
+  await mockRpc(page, [
+    artifacts(() => [{ name: "notes.md", path: "notes.md" }]),
+    preview(() => "# Saved preview"),
+  ]);
   await mockUserPreferences(page);
   await page.goto("/run/sidebar-test");
   const toggle = page.getByRole("button", { name: "Toggle artifacts" });
@@ -540,8 +496,7 @@ test("chat sidebar desktop restores artifact preview and width on reload", async
   });
   const savedWidth = page.waitForResponse(
     (response) =>
-      new URL(response.url()).pathname === "/api/settings/user" &&
-      response.request().method() === "PATCH" &&
+      rpcKey(response.request()) === "PreferenceService/UpdatePreferences" &&
       response.request().postDataJSON().layout?.artifactWidth !== undefined,
   );
   await resize.press("ArrowLeft");
@@ -565,7 +520,8 @@ test("chat sidebar desktop rename starts empty and ignores unchanged saves", asy
   await mockApp(page);
   const patches: string[] = [];
   page.on("request", (request) => {
-    if (request.method() === "PATCH") patches.push(request.url());
+    if (rpcKey(request) === "SessionService/UpdateSession")
+      patches.push(request.url());
   });
   await mockUserPreferences(page);
   await page.goto("/");
@@ -668,9 +624,12 @@ test("chat sidebar desktop keeps a remembered files panel closed for an empty wo
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockApp(page);
-  const tree = page.waitForResponse("**/artifacts/tree?*");
+  const tree = page.waitForResponse(
+    (response) =>
+      rpcKey(response.request()) === "WorkspaceService/ListArtifacts",
+  );
   await mockUserPreferences(page, undefined, {
-    layout: { artifactState: { open: true, workspace: "", path: null } },
+    layout: { artifactState: { open: true, workspace: "" } },
   });
   await page.goto("/run/sidebar-test");
   await tree;
@@ -691,24 +650,11 @@ test("chat sidebar desktop jumps to the latest message after scrolling up", asyn
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 700 });
-  await mockApp(page);
-  await page.route(/\/api\/sessions\/sidebar-test(?:\/runtime)?$/, (route) =>
-    route.fulfill({
-      json: {
-        id: "sidebar-test",
-        agents: [],
-        activation: null,
-        queued: [],
-        held: false,
-        sequence: 0,
-        model: "test",
-        workspace: { kind: "sandbox" },
-        history: Array.from({ length: 40 }, (_, i) => ({
-          role: i % 2 ? "assistant" : "user",
-          content: `Message ${i}`,
-        })),
-      },
-    }),
+  await mockApp(
+    page,
+    Array.from({ length: 40 }, (_, i) =>
+      message(i % 2 ? "assistant" : "user", `Message ${i}`),
+    ),
   );
   await mockUserPreferences(page);
   await page.goto("/run/sidebar-test");
@@ -728,17 +674,15 @@ test("chat sidebar desktop jumps to the latest message after scrolling up", asyn
 async function openLayoutChat(
   page: Page,
   width: number,
-  appearance: Partial<Appearance>,
+  appearance: MessageInitShape<
+    typeof UpdatePreferencesRequest_AppearancePatchSchema
+  >,
 ) {
   await page.setViewportSize({ width, height: 900 });
   await mockApp(page);
-  await page.route("**/artifacts/tree?*", (route) =>
-    route.fulfill({
-      json: {
-        entries: [{ name: "notes.md", path: "notes.md", kind: "file" }],
-      },
-    }),
-  );
+  await mockRpc(page, [
+    artifacts(() => [{ name: "notes.md", path: "notes.md" }]),
+  ]);
   await mockUserPreferences(page, undefined, {
     appearance: { sidebarAnimationMs: 0, ...appearance },
     layout: { artifactWidth: 560 },
@@ -801,7 +745,7 @@ test("chat sidebar mobile chat uses the full width with any setting", async ({
   page,
 }) => {
   const layout = await openLayoutChat(page, 390, {
-    chatWidth: "full",
+    chatWidth: Appearance_ChatWidth.FULL,
     shiftForChatList: true,
   });
   await expect.poll(layout.composerSpan).toEqual([14, 376]);

@@ -8,74 +8,44 @@ import {
   setOpenRouterApiKey,
 } from "../../src/db";
 import { getOpenRouterRequests } from "../helpers/mockOpenRouter";
-import { TEST_USER_ID, startTestServer, userHeaders } from "../helpers/server";
+import { Code, rpc, rpcCode } from "../helpers/rpc";
+import { TEST_USER_ID } from "../helpers/server";
 
-test("POST /api/sessions/debug-prompt returns the server-rendered system prompt", async () => {
-  const { url, close } = await startTestServer();
-  try {
-    // 1. Default request with no metadata includes current date and core directives
-    const res1 = await fetch(`${url}/api/sessions/debug-prompt`, {
-      method: "POST",
-      headers: userHeaders(undefined, {
-        "Content-Type": "application/json",
-      }),
-      body: JSON.stringify({}),
-    });
-    expect(res1.status).toBe(200);
-    const data1 = (await res1.json()) as { systemPrompt: string };
-    expect(data1.systemPrompt).toBeString();
-    expect(data1.systemPrompt).toContain("Current date:");
-    expect(data1.systemPrompt).toContain("<tool_format>");
-    expect(data1.systemPrompt).toContain("<agency>");
+test("PreviewPrompt returns the server-rendered system prompt", async () => {
+  const { debug } = rpc();
+  // 1. Without metadata the prompt includes the date and core directives.
+  const first = await debug.previewPrompt({});
+  expect(first.systemPrompt).toContain("Current date:");
+  expect(first.systemPrompt).toContain("<tool_format>");
+  expect(first.systemPrompt).toContain("<agency>");
 
-    // 2. Request with includeCurrentDate: false omits the date
-    const res2 = await fetch(`${url}/api/sessions/debug-prompt`, {
-      method: "POST",
-      headers: userHeaders(undefined, {
-        "Content-Type": "application/json",
-      }),
-      body: JSON.stringify({
-        metadata: {
-          includeCurrentDate: false,
-        },
-      }),
-    });
-    expect(res2.status).toBe(200);
-    const data2 = (await res2.json()) as { systemPrompt: string };
-    expect(data2.systemPrompt).not.toContain("Current date:");
-    expect(data2.systemPrompt).toContain("<tool_format>");
+  // 2. includeCurrentDate: false omits the date.
+  const second = await debug.previewPrompt({
+    metadata: { includeCurrentDate: false },
+  });
+  expect(second.systemPrompt).not.toContain("Current date:");
+  expect(second.systemPrompt).toContain("<tool_format>");
 
-    // 3. Request with custom metadata includes personalization fields
-    const res3 = await fetch(`${url}/api/sessions/debug-prompt`, {
-      method: "POST",
-      headers: userHeaders(undefined, {
-        "Content-Type": "application/json",
-      }),
-      body: JSON.stringify({
-        metadata: {
-          name: "Alice",
-          location: "Wonderland",
-          preferredFormats: "markdown tables",
-          includeCurrentDate: true,
-        },
-      }),
-    });
-    expect(res3.status).toBe(200);
-    const data3 = (await res3.json()) as { systemPrompt: string };
-    expect(data3.systemPrompt).toContain("User name: Alice");
-    expect(data3.systemPrompt).toContain("Location: Wonderland");
-    expect(data3.systemPrompt).toContain(
-      "Preferred response format: markdown tables",
-    );
-    expect(data3.systemPrompt).toContain("Current date:");
-  } finally {
-    await close();
-  }
+  // 3. Personal fields appear in the prompt.
+  const third = await debug.previewPrompt({
+    metadata: {
+      name: "Alice",
+      location: "Wonderland",
+      preferredFormats: "markdown tables",
+      includeCurrentDate: true,
+    },
+  });
+  expect(third.systemPrompt).toContain("User name: Alice");
+  expect(third.systemPrompt).toContain("Location: Wonderland");
+  expect(third.systemPrompt).toContain(
+    "Preferred response format: markdown tables",
+  );
+  expect(third.systemPrompt).toContain("Current date:");
 });
 
 for (const includeCurrentDate of [undefined, false]) {
   test(`run sends the same custom prompt as the preview with date ${includeCurrentDate === false ? "disabled" : "defaulted"}`, async () => {
-    const { url, close } = await startTestServer();
+    const { debug, agent } = rpc();
     setOpenRouterApiKey("sk-or-prompt-test");
     const id = crypto.randomUUID();
     createSessionRow(TEST_USER_ID, id, Date.now(), null);
@@ -87,42 +57,28 @@ for (const includeCurrentDate of [undefined, false]) {
         user_invocable: true,
         disable_model_invocation: false,
       });
-      const input = {
+      const message = "Use $prompt-check";
+      const metadata = {
+        systemPrompt:
+          "Follow these instructions.\n{{PERSONALIZATION}}\n{{SESSION_DIRECTORY}}\n{{OS}}",
+        includeCurrentDate,
+      };
+      const { systemPrompt } = await debug.previewPrompt({
         sessionId: id,
-        message: "Use $prompt-check",
-        metadata: {
-          systemPrompt:
-            "Follow these instructions.\n{{PERSONALIZATION}}\n{{SESSION_DIRECTORY}}\n{{OS}}",
-          includeCurrentDate,
-        },
-      };
-      const preview = await fetch(`${url}/api/sessions/debug-prompt`, {
-        method: "POST",
-        headers: userHeaders(undefined, { "Content-Type": "application/json" }),
-        body: JSON.stringify(input),
+        message,
+        metadata,
       });
-      expect(preview.status).toBe(200);
-      const { systemPrompt } = (await preview.json()) as {
-        systemPrompt: string;
-      };
       expect(systemPrompt).toContain(skill.instructions);
       expect(systemPrompt.includes("Current date:")).toBe(
         includeCurrentDate === undefined,
       );
       expect(systemPrompt).toStartWith("Follow these instructions.");
       expect(systemPrompt).toContain("<tool_format>");
-      const run = await fetch(`${url}/api/sessions/${id}/messages`, {
-        method: "POST",
-        headers: userHeaders(undefined, {
-          "Content-Type": "application/json",
-        }),
-        body: JSON.stringify({
-          content: input.message,
-          metadata: input.metadata,
-          model: "openrouter:openai/gpt-5.4-mini",
-        }),
+      await agent.sendMessage({
+        sessionId: id,
+        content: message,
+        settings: { metadata, model: "openrouter:openai/gpt-5.4-mini" },
       });
-      expect(run.status).toBe(202);
       await waitForActivation(id);
       expect(getOpenRouterRequests()).toHaveLength(1);
       const messages = getOpenRouterRequests()[0]!.body.messages as Array<{
@@ -132,27 +88,24 @@ for (const includeCurrentDate of [undefined, false]) {
       expect(messages[0]).toEqual({ role: "system", content: systemPrompt });
     } finally {
       await agentRuntime.deleteSession(TEST_USER_ID, id);
-      await close();
     }
   });
 }
 
-test("debug preview rejects invalid sessions and metadata", async () => {
-  const { url, close } = await startTestServer();
-  try {
-    for (const [body, status] of [
-      [{ sessionId: "missing-session" }, 404],
-      [{ metadata: { includeCurrentDate: "false" } }, 400],
-    ] as const) {
-      const response = await fetch(`${url}/api/sessions/debug-prompt`, {
-        method: "POST",
-        headers: userHeaders(undefined, { "Content-Type": "application/json" }),
-        body: JSON.stringify(body),
-      });
-      expect(response.status).toBe(status);
-      expect(await response.json()).not.toHaveProperty("systemPrompt");
-    }
-  } finally {
-    await close();
-  }
+test("debug preview rejects unknown and other users' chats", async () => {
+  const { sessions } = rpc();
+  const { id } = await sessions.createSession({});
+  expect(
+    await rpcCode(rpc().debug.previewPrompt({ sessionId: "missing-session" })),
+  ).toBe(Code.NotFound);
+  expect(
+    await rpcCode(
+      rpc("22222222-2222-4222-8222-222222222222").debug.previewPrompt({
+        sessionId: id,
+      }),
+    ),
+  ).toBe(Code.NotFound);
+  expect(await rpcCode(rpc().debug.previewPrompt({ sessionId: "" }))).toBe(
+    Code.InvalidArgument,
+  );
 });

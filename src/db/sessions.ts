@@ -64,6 +64,25 @@ export function listSessionSummaries(ownerUuid: string): SessionSummaryRow[] {
   });
 }
 
+/** A chat's name as the chat list shows it, or null when it is gone. */
+export function sessionPreview(ownerUuid: string, id: string): string | null {
+  const db = getDb();
+  const session = db
+    .query("SELECT title FROM sessions WHERE owner_uuid = ? AND id = ?")
+    .get(ownerUuid, id) as { title: string | null } | null;
+  if (!session) return null;
+  const firstUser = db
+    .query(
+      "SELECT content FROM messages WHERE session_id = ? AND role = 'user' ORDER BY position ASC LIMIT 1",
+    )
+    .get(id) as { content: string } | null;
+  return previewFromTitleAndFirstUser(
+    session.title,
+    firstUser?.content ?? null,
+    new Set(listSkills(ownerUuid).map((skill) => skill.name)),
+  );
+}
+
 /**
  * A chat other than `excludeId` working in sandbox `workspaceId`, preferring
  * the chat that created it. Null means no such chat exists.

@@ -1,70 +1,45 @@
 import "../setup";
 import { describe, expect, test } from "bun:test";
-import { startTestServer, userHeaders } from "../helpers/server";
+import { Code, rpc, rpcCode } from "../helpers/rpc";
 
 const USER_A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const USER_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 
 describe("browser UUID ownership", () => {
   test("isolates chats while connections stay global", async () => {
-    const { url, close } = await startTestServer();
-    try {
-      expect((await fetch(`${url}/api/sessions`)).status).toBe(400);
+    const a = rpc(USER_A);
+    const b = rpc(USER_B);
+    expect(await rpcCode(rpc(null).sessions.listSessions({}))).toBe(
+      Code.InvalidArgument,
+    );
+    expect(await rpcCode(rpc("not-a-uuid").sessions.listSessions({}))).toBe(
+      Code.InvalidArgument,
+    );
 
-      const createSessionA = await fetch(`${url}/api/sessions`, {
-        method: "POST",
-        headers: userHeaders(USER_A, { "Content-Type": "application/json" }),
-        body: JSON.stringify({}),
-      });
-      const sessionA = (await createSessionA.json()) as { id: string };
-      expect(createSessionA.status).toBe(201);
+    const sessionA = await a.sessions.createSession({});
+    expect((await b.sessions.listSessions({})).sessions).toEqual([]);
+    expect(await rpcCode(b.sessions.getSession({ id: sessionA.id }))).toBe(
+      Code.NotFound,
+    );
+    expect(await rpcCode(b.sessions.deleteSession({ id: sessionA.id }))).toBe(
+      Code.NotFound,
+    );
+    expect(
+      await rpcCode(
+        b.agent.sendMessage({
+          sessionId: sessionA.id,
+          content: "Hello",
+          settings: { model: "llama3:latest" },
+        }),
+      ),
+    ).toBe(Code.NotFound);
+    expect(await rpcCode(b.agent.getRuntime({ sessionId: sessionA.id }))).toBe(
+      Code.NotFound,
+    );
 
-      const sessionsB = await fetch(`${url}/api/sessions`, {
-        headers: userHeaders(USER_B),
-      });
-      expect(await sessionsB.json()).toEqual({ sessions: [] });
-      expect(
-        (
-          await fetch(`${url}/api/sessions/${sessionA.id}`, {
-            headers: userHeaders(USER_B),
-          })
-        ).status,
-      ).toBe(404);
-      expect(
-        (
-          await fetch(`${url}/api/sessions/${sessionA.id}`, {
-            method: "DELETE",
-            headers: userHeaders(USER_B),
-          })
-        ).status,
-      ).toBe(404);
-
-      const forbiddenRun = await fetch(
-        `${url}/api/sessions/${sessionA.id}/messages`,
-        {
-          method: "POST",
-          headers: userHeaders(USER_B, { "Content-Type": "application/json" }),
-          body: JSON.stringify({
-            content: "Hello",
-            model: "llama3:latest",
-          }),
-        },
-      );
-      expect(forbiddenRun.status).toBe(404);
-
-      await fetch(`${url}/api/ollama/config`, {
-        method: "PUT",
-        headers: userHeaders(USER_A, { "Content-Type": "application/json" }),
-        body: JSON.stringify({ host: "http://global-ollama.test" }),
-      });
-      const globalConfig = await fetch(`${url}/api/ollama/config`, {
-        headers: userHeaders(USER_B),
-      });
-      expect(await globalConfig.json()).toMatchObject({
-        host: "http://global-ollama.test",
-      });
-    } finally {
-      await close();
-    }
+    await a.providers.updateOllamaConfig({ host: "http://global-ollama.test" });
+    expect((await b.providers.getOllamaConfig({})).config).toMatchObject({
+      host: "http://global-ollama.test",
+    });
   });
 });

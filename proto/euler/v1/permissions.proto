@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package euler.v1;
+
+import "buf/validate/validate.proto";
+import "euler/v1/common.proto";
+import "google/protobuf/struct.proto";
+
+// A rule that allows, denies, or asks about a tool's calls.
+message ToolPermissionRule {
+  enum Action {
+    ACTION_UNSPECIFIED = 0;
+    ACTION_ALLOW = 1;
+    ACTION_DENY = 2;
+    ACTION_ASK = 3;
+  }
+  string id = 1 [(buf.validate.field).string.uuid = true];
+  string tool = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 200
+  }];
+  Action action = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  ToolPermissionCondition condition = 4 [(buf.validate.field).required = true];
+  // Limits the rule to one chat.
+  optional string session_id = 5 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 200
+  }];
+  // Limits the rule to one working directory.
+  optional string workspace_path = 6 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 4096
+  }];
+}
+
+message ToolPermissionCondition {
+  // Every call of the tool.
+  message Any {}
+  // One argument equals a value or matches an RE2 pattern.
+  message Argument {
+    enum Match {
+      MATCH_UNSPECIFIED = 0;
+      MATCH_EXACT = 1;
+      MATCH_REGEX = 2;
+    }
+    string field = 1 [(buf.validate.field).string = {
+      min_len: 1
+      max_len: 200
+    }];
+    Match match = 2 [(buf.validate.field).enum = {
+      defined_only: true
+      not_in: [0]
+    }];
+    // A string, number or boolean; a regex match takes a string pattern.
+    google.protobuf.Value value = 3 [(buf.validate.field).required = true];
+  }
+  // The call's arguments equal these exactly.
+  message Arguments {
+    google.protobuf.Struct value = 1 [(buf.validate.field).required = true];
+  }
+  oneof kind {
+    option (buf.validate.oneof).required = true;
+    Any any = 1;
+    Argument argument = 2;
+    Arguments arguments = 3;
+  }
+}
+
+// A tool call waiting for the user to allow or deny it.
+message ToolApproval {
+  string id = 1;
+  string session_id = 2;
+  string agent_id = 3;
+  string agent_title = 4;
+  string tool = 5;
+  repeated DisplayIcon icons = 6;
+  google.protobuf.Struct arguments = 7;
+  string workspace_path = 8;
+  string reason = 9;
+  // What "allow matching" would allow from now on.
+  string matching_scope = 10;
+}
+
+enum ApprovalDecision {
+  APPROVAL_DECISION_UNSPECIFIED = 0;
+  APPROVAL_DECISION_ALLOW_ONCE = 1;
+  // Allow, and save a rule for identical calls in this chat and workspace.
+  APPROVAL_DECISION_ALLOW_MATCHING = 2;
+  APPROVAL_DECISION_DENY = 3;
+}

@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package euler.v1;
+
+import "buf/validate/validate.proto";
+
+// Folders on the server, for choosing a chat's working directory.
+service DirectoryService {
+  rpc ListDirectory(ListDirectoryRequest) returns (ListDirectoryResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+
+message ListDirectoryRequest {
+  // An absolute path, a path starting with ~, or empty for the home folder. A
+  // missing last segment lists its parent's subfolders starting with it.
+  string path = 1 [(buf.validate.field).string.max_len = 4096];
+}
+
+message ListDirectoryResponse {
+  message Directory {
+    string name = 1;
+    string path = 2;
+  }
+  // The folder listed.
+  string path = 1;
+  // The requested path named this folder rather than a prefix within it.
+  bool exact = 2;
+  // Absent at the filesystem root.
+  optional string parent = 3;
+  repeated Directory directories = 4;
+}

@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package euler.v1;
+
+import "euler/v1/agent.proto";
+import "euler/v1/permissions.proto";
+import "euler/v1/sessions.proto";
+import "euler/v1/steps.proto";
+
+// The user's live agent events across all chats.
+service EventService {
+  // Streams events after `after_sequence`, replaying buffered ones first. When
+  // the buffer has moved past it, the stream starts with Resync and the client
+  // refetches AgentService.GetRuntime. Keepalive arrives after idle seconds.
+  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
+}
+
+message SubscribeRequest {
+  // The last sequence the client applied; 0 on a first connection.
+  uint64 after_sequence = 1;
+}
+
+message SubscribeResponse {
+  Event event = 1;
+}
+
+message Event {
+  // Increases per user. Keepalive carries 0 and is not replayed.
+  uint64 sequence = 1;
+  string session_id = 2;
+  string agent_id = 3;
+  oneof payload {
+    ActivationStarted activation_started = 4;
+    Delta delta = 5;
+    StepChanged step = 6;
+    ActivationEnded activation_ended = 7;
+    TranscriptAppended transcript_appended = 8;
+    AgentStatusChanged agent_status = 9;
+    InboxQueued inbox_queued = 10;
+    Resync resync = 11;
+    Keepalive keepalive = 12;
+    ApprovalRequested approval_requested = 13;
+    ApprovalResolved approval_resolved = 14;
+  }
+}
+
+message ActivationStarted {
+  Activation activation = 1;
+}
+
+// Streamed reply and reasoning text.
+message Delta {
+  string activation_id = 1;
+  string content_delta = 2;
+  string thinking_delta = 3;
+}
+
+message StepChanged {
+  string activation_id = 1;
+  // The step's index in the activation's open segment.
+  int32 position = 2;
+  Step step = 3;
+}
+
+message ActivationEnded {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    OUTCOME_DONE = 1;
+    OUTCOME_ABORTED = 2;
+    OUTCOME_ERROR = 3;
+    // Stopped at the automatic-turn limit.
+    OUTCOME_PAUSED = 4;
+  }
+  string activation_id = 1;
+  Outcome outcome = 2;
+}
+
+message TranscriptAppended {
+  Message message = 1;
+}
+
+message AgentStatusChanged {
+  Agent agent = 1;
+}
+
+message InboxQueued {
+  repeated InboxMessage messages = 1;
+}
+
+// The client missed events or the chat changed wholesale: refetch its state.
+// An empty session_id means every chat.
+message Resync {}
+
+message Keepalive {}
+
+message ApprovalRequested {
+  ToolApproval approval = 1;
+}
+
+message ApprovalResolved {
+  string approval_id = 1;
+}

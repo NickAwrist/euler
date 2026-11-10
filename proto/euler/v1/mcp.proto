@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package euler.v1;
+
+import "buf/validate/validate.proto";
+import "euler/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+// Remote MCP servers whose tools agents can call.
+service McpServerService {
+  rpc ListServers(ListServersRequest) returns (ListServersResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Tools from every enabled server, named as agents see them.
+  rpc ListTools(ListToolsRequest) returns (ListToolsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Adds every server in a pasted `mcpServers` config.
+  rpc CreateServers(CreateServersRequest) returns (CreateServersResponse);
+  rpc UpdateServer(UpdateServerRequest) returns (UpdateServerResponse);
+  rpc DeleteServer(DeleteServerRequest) returns (DeleteServerResponse);
+  // Connects to the server and lists its tools. An unreachable server is a
+  // result of the test, not a failed call.
+  rpc TestServer(TestServerRequest) returns (TestServerResponse);
+}
+
+// Header values hold credentials, so only their names leave the server.
+message McpServer {
+  string id = 1;
+  string name = 2;
+  string url = 3;
+  repeated string header_names = 4;
+  bool enabled = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message McpTool {
+  string name = 1;
+  string description = 2;
+  repeated DisplayIcon icons = 3;
+}
+
+message ListServersRequest {}
+
+message ListServersResponse {
+  repeated McpServer servers = 1;
+}
+
+message ListToolsRequest {}
+
+message ListToolsResponse {
+  repeated McpTool tools = 1;
+}
+
+message CreateServersRequest {
+  // The JSON config as pasted from an MCP server's docs.
+  string config = 1 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 100000
+  }];
+}
+
+message CreateServersResponse {
+  repeated McpServer servers = 1;
+}
+
+message UpdateServerRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+  bool enabled = 2;
+}
+
+message UpdateServerResponse {
+  McpServer server = 1;
+}
+
+message DeleteServerRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message DeleteServerResponse {}
+
+message TestServerRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message TestServerResponse {
+  message Connected {
+    repeated DisplayIcon icons = 1;
+    repeated McpTool tools = 2;
+  }
+  oneof result {
+    Connected connected = 1;
+    // Why the server could not be reached.
+    string error = 2;
+  }
+}

@@ -32,10 +32,16 @@ type PendingApproval = {
   resolve(decision: ToolApprovalResponse["decision"]): void;
 };
 
+/** Where the coordinator announces approvals as they open and close. */
+export type ApprovalEvents = {
+  requested(owner: string, approval: ToolApproval): void;
+  resolved(owner: string, approval: ToolApproval): void;
+};
+
 /** Pending calls live with the activation; server restart interrupts rather than replays them. */
 export class ToolApprovalCoordinator {
   private pending = new Map<string, PendingApproval>();
-  constructor(private changed: (owner: string, sessionId: string) => void) {}
+  constructor(private events: ApprovalEvents) {}
 
   list(owner: string, sessionId: string): ToolApproval[] {
     return [...this.pending.values()]
@@ -107,7 +113,7 @@ export class ToolApprovalCoordinator {
             return;
           }
           context.waiting();
-          this.changed(context.owner, context.sessionId);
+          this.events.requested(context.owner, structuredClone(approval));
         },
       );
       if (context.signal.aborted) throw new Error("Tool call cancelled");
@@ -117,8 +123,9 @@ export class ToolApprovalCoordinator {
       if (current.action === "deny") throw new Error(current.reason);
     } finally {
       if (abort) context.signal.removeEventListener("abort", abort);
-      this.pending.delete(approval.id);
-      this.changed(context.owner, context.sessionId);
+      // Answered, denied or cancelled: the approval closes here either way.
+      if (this.pending.delete(approval.id))
+        this.events.resolved(context.owner, approval);
     }
   }
 
@@ -180,7 +187,6 @@ export class ToolApprovalCoordinator {
     if (rule) saveToolPermissionRule(owner, rule);
     entry.answered = true;
     entry.resolve(response.decision);
-    this.changed(owner, sessionId);
     return {
       ok: true as const,
       ...(rule ? { rule: structuredClone(rule) } : {}),

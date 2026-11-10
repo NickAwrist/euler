@@ -1,9 +1,6 @@
 import { z } from "zod";
-import {
-  MAX_IMAGES_PER_MESSAGE,
-  OutputAttachmentSchema,
-} from "../attachments/types";
-import { MessageVersionSchema, RunMetadataSchema } from "./run";
+import { OutputAttachmentSchema } from "../attachments/types";
+import { type MessageVersion, RunMetadataSchema } from "./run";
 
 export const AgentStatusSchema = z.enum([
   "queued",
@@ -61,17 +58,15 @@ export const TurnSettingsSchema = z.object({
   metadata: RunMetadataSchema.optional(),
 });
 export type TurnSettings = z.infer<typeof TurnSettingsSchema>;
-export const SendMessageSchema = TurnSettingsSchema.extend({
-  content: z.string().trim().min(1),
-  attachmentIds: z.array(z.uuid()).max(MAX_IMAGES_PER_MESSAGE).default([]),
-}).strict();
-export type SendMessageRequest = z.infer<typeof SendMessageSchema>;
-export const RewindSchema = TurnSettingsSchema.extend({
-  position: z.number().int().nonnegative(),
-  content: z.string().trim().min(1).optional(),
-  versions: z.array(MessageVersionSchema).optional(),
-}).strict();
-export type RewindRequest = z.infer<typeof RewindSchema>;
+export type SendMessageRequest = TurnSettings & {
+  content: string;
+  attachmentIds: string[];
+};
+export type RewindRequest = TurnSettings & {
+  position: number;
+  content?: string;
+  versions?: MessageVersion[];
+};
 export type AgentStatus = z.infer<typeof AgentStatusSchema>;
 export const FINAL_STATUSES: readonly AgentStatus[] = [
   "completed",

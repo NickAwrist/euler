@@ -18,8 +18,8 @@ export function PersonalizationPanel({
     <div className="mx-auto max-w-3xl space-y-8">
       <section className="space-y-4" aria-label="Agent instructions">
         <SystemPromptField
-          value={settings.systemPrompt}
-          onChange={(value) => onChange("systemPrompt", value)}
+          value={settings.systemPrompt ?? null}
+          onChange={(value) => onChange("systemPrompt", value ?? undefined)}
         />
         <div className="flex items-start gap-3">
           <EnableSwitch

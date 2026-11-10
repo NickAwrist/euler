@@ -1,3 +1,4 @@
+import { toMillis } from "../../lib/timestamps";
 import type { SessionSummary } from "../../types";
 
 const MINUTE = 60_000;
@@ -31,7 +32,7 @@ export function groupSessionsByDate(
 ): SessionGroup[] {
   const groups: SessionGroup[] = [];
   for (const session of sessions) {
-    const label = groupLabel(session.updatedAt, now);
+    const label = groupLabel(toMillis(session.updatedAt), now);
     const last = groups.at(-1);
     if (last?.label === label) last.sessions.push(session);
     else groups.push({ label, sessions: [session] });

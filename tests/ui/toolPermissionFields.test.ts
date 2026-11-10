@@ -15,6 +15,7 @@ const tools = [
       { path: "background", type: "boolean" as const },
       { path: "mode", type: "string" as const, values: ["a", "b"] },
     ],
+    icons: [],
   },
   {
     name: "image",
@@ -25,8 +26,9 @@ const tools = [
       { path: "mode", type: "string" as const, values: ["b", "c"] },
       { path: "command", type: "string" as const, description: "Prompt" },
     ],
+    icons: [],
   },
-  { name: "list", description: "List", fields: [] },
+  { name: "list", description: "List", fields: [], icons: [] },
 ];
 
 describe("tool permission fields", () => {
@@ -55,6 +57,7 @@ describe("tool permission fields", () => {
           name: "other",
           description: "",
           fields: [{ path: "mode", type: "string" as const }],
+          icons: [],
         },
       ],
       "*",

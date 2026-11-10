@@ -1,19 +1,17 @@
+import { type Page, expect, test } from "@playwright/test";
+import { AgentService } from "../../src/gen/euler/v1/agent_pb";
+import { PreferenceService } from "../../src/gen/euler/v1/preferences_pb";
+import { fromProtoRule, toProtoRule } from "../../src/permissions/wire";
+import type { ToolPermissionRule } from "../../src/schemas/toolPermissions";
 import {
-  type APIRequestContext,
-  type Page,
-  expect,
-  test,
-} from "@playwright/test";
-import type {
-  ToolApproval,
-  ToolPermissionRule,
-} from "../../src/schemas/toolPermissions";
-import type { UserPreferences } from "../../src/schemas/userPreferences";
-import { startAsyncBackend } from "./asyncBackend";
+  FIXTURE_MODEL,
+  backendClient,
+  startAsyncBackend,
+  useBackend,
+} from "./asyncBackend";
 
 // Real Express/SQLite/runtime/Bash backend; only the model catalog is mocked.
 const USER = "12345678-1234-4234-9234-123456789abc";
-const MODEL = "openrouter:openai/gpt-5.6-terra";
 const COMMAND = "echo approved >> marker.txt";
 const REPLY = "The script is running in the background. You can keep chatting.";
 const ASK_ALL: ToolPermissionRule = {
@@ -23,7 +21,8 @@ const ASK_ALL: ToolPermissionRule = {
   condition: { kind: "any" },
 };
 let server: Awaited<ReturnType<typeof startAsyncBackend>>;
-let backend: string;
+let preferences: ReturnType<typeof backendClient<typeof PreferenceService>>;
+let agents: ReturnType<typeof backendClient<typeof AgentService>>;
 
 test.beforeAll(async () => {
   // Each parallel worker gets its own backend.
@@ -31,62 +30,34 @@ test.beforeAll(async () => {
     port: 5196 - Number(process.env.TEST_PARALLEL_INDEX ?? 0),
     mode: "permissions",
   });
-  backend = server.url;
+  preferences = backendClient(server.url, PreferenceService, USER);
+  agents = backendClient(server.url, AgentService, USER);
 });
 test.afterAll(async () => server?.stop());
 
-test.beforeEach(async ({ page, request }) => {
+/** The user's saved rules, as the server stores them. */
+const savedRules = async () =>
+  (
+    (await preferences.getPreferences({})).preferences?.toolPermissionRules ??
+    []
+  ).map(fromProtoRule);
+
+test.beforeEach(async ({ page }) => {
   await page.addInitScript((user) => {
     localStorage.setItem("euler:userUuid", user);
   }, USER);
-  await page.route("**/api/**", async (route) => {
-    const url = new URL(route.request().url());
-    if (url.pathname === "/api/models")
-      return route.fulfill({
-        json: {
-          models: [
-            {
-              id: MODEL,
-              name: "Fixture",
-              provider: "openrouter",
-              lab: "Test",
-              configured: true,
-              inputCapabilities: ["text"],
-            },
-          ],
-        },
-      });
-    return route.continue({ url: `${backend}${url.pathname}${url.search}` });
+  await useBackend(page, server.url);
+  await preferences.updatePreferences({
+    settings: { defaultModel: FIXTURE_MODEL },
   });
-  await api(request, "PATCH", "/api/settings/user", {
-    settings: { defaultModel: MODEL },
-    toolPermissions: { rules: [ASK_ALL] },
-  });
+  // Every test starts from a single ask-all rule.
+  for (const rule of await savedRules())
+    await preferences.deletePermissionRule({ ruleId: rule.id });
+  await preferences.putPermissionRule({ rule: toProtoRule(ASK_ALL) });
 });
 
-async function api<T>(
-  request: APIRequestContext,
-  method: "GET" | "PATCH",
-  path: string,
-  data?: unknown,
-): Promise<T> {
-  const response = await request.fetch(`${backend}${path}`, {
-    method,
-    headers: { "x-euler-user-id": USER },
-    data,
-  });
-  expect(response.ok()).toBe(true);
-  return (await response.json()) as T;
-}
-
-const pendingApprovals = async (request: APIRequestContext, session: string) =>
-  (
-    await api<{ approvals: ToolApproval[] }>(
-      request,
-      "GET",
-      `/api/sessions/${session}/runtime`,
-    )
-  ).approvals;
+const pendingApprovals = async (session: string) =>
+  (await agents.getRuntime({ sessionId: session })).approvals;
 
 async function sendCommand(page: Page) {
   await page.getByPlaceholder("Send a message...").fill(`command:${COMMAND}`);
@@ -110,7 +81,6 @@ test.describe("wide", () => {
 
   test("tools desktop: live approval saves an exact rule that skips later identical calls", async ({
     page,
-    request,
   }, testInfo) => {
     await page.goto("/");
     await sendCommand(page);
@@ -134,18 +104,13 @@ test.describe("wide", () => {
     await input.fill("Draft while waiting");
     await expect(input).toHaveValue("Draft while waiting");
     await page.screenshot({ path: testInfo.outputPath("pending-wide.png") });
-    expect(await pendingApprovals(request, session)).toHaveLength(1);
+    expect(await pendingApprovals(session)).toHaveLength(1);
 
     await card.getByRole("button", { name: "Allow matching calls" }).click();
     await expect(card).toBeHidden();
     await expect(page.getByText(REPLY, { exact: true })).toHaveCount(1);
-    expect(await pendingApprovals(request, session)).toEqual([]);
-    const { toolPermissions } = await api<UserPreferences>(
-      request,
-      "GET",
-      "/api/settings/user",
-    );
-    expect(toolPermissions.rules).toEqual([
+    expect(await pendingApprovals(session)).toEqual([]);
+    expect(await savedRules()).toEqual([
       ASK_ALL,
       expect.objectContaining({
         tool: "bash",
@@ -165,20 +130,14 @@ test.describe("wide", () => {
 
     await page.getByRole("button", { name: "Undo" }).click();
     await expect(page.getByText("Removed the rule for bash.")).toBeVisible();
-    await expect
-      .poll(
-        async () =>
-          (await api<UserPreferences>(request, "GET", "/api/settings/user"))
-            .toolPermissions.rules,
-      )
-      .toEqual([ASK_ALL]);
+    await expect.poll(savedRules).toEqual([ASK_ALL]);
 
     // Without the rule the identical call asks again; stopping cancels it.
     await sendCommand(page);
     await expect(card).toBeVisible();
     await page.getByRole("button", { name: "Stop generation" }).click();
     await expect(card).toHaveCount(0);
-    await expect.poll(() => pendingApprovals(request, session)).toEqual([]);
+    await expect.poll(() => pendingApprovals(session)).toEqual([]);
     await page.reload();
     await expect(page.getByText(REPLY, { exact: true })).toHaveCount(2);
     await expect(card).toHaveCount(0);
@@ -187,7 +146,6 @@ test.describe("wide", () => {
 
 test("composer selectors mobile: live tool approval denies inline without a stale request", async ({
   page,
-  request,
 }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/");
@@ -210,14 +168,9 @@ test("composer selectors mobile: live tool approval denies inline without a stal
   await expect(card).toHaveCount(0);
   await expect(page.getByText(REPLY, { exact: true })).toBeVisible();
   await expect(input).toHaveValue("Draft while waiting");
-  expect(await pendingApprovals(request, session)).toEqual([]);
-  const { toolPermissions } = await api<UserPreferences>(
-    request,
-    "GET",
-    "/api/settings/user",
-  );
+  expect(await pendingApprovals(session)).toEqual([]);
   expect(
-    toolPermissions.rules.filter((rule) => rule.sessionId === session),
+    (await savedRules()).filter((rule) => rule.sessionId === session),
   ).toEqual([]);
   await page.reload();
   await expect(page.getByText(REPLY, { exact: true })).toBeVisible();

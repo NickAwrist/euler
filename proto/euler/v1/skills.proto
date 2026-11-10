@@ -1,0 +1,109 @@
+syntax = "proto3";
+
+package euler.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+// Instructions agents load on demand, and the user invokes with $name.
+service SkillService {
+  rpc ListSkills(ListSkillsRequest) returns (ListSkillsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc GetSkill(GetSkillRequest) returns (GetSkillResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc CreateSkill(CreateSkillRequest) returns (CreateSkillResponse);
+  rpc UpdateSkill(UpdateSkillRequest) returns (UpdateSkillResponse);
+  rpc DeleteSkill(DeleteSkillRequest) returns (DeleteSkillResponse);
+}
+
+message Skill {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string instructions = 4;
+  bool user_invocable = 5;
+  bool disable_model_invocation = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+// A skill's editable fields. Surrounding whitespace is trimmed. Rules with
+// "euler." IDs carry the message clients show.
+message SkillFields {
+  // Lowercase letters, numbers and single hyphens.
+  string name = 1 [
+    (buf.validate.field).cel = {
+      id: "euler.skill_name_required"
+      message: "name is required"
+      expression: "this.matches(r'\\S')"
+    },
+    (buf.validate.field).cel = {
+      id: "euler.skill_name_length"
+      message: "name must be 64 characters or fewer"
+      expression: "size(this) <= 64 || this.matches(r'^\\s*(?s:.){0,64}\\s*$')"
+    },
+    (buf.validate.field).cel = {
+      id: "euler.skill_name_pattern"
+      message: "name must use lowercase letters, numbers, and single hyphens only"
+      expression: "!this.matches(r'\\S') || this.matches(r'^\\s*[a-z0-9]+(?:-[a-z0-9]+)*\\s*$')"
+    }
+  ];
+  string description = 2 [
+    (buf.validate.field).cel = {
+      id: "euler.skill_description_required"
+      message: "description is required"
+      expression: "this.matches(r'\\S')"
+    },
+    (buf.validate.field).cel = {
+      id: "euler.skill_description_length"
+      message: "description must be 500 characters or fewer"
+      expression: "size(this) <= 500 || this.matches(r'^\\s*(?s:.){0,500}\\s*$')"
+    }
+  ];
+  string instructions = 3 [(buf.validate.field).cel = {
+    id: "euler.skill_instructions_required"
+    message: "instructions are required"
+    expression: "this.matches(r'\\S')"
+  }];
+  bool user_invocable = 4;
+  bool disable_model_invocation = 5;
+}
+
+message ListSkillsRequest {}
+
+message ListSkillsResponse {
+  repeated Skill skills = 1;
+}
+
+message GetSkillRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message GetSkillResponse {
+  Skill skill = 1;
+}
+
+message CreateSkillRequest {
+  SkillFields skill = 1 [(buf.validate.field).required = true];
+}
+
+message CreateSkillResponse {
+  Skill skill = 1;
+}
+
+message UpdateSkillRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+  SkillFields skill = 2 [(buf.validate.field).required = true];
+}
+
+message UpdateSkillResponse {
+  Skill skill = 1;
+}
+
+message DeleteSkillRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message DeleteSkillResponse {}

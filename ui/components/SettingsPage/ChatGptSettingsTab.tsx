@@ -1,5 +1,8 @@
+import { create } from "@bufbuild/protobuf";
 import { CircleUserRound, ExternalLink, LogOut } from "lucide-react";
 import { useState } from "react";
+import { DisplayIcon_Theme } from "../../../src/gen/euler/v1/common_pb";
+import { ChatGptStatusSchema } from "../../../src/gen/euler/v1/providers_pb";
 import { whileRunning } from "../../lib/whileRunning";
 import {
   disconnectChatGpt,
@@ -66,13 +69,7 @@ export function ChatGptSettingsTab({
   const disconnect = () =>
     run(async () => {
       const { revoked } = await disconnectChatGpt();
-      setStatus({
-        connected: false,
-        email: null,
-        name: null,
-        picture: null,
-        planEnabled: false,
-      });
+      setStatus(create(ChatGptStatusSchema));
       if (!revoked)
         setNotice(
           "Disconnected here, but ChatGPT didn't confirm. Remove this app's access in ChatGPT Settings.",
@@ -110,7 +107,16 @@ export function ChatGptSettingsTab({
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <ServiceIcon
-                icons={status.picture ? [{ src: status.picture }] : []}
+                icons={
+                  status.picture
+                    ? [
+                        {
+                          src: status.picture,
+                          theme: DisplayIcon_Theme.UNSPECIFIED,
+                        },
+                      ]
+                    : []
+                }
                 fallback={CircleUserRound}
                 size={36}
                 className="rounded-full text-muted-foreground"

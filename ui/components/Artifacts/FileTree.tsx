@@ -1,6 +1,9 @@
 import { ChevronDown, ChevronRight, FolderOpen } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { DirectoryEntry } from "../../../src/schemas/artifacts";
+import {
+  ArtifactEntry_Kind,
+  type ArtifactEntry as DirectoryEntry,
+} from "../../../src/gen/euler/v1/workspace_pb";
 import { RefreshButton } from "../RefreshButton";
 import { FileIcon } from "./FileIcon";
 import type { ArtifactPreviewCache } from "./previewCache";
@@ -92,14 +95,16 @@ function Directory({
           <li key={entry.path}>
             <button
               type="button"
-              data-file-path={entry.kind === "file" ? entry.path : undefined}
+              data-file-path={
+                entry.kind === ArtifactEntry_Kind.FILE ? entry.path : undefined
+              }
               aria-expanded={
-                entry.kind === "directory"
+                entry.kind === ArtifactEntry_Kind.DIRECTORY
                   ? expanded.has(entry.path)
                   : undefined
               }
               onClick={() =>
-                entry.kind === "file"
+                entry.kind === ArtifactEntry_Kind.FILE
                   ? onOpen(entry.path)
                   : setExpanded((previous) => {
                       const next = new Set(previous);
@@ -111,7 +116,7 @@ function Directory({
               className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-accent-ring"
               title={entry.path}
             >
-              {entry.kind === "directory" &&
+              {entry.kind === ArtifactEntry_Kind.DIRECTORY &&
                 (expanded.has(entry.path) ? (
                   <ChevronDown
                     size={14}
@@ -125,23 +130,28 @@ function Directory({
                 ))}
               <FileIcon
                 path={entry.path}
-                directory={entry.kind === "directory"}
+                directory={entry.kind === ArtifactEntry_Kind.DIRECTORY}
                 expanded={expanded.has(entry.path)}
-                className={entry.kind === "file" ? "ml-[22px]" : undefined}
+                className={
+                  entry.kind === ArtifactEntry_Kind.FILE
+                    ? "ml-[22px]"
+                    : undefined
+                }
               />
               <span className="truncate">{entry.name}</span>
             </button>
-            {entry.kind === "directory" && expanded.has(entry.path) && (
-              <div className="ml-3 border-l border-border-subtle pl-1">
-                <Directory
-                  active={active}
-                  source={source}
-                  path={entry.path}
-                  onOpen={onOpen}
-                  revision={revision}
-                />
-              </div>
-            )}
+            {entry.kind === ArtifactEntry_Kind.DIRECTORY &&
+              expanded.has(entry.path) && (
+                <div className="ml-3 border-l border-border-subtle pl-1">
+                  <Directory
+                    active={active}
+                    source={source}
+                    path={entry.path}
+                    onOpen={onOpen}
+                    revision={revision}
+                  />
+                </div>
+              )}
           </li>
         ))}
       </ul>

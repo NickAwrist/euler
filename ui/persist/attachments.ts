@@ -1,25 +1,18 @@
-import {
-  type ImageAttachment,
-  ImageAttachmentSchema,
-} from "../../src/attachments/types";
-import { apiBlob, apiJson } from "../lib/api";
+import type { ImageAttachment } from "../../src/gen/euler/v1/attachments_pb";
+import { attachmentClient } from "../lib/rpc";
 
 export async function uploadImageAttachment(
   sessionId: string,
   file: File,
 ): Promise<ImageAttachment> {
-  const payload = await apiJson<{ attachment?: unknown }>("/api/attachments", {
-    method: "POST",
-    headers: {
-      "Content-Type": file.type,
-      "X-Euler-Session-ID": sessionId,
-      "X-Attachment-Filename": encodeURIComponent(file.name),
-    },
-    body: file,
+  const { attachment } = await attachmentClient.createAttachment({
+    sessionId,
+    filename: file.name,
+    mimeType: file.type,
+    data: new Uint8Array(await file.arrayBuffer()),
   });
-  const parsed = ImageAttachmentSchema.safeParse(payload.attachment);
-  if (!parsed.success) throw new Error("The server returned an invalid image");
-  return parsed.data;
+  if (!attachment) throw new Error("The server returned an invalid image");
+  return attachment;
 }
 
 const imageCache = new Map<string, string>();
@@ -89,10 +82,11 @@ export function fetchAttachmentImage(
             resolve(existing);
             return;
           }
-          const blob = await apiBlob(
-            `/api/attachments/${encodeURIComponent(id)}`,
+          const { mimeType, data } = await attachmentClient.getAttachmentData(
+            { id },
             { signal },
           );
+          const blob = new Blob([new Uint8Array(data)], { type: mimeType });
           signal?.throwIfAborted();
           const url = cachedImage(id) ?? URL.createObjectURL(blob);
           imageCache.set(id, url);

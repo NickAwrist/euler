@@ -17,7 +17,9 @@ import {
   sessionPath,
 } from "../../lib/navigation";
 import { safeStorage } from "../../lib/safeStorage";
+import { optionalMillis, toMillis } from "../../lib/timestamps";
 import { whileRunning } from "../../lib/whileRunning";
+import { sandboxWorkspace } from "../../lib/workspace";
 import {
   createSessionApi,
   deleteSessionApi,
@@ -53,11 +55,11 @@ function keepUnchangedSummaries(
   return next.map((session) => {
     const old = previous.get(session.id);
     return old &&
-      old.updatedAt === session.updatedAt &&
+      toMillis(old.updatedAt) === toMillis(session.updatedAt) &&
       old.preview === session.preview &&
       old.customTitle === session.customTitle &&
       old.badge === session.badge &&
-      old.expiresAt === session.expiresAt
+      optionalMillis(old.expiresAt) === optionalMillis(session.expiresAt)
       ? old
       : session;
   });
@@ -196,9 +198,9 @@ export function useSessionsAndNavigation({
         (stored) => {
           if (gen !== loadGenRef.current) return;
           if (!stored) return fail("Conversation not found.");
-          setActiveExpiresAt(stored.expiresAt);
+          setActiveExpiresAt(optionalMillis(stored.expiresAt));
           setSessionModel(stored.model ?? null);
-          setWorkspace(stored.workspace ?? { kind: "sandbox" });
+          setWorkspace(stored.workspace ?? sandboxWorkspace());
           // The runtime snapshot may have set newer history while this
           // request was in flight. Never replace that newer state.
           setMessages((current) =>
@@ -272,7 +274,7 @@ export function useSessionsAndNavigation({
         loadGenRef.current++;
         activeSessionIdRef.current = id;
         setActiveSessionId(id);
-        setActiveExpiresAt(expiresAt);
+        setActiveExpiresAt(optionalMillis(expiresAt));
         setSessionLoadState("empty");
         setSessionError(null);
         setSessionModel(selectedModel || null);
@@ -290,11 +292,11 @@ export function useSessionsAndNavigation({
     loadGenRef.current++;
     activeSessionIdRef.current = id;
     setActiveSessionId(id);
-    setActiveExpiresAt(expiresAt);
+    setActiveExpiresAt(optionalMillis(expiresAt));
     resetSessionTransientState();
     setSessionLoadState("empty");
     setSessionError(null);
-    setWorkspace({ kind: "sandbox" });
+    setWorkspace(sandboxWorkspace());
     pushSessionUrl(id);
     void refreshSessions();
     onNavigate?.();
@@ -325,7 +327,7 @@ export function useSessionsAndNavigation({
         activeSessionIdRef.current = null;
         setActiveSessionId(null);
         setActiveExpiresAt(null);
-        setWorkspace({ kind: "sandbox" });
+        setWorkspace(sandboxWorkspace());
         resetSessionTransientState();
       }
     };
@@ -346,7 +348,7 @@ export function useSessionsAndNavigation({
     setActiveExpiresAt(null);
     resetSessionTransientState();
     onNavigate?.();
-    setWorkspace({ kind: "sandbox" });
+    setWorkspace(sandboxWorkspace());
     pushSessionUrl(null);
   }, [
     onNavigate,
@@ -367,7 +369,7 @@ export function useSessionsAndNavigation({
         activeSessionIdRef.current = null;
         setActiveSessionId(null);
         setActiveExpiresAt(null);
-        setWorkspace({ kind: "sandbox" });
+        setWorkspace(sandboxWorkspace());
         setSessionModel(null);
         setMessages([]);
         setDebugOpen(false);

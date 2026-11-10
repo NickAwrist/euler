@@ -1,0 +1,5 @@
+Euler.xcodeproj/
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/

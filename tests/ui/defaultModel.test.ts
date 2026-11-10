@@ -1,32 +1,44 @@
 import { expect, test } from "bun:test";
-import { mapModelOptions } from "../../ui/hooks/run/useOllamaConnection";
+import { create } from "@bufbuild/protobuf";
+import {
+  ModelProvider,
+  ModelSchema,
+  Model_Availability,
+} from "../../src/gen/euler/v1/models_pb";
 import { effectiveDefaultRunModel } from "../../ui/lib/defaultModel";
 
-const models = mapModelOptions([
+const models = [
   {
     id: "disabled",
     name: "Disabled",
-    provider: "openrouter",
+    provider: ModelProvider.OPENROUTER,
     lab: "Test",
     configured: false,
   },
   {
     id: "gone",
     name: "Gone",
-    provider: "openrouter",
+    provider: ModelProvider.OPENROUTER,
     lab: "Test",
-    availability: "unavailable",
+    configured: true,
+    availability: Model_Availability.UNAVAILABLE,
   },
-  { id: "local", name: "Local", provider: "ollama", lab: "Ollama" },
+  {
+    id: "local",
+    name: "Local",
+    provider: ModelProvider.OLLAMA,
+    lab: "Ollama",
+    configured: true,
+  },
   {
     id: "remote",
     name: "Remote",
-    provider: "openrouter",
+    provider: ModelProvider.OPENROUTER,
     lab: "Test",
     configured: true,
-    availability: "unverified",
+    availability: Model_Availability.UNVERIFIED,
   },
-]);
+].map((model) => create(ModelSchema, model));
 
 test("new chat defaults use an available preference or the first usable model", () => {
   expect(effectiveDefaultRunModel(" remote ", models)).toBe("remote");

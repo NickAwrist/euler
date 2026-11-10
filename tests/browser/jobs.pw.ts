@@ -1,7 +1,7 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test } from "@playwright/test";
-import { startAsyncBackend } from "./asyncBackend";
+import { FIXTURE_MODEL, startAsyncBackend, useBackend } from "./asyncBackend";
 import { mockUserPreferences } from "./userPreferencesFixture";
 test.use({
   isMobile: false,
@@ -35,28 +35,9 @@ test("session loading: background Bash jobs complete after ten seconds and remai
   const consoleErrors: string[] = [];
   page.on("pageerror", (error) => consoleErrors.push(String(error)));
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.route("**/api/**", async (route) => {
-    const url = new URL(route.request().url());
-    if (url.pathname === "/api/models")
-      return route.fulfill({
-        json: {
-          models: [
-            {
-              id: "openrouter:openai/gpt-5.6-terra",
-              name: "Fixture",
-              provider: "openrouter",
-              lab: "Test",
-              configured: true,
-              inputCapabilities: ["text"],
-            },
-          ],
-        },
-      });
-    url.port = "5197";
-    return route.continue({ url: url.toString() });
-  });
+  await useBackend(page, server.url);
   await mockUserPreferences(page, undefined, {
-    settings: { defaultModel: "openrouter:openai/gpt-5.6-terra" },
+    settings: { defaultModel: FIXTURE_MODEL },
   });
   await page.goto("/");
   const input = page.getByPlaceholder("Send a message...");

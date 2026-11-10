@@ -1,24 +1,30 @@
-import type { AgentEvent } from "../../../src/schemas/events";
+import type { Event } from "../../../src/gen/euler/v1/events_pb";
+import { Step_Kind, Step_Status } from "../../../src/gen/euler/v1/steps_pb";
 import type { AgentPhase } from "../../types";
 
 export type AgentPhases = Readonly<Record<string, AgentPhase>>;
 
 /** The phase an event moves its agent into; null ends it, undefined leaves it. */
-function eventPhase(event: AgentEvent): AgentPhase | null | undefined {
-  if (event.type === "delta") {
-    if (event.contentDelta) return "responding";
-    if (event.thinkingDelta) return "thinking";
+function eventPhase({ payload }: Event): AgentPhase | null | undefined {
+  if (payload.case === "delta") {
+    if (payload.value.contentDelta) return "responding";
+    if (payload.value.thinkingDelta) return "thinking";
   }
-  if (event.type === "step" && event.step.status === "running")
-    return event.step.kind === "tool_call" ? "tool" : "thinking";
-  if (event.type === "activation_ended") return null;
+  if (
+    payload.case === "step" &&
+    payload.value.step?.status === Step_Status.RUNNING
+  )
+    return payload.value.step.kind === Step_Kind.TOOL_CALL
+      ? "tool"
+      : "thinking";
+  if (payload.case === "activationEnded") return null;
   return undefined;
 }
 
 /** Returns the same object when nothing changes, so token deltas skip re-renders. */
 export function nextAgentPhases(
   phases: AgentPhases,
-  event: AgentEvent,
+  event: Event,
 ): AgentPhases {
   const phase = eventPhase(event);
   if (phase === undefined || phases[event.agentId] === phase) return phases;

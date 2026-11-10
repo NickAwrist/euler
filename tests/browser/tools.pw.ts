@@ -1,6 +1,11 @@
 import { expect, test } from "@playwright/test";
-import type { McpServerData } from "../../src/schemas/mcp";
+import {
+  type McpServerSchema,
+  McpServerService,
+} from "../../src/gen/euler/v1/mcp_pb";
 import type { UserPreferences } from "../../src/schemas/userPreferences";
+import { type Init, at } from "./appFixture";
+import { RpcFailure, mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 test.beforeEach(async ({ page }) => {
@@ -15,44 +20,46 @@ test.beforeEach(async ({ page }) => {
 test("tools desktop: paste a config, surface errors, and list server tools", async ({
   page,
 }) => {
-  const server: McpServerData = {
+  const server: Init<typeof McpServerSchema> = {
     id: "server-1",
     name: "linear",
     url: "https://mcp.linear.app/mcp",
     headerNames: ["Authorization"],
     enabled: true,
-    created_at: 1,
-    updated_at: 1,
+    createdAt: at(1),
+    updatedAt: at(1),
   };
-  await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
-  await mockUserPreferences(page);
-  await page.route("**/api/mcp-servers", (route) => {
-    if (route.request().method() === "GET")
-      return route.fulfill({ json: { servers: [] } });
-    const config = route.request().postDataJSON() as {
-      mcpServers: Record<string, { command?: string }>;
-    };
-    if (config.mcpServers.files?.command)
-      return route.fulfill({
-        status: 400,
-        json: {
-          error: {
-            code: "INVALID_REQUEST",
-            message:
-              "local (command) servers are not supported; use a remote server url",
-          },
-        },
-      });
-    return route.fulfill({ status: 201, json: { servers: [server] } });
-  });
-  await page.route("**/api/mcp-servers/server-1/check", (route) =>
-    route.fulfill({
-      json: {
-        ok: true,
-        tools: [{ name: "list_issues" }, { name: "create_issue" }],
-      },
-    }),
+  await mockRpc(
+    page,
+    [
+      on(McpServerService.method.createServers, ({ config }) => {
+        const { mcpServers } = JSON.parse(config) as {
+          mcpServers: Record<string, { command?: string }>;
+        };
+        if (mcpServers.files?.command)
+          return new RpcFailure(
+            "invalid_argument",
+            "local (command) servers are not supported; use a remote server url",
+            "INVALID_REQUEST",
+          );
+        return { servers: [server] };
+      }),
+      on(McpServerService.method.testServer, ({ id }) =>
+        id === server.id
+          ? {
+              result: {
+                case: "connected" as const,
+                value: {
+                  tools: [{ name: "list_issues" }, { name: "create_issue" }],
+                },
+              },
+            }
+          : undefined,
+      ),
+    ],
+    { empty: true },
   );
+  await mockUserPreferences(page);
 
   await page.goto("/customization");
   await page.getByRole("button", { name: "Tools" }).click();
@@ -89,11 +96,8 @@ test("tools desktop: paste a config, surface errors, and list server tools", asy
 
 test("tools desktop: built-in capabilities save per user", async ({ page }) => {
   const store = new Map<string, UserPreferences>();
-  await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
+  await mockRpc(page, [], { empty: true });
   await mockUserPreferences(page, store);
-  await page.route("**/api/mcp-servers", (route) =>
-    route.fulfill({ json: { servers: [] } }),
-  );
 
   await page.goto("/customization");
   await page.getByRole("button", { name: "Tools" }).click();

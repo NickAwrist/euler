@@ -84,6 +84,11 @@ export function withLogContext<T>(fields: LogContext, run: () => T): T {
   return context.run({ ...context.getStore(), ...fields }, run);
 }
 
+/** The request being handled, when logging runs inside one. */
+export function currentRequestId(): string | undefined {
+  return context.getStore()?.requestId;
+}
+
 /** Starts background work without inheriting the request that scheduled it. */
 export function withBackgroundLogContext<T>(
   fields: Omit<LogContext, "requestId">,

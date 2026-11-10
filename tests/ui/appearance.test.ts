@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
+import {
+  type Appearance,
+  appearanceSchema,
+} from "../../src/schemas/userPreferences";
 import { parseRoute } from "../../ui/lib/navigation";
-import { type Appearance, appearanceSchema } from "../../ui/persist/appearance";
 
 const defaults: Appearance = {
   theme: "default",

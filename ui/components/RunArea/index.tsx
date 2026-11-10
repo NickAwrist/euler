@@ -2,6 +2,8 @@ import { ArrowDown } from "lucide-react";
 import { memo, useLayoutEffect, useState } from "react";
 import { useStickToBottom } from "use-stick-to-bottom";
 import { MAIN_AGENT_NAME } from "../../../src/agents/agentNames";
+import { Step_Kind } from "../../../src/gen/euler/v1/steps_pb";
+import { toMillis } from "../../lib/timestamps";
 import { AgentRows } from "../Agents/AgentTaskCard";
 import { IconButton } from "../IconButton";
 import { JobRows } from "../Jobs/JobTaskCard";
@@ -133,10 +135,10 @@ export const RunArea = memo(function RunArea({
             />
           )}
 
-          {streamingStep?.kind === "llm_call" &&
+          {streamingStep?.kind === Step_Kind.LLM_CALL &&
             streamingStep.agentName === MAIN_AGENT_NAME && (
               <LiveThinking
-                key={streamingStep.startedAt}
+                key={toMillis(streamingStep.startedAt)}
                 thinking={streamingThinking}
                 responding={streamingContent.length > 0}
               />

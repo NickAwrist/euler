@@ -1,19 +1,21 @@
 import { expect, test } from "@playwright/test";
+import {
+  type Appearance_CodeFont,
+  type Appearance_Font,
+  type Appearance_Theme,
+  PreferenceService,
+} from "../../src/gen/euler/v1/preferences_pb";
+import type { UserPreferences } from "../../src/schemas/userPreferences";
+import { RpcFailure, mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
-const apiFixture = (url: string) =>
-  url.endsWith("/api/settings/environment")
-    ? { ollamaHost: false, comfyuiHost: false }
-    : {};
+const USER = "12345678-1234-4234-9234-123456789abc";
 
 // These checks exercise returning users; first-visit setup has its own suite.
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      "euler:userUuid",
-      "12345678-1234-4234-9234-123456789abc",
-    );
-  });
+  await page.addInitScript((user) => {
+    localStorage.setItem("euler:userUuid", user);
+  }, USER);
 });
 
 for (const device of ["desktop", "mobile"] as const) {
@@ -27,11 +29,10 @@ for (const device of ["desktop", "mobile"] as const) {
           ? { width: 1280, height: 900 }
           : { width: 390, height: 844 },
     });
-    await page.route("**/api/**", (route) =>
-      route.fulfill({ json: apiFixture(route.request().url()) }),
-    );
+    const store = new Map<string, UserPreferences>();
+    await mockRpc(page, [], { empty: true });
     try {
-      await mockUserPreferences(page);
+      await mockUserPreferences(page, store);
       await page.goto("/dev/settings");
       await page
         .getByRole("button", { name: "Appearance", exact: true })
@@ -77,12 +78,7 @@ for (const device of ["desktop", "mobile"] as const) {
         "data-theme",
         "default",
       );
-      expect(
-        await page.evaluate(
-          async () =>
-            (await (await fetch("/api/settings/user")).json()).appearance.theme,
-        ),
-      ).toBe("default");
+      expect(store.get(USER)?.appearance.theme ?? "default").toBe("default");
       await expect(page.locator("footer")).toContainText(
         "Unsaved changes in Appearance",
       );
@@ -175,9 +171,7 @@ for (const device of ["desktop", "mobile"] as const) {
 test("settings save desktop: each font renders in the shared preview without applying globally", async ({
   page,
 }) => {
-  await page.route("**/api/**", (route) =>
-    route.fulfill({ json: apiFixture(route.request().url()) }),
-  );
+  await mockRpc(page, [], { empty: true });
   await mockUserPreferences(page);
   await page.goto("/dev/settings");
   await page.getByRole("button", { name: "Appearance", exact: true }).click();
@@ -236,36 +230,34 @@ test("settings save desktop: each font renders in the shared preview without app
 test("settings save desktop: invalid preferences fall back and failed saves retain drafts without applying", async ({
   page,
 }) => {
-  await page.route("**/api/**", (route) =>
-    route.fulfill({ json: apiFixture(route.request().url()) }),
-  );
+  await mockRpc(page, [], { empty: true });
   await mockUserPreferences(page);
   // Saved values that are no longer valid choices fall back to defaults.
-  await page.route("**/api/settings/user", (route) =>
-    route.request().method() === "GET"
-      ? route.fulfill({
-          json: {
-            appearance: { font: "invalid", theme: {}, codeFont: false },
-          },
-        })
-      : route.fallback(),
-  );
+  await mockRpc(page, [
+    on(PreferenceService.method.getPreferences, () => ({
+      preferences: {
+        appearance: {
+          font: 99 as Appearance_Font,
+          theme: 99 as Appearance_Theme,
+          codeFont: 99 as Appearance_CodeFont,
+        },
+      },
+    })),
+  ]);
   await page.goto("/dev/settings");
   await page.getByRole("button", { name: "Appearance", exact: true }).click();
   await page.getByLabel("Font style", { exact: true }).selectOption("serif");
-  await page.route("**/api/settings/user", (route) =>
-    route.request().method() === "PATCH"
-      ? route.fulfill({
-          status: 503,
-          json: {
-            error: {
-              code: "INTERNAL_ERROR",
-              message: "Could not save appearance",
-            },
-          },
-        })
-      : route.fallback(),
-  );
+  await mockRpc(page, [
+    on(
+      PreferenceService.method.updatePreferences,
+      () =>
+        new RpcFailure(
+          "internal",
+          "Could not save appearance",
+          "INTERNAL_ERROR",
+        ),
+    ),
+  ]);
   await page
     .getByRole("button", { name: "Save settings", exact: true })
     .click();

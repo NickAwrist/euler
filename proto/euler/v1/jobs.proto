@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package euler.v1;
+
+import "buf/validate/validate.proto";
+import "euler/v1/attachments.proto";
+import "euler/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+// Background jobs agents start with tools, such as long shell commands.
+service JobService {
+  rpc ListJobs(ListJobsRequest) returns (ListJobsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc GetJob(GetJobRequest) returns (GetJobResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc CancelJob(CancelJobRequest) returns (CancelJobResponse);
+}
+
+message Job {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_STARTING = 1;
+    STATUS_RUNNING = 2;
+    STATUS_SUCCEEDED = 3;
+    STATUS_FAILED = 4;
+    STATUS_CANCELLED = 5;
+    STATUS_INTERRUPTED = 6;
+  }
+  message Result {
+    string text = 1;
+    repeated OutputAttachment attachments = 2;
+    bool failed = 3;
+  }
+  string id = 1;
+  string session_id = 2;
+  string agent_id = 3;
+  string tool = 4;
+  string description = 5;
+  string activation_id = 6;
+  // Transcript length when the job started.
+  optional int32 spawn_position = 7;
+  ToolContent input = 8;
+  Status status = 9;
+  google.protobuf.Timestamp created_at = 10;
+  optional google.protobuf.Timestamp ended_at = 11;
+  optional ToolContent progress = 12;
+  optional ToolContent output = 13;
+  optional ToolContent metadata = 14;
+  bool output_truncated = 15;
+  optional Result result = 16;
+  optional ErrorDetail error = 17;
+  // Whether the agent was told the job ended.
+  bool notified = 18;
+}
+
+message ListJobsRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message ListJobsResponse {
+  repeated Job jobs = 1;
+}
+
+message GetJobRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  string job_id = 2 [(buf.validate.field).string.min_len = 1];
+}
+
+message GetJobResponse {
+  Job job = 1;
+}
+
+message CancelJobRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  string job_id = 2 [(buf.validate.field).string.min_len = 1];
+}
+
+message CancelJobResponse {
+  Job job = 1;
+}

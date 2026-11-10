@@ -1,8 +1,8 @@
 # Euler
 
-A local-first agent runtime with a chat UI. Run local models through
-[Ollama](https://ollama.com/), remote models through OpenRouter, or connect
-your ChatGPT plan.
+A local-first agent runtime with a chat UI in the browser and a native iPhone
+app. Run local models through [Ollama](https://ollama.com/), remote models
+through OpenRouter, or connect your ChatGPT plan.
 
 Every chat uses one agent with the enabled tools. It can hand self-contained
 work to subagents, which share its system prompt and built-in tools but run in a
@@ -352,16 +352,20 @@ and baseline updates. CI does not yet run all the checks above.
 
 ## Documentation
 
-- [Issue triage](BUG_TRIAGE.md) and [codebase audit](docs/audit-issues.md) track remaining work.
-- [Async agents](docs/design/async-agents.md) documents the agent runtime.
-- [Background tools and networking](docs/design/background-tools-and-session-networking.md) separates implemented jobs from proposed sandbox networking.
+- [The Connect API](docs/connect-api.md) covers the contract in `proto/`, the event stream, and push.
+- [Euler for iPhone](ios/README.md) covers the iOS app.
+- [Issue triage](BUG_TRIAGE.md), the [codebase audit](docs/audit-issues.md), and the [wishlist](wishlist.md) track remaining work.
+- [Shared session networking](docs/design/session-networking.md) is a proposal for sandbox workspaces.
+- `.claude/skills/test-euler-web/` and `.claude/skills/test-euler-ios/` tell coding agents how to test each app.
 
 ## Project structure
 
-- `src/` - backend server, agent loop, tools, and session storage
+- `proto/` - the API contract; `bun run proto` generates `src/gen/` and the Swift in `ios/EulerAPI/`
+- `src/` - backend server, RPC handlers, agent loop, tools, and session storage
 - `ui/` - React frontend
+- `ios/` - the iPhone app
 - `tests/` - unit, integration, and Playwright browser tests (`tests/browser/*.pw.ts`)
-- `scripts/` - worktree setup and the performance check
+- `scripts/` - worktree setup, the performance check, and the proto check
 - `config/apparmor/` - Bubblewrap AppArmor profile
-- `docs/` - design notes and the codebase audit
+- `docs/` - the API reference, a design proposal, and the codebase audit
 - `data/` - default local data root, ignored by Git

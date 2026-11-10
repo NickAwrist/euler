@@ -1,0 +1,21 @@
+version: v2
+clean: true
+plugins:
+  - local: protoc-gen-es
+    out: src/gen
+    include_imports: true
+    opt:
+      - target=ts
+      - import_extension=none
+  - remote: buf.build/apple/swift:v1.39.0
+    out: ios/EulerAPI/Sources/EulerAPI/Generated
+    opt:
+      - Visibility=Public
+      - FileNaming=PathToUnderscores
+  - remote: buf.build/connectrpc/swift:v1.2.3
+    out: ios/EulerAPI/Sources/EulerAPI/Generated
+    opt:
+      - Visibility=Public
+      - FileNaming=PathToUnderscores
+      - GenerateCallbackMethods=false
+      - GenerateAsyncMethods=true

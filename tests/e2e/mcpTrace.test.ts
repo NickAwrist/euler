@@ -3,9 +3,11 @@ import "../setup";
 import { expect, test } from "bun:test";
 import { setOpenRouterApiKey } from "../../src/db";
 import { createMcpServers } from "../../src/db/mcpServers";
+import { Step_Kind } from "../../src/gen/euler/v1/steps_pb";
 import { MCP_TEST_TOKEN, startMcpTestServer } from "../helpers/mcpServer";
 import { setOpenRouterScenario } from "../helpers/mockOpenRouter";
-import { TEST_USER_ID, startTestServer, userHeaders } from "../helpers/server";
+import { rpc } from "../helpers/rpc";
+import { TEST_USER_ID } from "../helpers/server";
 
 const model = "openrouter:openai/gpt-5.6-terra";
 
@@ -21,40 +23,26 @@ test("MCP tool calls are traced with their arguments and result", async () => {
       headers: { Authorization: `Bearer ${MCP_TEST_TOKEN}` },
     },
   ]);
-  const { url, close } = await startTestServer();
-  const headers = userHeaders(undefined, {
-    "Content-Type": "application/json",
-  });
+  const api = rpc();
   try {
-    const created = await fetch(`${url}/api/sessions`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ model }),
-    });
-    const { id } = (await created.json()) as { id: string };
-    await fetch(`${url}/api/sessions/${id}/messages`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ content: "Echo hello", model }),
+    const { id } = await api.sessions.createSession({ model });
+    await api.agent.sendMessage({
+      sessionId: id,
+      content: "Echo hello",
+      settings: { model },
     });
     await waitForActivation(id);
-    const stored = await fetch(`${url}/api/sessions/${id}`, {
-      headers: userHeaders(),
-    });
-    const { history } = (await stored.json()) as {
-      history: { role: string; steps?: Record<string, unknown>[] }[];
-    };
-    expect(history.at(-1)?.steps).toContainEqual(
+    const { session } = await api.sessions.getSession({ id });
+    expect(session?.history.at(-1)?.steps).toContainEqual(
       expect.objectContaining({
-        kind: "tool_call",
+        kind: Step_Kind.TOOL_CALL,
         toolName: "mcp__test__echo",
-        toolIcons: icons,
+        toolIcons: [expect.objectContaining({ src: icons[0]!.src })],
         args: { text: "hello" },
         result: "hello",
       }),
     );
   } finally {
-    await close();
     mcp.close();
   }
 });

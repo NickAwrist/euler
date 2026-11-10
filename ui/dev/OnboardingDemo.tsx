@@ -1,4 +1,10 @@
+import { create } from "@bufbuild/protobuf";
 import { useState } from "react";
+import {
+  InputCapability,
+  ModelProvider,
+  ModelSchema,
+} from "../../src/gen/euler/v1/models_pb";
 import { Onboarding } from "../components/Onboarding";
 import { saveComfyUIConfig } from "../persist/comfyui";
 import { saveOllamaConfig } from "../persist/services";
@@ -13,13 +19,14 @@ export default function OnboardingDemo() {
     <Onboarding
       settings={settings}
       models={[
-        {
+        create(ModelSchema, {
           id: "qwen3:8b",
           name: "Qwen 3 8B",
-          provider: "ollama",
+          provider: ModelProvider.OLLAMA,
           lab: "Qwen",
-          inputCapabilities: ["text"],
-        },
+          configured: true,
+          inputCapabilities: [InputCapability.TEXT],
+        }),
       ]}
       catalogLoaded
       ollama={{ host: "", connected: null }}

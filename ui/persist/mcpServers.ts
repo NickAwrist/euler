@@ -1,73 +1,65 @@
-import {
-  type McpServerCheck,
-  McpServerCheckSchema,
-  type McpServerData,
-  McpServerListResponseSchema,
-  McpServerSchema,
-  type McpToolData,
-  McpToolListResponseSchema,
-} from "../../src/schemas/mcp";
-import { apiJson, apiVoid } from "../lib/api";
+import type {
+  McpServer,
+  McpTool,
+  TestServerResponse,
+} from "../../src/gen/euler/v1/mcp_pb";
+import { mcpServerClient, withErrorMessage } from "../lib/rpc";
 
-export type { McpServerCheck, McpServerData };
+export type { McpServer, McpTool };
+export type McpServerCheck = TestServerResponse["result"];
 
-export async function fetchMcpServers(): Promise<McpServerData[]> {
-  return McpServerListResponseSchema.parse(
-    await apiJson<unknown>("/api/mcp-servers", {
-      errorMessage: "Failed to fetch MCP servers",
-    }),
+export async function fetchMcpServers(): Promise<McpServer[]> {
+  return (
+    await withErrorMessage(
+      mcpServerClient.listServers({}),
+      "Failed to fetch MCP servers",
+    )
   ).servers;
 }
 
 /** Adds every server in a pasted `mcpServers` config. */
-export async function addMcpServersApi(
-  config: unknown,
-): Promise<McpServerData[]> {
-  return McpServerListResponseSchema.parse(
-    await apiJson<unknown>("/api/mcp-servers", {
-      method: "POST",
-      json: config,
-      errorMessage: "Failed to add MCP servers",
-    }),
+export async function addMcpServersApi(config: string): Promise<McpServer[]> {
+  return (
+    await withErrorMessage(
+      mcpServerClient.createServers({ config }),
+      "Failed to add MCP servers",
+    )
   ).servers;
 }
 
 export async function setMcpServerEnabledApi(
   id: string,
   enabled: boolean,
-): Promise<McpServerData> {
-  return McpServerSchema.parse(
-    await apiJson<unknown>(`/api/mcp-servers/${id}`, {
-      method: "PATCH",
-      json: { enabled },
-      errorMessage: "Failed to update MCP server",
-    }),
-  );
+): Promise<McpServer> {
+  return (
+    await withErrorMessage(
+      mcpServerClient.updateServer({ id, enabled }),
+      "Failed to update MCP server",
+    )
+  ).server!;
 }
 
-export function deleteMcpServerApi(id: string): Promise<void> {
-  return apiVoid(`/api/mcp-servers/${id}`, {
-    method: "DELETE",
-    errorMessage: "Failed to delete MCP server",
-  });
+export async function deleteMcpServerApi(id: string): Promise<void> {
+  await withErrorMessage(
+    mcpServerClient.deleteServer({ id }),
+    "Failed to delete MCP server",
+  );
 }
 
 export async function checkMcpServerApi(id: string): Promise<McpServerCheck> {
-  return McpServerCheckSchema.parse(
-    await apiJson<unknown>(`/api/mcp-servers/${id}/check`, {
-      method: "POST",
-      errorMessage: "Failed to check MCP server",
-    }),
-  );
+  return (
+    await withErrorMessage(
+      mcpServerClient.testServer({ id }),
+      "Failed to check MCP server",
+    )
+  ).result;
 }
 
-export async function fetchMcpTools(
-  signal?: AbortSignal,
-): Promise<McpToolData[]> {
-  return McpToolListResponseSchema.parse(
-    await apiJson<unknown>("/api/mcp-servers/tools", {
-      signal,
-      errorMessage: "Failed to fetch MCP tools",
-    }),
+export async function fetchMcpTools(signal?: AbortSignal): Promise<McpTool[]> {
+  return (
+    await withErrorMessage(
+      mcpServerClient.listTools({}, { signal }),
+      "Failed to fetch MCP tools",
+    )
   ).tools;
 }

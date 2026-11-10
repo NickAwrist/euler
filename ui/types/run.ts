@@ -1,54 +1,12 @@
-import type { DisplayIcon } from "../../src/schemas/icons";
+import type { JsonObject } from "@bufbuild/protobuf";
+import type { Message } from "../../src/gen/euler/v1/sessions_pb";
 
-/** Billed cost of a model call split by token class. */
-export interface CostBreakdown {
-  cachedInput: number;
-  uncachedInput: number;
-  output: number;
-}
-
-export interface MessageStep {
-  kind: string;
-  status?: string;
-  toolName?: string;
-  toolIcons?: readonly DisplayIcon[];
-  agentName?: string;
-  args?: unknown;
-  thinking?: string;
-  metrics?: {
-    cost?: number;
-    cachedTokens?: number;
-    outputTokens?: number;
-    outputDurationMs?: number;
-    promptTokens?: number;
-    promptDurationMs?: number;
-    totalDurationMs?: number;
-    loadDurationMs?: number;
-    tokensPerSecond?: number;
-    thinkingDurationMs?: number;
-    costBreakdown?: CostBreakdown;
-    cacheSavings?: number;
-  };
-  result?: string;
-  error?: string;
-  /** ISO timestamps set by the server when the step begins and ends. */
-  startedAt?: string;
-  endedAt?: string;
-}
-
-export interface Message {
-  id?: number;
-  activationId?: string;
-  role: "user" | "assistant" | "event";
-  content: string;
-  steps?: MessageStep[];
-  attachments?: MessageAttachment[];
-  /** Earlier replies replaced by Regenerate, oldest first. */
-  versions?: MessageVersion[];
-}
-
-/** An earlier reply replaced by Regenerate. */
-export type MessageVersion = Pick<Message, "content" | "steps" | "attachments">;
+export type {
+  Message,
+  MessageVersion,
+  SessionSummary,
+} from "../../src/gen/euler/v1/sessions_pb";
+export type { CostBreakdown, Step } from "../../src/gen/euler/v1/steps_pb";
 
 /** Confirm deleting later messages before an edit or regenerate. */
 export type TruncateConfirmState =
@@ -56,15 +14,11 @@ export type TruncateConfirmState =
   | { kind: "regenerate"; assistantIndex: number }
   | null;
 
-export type { SessionSummary } from "../../src/schemas/sessions";
-
 export interface DebugData {
   error?: string;
   systemPrompt: string;
   history: Message[];
-  customTitle?: string | null;
-  /** Cumulative Ollama `messages` (excludes system); next turn prepends system and appends the new user message. */
-  modelMessages?: Array<Record<string, unknown>> | null;
+  customTitle?: string;
+  /** Cumulative model `messages` (excludes system); next turn prepends system and appends the new user message. */
+  modelMessages?: JsonObject[];
 }
-
-import type { MessageAttachment } from "../../src/attachments/types";

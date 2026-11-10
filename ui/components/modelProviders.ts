@@ -1,5 +1,15 @@
+import { ModelProvider as Provider } from "../../src/gen/euler/v1/models_pb";
 import { compareModels } from "../../src/models/modelSort";
+import { optionalMillis } from "../lib/timestamps";
 import type { ModelOption } from "../types";
+
+/** Favorites first, then newest additions; unknown dates sort last. */
+export function compareModelOptions(a: ModelOption, b: ModelOption): number {
+  return compareModels(
+    { ...a, created: optionalMillis(a.created) ?? undefined },
+    { ...b, created: optionalMillis(b.created) ?? undefined },
+  );
+}
 
 export type ModelProvider = {
   id: string;
@@ -30,15 +40,17 @@ export function groupModelProviders(models: ModelOption[]): ModelProvider[] {
   const groups = new Map<string, ModelProvider>();
   for (const model of models) {
     const name =
-      model.provider === "ollama"
+      model.provider === Provider.OLLAMA
         ? "Ollama"
-        : model.provider === "chatgpt"
+        : model.provider === Provider.CHATGPT
           ? "ChatGPT"
           : model.lab.trim() || "OpenRouter";
     const id =
-      model.provider === "ollama" || model.provider === "chatgpt"
-        ? model.provider
-        : `openrouter:${model.publisherId ?? (model.route ?? model.id.replace(/^openrouter:/, "")).split("/")[0]}`;
+      model.provider === Provider.OLLAMA
+        ? "ollama"
+        : model.provider === Provider.CHATGPT
+          ? "chatgpt"
+          : `openrouter:${model.publisherId ?? (model.route ?? model.id.replace(/^openrouter:/, "")).split("/")[0]}`;
     let group = groups.get(id);
     if (!group) {
       const route = model.route ?? model.id.replace(/^openrouter:/, "");
@@ -49,16 +61,16 @@ export function groupModelProviders(models: ModelOption[]): ModelProvider[] {
         .toLowerCase()
         .replace(/[^a-z0-9-]/g, "");
       const icon =
-        model.provider === "openrouter"
+        model.provider === Provider.OPENROUTER
           ? (providerIcons[routeOrg] ?? providerIcons[labKey])
           : undefined;
       group = {
         id,
         name,
         iconUrl:
-          model.provider === "ollama"
+          model.provider === Provider.OLLAMA
             ? "/icons/ollama.svg"
-            : model.provider === "chatgpt"
+            : model.provider === Provider.CHATGPT
               ? providerIcons.chatgpt
               : icon,
         models: [],
@@ -67,7 +79,7 @@ export function groupModelProviders(models: ModelOption[]): ModelProvider[] {
     }
     group.models.push(model);
   }
-  for (const group of groups.values()) group.models.sort(compareModels);
+  for (const group of groups.values()) group.models.sort(compareModelOptions);
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 

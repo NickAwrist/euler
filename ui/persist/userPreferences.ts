@@ -1,39 +1,48 @@
-import type { z } from "zod";
+import { type MessageInitShape, create } from "@bufbuild/protobuf";
+import type { DisplayIcon } from "../../src/gen/euler/v1/common_pb";
+import type { ToolPermissionRule } from "../../src/gen/euler/v1/permissions_pb";
 import {
-  type ToolPermissionRule,
-  ToolPermissionRuleSchema,
-  ToolPermissionToolsSchema,
-} from "../../src/schemas/toolPermissions";
-import {
+  type UpdatePreferencesRequestSchema,
   type UserPreferences,
-  type UserPreferencesPatch,
-  userPreferencesPatchSchema,
-  userPreferencesSchema,
-} from "../../src/schemas/userPreferences";
-import { type ApiRequestOptions, userApiJson } from "../lib/api";
+  UserPreferencesSchema,
+} from "../../src/gen/euler/v1/preferences_pb";
+import { fromProtoField } from "../../src/permissions/wire";
+import type { ToolPermissionField } from "../../src/schemas/toolPermissions";
+import { preferenceClient, withErrorMessage } from "../lib/rpc";
 
-let preferences = userPreferencesSchema.parse({});
+export type { UserPreferences };
+
+/** A tool for the rule editor, with its fields as plain values. */
+export type ToolPermissionTool = {
+  name: string;
+  description: string;
+  fields: ToolPermissionField[];
+  icons: DisplayIcon[];
+};
+export type UserPreferencesPatch = MessageInitShape<
+  typeof UpdatePreferencesRequestSchema
+>;
+
+// Replaced before the app renders; see UserPreferencesGate.
+let preferences = create(UserPreferencesSchema);
 export function getUserPreferences(): UserPreferences {
   return preferences;
 }
 
 export async function initializeUserPreferences(): Promise<void> {
-  preferences = userPreferencesSchema.parse(
-    await userApiJson("/api/settings/user"),
-  );
+  preferences = (await preferenceClient.getPreferences({})).preferences!;
 }
 
 let pending: Promise<unknown> = Promise.resolve();
 /** Serializes writes that return the complete saved preferences. */
 function savePreferences(
-  url: string,
-  options: ApiRequestOptions,
+  write: () => Promise<{ preferences?: UserPreferences }>,
 ): Promise<UserPreferences> {
   const request = pending
     .catch(() => {})
     .then(async () => {
-      const saved: unknown = await userApiJson(url, options);
-      preferences = userPreferencesSchema.parse(saved);
+      const saved = (await write()).preferences;
+      if (saved) preferences = saved;
       return preferences;
     });
   pending = request;
@@ -43,54 +52,49 @@ function savePreferences(
 export function updateUserPreferences(
   patch: UserPreferencesPatch,
 ): Promise<UserPreferences> {
-  return savePreferences("/api/settings/user", {
-    method: "PATCH",
-    json: userPreferencesPatchSchema.parse(patch),
-  });
+  return savePreferences(() => preferenceClient.updatePreferences(patch));
 }
-
-const toolPermissionRulePath = (id: string) =>
-  `/api/settings/user/tool-permission-rules/${encodeURIComponent(id)}`;
 
 export function saveToolPermissionRule(
   rule: ToolPermissionRule,
 ): Promise<UserPreferences> {
-  return savePreferences(toolPermissionRulePath(rule.id), {
-    method: "PUT",
-    json: ToolPermissionRuleSchema.parse(rule),
-  });
+  return savePreferences(() => preferenceClient.putPermissionRule({ rule }));
 }
 
-export function deleteToolPermissionRule(id: string): Promise<UserPreferences> {
-  return savePreferences(toolPermissionRulePath(id), { method: "DELETE" });
+export function deleteToolPermissionRule(
+  ruleId: string,
+): Promise<UserPreferences> {
+  return savePreferences(() =>
+    preferenceClient.deletePermissionRule({ ruleId }),
+  );
 }
-
-export type ToolPermissionTool = z.infer<
-  typeof ToolPermissionToolsSchema
->["tools"][number];
 
 /** Lists the tools currently available to agents, for rule pickers. */
 export async function fetchToolPermissionTools(): Promise<
   ToolPermissionTool[]
 > {
-  return ToolPermissionToolsSchema.parse(
-    await userApiJson<unknown>("/api/settings/user/tools", {
-      errorMessage: "Failed to load tools",
-    }),
-  ).tools;
+  return (
+    await withErrorMessage(
+      preferenceClient.listPermissionTools({}),
+      "Failed to load tools",
+    )
+  ).tools.map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    fields: tool.fields.map(fromProtoField),
+    icons: tool.icons,
+  }));
 }
 
 /** Caches a rule the server saved elsewhere, such as from an approval. */
 export function rememberToolPermissionRule(rule: ToolPermissionRule) {
-  const { toolPermissions } = preferences;
   preferences = {
     ...preferences,
-    toolPermissions: {
-      ...toolPermissions,
-      rules: [
-        ...toolPermissions.rules.filter((saved) => saved.id !== rule.id),
-        rule,
-      ],
-    },
+    toolPermissionRules: [
+      ...preferences.toolPermissionRules.filter(
+        (saved) => saved.id !== rule.id,
+      ),
+      rule,
+    ],
   };
 }

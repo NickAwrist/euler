@@ -1,6 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { OpenRouterBalance } from "../../../src/schemas/openRouterBalance";
+import type { GetOpenRouterBalanceResponse as OpenRouterBalance } from "../../../src/gen/euler/v1/providers_pb";
 import { loadOpenRouterBalance } from "../../persist/openRouter";
 import { RefreshButton } from "../RefreshButton";
 
@@ -60,7 +60,7 @@ export function OpenRouterBalanceCard() {
             <div>
               <dt className="text-sm text-muted-foreground">Account balance</dt>
               <dd className="text-lg font-medium tabular-nums">
-                {balance.accountBalance === null
+                {balance.accountBalance === undefined
                   ? "Unavailable for this key"
                   : dollars.format(balance.accountBalance)}
               </dd>
@@ -70,9 +70,9 @@ export function OpenRouterBalanceCard() {
                 Key allowance remaining
               </dt>
               <dd className="text-lg font-medium tabular-nums">
-                {balance.keyLimit === null
+                {balance.keyLimit === undefined
                   ? "No spending limit"
-                  : balance.keyRemaining === null
+                  : balance.keyRemaining === undefined
                     ? "Unavailable"
                     : dollars.format(balance.keyRemaining)}
               </dd>
@@ -87,9 +87,9 @@ export function OpenRouterBalanceCard() {
             </div>
           </dl>
           <p className="text-sm text-muted-foreground">
-            {balance.accountBalance === null &&
+            {balance.accountBalance === undefined &&
               "OpenRouter requires a management key to read the account balance. "}
-            {balance.keyLimit !== null &&
+            {balance.keyLimit !== undefined &&
               `Key spending limit: ${dollars.format(balance.keyLimit)}${balance.keyLimitReset ? `, resets ${balance.keyLimitReset}` : ""}. `}
             Key allowance is separate from account credits.
           </p>

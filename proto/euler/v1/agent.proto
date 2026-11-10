@@ -1,0 +1,222 @@
+syntax = "proto3";
+
+package euler.v1;
+
+import "buf/validate/validate.proto";
+import "euler/v1/attachments.proto";
+import "euler/v1/jobs.proto";
+import "euler/v1/permissions.proto";
+import "euler/v1/sessions.proto";
+import "euler/v1/steps.proto";
+import "google/protobuf/timestamp.proto";
+
+// A chat's agents: the main agent the user talks to and the subagents it
+// spawns. Live changes arrive on EventService.Subscribe.
+service AgentService {
+  // The chat's live state and the event sequence it reflects.
+  rpc GetRuntime(GetRuntimeRequest) returns (GetRuntimeResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Sends a user message to the main agent, queueing it while a turn runs.
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  // Stops the main agent's turn.
+  rpc Stop(StopRequest) returns (StopResponse);
+  // Delivers held and queued messages now.
+  rpc Deliver(DeliverRequest) returns (DeliverResponse);
+  rpc RemoveQueued(RemoveQueuedRequest) returns (RemoveQueuedResponse);
+  // Drops the transcript from a user message on and runs it again.
+  rpc Rewind(RewindRequest) returns (RewindResponse);
+  rpc GetAgent(GetAgentRequest) returns (GetAgentResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc CancelAgent(CancelAgentRequest) returns (CancelAgentResponse);
+  rpc RespondToApproval(RespondToApprovalRequest) returns (RespondToApprovalResponse);
+}
+
+message Agent {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_MAIN = 1;
+    KIND_GENERAL = 2;
+  }
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_QUEUED = 1;
+    STATUS_RUNNING = 2;
+    // Blocked on a reply or an approval.
+    STATUS_WAITING = 3;
+    // Ready for more work.
+    STATUS_IDLE = 4;
+    STATUS_COMPLETED = 5;
+    STATUS_CANCELLED = 6;
+  }
+  string id = 1;
+  string session_id = 2;
+  optional string parent_id = 3;
+  Kind kind = 4;
+  string title = 5;
+  Status status = 6;
+  string model = 7;
+  // Transcript length when the agent was spawned.
+  int32 spawn_position = 8;
+  google.protobuf.Timestamp created_at = 9;
+  optional google.protobuf.Timestamp ended_at = 10;
+  // What the agent is doing, in a few words.
+  string activity = 11;
+  optional string interruption = 12;
+  // Messages wait for the user to deliver them.
+  bool held = 13;
+}
+
+message InboxMessage {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    KIND_USER = 1;
+    KIND_TASK = 2;
+    KIND_MESSAGE = 3;
+    KIND_QUESTION = 4;
+    KIND_PROGRESS = 5;
+    KIND_RESULT = 6;
+    KIND_FAILURE = 7;
+    KIND_CONTROL = 8;
+    KIND_JOB = 9;
+  }
+  int64 id = 1;
+  string agent_id = 2;
+  // "user", "runtime", or the sending agent's ID.
+  string sender = 3;
+  Kind kind = 4;
+  string content = 5;
+  bool wakes = 6;
+  google.protobuf.Timestamp created_at = 7;
+  optional google.protobuf.Timestamp delivered_at = 8;
+  bool held = 9;
+  repeated string attachment_ids = 10;
+  repeated OutputAttachment attachments = 11;
+}
+
+// The main agent's turn in progress: its reply so far and its trace.
+message Activation {
+  string id = 1;
+  string agent_id = 2;
+  string session_id = 3;
+  string content = 4;
+  string thinking = 5;
+  repeated Step steps = 6;
+}
+
+// Personal context sent with a turn.
+message RunMetadata {
+  optional string system_prompt = 1;
+  optional string name = 2;
+  optional string location = 3;
+  optional string preferred_formats = 4;
+  optional bool include_current_date = 5;
+}
+
+// Composer settings sent with each turn the user starts.
+message TurnSettings {
+  optional string model = 1 [(buf.validate.field).string.max_len = 200];
+  optional string reasoning_effort = 2 [(buf.validate.field).string.max_len = 50];
+  optional RunMetadata metadata = 3;
+}
+
+message GetRuntimeRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message GetRuntimeResponse {
+  // Resume EventService.Subscribe after this sequence.
+  uint64 sequence = 1;
+  repeated Agent agents = 2;
+  repeated Job jobs = 3;
+  optional Activation activation = 4;
+  // User messages waiting for the main agent.
+  repeated InboxMessage queued = 5;
+  bool held = 6;
+  repeated Message history = 7;
+  repeated ToolApproval approvals = 8;
+}
+
+message SendMessageRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  string content = 2 [(buf.validate.field).string.pattern = "\\S"];
+  repeated string attachment_ids = 3 [(buf.validate.field).repeated = {
+    max_items: 4
+    items: {
+      string: {uuid: true}
+    }
+  }];
+  TurnSettings settings = 4;
+}
+
+message SendMessageResponse {
+  int64 message_id = 1;
+  // The main agent was busy, so the message waits its turn.
+  bool queued = 2;
+}
+
+message StopRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message StopResponse {}
+
+message DeliverRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message DeliverResponse {}
+
+message RemoveQueuedRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  int64 message_id = 2;
+}
+
+message RemoveQueuedResponse {}
+
+message RewindRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  // The transcript index of the user message to run again.
+  int32 position = 2 [(buf.validate.field).int32.gte = 0];
+  // Replaces the message's text when set.
+  optional string content = 3 [(buf.validate.field).string.pattern = "\\S"];
+  // Earlier replies to keep on the new reply.
+  repeated MessageVersion versions = 4;
+  TurnSettings settings = 5;
+}
+
+message RewindResponse {}
+
+message GetAgentRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  string agent_id = 2 [(buf.validate.field).string.min_len = 1];
+}
+
+message GetAgentResponse {
+  Agent agent = 1;
+  repeated Step steps = 2;
+  // Messages the agent received or sent, oldest first.
+  repeated InboxMessage messages = 3;
+}
+
+message CancelAgentRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  string agent_id = 2 [(buf.validate.field).string.min_len = 1];
+}
+
+message CancelAgentResponse {}
+
+message RespondToApprovalRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  string approval_id = 2 [(buf.validate.field).string.min_len = 1];
+  ApprovalDecision decision = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+
+message RespondToApprovalResponse {
+  // The rule saved by APPROVAL_DECISION_ALLOW_MATCHING.
+  optional ToolPermissionRule rule = 1;
+}

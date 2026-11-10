@@ -1,5 +1,11 @@
+import { MethodOptions_IdempotencyLevel } from "@bufbuild/protobuf/wkt";
 import { type Page, expect, test } from "@playwright/test";
+import {
+  CatalogFreshness_Status,
+  ProviderService,
+} from "../../src/gen/euler/v1/providers_pb";
 import type { UserPreferences } from "../../src/schemas/userPreferences";
+import { mockRpc, on, rpcKey, rpcMethod, rpcRequest } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 test.use({
@@ -8,39 +14,48 @@ test.use({
   hasTouch: false,
 });
 
-function mockSettings(page: Page, writes: string[] = []) {
-  return page.route("**/api/**", (route) => {
-    const path = new URL(route.request().url()).pathname;
-    if (route.request().method() === "PUT") writes.push(path);
-    return route.fulfill({
-      json: path.endsWith("/environment")
-        ? { ollamaHost: false, comfyuiHost: false }
-        : path.endsWith("/openrouter") || path.endsWith("/brave")
-          ? { hasKey: false, environmentManaged: false }
-          : path.endsWith("/catalog")
-            ? {
-                publishers: [],
-                modelsByPublisher: {},
-                discoveredPublishers: [],
-                catalog: { status: "fresh", fetchedAt: null, error: null },
-              }
-            : path.endsWith("/comfyui/config")
-              ? {
-                  host: "http://saved.comfy.test",
-                  defaultModel: "saved.safetensors",
-                  defaultWidth: 1024,
-                  defaultHeight: 768,
-                  negativePrompt: "Keep this",
-                }
-              : path.endsWith("/config")
-                ? { host: "http://saved.ollama.test" }
-                : path === "/api/sessions"
-                  ? { sessions: [] }
-                  : path.endsWith("/models")
-                    ? { models: [] }
-                    : { connected: false },
-    });
+async function mockSettings(
+  page: Page,
+  writes: string[] = [],
+  preferences?: Map<string, UserPreferences>,
+) {
+  page.on("request", (request) => {
+    const method = rpcMethod(request);
+    if (
+      method?.parent.typeName === ProviderService.typeName &&
+      method.idempotency !== MethodOptions_IdempotencyLevel.NO_SIDE_EFFECTS &&
+      !method.name.startsWith("Test")
+    )
+      writes.push(rpcKey(request)!);
   });
+  await mockRpc(
+    page,
+    [
+      on(ProviderService.method.getOpenRouterCatalog, () => ({
+        catalog: { freshness: { status: CatalogFreshness_Status.FRESH } },
+      })),
+      on(ProviderService.method.getComfyUiConfig, () => ({
+        config: {
+          host: "http://saved.comfy.test",
+          effectiveHost: "http://saved.comfy.test",
+        },
+        image: {
+          defaultModel: "saved.safetensors",
+          defaultWidth: 1024,
+          defaultHeight: 768,
+          negativePrompt: "Keep this",
+        },
+      })),
+      on(ProviderService.method.getOllamaConfig, () => ({
+        config: {
+          host: "http://saved.ollama.test",
+          effectiveHost: "http://saved.ollama.test",
+        },
+      })),
+    ],
+    { empty: true },
+  );
+  await mockUserPreferences(page, preferences);
 }
 
 for (const screen of ["Settings", "Onboarding"] as const) {
@@ -56,21 +71,21 @@ for (const screen of ["Settings", "Onboarding"] as const) {
     const started = new Promise<void>((resolve) => {
       oldStarted = resolve;
     });
-    await page.route("**/api/ollama/test", async (route) => {
-      const body: unknown = route.request().postDataJSON();
-      const old =
-        typeof body === "object" &&
-        body !== null &&
-        "host" in body &&
-        body.host === "http://old.ollama.test";
-      if (old) {
-        oldStarted();
-        await oldPending;
-      }
-      await route.fulfill({
-        json: { ok: true, version: old ? "old-version" : "current-version" },
-      });
-    });
+    await mockRpc(page, [
+      on(ProviderService.method.testOllamaHost, async ({ host }) => {
+        const old = host === "http://old.ollama.test";
+        if (old) {
+          oldStarted();
+          await oldPending;
+        }
+        return {
+          result: {
+            ok: true,
+            version: old ? "old-version" : "current-version",
+          },
+        };
+      }),
+    ]);
     await page.goto(
       screen === "Settings" ? "/dev/settings" : "/dev/onboarding",
     );
@@ -100,8 +115,8 @@ for (const screen of ["Settings", "Onboarding"] as const) {
     await expect(current).toBeVisible();
     const oldResponse = page.waitForResponse(
       (response) =>
-        response.url().endsWith("/api/ollama/test") &&
-        response.request().postData()?.includes("old.ollama.test") === true,
+        rpcRequest(response.request(), ProviderService.method.testOllamaHost)
+          ?.host === "http://old.ollama.test",
     );
     releaseOld();
     await (await oldResponse).finished();
@@ -119,8 +134,7 @@ test("settings save desktop: saving a user preference does not rewrite shared pr
 }) => {
   const writes: string[] = [];
   const preferences = new Map<string, UserPreferences>();
-  await mockSettings(page, writes);
-  await mockUserPreferences(page, preferences);
+  await mockSettings(page, writes, preferences);
   await page.goto("/");
   for (let step = 0; step < 8; step++)
     await page.getByRole("button", { name: "Skip", exact: true }).click();
@@ -140,4 +154,38 @@ test("settings save desktop: saving a user preference does not rewrite shared pr
   expect(
     [...preferences.values()].map((saved) => saved.settings.showDebugButton),
   ).toEqual([true]);
+});
+
+test("settings save desktop: Show QR displays the saved user ID", async ({
+  page,
+}, testInfo) => {
+  const user = "12345678-1234-4234-9234-123456789abc";
+  await page.addInitScript((id) => {
+    localStorage.setItem("euler:userUuid", id);
+  }, user);
+  await mockSettings(page);
+  await page.goto("/dev/settings");
+  // An unsaved draft is not what the phone should scan.
+  await page.locator("#userUuid").fill("draft");
+  await page.getByRole("button", { name: "Show QR", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "User ID" });
+  const code = dialog.getByRole("img", { name: `QR code for ${user}` });
+  await expect(code).toBeVisible();
+  const box = (await code.boundingBox())!;
+  expect(box.width).toBeGreaterThan(200);
+  expect(box.height).toBeCloseTo(box.width, 1);
+  await expect(dialog).toContainText(user);
+  await dialog.evaluate((element) =>
+    Promise.all(
+      element
+        .getAnimations({ subtree: true })
+        .map((animation) => animation.finished),
+    ),
+  );
+  await page.screenshot({ path: testInfo.outputPath("user-id-qr.png") });
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(
+    page.getByRole("button", { name: "Show QR", exact: true }),
+  ).toBeFocused();
 });

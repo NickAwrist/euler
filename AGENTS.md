@@ -43,14 +43,20 @@ These conventions supplement the general engineering instructions.
 
 ## Data and types
 
-- Put domain API operations in ui/persist/ and use ui/lib/api.ts for
-  request handling. Choose user-scoped or global helpers explicitly.
-  Avoid repeating endpoint strings and HTTP handling in components.
+- The API contract is proto/euler/v1/. Change an RPC there, run
+  `bun run proto`, and commit the generated code in src/gen/ and
+  ios/EulerAPI/; `bun run lint` fails when it is stale. Handlers live in
+  src/rpc/, one file per service, and call existing domain code.
+- Put domain API operations in ui/persist/ and call the generated clients
+  from ui/lib/rpc.ts. Avoid calling clients directly from components.
 - Use ui/lib/safeStorage.ts for browser storage. Handle storage failure
   according to the caller's needs.
-- Validate untrusted data at runtime boundaries using existing Zod
-  patterns. Reuse contracts in src/schemas/ when server and UI share
-  them. Type annotations and generic JSON helpers do not validate data.
+- API messages are decoded by the generated code and checked by
+  buf.validate rules in the protos; put field rules there, and rules that
+  need state in handlers. Validate other untrusted data (environment,
+  files on disk, provider and MCP responses, tool input) with existing Zod
+  patterns in src/schemas/. Type annotations and generic JSON helpers do
+  not validate data.
 - Put shared UI types in focused modules under ui/types/ and re-export
   them from ui/types/index.ts. Keep feature-local types in the feature's
   types.ts. Reuse existing contracts rather than copying their shapes.
@@ -68,8 +74,17 @@ These conventions supplement the general engineering instructions.
 - Run `bun run build` for changes affecting the UI build and
   `bun run test:browser` for browser interaction changes. Run the full
   relevant suites for broad changes.
+- .claude/skills/test-euler-web/SKILL.md covers choosing a check, the
+  checks that need Linux, the fixture servers, and driving the app in a
+  browser. Read it before verifying web or server work.
 - Review the diff for duplicated behavior, unnecessary abstractions,
   and competing sources of truth. Report checks actually run and
   any verification gaps.
 - In the handoff, give net lines changed in src/, ui/, and tests/.
   Name each new component or hook and why an existing one didn't fit.
+
+## iOS
+
+- The iPhone app lives in ios/. Read ios/README.md before changing it and
+  .claude/skills/test-euler-ios/SKILL.md before testing it, running it
+  on a device, or deploying the iOS test server. The phone never points at production.

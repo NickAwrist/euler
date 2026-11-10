@@ -1,8 +1,28 @@
+import { MethodOptions_IdempotencyLevel } from "@bufbuild/protobuf/wkt";
+import {
+  Code,
+  ConnectError,
+  type Interceptor,
+  type ServiceImpl,
+  createConnectRouter,
+} from "@connectrpc/connect";
+import {
+  universalServerRequestFromFetch,
+  universalServerResponseToFetch,
+} from "@connectrpc/connect/protocol";
+import { ModelProvider, ModelService } from "../../src/gen/euler/v1/models_pb";
+import { ProviderService } from "../../src/gen/euler/v1/providers_pb";
 import type { CatalogModel } from "../../src/models/openRouterModels";
 import {
   POPULAR_PUBLISHERS,
   publisherName,
 } from "../../src/models/openRouterPublishers";
+import {
+  AVAILABILITY,
+  type CatalogSettings,
+  inputCapabilities,
+  openRouterCatalog,
+} from "../../src/models/openRouterWire";
 
 export type DemoScenario =
   | "ready"
@@ -116,7 +136,7 @@ function record(message: string) {
   log = [message, ...log].slice(0, 8);
   notify();
 }
-function freshness() {
+function freshness(): CatalogSettings["catalog"] {
   const status =
     scenario === "stale"
       ? "stale"
@@ -132,7 +152,9 @@ function freshness() {
     error: status === "fresh" ? null : "Demo catalog outage",
   };
 }
-function publisherModels(id: string) {
+function publisherModels(
+  id: string,
+): CatalogSettings["modelsByPublisher"][string] {
   const visible =
     scenario === "unavailable"
       ? []
@@ -150,10 +172,10 @@ function publisherModels(id: string) {
     favorite: favorites.has(`openrouter:${m.route}`),
     availability:
       scenario === "unavailable"
-        ? "unverified"
+        ? ("unverified" as const)
         : models.some((entry) => entry.route === m.route)
-          ? "available"
-          : "unavailable",
+          ? ("available" as const)
+          : ("unavailable" as const),
     isNew:
       (simulatedNow - m.created) / 86400 <= 21 && m.created <= simulatedNow,
     ...(scenario === "unavailable"
@@ -195,7 +217,7 @@ function enableDiscoveredModels() {
       choices.set(model.route, true);
   }
 }
-function settingsSnapshot() {
+function settingsSnapshot(): CatalogSettings {
   enableDiscoveredModels();
   const ids = new Set([...publishers, ...models.map((m) => m.publisherId)]);
   return {
@@ -231,182 +253,170 @@ export function removeDemoModel(route: string) {
   record(`Removed ${route} from the catalog; preferences retained.`);
 }
 
+const demoProviders: Partial<ServiceImpl<typeof ProviderService>> = {
+  getOpenRouterCatalog: () => ({
+    catalog: openRouterCatalog(settingsSnapshot()),
+  }),
+  refreshOpenRouterCatalog() {
+    if (freshness().status === "fresh") fetchedAt = Date.now();
+    enableDiscoveredModels();
+    record(
+      freshness().status === "fresh"
+        ? "Catalog refreshed; subscriptions synced."
+        : "Refresh failed; saved preferences retained.",
+    );
+    return { catalog: openRouterCatalog(settingsSnapshot()) };
+  },
+  removeOpenRouterPublisher({ publisherId: id }) {
+    publishers.delete(id);
+    subscriptions.delete(id);
+    for (const model of knownModels)
+      if (model.publisherId === id && choices.has(model.route))
+        choices.set(model.route, false);
+    record(`Removed ${id}; favorites retained.`);
+    return {};
+  },
+  getApiKey: () => ({
+    state: { hasKey: configured, environmentManaged: false },
+  }),
+  setApiKey({ apiKey }) {
+    configured = Boolean(apiKey.trim());
+    record(configured ? "Demo key configured." : "Demo key removed.");
+    return { state: { hasKey: configured, environmentManaged: false } };
+  },
+  setOpenRouterModelEnabled({ route, enabled }) {
+    const model = models.find((entry) => entry.route === route);
+    if (enabled && (!model || scenario === "unavailable"))
+      throw new ConnectError(
+        "Model is not available for interactive use",
+        Code.InvalidArgument,
+      );
+    if (enabled && model) publishers.add(model.publisherId);
+    choices.set(route, enabled);
+    record(`${enabled ? "Enabled" : "Disabled"} ${route}`);
+    return {};
+  },
+  trackOpenRouterPublisher({ publisherId }) {
+    publishers.add(publisherId);
+    record(`Tracking ${publisherId}`);
+    return {};
+  },
+  setOpenRouterSubscription({ publisherId: id, subscribed }) {
+    if (subscribed && !subscriptions.has(id))
+      subscriptions.set(id, ++simulatedNow);
+    if (!subscribed) subscriptions.delete(id);
+    record(`${subscribed ? "Subscribed to" : "Unsubscribed from"} ${id}`);
+    return {};
+  },
+  getOllamaHealth: () => ({ connected: true }),
+  getOllamaConfig: () => ({
+    config: { host: "Demo only", effectiveHost: "Demo only" },
+  }),
+};
+
+const PROVIDER_KEYS: Partial<Record<ModelProvider, string>> = {
+  [ModelProvider.OLLAMA]: "ollama",
+  [ModelProvider.OPENROUTER]: "openrouter",
+};
+
+const demoModels: Partial<ServiceImpl<typeof ModelService>> = {
+  listModels: () => ({
+    models: [
+      ...(scenario === "empty"
+        ? []
+        : [
+            {
+              id: "local-model",
+              name: "Local model · Demo",
+              provider: ModelProvider.OLLAMA,
+              lab: "Ollama",
+              favorite: favorites.has("ollama:local-model"),
+              inputCapabilities: inputCapabilities(["text"]),
+            },
+          ]),
+      ...(configured
+        ? [...publishers]
+            .flatMap(publisherModels)
+            .filter((m) => m.enabled && m.availability !== "unavailable")
+            .map((m) => ({
+              id: `openrouter:${m.route}`,
+              route: m.route,
+              name: m.name,
+              provider: ModelProvider.OPENROUTER,
+              lab: publisherName(m.publisherId),
+              publisherId: m.publisherId,
+              favorite: m.favorite,
+              isNew: m.isNew,
+              supportsTools: m.supportsTools,
+              contextLength: m.contextLength ?? undefined,
+              promptPricePerMillion: m.promptPricePerMillion ?? undefined,
+              completionPricePerMillion:
+                m.completionPricePerMillion ?? undefined,
+              availability: AVAILABILITY[m.availability],
+              configured: true,
+              inputCapabilities: inputCapabilities(m.inputCapabilities),
+            }))
+        : []),
+    ],
+  }),
+  setFavorite({ provider, modelId, favorite }) {
+    const key = `${PROVIDER_KEYS[provider]}:${modelId}`;
+    if (favorite) favorites.add(key);
+    else favorites.delete(key);
+    record(`${favorite ? "Favorited" : "Unfavorited"} ${modelId}`);
+    return {};
+  },
+};
+
+/** Simulates latency, and failed saves in the errors scenario. */
+const demoConditions: Interceptor = (next) => async (request) => {
+  await new Promise((resolve) =>
+    setTimeout(resolve, scenario === "slow" ? 1400 : 120),
+  );
+  const mutation =
+    request.method.idempotency !==
+    MethodOptions_IdempotencyLevel.NO_SIDE_EFFECTS;
+  if (mutation && scenario === "errors") {
+    record("Simulated save failure. No preferences changed.");
+    throw new ConnectError(
+      "Couldn't save change. Try again.",
+      Code.Unavailable,
+    );
+  }
+  return next(request);
+};
+
 /** Installed only in the standalone development playground. API traffic never leaves this page. */
 export function installDemoApi() {
   resetDemo("ready");
+  const router = createConnectRouter({ interceptors: [demoConditions] })
+    .service(ProviderService, demoProviders)
+    .service(ModelService, demoModels);
+  const handlers = new Map(
+    router.handlers.map((handler) => [
+      `/api/rpc${handler.requestPath}`,
+      handler,
+    ]),
+  );
   const originalFetch = window.fetch.bind(window);
   window.fetch = Object.assign(
     async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = new URL(
-        input instanceof Request ? input.url : String(input),
-        window.location.href,
-      );
-      if (
-        url.origin !== window.location.origin ||
-        !url.pathname.startsWith("/api/")
-      )
-        return originalFetch(input, init);
-      await new Promise((resolve) =>
-        setTimeout(resolve, scenario === "slow" ? 1400 : 120),
-      );
-      const request = new Request(url, input instanceof Request ? input : init);
-      const path = url.pathname.replace("/api/", "");
-      const mutation = request.method !== "GET";
-      if (mutation && scenario === "errors") {
-        record("Simulated save failure. No preferences changed.");
+      const request = new Request(input, init);
+      const url = new URL(request.url);
+      if (url.origin !== window.location.origin) return originalFetch(request);
+      const handler = handlers.get(url.pathname);
+      if (!handler) {
+        if (!url.pathname.startsWith("/api/")) return originalFetch(request);
         return Response.json(
           {
-            error: {
-              code: "INTERNAL_ERROR",
-              message: "Couldn't save change. Try again.",
-            },
+            code: "unimplemented",
+            message: `No demo handler for ${url.pathname}`,
           },
-          { status: 503 },
+          { status: 404 },
         );
       }
-      const body =
-        mutation &&
-        request.headers.get("Content-Type")?.includes("application/json")
-          ? ((await request.json()) as {
-              route?: string;
-              enabled?: boolean;
-              provider?: string;
-              modelId?: string;
-              favorite?: boolean;
-              publisherId?: string;
-              subscribed?: boolean;
-              apiKey?: string;
-            })
-          : {};
-      if (path === "settings/openrouter/catalog")
-        return Response.json(settingsSnapshot());
-      const removal = path.match(/^settings\/openrouter\/publishers\/([^/]+)$/);
-      if (request.method === "DELETE" && removal) {
-        const id = decodeURIComponent(removal[1]!);
-        publishers.delete(id);
-        subscriptions.delete(id);
-        for (const model of knownModels)
-          if (model.publisherId === id && choices.has(model.route))
-            choices.set(model.route, false);
-        record(`Removed ${id}; favorites retained.`);
-        return Response.json({ ok: true });
-      }
-      if (path === "settings/openrouter") {
-        if (mutation) {
-          configured = Boolean(body.apiKey?.trim());
-          record(configured ? "Demo key configured." : "Demo key removed.");
-        }
-        return Response.json({ hasKey: configured, environmentManaged: false });
-      }
-      if (path === "settings/openrouter/models" && body.route) {
-        const model = models.find((entry) => entry.route === body.route);
-        if (body.enabled && (!model || scenario === "unavailable"))
-          return Response.json(
-            {
-              error: {
-                code: "INVALID_REQUEST",
-                message: "Model is not available for interactive use",
-              },
-            },
-            { status: 400 },
-          );
-        if (body.enabled && model) publishers.add(model.publisherId);
-        choices.set(body.route, body.enabled === true);
-        record(`${body.enabled ? "Enabled" : "Disabled"} ${body.route}`);
-        return Response.json({ ok: true });
-      }
-      if (path === "settings/models/favorite" && body.modelId) {
-        const key = `${body.provider}:${body.modelId}`;
-        if (body.favorite) favorites.add(key);
-        else favorites.delete(key);
-        record(
-          `${body.favorite ? "Favorited" : "Unfavorited"} ${body.modelId}`,
-        );
-        return Response.json({ ok: true });
-      }
-      if (path === "settings/openrouter/catalog/publishers")
-        return Response.json({
-          catalog: freshness(),
-          publishers:
-            scenario === "unavailable"
-              ? null
-              : [...new Set(models.map((m) => m.publisherId))].map((id) => ({
-                  id,
-                  name: publisherName(id),
-                  tracked: publishers.has(id),
-                })),
-        });
-      if (path === "settings/openrouter/publishers") {
-        if (body.publisherId) {
-          publishers.add(body.publisherId);
-          record(`Tracking ${body.publisherId}`);
-        }
-        return Response.json(overview());
-      }
-      const publisherPath = path.match(
-        /^settings\/openrouter\/publishers\/([^/]+)\/(models|subscription)$/,
-      );
-      if (publisherPath) {
-        const id = decodeURIComponent(publisherPath[1]!);
-        if (publisherPath[2] === "models")
-          return Response.json({
-            catalog: freshness(),
-            models: publisherModels(id),
-          });
-        if (body.subscribed && !subscriptions.has(id))
-          subscriptions.set(id, ++simulatedNow);
-        if (!body.subscribed) subscriptions.delete(id);
-        record(
-          `${body.subscribed ? "Subscribed to" : "Unsubscribed from"} ${id}`,
-        );
-        return Response.json({ ok: true });
-      }
-      if (path === "settings/openrouter/catalog/refresh") {
-        if (freshness().status === "fresh") fetchedAt = Date.now();
-        enableDiscoveredModels();
-        record(
-          freshness().status === "fresh"
-            ? "Catalog refreshed; subscriptions synced."
-            : "Refresh failed; saved preferences retained.",
-        );
-        return Response.json(settingsSnapshot());
-      }
-      if (path === "models")
-        return Response.json({
-          models: [
-            ...(scenario === "empty"
-              ? []
-              : [
-                  {
-                    id: "local-model",
-                    name: "Local model · Demo",
-                    provider: "ollama",
-                    lab: "Ollama",
-                    favorite: favorites.has("ollama:local-model"),
-                    inputCapabilities: ["text"],
-                  },
-                ]),
-            ...(configured
-              ? [...publishers]
-                  .flatMap(publisherModels)
-                  .filter((m) => m.enabled && m.availability !== "unavailable")
-                  .map((m) => ({
-                    ...m,
-                    id: `openrouter:${m.route}`,
-                    provider: "openrouter",
-                    lab: publisherName(m.publisherId),
-                    configured: true,
-                  }))
-              : []),
-          ],
-        });
-      if (path === "ollama/health") return Response.json({ connected: true });
-      if (path === "ollama/config") return Response.json({ host: "Demo only" });
-      return Response.json(
-        {
-          error: { code: "NOT_FOUND", message: `No demo handler for ${path}` },
-        },
-        { status: 404 },
+      return universalServerResponseToFetch(
+        await handler(universalServerRequestFromFetch(request, {})),
       );
     },
     { preconnect: originalFetch.preconnect },

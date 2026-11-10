@@ -2,8 +2,8 @@ import { Plug, Plus, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { whileRunning } from "../../lib/whileRunning";
 import {
+  type McpServer,
   type McpServerCheck,
-  type McpServerData,
   checkMcpServerApi,
 } from "../../persist/mcpServers";
 import { eyebrowText } from "../../styles";
@@ -78,7 +78,7 @@ function McpServerItem({
   onEnabledChange,
   onDelete,
 }: {
-  server: McpServerData;
+  server: McpServer;
   onEnabledChange: (enabled: boolean) => void;
   onDelete: () => void;
 }) {
@@ -91,8 +91,8 @@ function McpServerItem({
         setCheck(await checkMcpServerApi(server.id));
       } catch (error: unknown) {
         setCheck({
-          ok: false,
-          error: error instanceof Error ? error.message : "Check failed",
+          case: "error",
+          value: error instanceof Error ? error.message : "Check failed",
         });
       }
     });
@@ -106,7 +106,7 @@ function McpServerItem({
     <div className="rounded-lg border border-border-subtle px-4 py-3">
       <div className="flex items-center gap-3">
         <ServiceIcon
-          icons={check?.ok ? check.icons : undefined}
+          icons={check?.case === "connected" ? check.value.icons : undefined}
           fallback={Plug}
           size={15}
           className="text-muted-foreground"
@@ -154,14 +154,14 @@ function McpToolSummary({ check }: { check: McpServerCheck | null }) {
       </p>
     );
   }
-  if (!check.ok) {
+  if (check.case !== "connected") {
     return (
       <output className="mt-2 block break-words text-[0.75rem] text-red-400">
-        Could not connect: {check.error}
+        Could not connect: {check.value}
       </output>
     );
   }
-  if (check.tools.length === 0) {
+  if (check.value.tools.length === 0) {
     return (
       <output className="mt-2 block text-[0.75rem] text-muted-foreground">
         The server offers no tools.
@@ -170,7 +170,7 @@ function McpToolSummary({ check }: { check: McpServerCheck | null }) {
   }
   return (
     <ul aria-label="Tools" className="mt-2.5 flex flex-wrap gap-1.5">
-      {check.tools.map((tool) => (
+      {check.value.tools.map((tool) => (
         <li
           key={tool.name}
           title={tool.description}

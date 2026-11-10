@@ -1,0 +1,149 @@
+syntax = "proto3";
+
+package euler.v1;
+
+import "buf/validate/validate.proto";
+import "euler/v1/attachments.proto";
+import "euler/v1/steps.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// The user's chats. Live changes to a chat arrive on EventService.Subscribe.
+service SessionService {
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
+  rpc UpdateSession(UpdateSessionRequest) returns (UpdateSessionResponse);
+  rpc DeleteSession(DeleteSessionRequest) returns (DeleteSessionResponse);
+  // Clears the chat's unread badge.
+  rpc MarkViewed(MarkViewedRequest) returns (MarkViewedResponse);
+}
+
+message SessionSummary {
+  enum Badge {
+    BADGE_UNSPECIFIED = 0;
+    BADGE_WORKING = 1;
+    BADGE_UNREAD = 2;
+  }
+  string id = 1;
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Timestamp updated_at = 3;
+  optional string custom_title = 4;
+  string preview = 5;
+  // Unspecified when the chat has nothing to show.
+  Badge badge = 6;
+  // When an ephemeral chat is deleted; absent for saved chats.
+  optional google.protobuf.Timestamp expires_at = 7;
+}
+
+message SessionWorkspace {
+  message Sandbox {
+    // Present when this chat is linked to another chat's sandbox.
+    optional LinkedWorkspace linked = 1;
+  }
+  message LinkedWorkspace {
+    string workspace_id = 1;
+    // Another chat using the sandbox, preferring the one that created it.
+    optional string session_id = 2;
+  }
+  message Local {
+    string path = 1;
+    string label = 2;
+  }
+  oneof kind {
+    Sandbox sandbox = 1;
+    Local local = 2;
+  }
+}
+
+// One entry of a chat's transcript.
+message Message {
+  enum Role {
+    ROLE_UNSPECIFIED = 0;
+    ROLE_USER = 1;
+    ROLE_ASSISTANT = 2;
+    // A note the runtime added, such as a workspace change.
+    ROLE_EVENT = 3;
+  }
+  optional int64 id = 1;
+  optional string activation_id = 2;
+  Role role = 3;
+  string content = 4;
+  repeated Step steps = 5;
+  repeated MessageAttachment attachments = 6;
+  // Earlier replies replaced by Regenerate, oldest first.
+  repeated MessageVersion versions = 7;
+}
+
+// An earlier assistant reply to the same message, kept on regenerate.
+message MessageVersion {
+  string content = 1;
+  repeated Step steps = 2;
+  repeated MessageAttachment attachments = 3;
+}
+
+message Session {
+  string id = 1;
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Timestamp updated_at = 3;
+  optional string custom_title = 4;
+  repeated Message history = 5;
+  // The main agent's provider-shaped model history, for the debug view.
+  repeated google.protobuf.Struct model_messages = 6;
+  optional string model = 7;
+  SessionWorkspace workspace = 8;
+  optional google.protobuf.Timestamp expires_at = 9;
+}
+
+message ListSessionsRequest {}
+
+message ListSessionsResponse {
+  // Most recently updated first.
+  repeated SessionSummary sessions = 1;
+}
+
+message GetSessionRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message GetSessionResponse {
+  Session session = 1;
+}
+
+message CreateSessionRequest {
+  optional string model = 1 [(buf.validate.field).string.max_len = 200];
+  // An ephemeral chat is deleted once its lifetime ends.
+  bool ephemeral = 2;
+}
+
+message CreateSessionResponse {
+  string id = 1;
+  google.protobuf.Timestamp created_at = 2;
+  optional google.protobuf.Timestamp expires_at = 3;
+}
+
+message UpdateSessionRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+  // Set to rename the chat; an empty title clears it.
+  optional string custom_title = 2 [(buf.validate.field).string.max_len = 1000];
+  // Set to change the chat's model; empty clears it.
+  optional string model = 3 [(buf.validate.field).string.max_len = 200];
+}
+
+message UpdateSessionResponse {}
+
+message DeleteSessionRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message DeleteSessionResponse {}
+
+message MarkViewedRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message MarkViewedResponse {}

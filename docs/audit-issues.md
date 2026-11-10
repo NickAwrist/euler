@@ -5,7 +5,8 @@ Audited October 3, 2026 against `main` at `523104d`. Each issue has a stable ID
 uses Critical / High / Medium / Low. Effort uses S (under a day), M (a few days),
 and L (a week or more).
 
-Rechecked against the source on November 1, 2026. Findings are source
+Rechecked against the source on November 1, 2026, and again on November 9,
+2026, after the API moved from REST to Connect RPC. Findings are source
 observations, not fresh exploit or UI reproductions.
 
 Issues are listed once, under the category that owns the fix. Related issues are
@@ -64,15 +65,15 @@ as the server user.
 backend and the Vite dev server. Normal access through every listed host still
 works. An e2e test covers the rejection.
 
-### SEC-2. No authentication on filesystem and settings routes (High, M)
+### SEC-2. No authentication on filesystem and settings RPCs (High, M)
 
-**Where:** `src/userIdentity.ts`, `src/routes/directories.ts`,
-`src/routes/sessions.ts` (`select-directory`), `src/routes/settings.ts` and
-`src/routes/openrouter.ts` (API keys and OpenRouter publisher routes have no
-owner check).
+**Where:** `src/userIdentity.ts`, `src/rpc/interceptors.ts` (accepts any
+well-formed `x-euler-user-id`), `src/rpc/directories.ts` (`ListDirectory`),
+`src/rpc/workspace.ts` (`SelectDirectory`), and `src/rpc/providers.ts` (the
+API key and OpenRouter publisher RPCs change settings every user shares).
 
-**Problem:** Identity comes from the client. `/api/directories` lists any
-directory on the host. `select-directory` binds any readable and writable
+**Problem:** Identity comes from the client. `ListDirectory` lists any
+directory on the host. `SelectDirectory` binds any readable and writable
 directory as the agent's workspace. Bubblewrap mounts that directory read-write,
 and the file tools can modify it. Global settings, including the OpenRouter and
 Brave API keys, can be changed by any client.
@@ -83,8 +84,8 @@ headers are a good fit: when traffic arrives through `tailscale serve`, trust
 loopback. A simpler option is a shared secret in `EULER_ACCESS_TOKEN` sent as a
 bearer token. Document the trust model in the README either way.
 
-**Done when:** Unauthenticated requests to every `/api` route except health
-checks are rejected, and the README states the trust model.
+**Done when:** Unauthenticated calls to every RPC and to the two image routes
+are rejected, and the README states the trust model.
 
 ### SEC-3. Vite dev server is exposed to the whole LAN (Medium, S)
 
@@ -97,34 +98,6 @@ development.
 **Fix:** Make the dev bind address configurable, for example
 `EULER_FRONTEND_HOST`, defaulting to `127.0.0.1`. Set it to the Tailscale IP or
 `0.0.0.0` only when needed. `SEC-1` and `SEC-2` reduce the risk either way.
-
-### SEC-4. Local workspace downloads bypass the stated policy (Medium, S)
-
-**Where:** `src/routes/sessions.ts` (`GET /:id/workspace/file` refuses local
-workspaces), compared with `src/routes/artifacts.ts`
-(`GET .../artifacts/download` serves local workspaces).
-
-**Problem:** Two routes download workspace files with opposite rules for local
-directories, so the restriction gives no protection. See also `API-1`.
-
-**Fix:** Decide whether local workspace files may be downloaded. Enforce that
-rule in one place, either `downloadWorkspaceFile` or `WorkspaceService`, and
-remove the redundant route.
-
-**Done when:** One download route remains, and a test asserts the chosen
-behavior for local workspaces.
-
-### SEC-5. The loopback check passes for every proxied request (Low, S)
-
-**Where:** `src/http/isLoopbackRequest.ts`, used by the `reveal` routes.
-
-**Problem:** Behind the Vite proxy or `tailscale serve`, every request comes
-from `127.0.0.1`. So "reveal only on the machine running Euler" passes for
-remote devices too.
-
-**Fix:** After `SEC-2`, decide based on the authenticated client rather than the
-socket address. Alternatively, reject the request when any forwarding header is
-present.
 
 ### SEC-6. A model-supplied grep regex can block the server (Low, S)
 
@@ -250,14 +223,14 @@ pattern), `src/llm/ollamaProvider.ts`, and
 `src/agents/runtime/AgentRuntime.ts` (`cancel` awaits `active.promise`).
 
 **Problem:** Until the provider sends its first byte, which can take a long time
-while Ollama loads a model, Stop does nothing. The `POST /stop` request also
-stays open until then.
+while Ollama loads a model, Stop does nothing. The `AgentService.Stop` call
+also stays open until then.
 
 **Fix:** Add `signal: AbortSignal` to `LlmChatRequest`. Pass it to `fetch` in
 the OpenRouter provider. For Ollama, call the client's `abort()` when the
 signal fires.
 
-**Done when:** A mock OpenRouter scenario that delays headers shows `/stop`
+**Done when:** A mock OpenRouter scenario that delays headers shows `Stop`
 returning promptly and the activation ending as `aborted`.
 
 **Implementation note:** The installed Ollama SDK registers a streamed request
@@ -385,10 +358,11 @@ longer serve a current requirement.
 
 ### LEG-6. Docker networking hints after Docker was removed (Low, S)
 
-**Where:** `src/models/containerNetworkHint.ts`, used in `src/routes/ollama.ts` and
-`src/routes/comfyui.ts`. Docker deployment was removed in `2fe581b`.
+**Where:** `src/models/containerNetworkHint.ts`, used by the Ollama and
+ComfyUI host tests in `src/rpc/providers.ts`. Docker deployment was removed in
+`2fe581b`.
 
-**Fix:** Delete the module and its two call sites.
+**Fix:** Delete the module and its call sites.
 
 ### LEG-7. Unprefixed environment variable aliases (Low, S)
 
@@ -403,17 +377,6 @@ client URL.
 **Fix:** Keep one documented name per setting, using the `EULER_` prefix except
 for the provider API keys that `.env.example` already documents.
 
-### LEG-8. The UI hand-coerces sessions that fail validation (Medium, S)
-
-**Where:** `ui/persist/sessions.ts` (`fetchSessionData`, the branch after
-`StoredRunSessionSchema.safeParse` fails).
-
-**Problem:** It casts unvalidated data into `StoredRunSession`, which undoes the
-schema check and hides contract drift.
-
-**Fix:** Delete the fallback. A parse failure should become the session error
-state with a clear message.
-
 ### LEG-9. Dead parameters and helpers (Low, S)
 
 **Where:**
@@ -421,9 +384,8 @@ state with a clear message.
   (only ever called as `run("", ctx)`), the `userMessage`/`userImages` path, and
   the unused `name`/`description` fields if nothing reads them after
   `RunContext.agentName` (check before removing)
-- `src/http/asyncRoute.ts`: Express 5 already forwards rejected promises
-- The `/api/runs` 404 assertion in `tests/e2e/asyncAgents.test.ts`, which tests
-  a route removed long ago
+- `src/http/asyncRoute.ts`, used by the two image routes in `src/routes/`:
+  Express 5 already forwards rejected promises
 
 ### LEG-10. Stale root documents (Low, S)
 
@@ -434,20 +396,18 @@ open issue, listed a closed one, and missed a new bug.
 **Fix:** Move open items to GitHub issues and delete `BUG_TRIAGE.md`. Keep
 `wishlist.md` only if it is maintained, or move it to `docs/`.
 
-### LEG-11. Unused imports remain in hooks and tests (Low, S)
+### LEG-11. Unused imports remain in two tests (Low, S)
 
-**Where:** `ModelReasoning` in `ui/hooks/run/useOllamaConnection.ts`,
-`MessageStep` in `ui/hooks/run/useRunStreaming.ts`, `BaseAgent` in
-`tests/agents/agentManager.test.ts`, `basename` in
-`tests/e2e/workspaces.test.ts`, and `modalSurface` in `tests/ui/modal.test.ts`.
+**Where:** `BaseAgent` in `tests/agents/agentManager.test.ts` and
+`modalSurface` in `tests/ui/modal.test.ts`.
 
 **Problem:** These were identified by running TypeScript with
-`--noUnusedLocals --noUnusedParameters`. The same check reports the intentionally
-unused `args` parameter in the base tool method.
+`--noUnusedLocals --noUnusedParameters`, ignoring `src/gen/`. The same check
+reports the intentionally unused `args` parameter in the base tool method.
 
 **Fix:** Delete the unused imports and rename the base parameter `_args`.
-Enable unused-symbol checks to prevent recurrence. No new behavior tests are
-needed for import removal.
+Enable unused-symbol checks outside `src/gen/` to prevent recurrence. No new
+behavior tests are needed for import removal.
 
 ---
 
@@ -473,23 +433,18 @@ any change touches `App.tsx`.
 
 Pass narrow props or use context.
 
-### ARCH-3. Fragile route mounting order (Low, S)
-
-**Where:** `src/app.ts` mounts `debugPromptRoutes` at `/api/sessions` before
-`sessionRoutes`, whose `router.use("/:id")` middleware would otherwise treat
-`debug-prompt` as a session ID.
-
-**Fix:** Mount the debug prompt at `/api/debug-prompt` and update
-`ui/hooks/run/useRunDebug.ts`.
-
 ### ARCH-4. Session navigation and runtime snapshots both own history (Medium, M)
 
 **Where:** `ui/hooks/run/useSessionsAndNavigation.ts` (`loadSession`),
 `ui/hooks/run/useAgentEvents.ts` (`refresh`, `publish`),
-`src/routes/sessions.ts` (`GET /:id`), `AgentRuntime.snapshot`.
+`SessionService.GetSession` in `src/rpc/sessions.ts`, and
+`AgentService.GetRuntime`, which returns `AgentRuntime.snapshot`.
 
-**Problem:** Loading a chat starts both a stored-session request and a runtime
-snapshot request, and both contain transcript history and update message state.
+**Problem:** Loading a chat sends `GetSession` and `GetRuntime` together, and
+both contain transcript history and update message state. React renders the two
+answers in one commit or two depending on which arrives first, about 648
+component renders or about 724 in the performance check, which is why that
+check answers them in turn.
 Navigation uses a generation counter and an object-identity check to avoid
 replacing newer runtime history. These protections are useful but make ownership
 harder to follow and transfer the same history twice. The stored-session response
@@ -506,44 +461,42 @@ late navigation responses cannot overwrite newer streamed history.
 
 ## 6. Type safety and data contracts
 
-### TYPE-1. The step/trace contract is untyped and defined three times (High, M)
+### TYPE-1. Stored steps are unchecked, and one bad step fails the whole chat (High, M)
 
-**Where:** `src/RunContext.ts` (`Step`, `LlmMetrics`, hand-written
-`wireStep()`), `src/schemas/run.ts` (`WireStepSchema = z.record(z.string(),
-z.unknown())`), `ui/types/run.ts` (`MessageStep` with `kind: string` and
-`status?: string`, and a copied `metrics` type),
-`ui/components/Agents/AgentTraceModal.tsx` (`as unknown as MessageStep[]`),
-`ui/hooks/run/useAgentEvents.ts` (type guard on `kind`).
+**Where:** `src/RunContext.ts` (`Step`, hand-written `wireStep()`),
+`src/schemas/run.ts` (`WireStepSchema = z.record(z.string(), z.unknown())`),
+`src/db/sessions.ts` and `src/db/agents.ts` (steps read back with `JSON.parse`
+and no schema), and `src/rpc/wire.ts` (`step()` converts an `unknown` record
+field by field and throws on a kind, status, or timestamp it does not accept).
 
-**Problem:** The data structure the trace UI depends on has no shared contract,
-so changes on the server reach the UI unchecked.
+**Problem:** The API and the UI now share one typed `Step`, generated from
+`proto/euler/v1/steps.proto`. The server side is still three hand-kept
+definitions with nothing checking a step between the database and the
+converter. One stored step the converter refuses turns `GetSession` and
+`GetRuntime` into a 500 for the whole chat. The performance fixture did this
+with a `completed` status. Production's stored chats all read back cleanly on
+November 9, 2026.
 
-**Fix:** Define `LlmMetricsSchema` and `StepSchema` in `src/schemas/run.ts`:
-`kind` and `status` as enums, plus `toolName`, `jobId`, `args`, `result`,
-`thinking`, `error`, `startedAt`, `endedAt`, and `agentName`. Derive the server
-`Step`, the wire type, and the UI `MessageStep` from it. Replace `wireStep()`
-with a parse or a typed pick. Remove the casts.
+**Fix:** Define `StepSchema` and `LlmMetricsSchema` in `src/schemas/run.ts`
+with `kind` and `status` as enums. Derive the server `Step` from it, parse
+steps where they are read from SQLite, and replace `wireStep()` with a typed
+pick. Decide what a chat with one unreadable step shows. Skipping the step and
+logging it is better than failing the chat.
 
-### TYPE-2. Message `role` is a free string (Medium, S)
+**Done when:** A stored step with an unknown status has a tested outcome that
+still opens the chat.
+
+### TYPE-2. Message `role` is a free string on the server (Medium, S)
 
 **Where:** `src/schemas/run.ts` (`WireMessageSchema.role: z.string()`),
-`src/db/types.ts` (`WireMessage.role: string`), the `messages.role` column,
-`ui/types/run.ts` (`"user" | "assistant" | "event"`), and the cast in
-`ui/hooks/run/useAgentEvents.ts` (`as Message[]`).
+`src/db/types.ts` (`WireMessage.role: string`), the `messages.role` column, and
+`src/rpc/wire.ts` (`roles`, which throws on any other value).
 
-**Fix:** Use `z.enum(["user", "assistant", "event"])`, derive the UI `Message`
-from the schema, add a `CHECK` constraint on the column, and remove the cast.
+**Problem:** The API's role is a proto enum, but the stored one is unchecked,
+so an unexpected value fails the read the same way as `TYPE-1`.
 
-### TYPE-3. API helpers return unvalidated casts (Medium, M)
-
-**Where:** `ui/lib/api.ts` (`userApiJson<T>` and `globalApiJson<T>` return
-`response.json() as Promise<T>` and `null as T`). Callers that skip their own
-validation trust the cast shape.
-
-**Fix:** Make the JSON helpers take a Zod schema
-(`userApiJson(url, Schema, options)`) and return `z.infer` of it. Use a separate
-overload or helper for `notFound: "null"` that returns `T | null`. Migrate all
-callers. AGENTS.md already says type annotations do not validate data.
+**Fix:** Use `z.enum(["user", "assistant", "event"])` and add a `CHECK`
+constraint on the column.
 
 ### TYPE-4. Ollama SDK private fields read through double casts (Low, S)
 
@@ -604,7 +557,7 @@ Background refreshes may stay console-only.
 
 ### FE-3. Raw buttons instead of shared primitives (Low, M)
 
-**Where:** About 65 raw `<button>` elements in nearly 40 files, compared with
+**Where:** About 80 raw `<button>` elements in about 45 files, compared with
 `IconButton` used in about a dozen. Example: the debug button in `ui/App.tsx`.
 
 **Fix:** When touching a file, migrate icon-only buttons to `IconButton` and
@@ -627,20 +580,37 @@ write.
 
 **Fix:** Enable the rule as a warning, then fix or annotate each finding.
 
+### FE-6. Components call the RPC clients directly (Low, S)
+
+**Where:** `ui/components/ModelSelectBar.tsx`, `ui/components/UsagePage/index.tsx`,
+`ui/components/Artifacts/api.ts`, `ui/components/SettingsPage/useApiKeySetting.ts`,
+`ui/components/SettingsPage/useOpenRouterCatalog.ts`, and
+`ui/hooks/run/useOllamaConnection.ts`, `useComfyUIConnection.ts`, and
+`useRunDebug.ts` import clients from `ui/lib/rpc.ts`.
+
+**Problem:** AGENTS.md puts domain API operations in `ui/persist/`. These
+eight call sites skip it, so the same call can be written twice and has no one
+place to change.
+
+**Fix:** Move each call into the `ui/persist/` module that owns its domain and
+import that instead.
+
 ---
 
 ## 8. API and backend consistency
 
-### API-1. Duplicate workspace file routes (Medium, S)
+### API-1. Two RPCs list workspace files (Low, S)
 
-**Where:** `GET /api/sessions/:id/workspace/files` and `/workspace/file`,
-compared with `/workspace/artifacts/{tree,preview,download}`. The UI still uses both, through
-`ui/persist/sessions.ts` (`fetchWorkspaceFiles`, `downloadWorkspaceFile`) and
-`ui/components/Artifacts/api.ts`.
+**Where:** `WorkspaceService.ListFiles` and `ListArtifacts` in
+`src/rpc/workspace.ts`. `ListFiles` returns a flat, filtered list for
+`ui/components/WorkspaceModal.tsx` and the composer's file suggestions.
+`ListArtifacts` returns one directory for the artifact sidebar.
 
-**Fix:** Use the artifacts routes as the single file API. Move
-`WorkspaceModal`'s file listing and download to them, then delete the older
-routes. Coordinate with `SEC-4`.
+**Problem:** Two listings of the same workspace with different walks and
+limits. Downloads already share one RPC, `DownloadFile`.
+
+**Fix:** Decide whether one listing with a query and a directory can serve all
+three callers. See `PERF-3` before keeping the flat walk.
 
 ### API-2. The session list query is N+1 (Low, S)
 
@@ -650,19 +620,11 @@ session for the first user message).
 **Fix:** Use one query with a correlated subquery for the first user message
 per session.
 
-### API-4. Title patch logic is convoluted (Low, S)
-
-**Where:** `src/routes/sessions.ts` (`PATCH /:id`, the nested ternary on
-`customTitle`).
-
-**Fix:** `patch.title = body.customTitle?.trim() || null` when the key is
-present. The schema already trims and validates the type.
-
 ### API-5. Workspace changes race with activation admission (High, M)
 
-**Where:** `src/routes/sessions.ts` (`POST /:id/workspace/use-sandbox`).
+**Where:** `src/rpc/workspace.ts` (`useSandbox`).
 
-**Problem:** `use-sandbox` checks busy, awaits provisioning, then changes the
+**Problem:** `useSandbox` checks busy, awaits provisioning, then changes the
 workspace without another busy check. A message can begin activation during that
 await, leaving the active tools on their previously resolved directory while
 the stored workspace and UI change. The asynchronous gaps are confirmed
@@ -673,7 +635,7 @@ respected by message/job admission, deletion, and competing workspace changes.
 At minimum, perform the final busy check immediately before synchronous mutation.
 Preserve local workspace containment.
 
-**Done when:** Barrier-controlled tests race workspace selection/use-sandbox
+**Done when:** Barrier-controlled tests race `SelectDirectory` and `UseSandbox`
 against message admission and competing changes. No activation can run in a
 workspace different from the committed selection.
 
@@ -691,7 +653,7 @@ Most items need measurement first. `TOOL-2` and `TOOL-4` are the confirmed wins.
 **Problem:** Uncached action lookups load all agents' histories to find the
 main agent.
 
-**Measure:** Time `POST /messages` on an idle chat with many subagents and large
+**Measure:** Time `AgentService.SendMessage` on an idle chat with many subagents and large
 histories. If material, find the main agent by its indexed identity before
 loading its history. Preserve shared record ownership while work is active.
 
@@ -707,21 +669,21 @@ Onboarding, and KaTeX are all eagerly imported. Only the `/dev` demos use
 ### PERF-3. Listing workspace files walks the whole tree (Low, S; measure first)
 
 **Where:** `src/workspaces/WorkspaceService.ts` (`listFiles` and `walkFiles` stat
-every file through per-component file handles), then routes return
-`slice(0, 200)`.
+every file through per-component file handles), then `listFiles` in
+`src/rpc/workspace.ts` returns `slice(0, 200)`.
 
-**Measure:** The latency of `/workspace/files` with a local workspace on a large
-repository.
+**Measure:** The latency of `WorkspaceService.ListFiles` with a local
+workspace on a large repository.
 
 **Fix if confirmed:** Stop after a bounded number of entries, or remove the
-route as part of `API-1`.
+RPC as part of `API-1`.
 
 ### PERF-4. Not worth pursuing now
 
 `AgentRuntime` cloning each event and `EventHub` serializing it, the
 `EventHub.users` and `JobManager.records` maps growing per user (each replay
-buffer is already capped at 2000 events and 4 MB), and the fixed 1-second SSE
-reconnect. Revisit only if memory or CPU measurements point here.
+buffer is already capped at 2000 events and 4 MB), and the fixed 1-second
+event stream reconnect. Revisit only if memory or CPU measurements point here.
 
 ### PERF-5. Whole-chat snapshots remain cached in the browser (Medium, S; measure first)
 
@@ -743,6 +705,21 @@ and expire inactive EventHub owners. Preserve replay behavior.
 The artifact preview cache and agent-store release logic provide existing
 patterns to reuse where appropriate.
 
+### PERF-6. The browser downloads validation rules it never runs (Low, S; measure first)
+
+**Where:** `src/gen/buf/validate/validate_pb.ts`, imported by every generated
+service file the UI uses.
+
+**Problem:** The generated contract embeds the `buf.validate` descriptor, about
+71 kB in the main bundle and 12 kB gzipped. Only the server's interceptor
+evaluates the rules.
+
+**Measure:** `bundle.jsGzipBytes` with the descriptor excluded from the UI
+build.
+
+**Fix if worth it:** Generate the UI's TypeScript without the validate import,
+or alias it to an empty descriptor in `vite.config.ts`.
+
 ---
 
 ## 10. Observability
@@ -758,7 +735,7 @@ only a name and stack frames, so the cause of a failure is often missing.
 **Fix:** Keep `error.message`, truncated to about 500 characters. Redact only
 specific sensitive patterns, such as bearer tokens and API keys. Keep the
 fixed public messages for API responses; that separation already exists in
-`sendError`.
+`src/rpc/errors.ts` and `sendError`.
 
 ### OBS-2. No log line per LLM call (Medium, S)
 
@@ -776,7 +753,7 @@ when known, and token counts. Pair this with `LLM-1` and `LLM-2`.
 **Where:** `src/agents/runtime/AgentRuntime.ts` (`pump` uses
 `withBackgroundLogContext`, which intentionally drops `requestId`).
 
-**Fix:** Log the inbox `messageId` with the `POST /messages` request completion,
+**Fix:** Log the inbox `messageId` when the `SendMessage` call completes,
 and log the delivered message IDs in `activation.started`.
 
 ### OBS-5. Failed tools can be logged as successful (Medium, S)
@@ -896,15 +873,9 @@ Add these with the related fixes:
 3. Model-visible tool output is capped for bash, read_file, and grep
    (`TOOL-2`).
 4. Requests with an unknown `Host` header are rejected (`SEC-1`).
-5. The local workspace download policy is enforced on the single download route
-   (`SEC-4`, `API-1`).
-6. A failed Stop or preference save shows an error (`FE-2`).
-7. An OpenRouter 429 is retried, and a mid-stream error leaves a held, retryable
+5. A failed Stop or preference save shows an error (`FE-2`).
+6. An OpenRouter 429 is retried, and a mid-stream error leaves a held, retryable
    turn (`LLM-3`).
-
-### TEST-4. Tests for removed behavior (Low, S)
-
-Delete them with the code they cover: see `LEG-9`.
 
 ### TEST-5. Fixed polling deadlines can be flaky (Low, S)
 
@@ -947,6 +918,19 @@ fail-closed contract. Keep this test rather than deleting it as obsolete.
 
 **Done when:** Both available and unavailable containment paths are tested
 without depending on which capabilities the developer machine has.
+
+### TEST-8. Three browser tests stub the API in the old REST shape (Low, S)
+
+**Where:** `tests/browser/welcome.pw.ts`, `agents.pw.ts`, and
+`settingsSave.pw.ts` answer `**/api/**` with hand-written JSON such as
+`{ skills: [] }` or a REST error body.
+
+**Problem:** Connect ignores fields a message does not define, so every RPC
+"succeeds" with an empty reply and the tests pass without the stub matching
+any contract.
+
+**Fix:** Replace each stub with `mockApp` or `mockRpc` from
+`tests/browser/rpcMock.ts`, which type the replies.
 
 ---
 
@@ -1007,11 +991,11 @@ invalid configured values cannot silently select a different port or limit.
 
 ## Suggested order
 
-1. **Security day:** `SEC-1`, `SEC-3`, `SEC-4` (with `API-1`), then `SEC-2`.
+1. **Security day:** `SEC-1`, `SEC-3`, then `SEC-2`.
 2. **Agent quality:** `TOOL-1`, `TOOL-2`, `LLM-1`, `LLM-2`, `OBS-2`.
-3. **Cleanup:** `LEG-6` through `LEG-11`, `TEST-4`, `DX-5`.
+3. **Cleanup:** `LEG-6` through `LEG-11`, `TEST-8`, `DX-5`.
 4. **Safety net:** `TEST-1`, `TEST-2`.
-5. **Contracts:** `TYPE-1`, `TYPE-2`, `TYPE-3`.
+5. **Contracts:** `TYPE-1`, `TYPE-2`.
 6. **Structural:** `ARCH-2` with `FE-1`.
 
 Include `LLM-6`, `LLM-7`, and `API-5` in the early reliability work, `OBS-5`
@@ -1024,8 +1008,11 @@ These work well. Changes elsewhere should preserve them:
 - `RuntimeTransaction` and the design that publishes events only after the
   database commit
 - `WorkspaceService`'s symlink-safe file access through `/proc/self/fd`
-- The error envelope (`ERROR_MESSAGES`, `sendError`, request IDs)
-- Zod contracts in `src/schemas/` shared by the server and UI
-- The mock OpenRouter scenarios and HTTP-level integration tests
+- The error contract: `ERROR_MESSAGES`, the Euler code carried as a Connect
+  `ErrorDetail`, and request IDs
+- One API contract in `proto/euler/v1/`, generated for the server, the web app,
+  and the iPhone app, with Zod in `src/schemas/` for stored and external data
+- The mock OpenRouter scenarios and the API tests that call the handlers
+  through in-process Connect clients
 - The favicon fetcher's SSRF protection
 - `AGENTS.md`

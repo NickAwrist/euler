@@ -1,9 +1,11 @@
 import { ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { MAIN_AGENT_NAME } from "../../../src/agents/agentNames";
+import { Step_Kind, Step_Status } from "../../../src/gen/euler/v1/steps_pb";
 import { formatDuration } from "../../lib/formatDuration";
+import { STEP_STATUS_LABELS } from "../../lib/steps";
 import { cx, debugBlock, eyebrowText } from "../../styles";
-import type { MessageStep } from "../../types";
+import type { Step } from "../../types";
 import { ToolIcon } from "../ToolIcon";
 import {
   type TimelineSpan,
@@ -60,14 +62,16 @@ export function TraceStepBody({
   streamingThinking,
   timeline,
 }: {
-  step: MessageStep;
+  step: Step;
   showIndex: boolean;
   stepNumber?: number;
   streamingThinking?: string;
   timeline?: TimelineSpan;
 }) {
   const thinkingText =
-    step.thinking || (step.status === "running" ? streamingThinking : "") || "";
+    step.thinking ||
+    (step.status === Step_Status.RUNNING ? streamingThinking : "") ||
+    "";
   const durationMs = traceStepDurationMs(step);
 
   return (
@@ -83,7 +87,7 @@ export function TraceStepBody({
           </span>
         ) : null}
         <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-[3px] text-[0.6875rem] font-medium text-foreground">
-          {step.kind === "tool_call" && (
+          {step.kind === Step_Kind.TOOL_CALL && (
             <ToolIcon name={step.toolName} icons={step.toolIcons} size={12} />
           )}
           {traceStepLabel(step)}
@@ -93,9 +97,10 @@ export function TraceStepBody({
             {step.agentName}
           </span>
         ) : null}
-        {step.status && step.status !== "done" ? (
+        {step.status !== Step_Status.UNSPECIFIED &&
+        step.status !== Step_Status.DONE ? (
           <span className="rounded-md bg-muted px-2 py-[3px] text-[0.6875rem] text-muted-foreground">
-            {step.status}
+            {STEP_STATUS_LABELS[step.status]}
           </span>
         ) : null}
         {durationMs !== undefined && (
@@ -110,7 +115,9 @@ export function TraceStepBody({
           <div
             className={cx(
               "absolute inset-y-0 min-w-1 rounded-full",
-              step.status === "error" ? "bg-red-400/70" : "bg-accent/70",
+              step.status === Step_Status.ERROR
+                ? "bg-red-400/70"
+                : "bg-accent/70",
             )}
             style={{
               left: `${timeline.offset * 100}%`,

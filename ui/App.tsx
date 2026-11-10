@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { isWorkingAgent } from "../src/schemas/agents";
+import { Agent_Kind } from "../src/gen/euler/v1/agent_pb";
 import { AgentContext } from "./components/Agents/AgentContext";
 import { AgentTraceModal } from "./components/Agents/AgentTraceModal";
 import { AgentsList } from "./components/Agents/AgentsList";
@@ -49,6 +49,7 @@ import { useAppKeybinds } from "./hooks/useAppKeybinds";
 import { useMobileLayout } from "./hooks/useMobileLayout";
 import { useRunApp } from "./hooks/useRunApp";
 import { useViewportWidth } from "./hooks/useViewportWidth";
+import { isWorkingAgent } from "./lib/agentStatus";
 import { CHAT_LIST_WIDTH, chatInsets } from "./lib/chatInsets";
 import { downloadBlob } from "./lib/downloadBlob";
 import {
@@ -61,6 +62,11 @@ import {
   parseRoute,
   sessionPath,
 } from "./lib/navigation";
+import {
+  linkedWorkspace,
+  localWorkspace,
+  workspaceKind,
+} from "./lib/workspace";
 import { cancelAgent } from "./persist/agents";
 import { CHAT_MAX_WIDTHS, loadAppearance } from "./persist/appearance";
 import { cancelJob } from "./persist/jobs";
@@ -84,7 +90,12 @@ import {
 } from "./persist/userPreferences";
 
 function loadArtifactState() {
-  return getUserPreferences().layout.artifactState;
+  const state = getUserPreferences().layout?.artifactState;
+  return {
+    open: state?.open ?? false,
+    workspace: state?.workspace ?? "",
+    path: state?.path ?? null,
+  };
 }
 
 function ChatView({
@@ -104,7 +115,8 @@ function ChatView({
     setSidebarOpen,
     switchToSession,
   } = app;
-  const workspaceKey = `${app.activeSessionId}:${app.workspace.kind === "local" ? app.workspace.path : (app.workspace.linked?.workspaceId ?? "sandbox")}`;
+  const localPath = localWorkspace(app.workspace)?.path;
+  const workspaceKey = `${app.activeSessionId}:${localPath ?? linkedWorkspace(app.workspace)?.workspaceId ?? "sandbox"}`;
   const [artifactView, setArtifactView] = useState<"files" | "agents" | "jobs">(
     "files",
   );
@@ -174,7 +186,7 @@ function ChatView({
         artifactState: {
           open: artifactsOpen,
           workspace: workspaceKey,
-          path: selectedFile,
+          path: selectedFile ?? undefined,
         },
       },
     }).catch(console.error);
@@ -201,7 +213,7 @@ function ChatView({
   // The remembered open state applies only to workspaces with files; an
   // explicit open in this chat shows the panel even when it is empty.
   const [openedSessionId, setOpenedSessionId] = useState<string | null>(null);
-  const subagents = app.agents.filter((a) => a.kind !== "main");
+  const subagents = app.agents.filter((a) => a.kind !== Agent_Kind.MAIN);
   const workingAgentCount = subagents.filter(isWorkingAgent).length;
   const filesOpen =
     artifactsOpen &&
@@ -252,11 +264,10 @@ function ChatView({
   const artifactContext = useMemo(
     () => ({
       openFile,
-      workspaceKind: app.workspace.kind,
-      localPath:
-        app.workspace.kind === "local" ? app.workspace.path : undefined,
+      workspaceKind: workspaceKind(app.workspace),
+      localPath,
     }),
-    [openFile, app.workspace],
+    [openFile, app.workspace, localPath],
   );
   const [runFooterInset, setRunFooterInset] = useState(104);
   // Home and empty chats center the composer; the first message docks it.
@@ -598,11 +609,7 @@ function ChatView({
                 source={source}
                 path={selectedFile}
                 revision={revision}
-                rootLabel={
-                  app.workspace.kind === "local"
-                    ? app.workspace.path
-                    : "/workspace"
-                }
+                rootLabel={localPath ?? "/workspace"}
                 onOpen={openFile}
                 onBack={() => setSelectedFile(null)}
                 onClose={() => setArtifactsOpen(false)}
@@ -834,9 +841,7 @@ export default function App() {
         )}
         {openSessionModal === "directory" && (
           <DirectoryModal
-            initialPath={
-              app.workspace.kind === "local" ? app.workspace.path : ""
-            }
+            initialPath={localWorkspace(app.workspace)?.path ?? ""}
             onSelect={app.chooseDirectory}
             onClose={() => setSessionModal(null)}
           />

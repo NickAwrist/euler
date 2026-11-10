@@ -2,6 +2,7 @@ import { Check, Copy, Pencil } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
 import type { CSSProperties } from "react";
+import { attachmentsOfKind } from "../../lib/attachments";
 import { cx } from "../../styles";
 import type { Message } from "../../types";
 import { Button } from "../Button";
@@ -66,16 +67,16 @@ export function UserMessageBubble({
               : "user-message-hold max-w-[min(85%,36rem)] max-[640px]:max-w-[92%]",
           )}
         >
-          {message.attachments && message.attachments.length > 0 && (
+          {message.attachments.length > 0 && (
             <div className="mb-2 flex flex-wrap justify-end gap-2">
-              {message.attachments
-                .filter((attachment) => attachment.kind === "image")
-                .map((attachment) => (
+              {attachmentsOfKind(message.attachments, "image").map(
+                (attachment) => (
                   <AttachmentImage
                     key={attachment.id}
                     attachment={attachment}
                   />
-                ))}
+                ),
+              )}
             </div>
           )}
           {isEditingUser ? (

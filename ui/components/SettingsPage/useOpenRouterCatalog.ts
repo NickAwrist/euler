@@ -1,11 +1,21 @@
+import { create } from "@bufbuild/protobuf";
 import { useCallback, useEffect, useState } from "react";
-import type { catalogSettings } from "../../../src/models/openRouterPreferences";
-import { modelSettingsRequest } from "../../lib/modelSettingsRequest";
+import {
+  ModelProvider,
+  Model_Availability,
+} from "../../../src/gen/euler/v1/models_pb";
+import {
+  type OpenRouterCatalog,
+  type OpenRouterModel,
+  type OpenRouterPublisher,
+  OpenRouterPublisherSchema,
+  PublisherModelsSchema,
+} from "../../../src/gen/euler/v1/providers_pb";
+import { modelClient, providerClient } from "../../lib/rpc";
 
-export type CatalogSettings = ReturnType<typeof catalogSettings>;
-export type Publisher = CatalogSettings["publishers"][number];
-export type PublisherModel =
-  CatalogSettings["modelsByPublisher"][string][number];
+export type CatalogSettings = OpenRouterCatalog;
+export type Publisher = OpenRouterPublisher;
+export type PublisherModel = OpenRouterModel;
 export type PreferenceChange =
   | { kind: "enabled"; publisherId: string; route: string; value: boolean }
   | { kind: "favorite"; publisherId: string; route: string; value: boolean }
@@ -19,7 +29,7 @@ function applyChange(
   change: PreferenceChange,
 ): CatalogSettings {
   const id = change.publisherId;
-  const models = (data.modelsByPublisher[id] ?? []).map((model) => {
+  const models = (data.modelsByPublisher[id]?.models ?? []).map((model) => {
     if (change.kind === "remove") return { ...model, enabled: false };
     if (
       (change.kind === "enabled" || change.kind === "favorite") &&
@@ -42,77 +52,80 @@ function applyChange(
   if (change.kind === "remove")
     publishers = publishers.filter((publisher) => publisher.id !== id);
   if (change.kind === "track") {
-    const discovered = data.discoveredPublishers?.find(
+    const discovered = data.discoveredPublishers?.publishers.find(
       (publisher) => publisher.id === id,
     );
     if (discovered)
       publishers = [
         ...publishers,
-        {
+        create(OpenRouterPublisherSchema, {
           id,
           name: discovered.name,
           subscribed: false,
-          subscribedAt: null,
           enabledCount: models.filter((model) => model.enabled).length,
           recentCount: models.filter(
-            (model) => model.isNew && model.availability === "available",
+            (model) =>
+              model.isNew &&
+              model.availability === Model_Availability.AVAILABLE,
           ).length,
-        },
+        }),
       ].sort((a, b) => a.name.localeCompare(b.name));
   }
   return {
     ...data,
     publishers,
-    modelsByPublisher: { ...data.modelsByPublisher, [id]: models },
-    discoveredPublishers:
-      data.discoveredPublishers?.map((publisher) =>
+    modelsByPublisher: {
+      ...data.modelsByPublisher,
+      [id]: create(PublisherModelsSchema, { models }),
+    },
+    discoveredPublishers: data.discoveredPublishers && {
+      ...data.discoveredPublishers,
+      publishers: data.discoveredPublishers.publishers.map((publisher) =>
         publisher.id === id &&
         (change.kind === "remove" || change.kind === "track")
           ? { ...publisher, tracked: change.kind === "track" }
           : publisher,
-      ) ?? null,
+      ),
+    },
   };
 }
 async function sendChange(
   operation: PreferenceChange,
   load: () => Promise<void>,
 ) {
-  const id = encodeURIComponent(operation.publisherId);
+  const { publisherId } = operation;
   switch (operation.kind) {
     case "add-model":
-      await modelSettingsRequest("openrouter/models", "PATCH", {
+      await providerClient.setOpenRouterModelEnabled({
         route: operation.route,
         enabled: true,
       });
       await load();
       break;
     case "enabled":
-      await modelSettingsRequest("openrouter/models", "PATCH", {
+      await providerClient.setOpenRouterModelEnabled({
         route: operation.route,
         enabled: operation.value,
       });
       break;
     case "favorite":
-      await modelSettingsRequest("models/favorite", "PUT", {
-        provider: "openrouter",
+      await modelClient.setFavorite({
+        provider: ModelProvider.OPENROUTER,
         modelId: operation.route,
         favorite: operation.value,
       });
       break;
     case "subscription":
-      await modelSettingsRequest(
-        `openrouter/publishers/${id}/subscription`,
-        "PATCH",
-        { subscribed: operation.value },
-      );
-      break;
-    case "track":
-      await modelSettingsRequest("openrouter/publishers", "POST", {
-        publisherId: operation.publisherId,
+      await providerClient.setOpenRouterSubscription({
+        publisherId,
+        subscribed: operation.value,
       });
       break;
+    case "track":
+      await providerClient.trackOpenRouterPublisher({ publisherId });
+      break;
     case "remove":
-      await modelSettingsRequest(`openrouter/publishers/${id}`, "DELETE");
+      await providerClient.removeOpenRouterPublisher({ publisherId });
       break;
   }
 }
@@ -122,11 +135,10 @@ export function useOpenRouterCatalog(onModelsChanged: () => Promise<void>) {
   const [error, setError] = useState<string | null>(null);
   const load = useCallback(async (force = false) => {
     setError(null);
-    const result = await modelSettingsRequest<CatalogSettings>(
-      force ? "openrouter/catalog/refresh" : "openrouter/catalog",
-      force ? "POST" : "GET",
-    );
-    setData(result);
+    const { catalog } = force
+      ? await providerClient.refreshOpenRouterCatalog({})
+      : await providerClient.getOpenRouterCatalog({});
+    setData(catalog ?? null);
   }, []);
   useEffect(() => {
     void load()
@@ -158,7 +170,7 @@ export function useOpenRouterCatalog(onModelsChanged: () => Promise<void>) {
       (cause: unknown) => {
         if (operation.kind === "enabled" || operation.kind === "favorite") {
           const previous =
-            before.modelsByPublisher[operation.publisherId]?.find(
+            before.modelsByPublisher[operation.publisherId]?.models.find(
               (model) => model.route === operation.route,
             )?.[operation.kind] ?? false;
           setData((current) =>

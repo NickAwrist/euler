@@ -19,7 +19,7 @@ const clampWidth = (width: number) =>
   Math.min(maxWidth(), Math.max(MIN_WIDTH, width));
 const defaultWidth = () => clampWidth(Math.min(window.innerWidth * 0.42, 560));
 export function initialArtifactWidth() {
-  const stored = getUserPreferences().layout.artifactWidth ?? 0;
+  const stored = getUserPreferences().layout?.artifactWidth ?? 0;
   if (stored >= MIN_WIDTH && Number.isFinite(stored)) {
     return clampWidth(stored);
   }
@@ -39,7 +39,7 @@ export function ArtifactSidebar({
   onWidthChange: (width: number) => void;
 }) {
   const [preferredWidth, setWidth] = useState(
-    () => getUserPreferences().layout.artifactWidth ?? defaultWidth(),
+    () => getUserPreferences().layout?.artifactWidth ?? defaultWidth(),
   );
   const [availableWidth, setAvailableWidth] = useState(maxWidth);
   const width = Math.min(availableWidth, Math.max(MIN_WIDTH, preferredWidth));

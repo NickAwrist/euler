@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
+import { UsageService } from "../../src/gen/euler/v1/usage_pb";
 import type { UsageDashboard, UsageGroup, UsageTotals } from "../../src/usage";
+import { usageQuery, usageResponse } from "../../src/usage/wire";
+import { mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 // Explicit API examples: aggregation and sorting are covered by backend tests.
@@ -174,13 +177,23 @@ for (const mode of ["desktop", "mobile"]) {
         : { width: 390, height: 844 },
     );
     let response = sample;
+    // The last request's query, in the form main's REST route took it.
     let params = new URLSearchParams();
-    await page.route("**/api/usage?*", async (route) => {
-      params = new URL(route.request().url()).searchParams;
-      await route.fulfill({
-        json: { ...response, asOf: Number(params.get("asOf")) },
-      });
-    });
+    await mockRpc(page, [
+      on(UsageService.method.getUsage, (request) => {
+        const query = usageQuery(request);
+        params = new URLSearchParams({
+          days: String(query.days),
+          grouping: query.grouping,
+          page: String(query.page),
+          asOf: String(query.asOf),
+          sorting: JSON.stringify(query.sorting),
+        });
+        for (const provider of query.providers)
+          params.append("providers", provider);
+        return usageResponse({ ...response, asOf: query.asOf ?? 0 });
+      }),
+    ]);
     const sorting = () => JSON.parse(params.get("sorting") ?? "[]") as unknown;
     await mockUserPreferences(page);
     await page.goto("/dev/usage");

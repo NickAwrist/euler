@@ -1,6 +1,12 @@
 import { type Page, expect, test } from "@playwright/test";
+import { AgentService } from "../../src/gen/euler/v1/agent_pb";
+import {
+  ApprovalDecision,
+  type ToolApprovalSchema,
+} from "../../src/gen/euler/v1/permissions_pb";
+import { PreferenceService } from "../../src/gen/euler/v1/preferences_pb";
+import { toProtoField, toProtoRule } from "../../src/permissions/wire";
 import type {
-  ToolApproval,
   ToolPermissionField,
   ToolPermissionRule,
 } from "../../src/schemas/toolPermissions";
@@ -8,10 +14,39 @@ import {
   type UserPreferences,
   userPreferencesSchema,
 } from "../../src/schemas/userPreferences";
-import type { ModelOption } from "../../ui/types";
+import { type Init, at, message, mockApp, openRouterModel } from "./appFixture";
+import { RpcFailure, mockRpc, on, rpcKey } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 const USER = "12345678-1234-4234-9234-123456789abc";
+
+type Tool = {
+  name: string;
+  description: string;
+  fields: ToolPermissionField[];
+};
+
+function listTools(tools: Tool[]) {
+  return {
+    tools: tools.map((tool) => ({
+      ...tool,
+      fields: tool.fields.map(toProtoField),
+    })),
+  };
+}
+
+/** Serves the customization page with saved preferences; other calls get empty replies. */
+async function mockSettings(page: Page, store?: Map<string, UserPreferences>) {
+  await mockRpc(page, [], { empty: true });
+  await mockUserPreferences(page, store);
+}
+
+/** Serves `tools` as the catalogue rules can choose from. */
+function mockTools(page: Page, tools: Tool[]) {
+  return mockRpc(page, [
+    on(PreferenceService.method.listPermissionTools, () => listTools(tools)),
+  ]);
+}
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript((user) => {
@@ -49,39 +84,23 @@ test("tools desktop: tool permission rules edit inline and save per user", async
   await page.addInitScript(() => {
     Object.defineProperty(crypto, "randomUUID", { value: undefined });
   });
-  await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
-  await page.route("**/api/mcp-servers", (route) =>
-    route.fulfill({ json: { servers: [] } }),
-  );
-  await mockUserPreferences(page, store);
-  const catalogue: {
-    name: string;
-    description: string;
-    fields: ToolPermissionField[];
-  }[] = [
+  await mockSettings(page, store);
+  const catalogue: Tool[] = [
     {
       name: "bash",
       description: "Run a shell command",
       fields: [{ path: "command", type: "string" }],
     },
   ];
-  await page.route("**/api/settings/user/tools", (route) =>
-    route.fulfill({ json: { tools: catalogue } }),
-  );
+  await mockTools(page, catalogue);
   let failNextPut = true;
-  await page.route(
-    "**/api/settings/user/tool-permission-rules/*",
-    async (route) => {
-      if (route.request().method() === "PUT" && failNextPut) {
-        failNextPut = false;
-        return route.fulfill({
-          status: 500,
-          json: { error: { code: "INTERNAL_ERROR", message: "Disk full" } },
-        });
-      }
-      await route.fallback();
-    },
-  );
+  await mockRpc(page, [
+    on(PreferenceService.method.putPermissionRule, () => {
+      if (!failNextPut) return undefined;
+      failNextPut = false;
+      return new RpcFailure("internal", "Disk full", "INTERNAL_ERROR");
+    }),
+  ]);
 
   await page.goto("/customization");
   await page.getByRole("button", { name: "Tools", exact: true }).click();
@@ -183,17 +202,13 @@ test("tools desktop: tool permission rules edit inline and save per user", async
 test("tools desktop: tool catalogue failures are shown without inventing tools", async ({
   page,
 }) => {
-  await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
-  await page.route("**/api/mcp-servers", (route) =>
-    route.fulfill({ json: { servers: [] } }),
-  );
-  await mockUserPreferences(page);
-  await page.route("**/api/settings/user/tools", (route) =>
-    route.fulfill({
-      status: 503,
-      json: { error: { code: "UNAVAILABLE", message: "Catalogue offline" } },
-    }),
-  );
+  await mockSettings(page);
+  await mockRpc(page, [
+    on(
+      PreferenceService.method.listPermissionTools,
+      () => new RpcFailure("unavailable", "Catalogue offline"),
+    ),
+  ]);
 
   await page.goto("/customization");
   await page.getByRole("button", { name: "Tools", exact: true }).click();
@@ -211,11 +226,7 @@ test("tools desktop: tool catalogue failures are shown without inventing tools",
 test("tools desktop: a slow older catalogue response does not replace a newer one", async ({
   page,
 }) => {
-  await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
-  await page.route("**/api/mcp-servers", (route) =>
-    route.fulfill({ json: { servers: [] } }),
-  );
-  await mockUserPreferences(page);
+  await mockSettings(page);
   // Requests made before Add rule are held, then answered with an old catalogue.
   let releaseOld = () => {};
   const oldReleased = new Promise<void>((resolve) => {
@@ -223,24 +234,20 @@ test("tools desktop: a slow older catalogue response does not replace a newer on
   });
   let held = 0;
   let addClicked = false;
-  await page.route("**/api/settings/user/tools", async (route) => {
-    if (!addClicked) {
-      held += 1;
-      await oldReleased;
-      return route.fulfill({
-        json: {
-          tools: [{ name: "bash", description: "Old catalogue", fields: [] }],
-        },
-      });
-    }
-    await route.fulfill({
-      json: {
-        tools: [
-          { name: "read_file", description: "New catalogue", fields: [] },
-        ],
-      },
-    });
-  });
+  await mockRpc(page, [
+    on(PreferenceService.method.listPermissionTools, async () => {
+      if (!addClicked) {
+        held += 1;
+        await oldReleased;
+        return listTools([
+          { name: "bash", description: "Old catalogue", fields: [] },
+        ]);
+      }
+      return listTools([
+        { name: "read_file", description: "New catalogue", fields: [] },
+      ]);
+    }),
+  ]);
 
   await page.goto("/customization");
   await page.getByRole("button", { name: "Tools", exact: true }).click();
@@ -252,7 +259,10 @@ test("tools desktop: a slow older catalogue response does not replace a newer on
     .getByRole("combobox", { name: "Tool", exact: true });
   await expect(tool.getByRole("option", { name: "read_file" })).toBeAttached();
 
-  const stale = page.waitForResponse("**/api/settings/user/tools");
+  const stale = page.waitForResponse(
+    (response) =>
+      rpcKey(response.request()) === "PreferenceService/ListPermissionTools",
+  );
   releaseOld();
   await (await stale).finished();
   // Let the stale response settle before checking it was ignored.
@@ -289,44 +299,34 @@ test("tools desktop: field match offers the selected tool's fields", async ({
     ],
   ]);
   const saved = () => store.get(USER)?.toolPermissions;
-  await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
-  await page.route("**/api/mcp-servers", (route) =>
-    route.fulfill({ json: { servers: [] } }),
-  );
-  await mockUserPreferences(page, store);
-  await page.route("**/api/settings/user/tools", (route) =>
-    route.fulfill({
-      json: {
-        tools: [
-          {
-            name: "bash",
-            description: "Run a shell command",
-            fields: [
-              { path: "command", type: "string" },
-              { path: "background", type: "boolean" },
-            ],
-          },
-          {
-            name: "manage_skills",
-            description: "Manage skills",
-            fields: [
-              {
-                path: "action",
-                type: "string",
-                values: ["list", "create", "delete"],
-              },
-            ],
-          },
-          {
-            name: "generate_image",
-            description: "Generate an image",
-            fields: [{ path: "size.width", type: "number" }],
-          },
-          { name: "list_files", description: "List files", fields: [] },
-        ],
-      },
-    }),
-  );
+  await mockSettings(page, store);
+  await mockTools(page, [
+    {
+      name: "bash",
+      description: "Run a shell command",
+      fields: [
+        { path: "command", type: "string" },
+        { path: "background", type: "boolean" },
+      ],
+    },
+    {
+      name: "manage_skills",
+      description: "Manage skills",
+      fields: [
+        {
+          path: "action",
+          type: "string",
+          values: ["list", "create", "delete"],
+        },
+      ],
+    },
+    {
+      name: "generate_image",
+      description: "Generate an image",
+      fields: [{ path: "size.width", type: "number" }],
+    },
+    { name: "list_files", description: "List files", fields: [] },
+  ]);
 
   await page.goto("/customization");
   await page.getByRole("button", { name: "Tools", exact: true }).click();
@@ -456,39 +456,29 @@ test("tools desktop: saved field values outlive changed tool choices", async ({
     ],
   ]);
   const saved = () => store.get(USER)?.toolPermissions;
-  await page.route("**/api/**", (route) => route.fulfill({ json: {} }));
-  await page.route("**/api/mcp-servers", (route) =>
-    route.fulfill({ json: { servers: [] } }),
-  );
-  await mockUserPreferences(page, store);
-  await page.route("**/api/settings/user/tools", (route) =>
-    route.fulfill({
-      json: {
-        tools: [
-          {
-            name: "bash",
-            description: "Run a shell command",
-            fields: [
-              { path: "command", type: "string" },
-              { path: "background", type: "boolean" },
-            ],
-          },
-          {
-            name: "manage_skills",
-            description: "Manage skills",
-            fields: [
-              {
-                path: "action",
-                type: "string",
-                values: ["list", "create", "delete"],
-              },
-            ],
-          },
-          { name: "list_files", description: "List files", fields: [] },
-        ],
-      },
-    }),
-  );
+  await mockSettings(page, store);
+  await mockTools(page, [
+    {
+      name: "bash",
+      description: "Run a shell command",
+      fields: [
+        { path: "command", type: "string" },
+        { path: "background", type: "boolean" },
+      ],
+    },
+    {
+      name: "manage_skills",
+      description: "Manage skills",
+      fields: [
+        {
+          path: "action",
+          type: "string",
+          values: ["list", "create", "delete"],
+        },
+      ],
+    },
+    { name: "list_files", description: "List files", fields: [] },
+  ]);
 
   await page.goto("/customization");
   await page.getByRole("button", { name: "Tools", exact: true }).click();
@@ -566,17 +556,14 @@ test("tools desktop: saved field values outlive changed tool choices", async ({
   await expect(skills.getByRole("textbox", { name: "Value" })).toBeVisible();
 });
 
-const model: ModelOption = {
-  id: "openrouter:anthropic/claude-sonnet",
-  route: "anthropic/claude-sonnet",
+const model = openRouterModel("anthropic/claude-sonnet", {
   name: "Claude Sonnet",
   lab: "Anthropic",
-  provider: "openrouter",
-  configured: true,
-  inputCapabilities: ["text"],
-};
+});
 
-function approval(overrides: Partial<ToolApproval>): ToolApproval {
+type ApprovalInit = Init<typeof ToolApprovalSchema>;
+
+function approval(overrides: ApprovalInit): ApprovalInit {
   return {
     id: "22222222-2222-4222-8222-222222222222",
     sessionId: "chat",
@@ -591,100 +578,72 @@ function approval(overrides: Partial<ToolApproval>): ToolApproval {
   };
 }
 
-async function openChat(page: Page, approvals: ToolApproval[]) {
+async function openChat(page: Page, approvals: ApprovalInit[]) {
   const decisions: { approvalId: string; decision: string }[] = [];
   const deleted: string[] = [];
   let failNext = false;
   let failRuntime = false;
-  await page.route("**/api/**", async (route) => {
-    const request = route.request();
-    const path = new URL(request.url()).pathname;
-    if (failRuntime && path.endsWith("/runtime"))
-      return route.fulfill({ status: 503, json: {} });
-    const answer = path.match(/^\/api\/sessions\/chat\/approvals\/(.+)$/);
-    if (answer) {
-      if (failNext) {
-        failNext = false;
-        return route.fulfill({
-          status: 409,
-          json: { error: { code: "CONFLICT", message: "Runtime busy" } },
-        });
-      }
-      const { decision } = request.postDataJSON() as { decision: string };
-      decisions.push({ approvalId: answer[1] ?? "", decision });
-      const index = approvals.findIndex((a) => a.id === answer[1]);
-      const [answered] = approvals.splice(index, 1);
-      return route.fulfill({
-        json: {
-          ok: true,
-          ...(decision === "allow_matching" && {
-            rule: {
-              id: "33333333-3333-4333-8333-333333333333",
-              tool: answered!.tool,
-              action: "allow",
-              condition: { kind: "arguments", value: answered!.arguments },
-              sessionId: "chat",
-              workspacePath: "/repo",
-            },
-          }),
-        },
-      });
-    }
-    if (path === "/api/settings/openrouter")
-      return route.fulfill({
-        json: { hasKey: true, environmentManaged: false },
-      });
-    // "other" is a second chat with no approvals, for switching chats.
-    const session = path.match(/^\/api\/sessions\/(chat|other)(\/runtime)?$/);
-    const json =
-      path === "/api/models"
-        ? { models: [model] }
-        : session && !session[2]
-          ? { id: session[1], model: model.id, history: [] }
-          : path === "/api/sessions"
-            ? {
-                sessions: [
-                  ["chat", "Approvals"],
-                  ["other", "Other chat"],
-                ].map(([id, preview]) => ({
-                  id,
-                  preview,
-                  createdAt: 1,
-                  updatedAt: 1,
-                  expiresAt: null,
-                })),
-              }
-            : session?.[1] === "other"
-              ? {
-                  agents: [],
-                  activation: null,
-                  queued: [],
-                  held: false,
-                  sequence: 0,
-                  history: [{ role: "user", content: "Unrelated work" }],
-                  approvals: [],
-                }
-              : path.endsWith("/runtime")
-                ? {
-                    agents: [],
-                    activation: null,
-                    queued: [],
-                    held: false,
-                    sequence: 0,
-                    history: [
-                      { role: "user", content: "Clean the build" },
-                      { role: "assistant", content: "Working on it." },
-                    ],
-                    approvals,
-                  }
-                : {};
-    await route.fulfill({ json });
+  // "other" is a second chat with no approvals, for switching chats.
+  await mockApp(page, {
+    sessions: [
+      ["chat", "Approvals"],
+      ["other", "Other chat"],
+    ].map(([id, preview]) => ({
+      id,
+      preview,
+      createdAt: at(1),
+      updatedAt: at(1),
+    })),
+    chats: { chat: { model: model.id }, other: { model: model.id } },
+    models: [model],
   });
   await mockUserPreferences(page);
-  await page.route("**/api/settings/user/tool-permission-rules/*", (route) => {
-    deleted.push(new URL(route.request().url()).pathname.split("/").at(-1)!);
-    return route.fulfill({ json: userPreferencesSchema.parse({}) });
-  });
+  await mockRpc(page, [
+    on(AgentService.method.getRuntime, ({ sessionId }) => {
+      if (failRuntime)
+        return new RpcFailure("unavailable", "Service Unavailable");
+      if (sessionId === "other")
+        return { history: [message("user", "Unrelated work")] };
+      return {
+        history: [
+          message("user", "Clean the build"),
+          message("assistant", "Working on it."),
+        ],
+        approvals,
+      };
+    }),
+    on(AgentService.method.respondToApproval, ({ approvalId, decision }) => {
+      if (failNext) {
+        failNext = false;
+        return new RpcFailure(
+          "failed_precondition",
+          "Runtime busy",
+          "CONFLICT",
+        );
+      }
+      decisions.push({
+        approvalId,
+        decision: ApprovalDecision[decision].toLowerCase(),
+      });
+      const index = approvals.findIndex((a) => a.id === approvalId);
+      const [answered] = approvals.splice(index, 1);
+      if (decision !== ApprovalDecision.ALLOW_MATCHING) return {};
+      return {
+        rule: toProtoRule({
+          id: "33333333-3333-4333-8333-333333333333",
+          tool: answered!.tool!,
+          action: "allow",
+          condition: { kind: "arguments", value: answered!.arguments ?? {} },
+          sessionId: "chat",
+          workspacePath: "/repo",
+        }),
+      };
+    }),
+    on(PreferenceService.method.deletePermissionRule, ({ ruleId }) => {
+      deleted.push(ruleId);
+      return undefined;
+    }),
+  ]);
   await page.goto("/run/chat");
   return {
     decisions,

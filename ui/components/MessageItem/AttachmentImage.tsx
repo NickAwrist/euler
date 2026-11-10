@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { ImageAttachment } from "../../../src/attachments/types";
+import type { ImageAttachment } from "../../../src/gen/euler/v1/attachments_pb";
 import {
   fetchAttachmentImage,
   invalidateAttachmentImage,

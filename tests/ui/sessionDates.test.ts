@@ -1,4 +1,7 @@
 import { describe, expect, test } from "bun:test";
+import { create } from "@bufbuild/protobuf";
+import { timestampFromDate } from "@bufbuild/protobuf/wkt";
+import { SessionSummarySchema } from "../../src/gen/euler/v1/sessions_pb";
 import {
   formatSessionTime,
   groupSessionsByDate,
@@ -7,13 +10,11 @@ import {
 const now = new Date(2026, 8, 25, 9, 30).getTime();
 
 function session(id: string, updatedAt: Date) {
-  return {
+  return create(SessionSummarySchema, {
     id,
     preview: id,
-    createdAt: 0,
-    updatedAt: updatedAt.getTime(),
-    expiresAt: null,
-  };
+    updatedAt: timestampFromDate(updatedAt),
+  });
 }
 
 describe("session dates", () => {

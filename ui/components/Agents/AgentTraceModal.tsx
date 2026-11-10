@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import {
   type Agent,
-  isFinalAgent,
-  isWorkingAgent,
-} from "../../../src/schemas/agents";
+  InboxMessage_Kind,
+} from "../../../src/gen/euler/v1/agent_pb";
 import type { Diagnostic } from "../../../src/schemas/observability";
+import { isFinalAgent, isWorkingAgent } from "../../lib/agentStatus";
 import { toDiagnostic } from "../../lib/apiError";
 import { fetchAgent } from "../../persist/agents";
-import type { MessageStep } from "../../types";
 import { ErrorNotice } from "../ErrorNotice";
 import { ModelLabel } from "../ModelLabel";
 import { StepsModal } from "../StepsModal";
@@ -52,10 +51,9 @@ export function AgentTraceModal({
     };
   }, [sessionId, agent.id, agent.status, working]);
   const initialPrompt = detail?.messages.find(
-    (m) => m.kind === "task",
+    (m) => m.kind === InboxMessage_Kind.TASK,
   )?.content;
-  // Server step records, trusted like transcript steps in useAgentEvents.
-  const steps = (detail?.steps ?? []) as unknown as MessageStep[];
+  const steps = detail?.steps ?? [];
   return (
     <StepsModal
       steps={steps}

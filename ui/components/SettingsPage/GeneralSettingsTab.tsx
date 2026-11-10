@@ -10,6 +10,7 @@ import type { ModelOption } from "../../types";
 import { Button } from "../Button";
 import { EnableSwitch } from "../ModelPreferenceControls";
 import { DefaultModelSetting } from "./DefaultModelSetting";
+import { UserIdQrModal } from "./UserIdQrModal";
 import { hintClass, inputClass, labelClass } from "./constants";
 
 type Props = {
@@ -30,6 +31,7 @@ export function GeneralSettingsTab({
 }: Props) {
   const [currentUserId] = useState(getOrCreateUserId);
   const [userIdDraft, setUserIdDraft] = useState(currentUserId);
+  const [showQr, setShowQr] = useState(false);
   const normalizedDraft = normalizeUserId(userIdDraft);
   const canSwitch =
     normalizedDraft !== null && normalizedDraft !== currentUserId;
@@ -42,6 +44,12 @@ export function GeneralSettingsTab({
 
   return (
     <div className="space-y-4">
+      {showQr && (
+        <UserIdQrModal
+          userId={currentUserId}
+          onClose={() => setShowQr(false)}
+        />
+      )}
       <div>
         <h2 className={cx(eyebrowText, "mb-4")}>Browser Data UUID</h2>
         <div className="space-y-2">
@@ -65,6 +73,13 @@ export function GeneralSettingsTab({
               className="shrink-0 justify-center"
             >
               Switch UUID
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => setShowQr(true)}
+              className="shrink-0 justify-center"
+            >
+              Show QR
             </Button>
           </div>
           {userIdDraft.trim().length > 0 && normalizedDraft === null && (

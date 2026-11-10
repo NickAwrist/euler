@@ -1,7 +1,12 @@
 import { Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
+import { Model_Availability } from "../../../src/gen/euler/v1/models_pb";
+import {
+  type CatalogFreshness,
+  CatalogFreshness_Status,
+} from "../../../src/gen/euler/v1/providers_pb";
 import { comparePublisherModels } from "../../../src/models/modelSort";
-import type { CatalogFreshness } from "../../../src/models/openRouterModels";
+import { toMillis } from "../../lib/timestamps";
 import { setKeyPending, whileRunning } from "../../lib/whileRunning";
 import { Button } from "../Button";
 import { Modal } from "../Modal";
@@ -28,30 +33,31 @@ import type {
 export function CatalogStatus({ catalog }: { catalog: CatalogFreshness }) {
   return (
     <output className="text-xs text-muted-foreground">
-      {catalog.status === "stale" &&
+      {catalog.status === CatalogFreshness_Status.STALE &&
         "Refresh failed. Showing the last known catalog. "}
-      {catalog.status === "unavailable" &&
+      {catalog.status === CatalogFreshness_Status.UNAVAILABLE &&
         "Catalog unavailable. Saved models have unverified availability. "}
-      {catalog.lastSuccessfulFetchAt !== null &&
-        `Last updated ${new Date(catalog.lastSuccessfulFetchAt).toLocaleString()}.`}
+      {catalog.lastSuccessfulFetchAt &&
+        `Last updated ${new Date(toMillis(catalog.lastSuccessfulFetchAt)).toLocaleString()}.`}
     </output>
   );
 }
-function rate(value: number | null) {
-  return value === null
+function rate(value: number | undefined) {
+  return value === undefined
     ? "Unknown"
     : `$${value.toLocaleString(undefined, { maximumFractionDigits: 4 })}`;
 }
 function modelDetails(model: PublisherModel): string[] {
   const details: string[] = [];
-  if (model.availability === "unavailable") details.push("Unavailable");
-  if (model.availability === "unverified")
+  if (model.availability === Model_Availability.UNAVAILABLE)
+    details.push("Unavailable");
+  if (model.availability === Model_Availability.UNVERIFIED)
     details.push("Availability unverified");
-  if (model.contextLength !== null)
+  if (model.contextLength !== undefined)
     details.push(formatContextLength(model.contextLength));
   if (
-    model.promptPricePerMillion !== null ||
-    model.completionPricePerMillion !== null
+    model.promptPricePerMillion !== undefined ||
+    model.completionPricePerMillion !== undefined
   )
     details.push(
       `${rate(model.promptPricePerMillion)} in / ${rate(model.completionPricePerMillion)} out`,
@@ -101,15 +107,22 @@ export function PublisherDialog({
   };
   const search = query.trim().toLowerCase();
   const models =
-    publisher === "add" ? [] : (data.modelsByPublisher[publisher.id] ?? []);
+    publisher === "add"
+      ? []
+      : (data.modelsByPublisher[publisher.id]?.models ?? []);
   const visible = models
     .filter((model) =>
       `${model.name} ${model.route}`.toLowerCase().includes(search),
     )
-    .sort(comparePublisherModels);
+    .sort((a, b) =>
+      comparePublisherModels(
+        { ...a, created: toMillis(a.created) / 1000 },
+        { ...b, created: toMillis(b.created) / 1000 },
+      ),
+    );
   const publishers =
-    data.discoveredPublishers
-      ?.filter((item) =>
+    data.discoveredPublishers?.publishers
+      .filter((item) =>
         `${item.name} ${item.id}`.toLowerCase().includes(search),
       )
       .sort((a, b) => a.name.localeCompare(b.name)) ?? [];
@@ -206,9 +219,10 @@ export function PublisherDialog({
               : "Search model name or route..."
           }
         />
-        {data.catalog.status !== "fresh" && (
-          <CatalogStatus catalog={data.catalog} />
-        )}
+        {data.freshness &&
+          data.freshness.status !== CatalogFreshness_Status.FRESH && (
+            <CatalogStatus catalog={data.freshness} />
+          )}
         {publisher !== "add" && (
           <p className="text-xs text-muted-foreground">
             Catalog base token rates per million tokens. Total cost may vary.
@@ -246,7 +260,7 @@ export function PublisherDialog({
             ))}
             {publishers.length === 0 && (
               <p className="text-sm text-muted-foreground">
-                {data.catalog.status === "unavailable"
+                {data.freshness?.status === CatalogFreshness_Status.UNAVAILABLE
                   ? "Publishers unavailable. Refresh the catalog from settings."
                   : "No matching publishers."}
               </p>
@@ -293,7 +307,8 @@ export function PublisherDialog({
                     disabled={
                       busy ||
                       pending.has(`enabled:${model.route}`) ||
-                      (!model.enabled && model.availability !== "available")
+                      (!model.enabled &&
+                        model.availability !== Model_Availability.AVAILABLE)
                     }
                     onChange={(value) =>
                       void mutate({
@@ -309,7 +324,7 @@ export function PublisherDialog({
             ))}
             {visible.length === 0 && (
               <p className="py-6 text-center text-sm text-muted-foreground">
-                {data.catalog.status === "unavailable"
+                {data.freshness?.status === CatalogFreshness_Status.UNAVAILABLE
                   ? "Catalog unavailable. No saved selections for this publisher."
                   : "No matching interactive models."}
               </p>

@@ -8,10 +8,9 @@ import {
   Waypoints,
 } from "lucide-react";
 import { type CSSProperties, type ComponentProps, useMemo } from "react";
-import type {
-  WebSourceAttachment,
-  WorkspaceFileAttachment,
-} from "../../../src/attachments/types";
+import type { WorkspaceFileAttachment } from "../../../src/gen/euler/v1/attachments_pb";
+import { attachmentsOfKind } from "../../lib/attachments";
+import { fileWorkspaceKind } from "../../lib/workspace";
 import { cx } from "../../styles";
 import type { Message } from "../../types";
 import { useArtifacts } from "../Artifacts/ArtifactContext";
@@ -63,33 +62,27 @@ export function AssistantMessageBubble({
   thinkingExpansion,
 }: Props) {
   const artifacts = useArtifacts();
-  const attachments = message.attachments ?? [];
+  const attachments = message.attachments;
   const markdownImageUrls = useMemo(
     () => extractComfyUIImageUrls(message.content),
     [message.content],
   );
   const markdownImageKeys = new Set(markdownImageUrls.map(comfyUIImageKey));
   // Tool results keep generated images visible when the reply omits their URLs.
-  const generatedImageUrls = attachments.flatMap((attachment) =>
-    attachment.kind === "generated_image" &&
-    !markdownImageKeys.has(comfyUIImageKey(attachment.url))
-      ? [attachment.url]
-      : [],
-  );
+  const generatedImageUrls = attachmentsOfKind(attachments, "generatedImage")
+    .map((image) => image.url)
+    .filter((url) => !markdownImageKeys.has(comfyUIImageKey(url)));
   const comfyImageUrls = [...markdownImageUrls, ...generatedImageUrls];
-  const outputFiles = attachments.filter(
-    (attachment): attachment is WorkspaceFileAttachment =>
-      attachment.kind === "file",
-  );
+  const outputFiles = attachmentsOfKind(attachments, "file");
   // Files from a previous workspace no longer resolve against the current one.
   const isOtherWorkspace = (file: WorkspaceFileAttachment) =>
-    artifacts !== null && file.workspaceKind !== artifacts.workspaceKind;
-  const otherWorkspaceKind = outputFiles.find(isOtherWorkspace)?.workspaceKind;
+    artifacts !== null &&
+    fileWorkspaceKind(file.workspaceKind) !== artifacts.workspaceKind;
+  const otherFile = outputFiles.find(isOtherWorkspace);
+  const otherWorkspaceKind =
+    otherFile && fileWorkspaceKind(otherFile.workspaceKind);
   const thinking = replyThinking(message.steps);
-  const sources = attachments.filter(
-    (attachment): attachment is WebSourceAttachment =>
-      attachment.kind === "web_source",
-  );
+  const sources = attachmentsOfKind(attachments, "webSource");
   return (
     <div
       className={cx(

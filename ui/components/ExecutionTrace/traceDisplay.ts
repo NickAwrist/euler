@@ -1,24 +1,25 @@
-import type { MessageStep } from "../../types";
+import { Step_Kind } from "../../../src/gen/euler/v1/steps_pb";
+import { toMillis } from "../../lib/timestamps";
+import type { Step } from "../../types";
 
-export function traceStepLabel(step: MessageStep): string {
+export function traceStepLabel(step: Step): string {
   switch (step.kind) {
-    case "llm_call":
+    case Step_Kind.LLM_CALL:
       return "Model call";
-    case "tool_call":
+    case Step_Kind.TOOL_CALL:
       return step.toolName ? `Tool: ${step.toolName}` : "Tool call";
-    case "error":
+    case Step_Kind.ERROR:
       return "Error";
     default:
-      return step.kind;
+      return "Complete";
   }
 }
 
-function timestamp(value: string | undefined): number | undefined {
-  const ms = value ? Date.parse(value) : Number.NaN;
-  return Number.isFinite(ms) ? ms : undefined;
+function timestamp(value: Step["startedAt"]): number | undefined {
+  return value ? toMillis(value) : undefined;
 }
 
-export function traceStepDurationMs(step: MessageStep): number | undefined {
+export function traceStepDurationMs(step: Step): number | undefined {
   const start = timestamp(step.startedAt);
   const end = timestamp(step.endedAt);
   return start === undefined || end === undefined
@@ -31,7 +32,7 @@ export type TimelineSpan = { offset: number; width: number };
 
 /** Positions steps on a shared timeline. Steps still running extend to `now`. */
 export function traceTimeline(
-  steps: MessageStep[],
+  steps: Step[],
   now: number,
 ): Array<TimelineSpan | undefined> {
   const ranges = steps.map((step) => {

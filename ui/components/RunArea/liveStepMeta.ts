@@ -1,5 +1,6 @@
 import { SUBAGENT_NAME } from "../../../src/agents/agentNames";
-import type { MessageStep } from "../../types";
+import { Step_Kind } from "../../../src/gen/euler/v1/steps_pb";
+import type { Step } from "../../types";
 
 function startCase(value: string) {
   return value
@@ -8,7 +9,7 @@ function startCase(value: string) {
 }
 
 export function getLiveStepMeta(
-  step: MessageStep | null,
+  step: Step | null,
   count: number,
   streamingContent: string,
   streamingThinking: string,
@@ -24,28 +25,28 @@ export function getLiveStepMeta(
   }
 
   const toolName = step.toolName ? startCase(step.toolName) : null;
-  if (step.kind === "tool_call") {
+  if (step.kind === Step_Kind.TOOL_CALL) {
     return {
       label: "Tool",
       detail: toolName,
     };
   }
 
-  if (step.kind === "llm_call" && step.agentName === SUBAGENT_NAME) {
+  if (step.kind === Step_Kind.LLM_CALL && step.agentName === SUBAGENT_NAME) {
     return {
       label: "Agent",
       detail: "Subagent",
     };
   }
 
-  if (step.kind === "complete") {
+  if (step.kind === Step_Kind.COMPLETE) {
     return {
       label: "Writing",
       detail: null,
     };
   }
 
-  if (step.kind === "error") {
+  if (step.kind === Step_Kind.ERROR) {
     return {
       label: "Error",
       detail: null,

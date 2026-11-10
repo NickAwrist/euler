@@ -1,12 +1,12 @@
 import { BookOpen, FileInput, Plus } from "lucide-react";
-import type { SkillData } from "../../persist/skills";
+import type { Skill } from "../../persist/skills";
 import { cx, eyebrowText } from "../../styles";
 
 type Props = {
-  skills: SkillData[];
+  skills: Skill[];
   selectedId: string | null;
   isNew: boolean;
-  onSelectSkill: (skill: SkillData) => void;
+  onSelectSkill: (skill: Skill) => void;
   onStartNew: () => void;
   onImport: () => void;
 };

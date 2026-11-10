@@ -1,4 +1,12 @@
+import { MethodOptions_IdempotencyLevel } from "@bufbuild/protobuf/wkt";
 import { expect, test } from "@playwright/test";
+import { PreferenceService } from "../../src/gen/euler/v1/preferences_pb";
+import {
+  CatalogFreshness_Status,
+  ProviderService,
+} from "../../src/gen/euler/v1/providers_pb";
+import { at } from "./appFixture";
+import { RpcFailure, mockRpc, on, rpcKey, rpcMethod } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 for (const device of ["desktop", "mobile"] as const) {
@@ -22,42 +30,40 @@ for (const device of ["desktop", "mobile"] as const) {
     const writes: string[] = [];
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
-    await page.route("**/api/**", async (route) => {
-      const path = new URL(route.request().url()).pathname;
-      if (path === "/api/settings/environment") {
-        await ownershipPending;
-        return route.fulfill({
-          status: failOwnership ? 500 : 200,
-          json: failOwnership
-            ? { error: { code: "INTERNAL_ERROR", message: "Unavailable" } }
-            : {
-                ollamaHost: managed,
-                comfyuiHost: managed,
-              },
-        });
-      }
+    page.on("request", (request) => {
+      const method = rpcMethod(request);
       if (
-        path === "/api/settings/openrouter" ||
-        path === "/api/settings/brave"
-      ) {
-        return route.fulfill({
-          json: { hasKey: true, environmentManaged: managed },
-        });
-      }
-      if (route.request().method() !== "GET") writes.push(path);
-      return route.fulfill({
-        json: path.endsWith("/test")
-          ? { ok: true, version: "test" }
-          : {
-              catalog: {
-                status: "fresh",
-                lastSuccessfulFetchAt: 1,
-                error: null,
-              },
-              publishers: [],
-            },
-      });
+        method &&
+        method.idempotency !== MethodOptions_IdempotencyLevel.NO_SIDE_EFFECTS
+      )
+        writes.push(rpcKey(request)!);
     });
+    const hostTest = { result: { ok: true, version: "test" } };
+    await mockRpc(
+      page,
+      [
+        on(PreferenceService.method.getEnvironment, async () => {
+          await ownershipPending;
+          return failOwnership
+            ? new RpcFailure("internal", "Unavailable", "INTERNAL_ERROR")
+            : { ollamaHost: managed, comfyuiHost: managed };
+        }),
+        on(ProviderService.method.getApiKey, () => ({
+          state: { hasKey: true, environmentManaged: managed },
+        })),
+        on(ProviderService.method.testOllamaHost, () => hostTest),
+        on(ProviderService.method.testComfyUiHost, () => hostTest),
+        on(ProviderService.method.getOpenRouterCatalog, () => ({
+          catalog: {
+            freshness: {
+              status: CatalogFreshness_Status.FRESH,
+              lastSuccessfulFetchAt: at(1),
+            },
+          },
+        })),
+      ],
+      { empty: true },
+    );
     await mockUserPreferences(page);
     await page.goto("/dev/settings");
     await page.getByRole("button", { name: "Ollama", exact: true }).click();
@@ -103,7 +109,10 @@ for (const device of ["desktop", "mobile"] as const) {
     await page.screenshot({
       path: testInfo.outputPath("environment-managed.png"),
     });
-    expect(writes).toEqual(["/api/ollama/test", "/api/comfyui/test"]);
+    expect(writes).toEqual([
+      "ProviderService/TestOllamaHost",
+      "ProviderService/TestComfyUiHost",
+    ]);
 
     managed = false;
     await page.reload();

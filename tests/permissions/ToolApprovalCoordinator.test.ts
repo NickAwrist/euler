@@ -19,7 +19,11 @@ async function fixture() {
   updateUserPreferences(owner, {
     toolPermissions: { rules: [allToolsRule()] },
   });
-  const coordinator = new ToolApprovalCoordinator(() => {});
+  const announced: string[] = [];
+  const coordinator = new ToolApprovalCoordinator({
+    requested: (_owner, approval) => announced.push(`requested ${approval.id}`),
+    resolved: (_owner, approval) => announced.push(`resolved ${approval.id}`),
+  });
   const context = {
     owner,
     sessionId: id,
@@ -29,10 +33,10 @@ async function fixture() {
     signal: controller.signal,
     waiting: () => {},
   };
-  return { owner, id, coordinator, context, controller };
+  return { owner, id, coordinator, context, controller, announced };
 }
 test("allow matching saves narrow rules, duplicate/foreign responses cannot grant access, Undo removes the grant", async () => {
-  const { owner, id, coordinator, context } = await fixture();
+  const { owner, id, coordinator, context, announced } = await fixture();
   const args = { command: "npm publish", background: false };
   const pending = coordinator.authorize(context, "bash", args);
   const approval = coordinator.list(owner, id)[0]!;
@@ -45,6 +49,11 @@ test("allow matching saves narrow rules, duplicate/foreign responses cannot gran
     decision: "allow_matching",
   });
   await pending;
+  // Each approval is announced once when it opens and once when it closes.
+  expect(announced).toEqual([
+    `requested ${approval.id}`,
+    `resolved ${approval.id}`,
+  ]);
   expect(saved.rule?.condition).toEqual({ kind: "arguments", value: args });
   expect(saved.rule?.sessionId).toBe(id);
   expect(coordinator.list(owner, id)).toEqual([]);

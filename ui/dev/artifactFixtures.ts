@@ -1,6 +1,14 @@
-import type { DirectoryEntry } from "../../src/schemas/artifacts";
+import { create } from "@bufbuild/protobuf";
+import { WorkspaceFileAttachment_WorkspaceKind } from "../../src/gen/euler/v1/attachments_pb";
+import {
+  type ArtifactEntry,
+  ArtifactEntrySchema,
+  ArtifactEntry_Kind,
+  ArtifactPreviewSchema,
+} from "../../src/gen/euler/v1/workspace_pb";
 import type { ArtifactSource } from "../components/Artifacts/api";
 import type { Message } from "../types";
+import { fixtureMessage, workspaceFile } from "./fixtures";
 
 const files: Record<string, string> = {
   "docs/status.html": `<!doctype html>
@@ -68,37 +76,38 @@ export function fixtureSource(alternate: boolean): ArtifactSource {
       if (!alternate && path === "large.txt")
         return new Blob(["a".repeat(1024 * 1024 + 1)], { type: "text/plain" });
       const preview = await fixtureSource(alternate).preview(path, signal);
-      return preview.kind === "text"
-        ? new Blob([preview.content], { type: "text/plain" })
-        : new Blob(
-            [
-              Uint8Array.from(atob(preview.data), (character) =>
-                character.charCodeAt(0),
-              ),
-            ],
-            { type: preview.mediaType },
-          );
+      const { content } = preview;
+      return content.case === "image"
+        ? new Blob([new Uint8Array(content.value.data)], {
+            type: content.value.mediaType,
+          })
+        : new Blob([content.value ?? ""], { type: "text/plain" });
     },
     list: async (path, signal) => {
       await new Promise((resolve) => setTimeout(resolve, 350));
       signal.throwIfAborted();
       const prefix = path === "." ? "" : `${path}/`;
-      const entries = new Map<string, DirectoryEntry>();
+      const entries = new Map<string, ArtifactEntry>();
       for (const file of paths) {
         if (!file.startsWith(prefix)) continue;
         const suffix = file.slice(prefix.length);
         const name = suffix.split("/")[0];
         if (name)
-          entries.set(name, {
+          entries.set(
             name,
-            path: `${prefix}${name}`,
-            kind: suffix.includes("/") ? "directory" : "file",
-          });
+            create(ArtifactEntrySchema, {
+              name,
+              path: `${prefix}${name}`,
+              kind: suffix.includes("/")
+                ? ArtifactEntry_Kind.DIRECTORY
+                : ArtifactEntry_Kind.FILE,
+            }),
+          );
       }
       return [...entries.values()].sort((a, b) =>
         a.kind === b.kind
           ? a.name.localeCompare(b.name)
-          : a.kind === "directory"
+          : a.kind === ArtifactEntry_Kind.DIRECTORY
             ? -1
             : 1,
       );
@@ -107,20 +116,27 @@ export function fixtureSource(alternate: boolean): ArtifactSource {
       await new Promise((resolve) => setTimeout(resolve, 350));
       signal.throwIfAborted();
       if (!alternate && path === "assets/latency.svg")
-        return {
-          kind: "image",
+        return create(ArtifactPreviewSchema, {
           path,
-          mediaType: "image/svg+xml",
-          data: btoa(
-            `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400"><rect width="640" height="400" rx="12" fill="#20242c"/><g font-family="system-ui,sans-serif" fill="#e6e8ef"><text x="40" y="55" font-size="24" font-weight="600">API response times</text><text x="40" y="85" font-size="14" fill="#a0aabb">95th percentile, milliseconds</text><text x="40" y="153" font-size="15">/health</text><text x="40" y="223" font-size="15">/jobs</text><text x="40" y="293" font-size="15">/jobs/123</text><rect x="155" y="128" width="20" height="36" rx="4" fill="#69a8ff"/><rect x="155" y="198" width="328" height="36" rx="4" fill="#69a8ff"/><rect x="155" y="268" width="72" height="36" rx="4" fill="#69a8ff"/><text x="187" y="153" font-size="16">4 ms</text><text x="495" y="223" font-size="16">82 ms</text><text x="239" y="293" font-size="16">18 ms</text><text x="40" y="365" font-size="13" fill="#a0aabb">Queue service / sample benchmark</text></g></svg>`,
-          ),
-        };
+          content: {
+            case: "image",
+            value: {
+              mediaType: "image/svg+xml",
+              data: new TextEncoder().encode(
+                `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400"><rect width="640" height="400" rx="12" fill="#20242c"/><g font-family="system-ui,sans-serif" fill="#e6e8ef"><text x="40" y="55" font-size="24" font-weight="600">API response times</text><text x="40" y="85" font-size="14" fill="#a0aabb">95th percentile, milliseconds</text><text x="40" y="153" font-size="15">/health</text><text x="40" y="223" font-size="15">/jobs</text><text x="40" y="293" font-size="15">/jobs/123</text><rect x="155" y="128" width="20" height="36" rx="4" fill="#69a8ff"/><rect x="155" y="198" width="328" height="36" rx="4" fill="#69a8ff"/><rect x="155" y="268" width="72" height="36" rx="4" fill="#69a8ff"/><text x="187" y="153" font-size="16">4 ms</text><text x="495" y="223" font-size="16">82 ms</text><text x="239" y="293" font-size="16">18 ms</text><text x="40" y="365" font-size="13" fill="#a0aabb">Queue service / sample benchmark</text></g></svg>`,
+              ),
+            },
+          },
+        });
 
       if (path === "large.txt")
         throw new Error("Preview is limited to files up to 1 MB");
       const content = contents[path];
       if (content === undefined) throw new Error("File no longer exists");
-      return { kind: "text", path, content };
+      return create(ArtifactPreviewSchema, {
+        path,
+        content: { case: "text", value: content },
+      });
     },
   };
 }
@@ -128,43 +144,40 @@ export function fixtureSource(alternate: boolean): ArtifactSource {
 export function fixtureMessages(alternate: boolean): Message[] {
   return alternate
     ? [
-        { role: "user", content: "What is in this directory?" },
-        {
-          role: "assistant",
-          content:
-            "This is a separate workspace. Open [the directory notes](notes.md) or inspect [config.json](config.json). Switch back with Change directory to return to the service example.",
-        },
+        fixtureMessage("user", "What is in this directory?"),
+        fixtureMessage(
+          "assistant",
+          "This is a separate workspace. Open [the directory notes](notes.md) or inspect [config.json](config.json). Switch back with Change directory to return to the service example.",
+        ),
       ]
     : [
-        {
-          role: "user",
-          content:
-            "Put together a small queue service example with documentation and sample results.",
-        },
-        {
-          role: "assistant",
-          attachments: [
-            {
-              id: "30a14710-74b8-4aa0-aa40-90e9b5ac606e",
-              kind: "file",
-              name: "readme.md",
-              path: "docs/readme.md",
-              size: files["docs/readme.md"]!.length,
-              sessionId: "demo",
-              workspaceKind: "sandbox",
-            },
-          ],
-          content:
-            "I've prepared the workspace. Start with [the notes](docs/readme.md), which include a checklist, a settings table, and a shell command.\n\nThe implementation is in [src/server.ts](src/server.ts), and [package.json](package.json) contains the start command. Read [the architecture](docs/architecture.md) for the queue and retry design.\n\nOpen [the HTML status page](docs/status.html) to test rendered HTML with CSS, then switch to source to inspect its code.",
-        },
-        {
-          role: "user",
-          content: "Show me the results and anything else worth checking.",
-        },
-        {
-          role: "assistant",
-          content:
-            "Open [the sample results](data/results.csv) or [the run log](/workspace/logs/run.txt). These use the plain text preview.\n\nYou can also test these states:\n\n- [empty.txt](empty.txt) is an empty file.\n- [assets/latency.svg](assets/latency.svg) previews the latency chart.\n- [large.txt](large.txt) shows the preview size limit.\n- [missing.md](missing.md) shows a missing-file error.\n\nUse the sidebar icon to browse the folders. **Change directory** switches to a different mock workspace.",
-        },
+        fixtureMessage(
+          "user",
+          "Put together a small queue service example with documentation and sample results.",
+        ),
+        fixtureMessage(
+          "assistant",
+          "I've prepared the workspace. Start with [the notes](docs/readme.md), which include a checklist, a settings table, and a shell command.\n\nThe implementation is in [src/server.ts](src/server.ts), and [package.json](package.json) contains the start command. Read [the architecture](docs/architecture.md) for the queue and retry design.\n\nOpen [the HTML status page](docs/status.html) to test rendered HTML with CSS, then switch to source to inspect its code.",
+          {
+            attachments: [
+              workspaceFile({
+                id: "30a14710-74b8-4aa0-aa40-90e9b5ac606e",
+                name: "readme.md",
+                path: "docs/readme.md",
+                size: files["docs/readme.md"]!.length,
+                sessionId: "demo",
+                workspaceKind: WorkspaceFileAttachment_WorkspaceKind.SANDBOX,
+              }),
+            ],
+          },
+        ),
+        fixtureMessage(
+          "user",
+          "Show me the results and anything else worth checking.",
+        ),
+        fixtureMessage(
+          "assistant",
+          "Open [the sample results](data/results.csv) or [the run log](/workspace/logs/run.txt). These use the plain text preview.\n\nYou can also test these states:\n\n- [empty.txt](empty.txt) is an empty file.\n- [assets/latency.svg](assets/latency.svg) previews the latency chart.\n- [large.txt](large.txt) shows the preview size limit.\n- [missing.md](missing.md) shows a missing-file error.\n\nUse the sidebar icon to browse the folders. **Change directory** switches to a different mock workspace.",
+        ),
       ];
 }

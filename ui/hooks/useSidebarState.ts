@@ -7,11 +7,11 @@ import {
 export function useSidebarState() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    return getUserPreferences().layout.sidebarCollapsed;
+    return getUserPreferences().layout?.sidebarCollapsed ?? false;
   });
 
   useEffect(() => {
-    if (sidebarCollapsed === getUserPreferences().layout.sidebarCollapsed)
+    if (sidebarCollapsed === getUserPreferences().layout?.sidebarCollapsed)
       return;
     void updateUserPreferences({ layout: { sidebarCollapsed } }).catch(
       console.error,

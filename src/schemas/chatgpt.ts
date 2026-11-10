@@ -18,15 +18,6 @@ export const chatGptProfileSchema = z.object({
     .nullable()
     .default(null),
 });
-export const chatGptStatusSchema = chatGptProfileSchema.extend({
-  connected: z.boolean(),
-  email: z.string().nullable(),
-  planEnabled: z.boolean(),
-});
-export const chatGptLoginSchema = z.object({
-  authorizationUrl: z.string().url(),
-});
-export const chatGptDisconnectSchema = z.object({ revoked: z.boolean() });
 export const chatGptCredentialSchema = chatGptProfileSchema.extend({
   clientId: z.string().min(1),
   subject: z.string().min(1),

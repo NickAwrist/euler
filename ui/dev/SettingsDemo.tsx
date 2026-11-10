@@ -1,4 +1,6 @@
+import { create } from "@bufbuild/protobuf";
 import { useState } from "react";
+import { UserSettingsSchema } from "../../src/gen/euler/v1/preferences_pb";
 import { SettingsPage } from "../components/SettingsPage";
 import type { UserSettings } from "../persist/userSettings";
 import type { SettingsTab } from "../types";
@@ -6,15 +8,16 @@ import type { SettingsTab } from "../types";
 // Browser tests intercept every API request; this route never seeds app data.
 export default function SettingsDemo() {
   const [tab, setTab] = useState<SettingsTab>("general");
-  const [settings, setSettings] = useState<UserSettings>({
-    systemPrompt: null,
-    name: "",
-    preferredFormats: "",
-    location: "",
-    defaultModel: "",
-    includeCurrentDate: true,
-    showDebugButton: false,
-  });
+  const [settings, setSettings] = useState<UserSettings>(() =>
+    create(UserSettingsSchema, {
+      name: "",
+      preferredFormats: "",
+      location: "",
+      defaultModel: "",
+      includeCurrentDate: true,
+      showDebugButton: false,
+    }),
+  );
   return (
     <div className="h-dvh">
       <SettingsPage

@@ -26,6 +26,6 @@
     "indentWidth": 2
   },
   "files": {
-    "ignore": ["node_modules", "data", "dist", "bun.lock"]
+    "ignore": ["node_modules", "data", "dist", "bun.lock", "src/gen", "ios"]
   }
 }

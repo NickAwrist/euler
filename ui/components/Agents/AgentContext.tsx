@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { Agent } from "../../../src/schemas/agents";
+import type { Agent } from "../../../src/gen/euler/v1/agent_pb";
 import type { AgentPhase } from "../../types";
 export const AgentContext = createContext<{
   agents: Agent[];
