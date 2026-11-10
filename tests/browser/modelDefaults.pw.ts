@@ -10,7 +10,7 @@ import {
   ollamaModel,
   openRouterModel,
 } from "./appFixture";
-import { mockRpc, on, rpcKey, rpcRequest } from "./rpcMock";
+import { mockRpc, on, rpcRequest } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 // These checks exercise returning users; first-visit setup has its own suite.

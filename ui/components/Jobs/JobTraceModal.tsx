@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { type Job, Job_Status } from "../../../src/gen/euler/v1/jobs_pb";
+import type { Job } from "../../../src/gen/euler/v1/jobs_pb";
 import type { Diagnostic } from "../../../src/schemas/observability";
-import { JOB_STATUS_LABELS, activeJob } from "../../lib/agentStatus";
+import { activeJob } from "../../lib/agentStatus";
 import { diagnosticFromDetail, toDiagnostic } from "../../lib/apiError";
 import { optionalMillis, toMillis } from "../../lib/timestamps";
 import { fetchJob } from "../../persist/jobs";

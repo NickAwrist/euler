@@ -396,16 +396,10 @@ open issue, listed a closed one, and missed a new bug.
 **Fix:** Move open items to GitHub issues and delete `BUG_TRIAGE.md`. Keep
 `wishlist.md` only if it is maintained, or move it to `docs/`.
 
-### LEG-11. Unused imports remain in the RPC layer, components, and tests (Low, S)
+### LEG-11. Unused imports remain in two tests (Low, S)
 
-**Where:** Eight names in `src/rpc/wire.ts` (`fromJson`, `toJson`,
-`ValueSchema`, `ToolPermissionCondition_Argument_Match`, `ToolPermissionRule`,
-`ToolPermissionRuleSchema`, `ToolPermissionRule_Action`,
-`DomainToolPermissionRule`), `JOB_STATUS_LABELS` and `Job_Status` in
-`ui/components/Jobs/` (`JobElapsed.tsx`, `JobTaskCard.tsx`,
-`JobTraceModal.tsx`), `BaseAgent` in `tests/agents/agentManager.test.ts`,
-`rpcKey` in `tests/browser/modelDefaults.pw.ts`, and `modalSurface` in
-`tests/ui/modal.test.ts`.
+**Where:** `BaseAgent` in `tests/agents/agentManager.test.ts` and
+`modalSurface` in `tests/ui/modal.test.ts`.
 
 **Problem:** These were identified by running TypeScript with
 `--noUnusedLocals --noUnusedParameters`, ignoring `src/gen/`. The same check

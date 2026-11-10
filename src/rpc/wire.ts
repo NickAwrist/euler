@@ -1,7 +1,6 @@
-import { type JsonObject, create, fromJson, toJson } from "@bufbuild/protobuf";
+import { type JsonObject, create } from "@bufbuild/protobuf";
 import {
   type Timestamp,
-  ValueSchema,
   timestampFromMs,
   timestampMs,
 } from "@bufbuild/protobuf/wkt";
@@ -63,10 +62,6 @@ import { type Job, JobSchema, Job_Status } from "../gen/euler/v1/jobs_pb";
 import {
   type ToolApproval,
   ToolApprovalSchema,
-  ToolPermissionCondition_Argument_Match,
-  type ToolPermissionRule,
-  ToolPermissionRuleSchema,
-  ToolPermissionRule_Action,
 } from "../gen/euler/v1/permissions_pb";
 import {
   type Message,
@@ -91,10 +86,7 @@ import type { Job as DomainJob } from "../schemas/jobs";
 import type { ErrorDetails } from "../schemas/observability";
 import type { MessageVersion as DomainMessageVersion } from "../schemas/run";
 import type { ToolContent as DomainToolContent } from "../schemas/toolContent";
-import type {
-  ToolApproval as DomainToolApproval,
-  ToolPermissionRule as DomainToolPermissionRule,
-} from "../schemas/toolPermissions";
+import type { ToolApproval as DomainToolApproval } from "../schemas/toolPermissions";
 
 // Converters between the runtime's records and the API contract. Domain code
 // keeps its own types; only RPC handlers and the event hub cross this line.

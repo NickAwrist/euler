@@ -1,6 +1,6 @@
 import { Activity, ChevronRight, Loader2 } from "lucide-react";
 import { useState } from "react";
-import { type Job, Job_Status } from "../../../src/gen/euler/v1/jobs_pb";
+import type { Job } from "../../../src/gen/euler/v1/jobs_pb";
 import type { Diagnostic } from "../../../src/schemas/observability";
 import { JOB_STATUS_LABELS, activeJob } from "../../lib/agentStatus";
 import { toDiagnostic } from "../../lib/apiError";

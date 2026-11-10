@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { type Job, Job_Status } from "../../../src/gen/euler/v1/jobs_pb";
-import { JOB_STATUS_LABELS, activeJob } from "../../lib/agentStatus";
+import { activeJob } from "../../lib/agentStatus";
 import { formatDuration } from "../../lib/formatDuration";
 import { optionalMillis, toMillis } from "../../lib/timestamps";
 export function JobElapsed({
