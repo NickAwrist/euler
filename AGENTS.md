@@ -74,6 +74,9 @@ These conventions supplement the general engineering instructions.
 - Run `bun run build` for changes affecting the UI build and
   `bun run test:browser` for browser interaction changes. Run the full
   relevant suites for broad changes.
+- .claude/skills/test-euler-web/SKILL.md covers choosing a check, the
+  checks that need Linux, the fixture servers, and driving the app in a
+  browser. Read it before verifying web or server work.
 - Review the diff for duplicated behavior, unnecessary abstractions,
   and competing sources of truth. Report checks actually run and
   any verification gaps.
@@ -83,5 +86,5 @@ These conventions supplement the general engineering instructions.
 ## iOS
 
 - The iPhone app lives in ios/. Read ios/README.md before changing it and
-  .claude/skills/ios-device-testing/SKILL.md before running it on a device
-  or the iOS test server. The phone never points at production.
+  .claude/skills/test-euler-ios/SKILL.md before testing it, running it
+  on a device, or deploying the iOS test server. The phone never points at production.

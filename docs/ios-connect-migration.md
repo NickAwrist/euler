@@ -44,7 +44,7 @@ and push.
 
 **iOS test server.** `euler-ios.service` on spaceheater, port 3200, data in
 `~/euler-ios/data` (a copy of production taken once), push on. Deploy and
-debugging steps are in `.claude/skills/ios-device-testing/SKILL.md`.
+debugging steps are in `.claude/skills/test-euler-ios/SKILL.md`.
 
 ## Departures from the plan
 
@@ -93,12 +93,14 @@ debugging steps are in `.claude/skills/ios-device-testing/SKILL.md`.
 - The iOS test server: web app, RPCs and a streamed turn over the tailnet
   (`scripts/rpc-smoke.ts`), and Apple accepting its APNs key.
 - The app builds, installs and launches on the user's iPhone.
+- By the user on the iPhone: a turn, a real push with its Allow and Deny
+  actions and attached image, and haptics.
+- `bun run perf:check` on Linux, with the baseline moved for the response
+  sizes and the bundle.
+- Every stored chat, agent and job in a snapshot of the production database
+  (33 chats, 493 steps) reads back through the new handlers.
 
 ## Not yet verified
 
-- Onboarding on the iPhone and a turn there, which need the user to scan the
-  QR code (Settings › General › Show QR at `http://spaceheater:3200`).
-- A real push delivered to the phone, its Allow and Deny actions, and the
-  attached image, which need a registered phone in the background.
-- The QR scanner (VisionKit needs a camera) and haptics, which need the phone.
-- The plan's per-phase manual phone gates, for the same reason.
+- Onboarding on the iPhone, with the QR scanner (Settings › General › Show QR
+  at `http://spaceheater:3200`).

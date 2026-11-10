@@ -137,4 +137,4 @@ cd ios && xcodebuild test -project Euler.xcodeproj -scheme Euler \
 `TEST_RUNNER_EULER_LIVE_USER` to xcodebuild).
 
 Running on the iPhone, the iOS test server and push are in
-`.claude/skills/ios-device-testing/SKILL.md`.
+`.claude/skills/test-euler-ios/SKILL.md`.

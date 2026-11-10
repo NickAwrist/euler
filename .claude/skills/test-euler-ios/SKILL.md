@@ -1,14 +1,37 @@
 ---
-name: ios-device-testing
-description: Test the Euler iOS app in the simulator and on the user's iPhone, deploy the iOS branch to the iOS test server on spaceheater, and debug push notifications and device crashes. Use for any iOS work that needs a running server, a build on the phone, a crash log, or a change to the server the phone talks to.
+name: test-euler-ios
+description: Test and verify changes to the Euler iPhone app. Covers choosing between the Swift unit tests, the UI tests on the fixture backend, the simulator and the user's iPhone, deploying a branch to the iOS test server on spaceheater, push notification checks, and device crash logs. Use for any iOS change that needs proof it works, and for any server or proto change the phone has to test against.
 ---
 
-# iOS testing, the iPhone, and the iOS test server
+# Testing the iPhone app
 
-iOS work happens on `t3/ios-app` (and branches merged into it). The phone talks
-to a separate **iOS test server** on `spaceheater`, never to production. Read
-`ios/README.md` for the app's layout and `docs/ios-connect-migration.md` for
-what is built.
+The iPhone app in `ios/` is a client of the same Connect API as the web app.
+While a change is in progress, the simulator and the phone talk to a separate
+**iOS test server** on `spaceheater` that runs the branch, never to
+production. Read `ios/README.md` for the app's layout and
+`docs/ios-connect-migration.md` for what is built. The web app and the server
+have their own skill, `test-euler-web`.
+
+## Pick the check
+
+| The change | Proof |
+| --- | --- |
+| The reducer, stream reconnects, Markdown, math, composer logic | The unit tests, on a simulator |
+| A flow through several screens | The UI tests, on the fixture backend |
+| Layout, color, motion | Screenshots from a simulator through the T3 device tools |
+| A proto or server change the app depends on | Deploy the branch to the test server, then run the app against it |
+| Push, haptics, the camera scanner, a crash on the device | The iPhone. The simulator has none of them. |
+
+## The usual loop
+
+1. Contract changes: edit `proto/euler/v1/`, run `bun run proto`, and commit
+   the TypeScript and Swift it writes. Update the handler, the web's callers
+   and the iOS stores and views in the same change.
+2. Run the unit tests on a simulator, and the checks in `test-euler-web` for
+   the server and the web app.
+3. Commit, then deploy the branch to the iOS test server.
+4. Run the app on a simulator or the iPhone, pointed at the test server, and
+   check the changed flow there.
 
 ## Machines and servers
 
@@ -19,7 +42,7 @@ what is built.
 | Server | Runs | Files and data | Address |
 | --- | --- | --- | --- |
 | Production | deployctl service `deployctl-9ecaeef3-…-euler`, from `main` | `~/.deployctl/workloads/9ecaeef3-f295-4e84-a970-7732d04f89b5/` | `http://spaceheater:3100` |
-| iOS test server | systemd user unit `euler-ios.service`, from `t3/ios-app` | `~/euler-ios/app` (a plain copy, no git), data in `~/euler-ios/data` | `http://spaceheater:3200` |
+| iOS test server | systemd user unit `euler-ios.service`, from the branch under test | `~/euler-ios/app` (a plain copy, no git), data in `~/euler-ios/data` | `http://spaceheater:3200` |
 
 **Never restart, edit, or read secrets out of production, its environment
 file, or its data.** The test server's database started as a copy of
@@ -43,13 +66,18 @@ ChatGPT.
 
 ## Deploy the branch to the test server
 
-Deploy from a clean, committed branch that contains the deployed commit, so the
-server never goes backwards.
+Deploy from a clean, committed branch. The server must never go backwards, and
+deploying over another branch's work drops it. Deploy when the server's commit
+is in your branch's history, or is already on `origin/main` and your branch
+contains `origin/main`. Otherwise stop and ask the user.
 
 ```bash
 # Quote remote paths: an unquoted ~ expands to this Mac's home.
 DEPLOYED=$(ssh -o BatchMode=yes spaceheater 'cat ~/euler-ios/DEPLOYED_COMMIT')
-git merge-base --is-ancestor "$DEPLOYED" HEAD || echo "HEAD does not contain the deployed commit: stop and ask"
+git fetch -q origin main
+git merge-base --is-ancestor "$DEPLOYED" HEAD \
+  || { git merge-base --is-ancestor "$DEPLOYED" origin/main && git merge-base --is-ancestor origin/main HEAD; } \
+  || echo "The server runs work this branch does not contain: stop and ask"
 
 # Files the branch deleted since the last deploy; tar does not remove them.
 git diff --name-only --diff-filter=D "$DEPLOYED" HEAD \
@@ -124,14 +152,36 @@ EOF
 
 ## Simulator
 
+`Euler.xcodeproj` is generated and never committed. Run `bun run ios:project`
+first, and again after every pull.
+
+Other sessions keep simulators booted. Run tests on one that is shut down, and
+name it by ID so two with the same name cannot be confused:
+
+```bash
+xcrun simctl list devices available | grep iPhone    # pick one marked (Shutdown)
+cd ios && xcodebuild test -project Euler.xcodeproj -scheme Euler \
+  -destination 'id=<simulator id>' -derivedDataPath <scratchpad>/ios-derived \
+  -only-testing:EulerTests
+```
+
+The first build compiles the Swift packages and takes several minutes. The
+result is the line `Test run with <n> tests in <m> suites passed`. The
+XCTest summary above it reads "Executed 0 tests" because the suite is Swift
+Testing, which is not a failure.
+
+The UI tests (`-only-testing:EulerUITests`) need the scripted fixture backend
+on port 5195, which has no real model. `LiveServerTests` run against a real
+server when two environment variables name it. Both commands are in
+`ios/README.md` under Tests.
+
 Drive simulator UI through the T3 device tools (`device_list`, `device_open`,
 `device_screenshot`, and the `agent-device` command they return), not `simctl`
 taps. If a simulator is held by another session, open a different one rather
 than taking it over. Haptics, real push and the camera scanner need the iPhone.
 
 A local dev server (`bun run dev`, ports from `.env`) is reachable from the
-simulator at `http://127.0.0.1:<EULER_FRONTEND_PORT>`. The UI tests use the
-scripted fixture backend instead; see `ios/README.md`.
+simulator at `http://127.0.0.1:<EULER_FRONTEND_PORT>`.
 
 ## Push notifications
 
