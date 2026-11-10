@@ -32,7 +32,7 @@ struct WorkspaceSheet: View {
             }
             .navigationTitle("Workspace")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { CloseToolbarItem { dismiss() } }
         }
     }
 

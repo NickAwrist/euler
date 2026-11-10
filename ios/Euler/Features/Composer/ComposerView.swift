@@ -50,6 +50,7 @@ struct ComposerView: View {
                         .focused(focused)
                         .padding(.vertical, 8)
                         .accessibilityLabel("Message")
+                        .background { ImagePasteTarget(paste: pasteImage) }
                     sendButton
                 }
                 .padding(.horizontal, 6)
@@ -150,6 +151,7 @@ struct ComposerView: View {
 
     @ViewBuilder
     private var sendButton: some View {
+        let ready = canSend || draft.sending
         if let chat = target.chat, chat.running, draft.trimmedText.isEmpty {
             Button("Stop generation", systemImage: "stop.fill") {
                 Task { await session.notices.attempt { try await chat.stop() } }
@@ -165,12 +167,13 @@ struct ComposerView: View {
                 .labelStyle(.iconOnly)
                 .font(.body.weight(.semibold))
                 .frame(width: 36, height: 36)
-                .background(palette.accent, in: .rect(cornerRadius: 12))
-                .foregroundStyle(palette.accentForeground)
-                .opacity(canSend || draft.sending ? 1 : 0.4)
+                // Pale while there is nothing to send, the tint once there is.
+                .background(ready ? palette.tint : palette.accent, in: .rect(cornerRadius: 12))
+                .foregroundStyle(ready ? palette.tintForeground : palette.accentForeground)
+                .opacity(ready ? 1 : 0.4)
                 .disabled(!canSend)
-                .overlay { if draft.sending { ProgressView().tint(palette.accentForeground) } }
-                .animation(.easeOut(duration: 0.15), value: canSend)
+                .overlay { if draft.sending { ProgressView().tint(palette.tintForeground) } }
+                .animation(.easeOut(duration: 0.15), value: ready)
         }
     }
 
@@ -235,12 +238,10 @@ struct ComposerView: View {
 
     private var attachMenu: some View {
         Menu {
-            Button("Photo Library", systemImage: "photo.on.rectangle") { pickingPhotos = true }
+            Button("Photo Library", systemImage: "photo.on.rectangle", action: Haptics.selecting { pickingPhotos = true })
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                Button("Take Photo", systemImage: "camera") { takingPhoto = true }
+                Button("Take Photo", systemImage: "camera", action: Haptics.selecting { takingPhoto = true })
             }
-            Button("Paste Image", systemImage: "doc.on.clipboard") { pasteImage() }
-                .disabled(!UIPasteboard.general.hasImages)
         } label: {
             Image(systemName: "photo.badge.plus")
                 .font(.system(size: 19))
@@ -281,17 +282,13 @@ struct ComposerView: View {
         }
     }
 
-    private func pasteImage() {
-        let board = UIPasteboard.general
-        for type in [UTType.png, .jpeg, .gif, .webP] {
-            if let data = board.data(forPasteboardType: type.identifier) {
-                draft.add(imageData: data, type: type, filename: "Pasted image")
-                return
-            }
+    /// An image pasted into the message box, as any paste arrives there.
+    private func pasteImage(_ data: Data, _ type: UTType) {
+        guard model?.acceptsImages != false else {
+            draft.error = "The selected model does not accept images."
+            return
         }
-        if let image = board.image, let data = image.pngData() {
-            draft.add(imageData: data, type: .png, filename: "Pasted image")
-        }
+        draft.add(imageData: data, type: type, filename: "Pasted image")
     }
 }
 

@@ -10,6 +10,8 @@ struct HomeView: View {
     @State private var drawerOpen = false
     /// The drawer's travel while a finger drags it, in points from where it rests.
     @State private var drag: CGFloat = 0
+    /// Whether the drawer is still sliding shut, which keeps it on screen until it has.
+    @State private var closing = false
 
     enum Screen: Hashable {
         /// Each new chat has its own identity, so starting another resets the draft.
@@ -27,7 +29,9 @@ struct HomeView: View {
             let progress = min(1, max(0, (drawerOpen ? width : 0) + drag) / width)
             ZStack(alignment: .leading) {
                 // Built only while showing, so a closed drawer isn't in the accessibility tree.
-                if progress > 0 {
+                // It stays until it has slid shut: removed any sooner, it would fade where it
+                // stood rather than move with the animation.
+                if progress > 0 || closing {
                     ChatDrawer(current: screen.chatID, open: show, newChat: newChat) { id in
                         if screen.chatID == id { newChat(ephemeral: false) }
                     }
@@ -37,10 +41,12 @@ struct HomeView: View {
                     .allowsHitTesting(drawerOpen)
                     .accessibilityAddTraits(.isModal)
                     .accessibilityAction(.escape) { settle(open: false) }
+                    .transition(.asymmetric(insertion: .opacity, removal: .identity))
                 }
                 NavigationStack {
                     content
                         .id(screen)
+                        .transition(.opacity)
                         .toolbar { toolbar }
                 }
                 // Full screen, so the content runs under the bars.
@@ -60,19 +66,22 @@ struct HomeView: View {
                         settle(open: value.translation.width > width / 3 || value.predictedEndTranslation.width > width / 2)
                     })
                 .overlay {
-                    if progress > 0 {
-                        Color.black.opacity(0.4 * progress)
-                            .ignoresSafeArea()
-                            .contentShape(.rect)
-                            .onTapGesture { settle(open: false) }
-                            .gesture(DragGesture(minimumDistance: 8)
-                                .onChanged { value in drag = min(0, value.translation.width) }
-                                .onEnded { value in
-                                    settle(open: value.translation.width > -width / 3 && value.predictedEndTranslation.width > -width / 2)
-                                })
-                            .accessibilityLabel("Close chats")
-                            .accessibilityAddTraits(.isButton)
-                    }
+                    // Always present, for the same reason: it dims by its opacity alone.
+                    Color.black.opacity(0.4 * progress)
+                        .ignoresSafeArea()
+                        .contentShape(.rect)
+                        .onTapGesture { settle(open: false) }
+                        // Measured on the screen: the dimmed content moves with the drag, so its
+                        // own coordinates would chase the finger and flicker.
+                        .gesture(DragGesture(minimumDistance: 8, coordinateSpace: .global)
+                            .onChanged { value in drag = min(0, value.translation.width) }
+                            .onEnded { value in
+                                settle(open: value.translation.width > -width / 3 && value.predictedEndTranslation.width > -width / 2)
+                            })
+                        .allowsHitTesting(progress > 0)
+                        .accessibilityHidden(!drawerOpen)
+                        .accessibilityLabel("Close chats")
+                        .accessibilityAddTraits(.isButton)
                 }
                 // A mask that covers the whole screen: a clip would follow this view's frame,
                 // which stops at the safe area and cut off the content under the home indicator.
@@ -85,7 +94,6 @@ struct HomeView: View {
         .sheet(item: Binding(get: { session.settingsPage }, set: { session.settingsPage = $0 })) { page in
             SettingsView(page: page)
         }
-        .overlay(alignment: .top) { NoticeBanner() }
         .onChange(of: session.route, initial: true) { _, route in
             guard case .chat(let id) = route else { return }
             session.settingsPage = nil
@@ -123,7 +131,7 @@ struct HomeView: View {
         }
         if screen.chatID != nil {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("New chat", systemImage: "square.and.pencil") { newChat(ephemeral: false) }
+                Button("New chat", systemImage: "square.and.pencil", action: Haptics.selecting { newChat(ephemeral: false) })
             }
         }
     }
@@ -134,20 +142,28 @@ struct HomeView: View {
     }
 
     private func show(_ id: String) {
-        if screen != .chat(id) { screen = .chat(id) }
+        if screen != .chat(id) { go(to: .chat(id)) }
         settle(open: false)
     }
 
     private func newChat(ephemeral: Bool) {
-        screen = .newChat(UUID(), ephemeral: ephemeral)
+        go(to: .newChat(UUID(), ephemeral: ephemeral))
         settle(open: false)
+    }
+
+    /// Screens trade places in a short fade rather than a cut.
+    private func go(to next: Screen) {
+        withAnimation(.easeInOut(duration: 0.22)) { screen = next }
     }
 
     private func settle(open: Bool) {
         if open { dismissKeyboard() }
+        closing = !open && (drawerOpen || drag > 0)
         withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
             drawerOpen = open
             drag = 0
+        } completion: {
+            closing = false
         }
     }
 }

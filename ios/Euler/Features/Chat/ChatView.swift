@@ -113,6 +113,8 @@ enum ChatSheet: Identifiable, Hashable {
     case workspace
     case artifacts(path: String?)
     case sources([Euler_V1_WebSourceAttachment])
+    /// A message's text, opened to select part of it.
+    case text(String)
 
     var id: String {
         switch self {
@@ -123,6 +125,7 @@ enum ChatSheet: Identifiable, Hashable {
         case .workspace: "workspace"
         case .artifacts(let path): "artifacts:\(path ?? "")"
         case .sources(let sources): "sources:\(sources.map(\.url).joined())"
+        case .text(let text): "text:\(text.hashValue)"
         }
     }
 }
@@ -130,16 +133,25 @@ enum ChatSheet: Identifiable, Hashable {
 private struct ChatSheetView: View {
     let sheet: ChatSheet
     let chat: ChatStore
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         switch sheet {
         case .agents: AgentsSheet(chat: chat)
-        case .agent(let id): NavigationStack { AgentDetailView(chat: chat, agentID: id) }
-        case .job(let id): NavigationStack { JobDetailView(chat: chat, jobID: id) }
-        case .trace(let steps): NavigationStack { TraceView(steps: steps) }
+        case .agent(let id): page { AgentDetailView(chat: chat, agentID: id) }
+        case .job(let id): page { JobDetailView(chat: chat, jobID: id) }
+        case .trace(let steps): page { TraceView(steps: steps) }
         case .workspace: WorkspaceSheet(chat: chat)
         case .artifacts(let path): ArtifactsView(chat: chat, initialPath: path)
         case .sources(let sources): SourcesSheet(sources: sources)
+        case .text(let text): SelectTextSheet(text: text)
+        }
+    }
+
+    /// A page that is the whole sheet: its own stack, with the X that closes it.
+    private func page(@ViewBuilder _ content: () -> some View) -> some View {
+        NavigationStack {
+            content().toolbar { CloseToolbarItem { dismiss() } }
         }
     }
 }
@@ -150,9 +162,9 @@ private struct ChatMenu: View {
 
     var body: some View {
         Menu {
-            Button("Agents and jobs", systemImage: "person.2") { sheet = .agents }
-            Button("Workspace", systemImage: "folder") { sheet = .workspace }
-            Button("Files", systemImage: "doc.on.doc") { sheet = .artifacts(path: nil) }
+            Button("Agents and jobs", systemImage: "person.2", action: Haptics.selecting { sheet = .agents })
+            Button("Workspace", systemImage: "folder", action: Haptics.selecting { sheet = .workspace })
+            Button("Files", systemImage: "doc.on.doc", action: Haptics.selecting { sheet = .artifacts(path: nil) })
         } label: {
             Label("Chat options", systemImage: "ellipsis")
                 .overlay(alignment: .topTrailing) {

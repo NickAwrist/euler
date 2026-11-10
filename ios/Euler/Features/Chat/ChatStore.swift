@@ -12,7 +12,12 @@ final class ChatStore {
     private(set) var history: [Euler_V1_Message] = []
     private(set) var agents: [Euler_V1_Agent] = []
     private(set) var jobs: [Euler_V1_Job] = []
+    /// User messages waiting behind the turn in progress.
     private(set) var queued: [Euler_V1_InboxMessage] = []
+    /// User messages sent to an idle agent, which its next turn starts with a moment
+    /// later. The transcript shows them after `history`, as the messages they are
+    /// about to be saved as, rather than as queued for that moment.
+    private(set) var arriving: [Euler_V1_Message] = []
     private(set) var held = false
     private(set) var approvals: [Euler_V1_ToolApproval] = []
     private(set) var phases: [String: AgentPhase] = [:]
@@ -30,6 +35,11 @@ final class ChatStore {
     @ObservationIgnored private var state = RuntimeState()
     @ObservationIgnored private let backend: Backend
     @ObservationIgnored private weak var app: AppSession?
+    @ObservationIgnored private var arrivals = ArrivalTracker()
+    /// A message the server accepted that the event stream hasn't reported yet, and
+    /// how long the transcript was when it was sent.
+    @ObservationIgnored private var sent: (message: Euler_V1_Message, position: Int)?
+    @ObservationIgnored private var arrivalTimeout: Task<Void, Never>?
 
     init(id: String, backend: Backend, session app: AppSession?) {
         self.id = id
@@ -86,6 +96,9 @@ final class ChatStore {
         case .set(let phase): if phases[event.agentID] != phase { phases[event.agentID] = phase }
         case .end: if phases[event.agentID] != nil { phases[event.agentID] = nil }
         }
+        if case .inboxQueued = event.payload, changes.contains(.queued) {
+            arrivals.noteQueued(state.queued, idle: !wasRunning)
+        }
         publish(changes)
         if case .approvalRequested = event.payload, changes.contains(.approvals) {
             Haptics.warning()
@@ -99,13 +112,36 @@ final class ChatStore {
     private func publish(_ changes: RuntimeState.Changes) {
         if changes.contains(.history) { history = state.history }
         if changes.contains(.agents) { agents = state.agents }
-        if changes.contains(.queued) { queued = state.queued }
+        if changes.contains(.queued) || changes.contains(.history) { publishQueued() }
         if changes.contains(.held) { held = state.held }
         if changes.contains(.approvals) { approvals = state.approvals }
         if changes.contains(.jobs) { jobs = state.jobs }
         if changes.contains(.activation) || changes.contains(.liveText) {
             live.show(state.activation, coalesce: !changes.contains(.activation))
             if running != (state.activation != nil) { running = state.activation != nil }
+        }
+    }
+
+    /// Shows the queue as the messages about to start a turn and those waiting behind one.
+    private func publishQueued() {
+        // A refetch can report the queue before the stream does, without what the agent
+        // was doing; a message just sent to an idle agent is the one in it.
+        if sent != nil { arrivals.noteQueued(state.queued, idle: true) }
+        let split = arrivals.split(state.queued)
+        // The stream has caught up with the sent message once it is queued or saved.
+        if let sent, state.history.count > sent.position || !state.queued.isEmpty { self.sent = nil }
+        let arriving = split.arriving.map { Euler_V1_Message(sending: $0.content, images: $0.attachmentIds) } + (sent.map { [$0.message] } ?? [])
+        if self.arriving != arriving { self.arriving = arriving }
+        if queued != split.waiting { queued = split.waiting }
+        arrivalTimeout?.cancel()
+        guard !arriving.isEmpty else { return }
+        // A turn that doesn't start, as when the agent is paused, leaves them queued after all.
+        arrivalTimeout = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard let self, !Task.isCancelled else { return }
+            arrivals.expire()
+            sent = nil
+            publishQueued()
         }
     }
 
@@ -126,8 +162,18 @@ final class ChatStore {
         request.content = content
         request.attachmentIds = attachments
         request.settings = settings(model: model, effort: effort)
+        let position = state.history.count
         _ = try await backend.agent.sendMessage(request: request, headers: [:]).value()
-        await refresh()
+        // A chat not yet loaded has nothing to show until the refetch.
+        guard loaded else { return await refresh() }
+        // An idle agent's next turn takes the message, so it shows as sent from here
+        // rather than once the event stream says so, which can be a moment later.
+        if state.activation == nil, state.queued.isEmpty, state.history.count == position {
+            sent = (Euler_V1_Message(sending: content, images: attachments), position)
+            publishQueued()
+        }
+        // The stream reports the rest, so the composer needn't wait on the refetch.
+        Task { await refresh() }
     }
 
     /// Reruns from the user message at `position`, with new text or kept versions of its reply.
@@ -243,5 +289,48 @@ final class ChatStore {
     /// Adopts a workspace change the workspace sheet made.
     func adoptWorkspace(_ workspace: Euler_V1_SessionWorkspace) {
         session?.workspace = workspace
+    }
+}
+
+extension Euler_V1_Message {
+    /// A user message as it will be saved, for showing it before it is.
+    init(sending content: String, images: [String]) {
+        self.init()
+        role = .user
+        self.content = content
+        attachments = images.map { id in
+            var image = Euler_V1_ImageAttachment()
+            image.id = id
+            var attachment = Euler_V1_MessageAttachment()
+            attachment.kind = .image(image)
+            return attachment
+        }
+    }
+}
+
+/// Tells queued user messages that are about to start a turn from those
+/// waiting behind one. A message queued while the agent is idle is taken by
+/// the turn that starts next; only the event that queued it says which it was.
+struct ArrivalTracker {
+    private var arriving: Set<Int64> = []
+    private var known: Set<Int64> = []
+
+    /// Records the queue after a message was queued, with whether the agent was idle then.
+    mutating func noteQueued(_ queue: [Euler_V1_InboxMessage], idle: Bool) {
+        for message in queue where !known.contains(message.id) {
+            if idle, !message.held { arriving.insert(message.id) }
+        }
+        known = Set(queue.map(\.id))
+    }
+
+    mutating func split(_ queue: [Euler_V1_InboxMessage]) -> (arriving: [Euler_V1_InboxMessage], waiting: [Euler_V1_InboxMessage]) {
+        known = Set(queue.map(\.id))
+        arriving.formIntersection(known)
+        return (queue.filter { arriving.contains($0.id) }, queue.filter { !arriving.contains($0.id) })
+    }
+
+    /// Gives up on the turn starting: what was arriving is queued.
+    mutating func expire() {
+        arriving = []
     }
 }

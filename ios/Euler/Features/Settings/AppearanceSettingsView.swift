@@ -32,9 +32,11 @@ struct AppearanceSettingsView: View {
                 Picker("Font style", selection: binding(\.font) { $0.font = $1 }) {
                     ForEach(Self.fonts, id: \.0) { font, name in Text(name).tag(font) }
                 }
+                .mutedPickerValue()
                 Picker("Code block font", selection: binding(\.codeFont) { $0.codeFont = $1 }) {
                     ForEach(Self.codeFonts, id: \.0) { font, name in Text(name).tag(font) }
                 }
+                .mutedPickerValue()
             }
         }
         .navigationTitle("Appearance")
@@ -48,7 +50,7 @@ struct AppearanceSettingsView: View {
         Binding(
             get: { Value.known(session.preferences.appearance[keyPath: path]) },
             set: { value in
-                Haptics.light()
+                Haptics.select()
                 savePreferences(session) { save(&$0.appearance, value) }
             }
         )

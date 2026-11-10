@@ -15,15 +15,21 @@ struct Palette: Equatable {
     var border: Color
     var borderSubtle: Color
     /// The theme's signature hue for controls the pale accent would wash out:
-    /// switches, checkmarks, unread dots. Default uses the gold of the Euler mark.
+    /// switches, checkmarks, unread dots, and the buttons that send or save.
     var tint: Color
+    /// Text and icons on the tint.
+    var tintForeground: Color
+    /// The mark on the new chat screen. Default keeps the gold of the Euler mark,
+    /// which stands out from the dark background where the blue tint does not.
+    var mark: Color
     /// The highlight.js theme closest to the web's code colors.
     var code: HighlightTheme
 
     static let `default` = Palette(
         background: Color(hex: 0x171717), surface: Color(hex: 0x212121), foreground: Color(hex: 0xE8E8E8),
         muted: Color(hex: 0x9B9B9B), fill: Color(hex: 0x262626), accent: Color(hex: 0xE8E8E8),
-        border: Color(hex: 0x3A3A3A), borderSubtle: Color(hex: 0x2A2A2A), tint: Color(hex: 0xD4AF37), code: .xcode
+        border: Color(hex: 0x3A3A3A), borderSubtle: Color(hex: 0x2A2A2A), tint: Color(hex: 0x0A84FF), tintForeground: .white,
+        mark: Color(hex: 0xD4AF37), code: .xcode
     )
 
     /// Ephemeral chats, as the web's amber-400.
@@ -38,7 +44,8 @@ struct Palette: Equatable {
 
     init(
         background: Color, surface: Color, foreground: Color, muted: Color, fill: Color, accent: Color,
-        border: Color, borderSubtle: Color, tint: Color, code: HighlightTheme
+        border: Color, borderSubtle: Color, tint: Color, tintForeground: Color? = nil,
+        mark: Color? = nil, code: HighlightTheme
     ) {
         self.background = background
         self.surface = surface
@@ -49,6 +56,9 @@ struct Palette: Equatable {
         self.border = border
         self.borderSubtle = borderSubtle
         self.tint = tint
+        // The themes' tints are pale, so dark text reads on them.
+        self.tintForeground = tintForeground ?? background
+        self.mark = mark ?? tint
         self.code = code
     }
 

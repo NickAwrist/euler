@@ -54,7 +54,7 @@ struct ModelPickerSheet: View {
                         ForEach(models, id: \.id) { model in
                             ModelPickerRow(model: model, selected: model.id == selected, saving: pendingFavorites.contains(model.id)) {
                                 pick(model)
-                                Haptics.light()
+                                Haptics.select()
                                 dismiss()
                             } toggleFavorite: {
                                 Task { await toggleFavorite(model) }
@@ -220,10 +220,10 @@ private struct ModelPickerRow: View {
                             .foregroundStyle(palette.tint)
                     }
                 }
-                .padding(.horizontal, 10)
+                .padding(.leading, 10)
+                .padding(.trailing, 4)
                 .padding(.vertical, 8)
                 .frame(minHeight: 50)
-                .background(selected ? palette.fill : .clear, in: .rect(cornerRadius: 10))
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
@@ -243,6 +243,8 @@ private struct ModelPickerRow: View {
             .animation(.snappy(duration: 0.2), value: model.favorite)
             .accessibilityLabel("\(model.favorite ? "Unfavorite" : "Favorite") \(model.name)")
         }
+        // One highlight for the whole row, so it doesn't stop short of the star.
+        .background(selected ? palette.fill : .clear, in: .rect(cornerRadius: 10))
     }
 }
 

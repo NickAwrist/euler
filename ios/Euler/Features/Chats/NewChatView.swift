@@ -80,7 +80,7 @@ struct NewChatView: View {
 
     private var header: some View {
         VStack(spacing: 0) {
-            let color = ephemeral ? Palette.ephemeral : palette.tint
+            let color = ephemeral ? Palette.ephemeral : palette.mark
             Image(systemName: ephemeral ? "eye.slash" : "sparkles")
                 .font(.system(size: 19, weight: .medium))
                 .foregroundStyle(color)
@@ -129,7 +129,7 @@ struct NewChatView: View {
         let recent = session.sessions.sessions.prefix(5)
         ScrollView {
             VStack(spacing: 22) {
-                if !recent.isEmpty, !ephemeral {
+                if !recent.isEmpty {
                     VStack(spacing: 6) {
                         Text("Recent")
                             .font(.caption2.weight(.semibold))
@@ -160,6 +160,11 @@ struct NewChatView: View {
                         }
                     }
                     .overlay(alignment: .top) { Rectangle().fill(palette.borderSubtle).frame(height: 1) }
+                    // An ephemeral chat hides them where they stand, so they fade rather than
+                    // fold away with the space they took.
+                    .opacity(ephemeral ? 0 : 1)
+                    .allowsHitTesting(!ephemeral)
+                    .accessibilityHidden(ephemeral)
                 }
             }
             .padding(.horizontal, 24)

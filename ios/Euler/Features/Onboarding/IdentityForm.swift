@@ -50,13 +50,19 @@ struct IdentityFields: View {
                 .autocorrectionDisabled()
             if QRScanner.isAvailable {
                 Button("Scan QR code", systemImage: "qrcode.viewfinder") { scanning = true }
+                    .sheet(isPresented: $scanning) {
+                        QRScanner { code in
+                            let id = code.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard Identity.isValidUserID(id) else { return false }
+                            draft.userID = id.lowercased()
+                            scanning = false
+                            return true
+                        }
+                        .ignoresSafeArea()
+                        .presentationDragIndicator(.visible)
+                    }
             }
-            // The system paste button reads the clipboard without a permission prompt.
-            PasteButton(payloadType: String.self) { strings in
-                if let pasted = strings.first?.trimmingCharacters(in: .whitespacesAndNewlines) {
-                    draft.userID = pasted.lowercased()
-                }
-            }
+            PasteTextButton { draft.userID = $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
             Button("Create new user ID", systemImage: "plus.circle") {
                 draft.userID = UUID().uuidString.lowercased()
             }
@@ -65,17 +71,6 @@ struct IdentityFields: View {
         } footer: {
             Text(draft.userIDIsInvalid ? "Not a user ID." : "Settings › General › Show QR on the web.")
                 .foregroundStyle(draft.userIDIsInvalid ? .red : .secondary)
-        }
-        .sheet(isPresented: $scanning) {
-            QRScanner { code in
-                let id = code.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard Identity.isValidUserID(id) else { return false }
-                draft.userID = id.lowercased()
-                scanning = false
-                return true
-            }
-            .ignoresSafeArea()
-            .presentationDragIndicator(.visible)
         }
     }
 }
@@ -145,7 +140,7 @@ struct IdentityEditor: View {
             .navigationTitle("Server and user")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                CloseToolbarItem(label: "Cancel", placement: .cancellationAction) { dismiss() }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { Task { await save() } }
                         .disabled(saving || draft.identity == nil || draft.identity == identityStore.identity)

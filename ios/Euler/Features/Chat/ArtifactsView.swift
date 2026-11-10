@@ -16,7 +16,7 @@ struct ArtifactsView: View {
                 .navigationDestination(for: String.self) { file in
                     ArtifactPreviewView(chat: chat, path: file)
                 }
-                .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+                .toolbar { CloseToolbarItem { dismiss() } }
         }
         .onAppear { if let initialPath, path.isEmpty { path = [initialPath] } }
     }

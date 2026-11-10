@@ -8,7 +8,6 @@ struct CodeBlockView: View {
     @Environment(\.palette) private var palette
     @Environment(\.typography) private var typography
     @State private var highlighted: AttributedString?
-    @State private var copied = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -17,24 +16,7 @@ struct CodeBlockView: View {
                     .font(.caption)
                     .foregroundStyle(palette.muted)
                 Spacer()
-                Button {
-                    UIPasteboard.general.string = code
-                    copied = true
-                } label: {
-                    Label(copied ? "Copied" : "Copy code", systemImage: copied ? "checkmark" : "doc.on.doc")
-                        .labelStyle(.iconOnly)
-                        .font(.caption)
-                        .foregroundStyle(palette.muted)
-                        .frame(width: 32, height: 28)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .sensoryFeedback(.success, trigger: copied) { _, new in new }
-                .task(id: copied) {
-                    guard copied else { return }
-                    try? await Task.sleep(for: .seconds(1.5))
-                    copied = false
-                }
+                CopyButton(text: code, label: "Copy code")
             }
             .padding(.leading, 12)
             .padding(.trailing, 4)
@@ -55,6 +37,35 @@ struct CodeBlockView: View {
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .task(id: "\(palette.code.rawValue)|\(language ?? "")|\(code)") {
             highlighted = await CodeHighlighter.highlight(code, language: language, theme: palette.code)
+        }
+    }
+}
+
+/// Copies text, showing a check for a moment once it has.
+struct CopyButton: View {
+    let text: String
+    var label = "Copy"
+    @Environment(\.palette) private var palette
+    @State private var copied = false
+
+    var body: some View {
+        Button {
+            UIPasteboard.general.string = text
+            copied = true
+        } label: {
+            Label(copied ? "Copied" : label, systemImage: copied ? "checkmark" : "doc.on.doc")
+                .labelStyle(.iconOnly)
+                .font(.caption)
+                .foregroundStyle(palette.muted)
+                .frame(width: 32, height: 28)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .sensoryFeedback(.success, trigger: copied) { _, new in new }
+        .task(id: copied) {
+            guard copied else { return }
+            try? await Task.sleep(for: .seconds(1.5))
+            copied = false
         }
     }
 }

@@ -49,7 +49,7 @@ struct ChatDrawer: View {
             Rectangle().fill(palette.borderSubtle).frame(height: 1)
             VStack(spacing: 2) {
                 footerButton("Usage insights", systemImage: "chart.line.uptrend.xyaxis") { openSettings(.usage) }
-                footerButton("Customization", systemImage: "slider.horizontal.3") { openSettings(.personalization) }
+                footerButton("Customization", systemImage: "slider.horizontal.3") { openSettings(.customization) }
                 footerButton("Settings", systemImage: "gearshape") { openSettings(.root) }
             }
             .padding(.horizontal, 8)
@@ -58,16 +58,6 @@ struct ChatDrawer: View {
         .background(palette.background)
         .sheet(item: $renaming) { summary in
             RenameChatSheet(summary: summary)
-        }
-        .confirmationDialog(
-            "Delete this chat?",
-            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
-            titleVisibility: .visible,
-            presenting: deleting
-        ) { summary in
-            Button("Delete", role: .destructive) { Task { await delete(summary) } }
-        } message: { summary in
-            Text(summary.title)
         }
     }
 
@@ -109,18 +99,30 @@ struct ChatDrawer: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityIdentifier("Drawer chat")
+                        // On the row, so the question opens from the chat it is about.
+                        .confirmationDialog(
+                            "Delete this chat?",
+                            isPresented: Binding(get: { deleting?.id == summary.id }, set: { if !$0 { deleting = nil } }),
+                            titleVisibility: .visible
+                        ) {
+                            Button("Delete", role: .destructive) { Task { await delete(summary) } }
+                        } message: {
+                            Text(summary.title)
+                        }
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(summary.id == current ? palette.fill : palette.background)
                         .listRowSeparatorTint(palette.borderSubtle)
                         .swipeActions(edge: .trailing) {
-                            Button("Delete", systemImage: "trash", role: .destructive) { deleting = summary }
+                            // No destructive role: that slides the row away as if it were already gone,
+                            // and takes the question with it.
+                            Button("Delete", systemImage: "trash", action: Haptics.selecting { deleting = summary })
                                 .tint(.red)
-                            Button("Rename", systemImage: "pencil") { renaming = summary }
+                            Button("Rename", systemImage: "pencil", action: Haptics.selecting { renaming = summary })
                                 .tint(palette.border)
                         }
                         .contextMenu {
-                            Button("Rename", systemImage: "pencil") { renaming = summary }
-                            Button("Delete", systemImage: "trash", role: .destructive) { deleting = summary }
+                            Button("Rename", systemImage: "pencil", action: Haptics.selecting { renaming = summary })
+                            Button("Delete", systemImage: "trash", role: .destructive, action: Haptics.selecting { deleting = summary })
                         }
                     }
                 }
@@ -237,7 +239,7 @@ private struct RenameChatSheet: View {
             .navigationTitle("Rename")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                CloseToolbarItem(label: "Cancel", placement: .cancellationAction) { dismiss() }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } } }
             }
         }
@@ -251,29 +253,6 @@ private struct RenameChatSheet: View {
     private func save() async {
         if await session.notices.attempt({ try await session.sessions.rename(summary.id, to: title) }) {
             dismiss()
-        }
-    }
-}
-
-/// The current notice, floating over the screen until it times out or is tapped.
-struct NoticeBanner: View {
-    @Environment(AppSession.self) private var session
-    @Environment(\.palette) private var palette
-
-    var body: some View {
-        if let notice = session.notices.current {
-            Button { session.notices.dismiss() } label: {
-                Label(notice.message, systemImage: notice.tone == .failure ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                    .font(.subheadline)
-                    .foregroundStyle(palette.foreground)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .glassEffect()
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 8)
-            .transition(.move(edge: .top).combined(with: .opacity))
-            .animation(.snappy, value: notice)
         }
     }
 }

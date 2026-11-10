@@ -53,7 +53,7 @@ struct ComposerSuggestions: View {
             if !suggestions.isEmpty {
                 VStack(spacing: 0) {
                     ForEach(suggestions) { suggestion in
-                        Button(action: suggestion.select) {
+                        Button(action: Haptics.selecting(suggestion.select)) {
                             HStack(spacing: 10) {
                                 Image(systemName: suggestion.icon).foregroundStyle(palette.muted).frame(width: 20)
                                 VStack(alignment: .leading, spacing: 1) {

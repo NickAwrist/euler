@@ -119,6 +119,34 @@ struct SkillImportTests {
     }
 }
 
+struct SkillFieldsTests {
+    @Test func namesWhatEachFieldIsMissing() {
+        #expect(SkillFields().problems == .init(
+            name: "Name is required",
+            description: "Description is required",
+            instructions: "Instructions are required"
+        ))
+        var fields = SkillFields()
+        fields.name = "release-notes"
+        fields.description = "  \n"
+        fields.instructions = "Do it."
+        #expect(fields.problems == .init(description: "Description is required"))
+        fields.description = "Write release notes."
+        #expect(fields.problems.isEmpty)
+    }
+
+    @Test func holdsFieldsToTheServersLengths() {
+        var fields = SkillFields()
+        fields.name = String(repeating: "a", count: 65)
+        fields.description = String(repeating: "b", count: 501)
+        fields.instructions = "Do it."
+        #expect(fields.problems == .init(
+            name: "Name must be 64 characters or fewer",
+            description: "Description must be 500 characters or fewer"
+        ))
+    }
+}
+
 struct IdentityTests {
     @Test func normalizesServerAddresses() {
         #expect(Identity.serverURL(from: "spaceheater:3200")?.absoluteString == "http://spaceheater:3200")

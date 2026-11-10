@@ -15,7 +15,7 @@ struct OllamaSettingsView: View {
                 title: "Server URL",
                 placeholder: "http://127.0.0.1:11434",
                 host: $host,
-                saved: config?.host ?? "",
+                config: config,
                 managed: managed,
                 connected: health?.connected,
                 test: { host in
@@ -47,22 +47,32 @@ struct OllamaSettingsView: View {
     }
 }
 
-/// An address field with Test and Save, read-only when the environment sets it.
+/// An address with its connection state beside it, and Test and Save under
+/// both. Read-only when the environment sets the address.
 struct HostSection: View {
     let title: String
     let placeholder: String
     @Binding var host: String
-    let saved: String
+    let config: Euler_V1_HostConfig?
     let managed: Bool
     let connected: Bool?
     let test: (String) async throws -> Euler_V1_HostTest
     let save: (String) async throws -> Void
     @Environment(AppSession.self) private var session
+    @Environment(\.palette) private var palette
     @State private var result: String?
     @State private var resultOK = false
     @State private var testing = false
+    @State private var saving = false
     /// The address a result belongs to; editing it hides a stale result.
     @State private var testedHost = ""
+
+    private var trimmed: String { host.trimmingCharacters(in: .whitespaces) }
+    /// The address in use: the saved one, or the server's default.
+    private var current: String {
+        guard let config else { return "" }
+        return config.host.isEmpty ? config.effectiveHost : config.host
+    }
 
     var body: some View {
         Section {
@@ -72,27 +82,50 @@ struct HostSection: View {
                 .autocorrectionDisabled()
                 .disabled(managed)
                 .accessibilityLabel(title)
-            if let connected {
-                LabeledContent("Status", value: connected ? "Connected" : "Not connected")
-            }
-            Button("Test connection") { Task { await runTest() } }
-                .disabled(testing || host.trimmingCharacters(in: .whitespaces).isEmpty)
-            if let result, testedHost == host {
-                Text(result).font(.footnote).foregroundStyle(resultOK ? .green : .red)
-            }
-            if !managed, host != saved {
-                Button("Save settings") {
-                    Task {
-                        if await session.notices.attempt({ try await save(host.trimmingCharacters(in: .whitespaces)) }) {
-                            session.notices.success("Saved.")
-                        }
-                    }
-                }
-            }
+            status
         } header: {
             Text(title)
         } footer: {
             if managed { Text("Managed by the environment.") }
+        }
+        FormActions {
+            Button("Test") { Task { await runTest() } }
+                .disabled(testing || trimmed.isEmpty)
+            if !managed {
+                Button("Save") { Task { await runSave() } }
+                    .buttonStyle(FormActionStyle(prominent: true))
+                    .disabled(saving || host == current || trimmed.isEmpty)
+            }
+        }
+    }
+
+    /// The latest test of this address, or what the server last said of the saved one.
+    @ViewBuilder
+    private var status: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            if testing {
+                ProgressView().controlSize(.small)
+                Text("Testing").foregroundStyle(palette.muted)
+            } else if let result, testedHost == host {
+                StatusDot(color: resultOK ? Palette.positive : .red)
+                Text(result).foregroundStyle(resultOK ? palette.foreground : Color.red)
+            } else if let connected, host == current {
+                StatusDot(color: connected ? Palette.positive : palette.muted)
+                Text(connected ? "Connected" : "Not connected").foregroundStyle(connected ? palette.foreground : palette.muted)
+            } else {
+                StatusDot(color: palette.muted)
+                Text("Not tested").foregroundStyle(palette.muted)
+            }
+        }
+        .font(.subheadline)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func runSave() async {
+        saving = true
+        defer { saving = false }
+        if await session.notices.attempt({ try await save(trimmed) }) {
+            session.notices.success("Saved.")
         }
     }
 
@@ -118,34 +151,49 @@ struct HostSection: View {
     }
 }
 
+/// The small dot beside a connection's state.
+struct StatusDot: View {
+    let color: Color
+
+    var body: some View {
+        Circle()
+            .fill(color)
+            .frame(width: 7, height: 7)
+            // Sits at the middle of a line of text beside it, even when that text wraps.
+            .alignmentGuide(.firstTextBaseline) { $0[.bottom] + 3 }
+            .accessibilityHidden(true)
+    }
+}
+
 /// An API key the server stores: Update, Remove, or read-only from the environment.
 struct ApiKeySection: View {
     let provider: Euler_V1_ApiKeyProvider
     let title: String
     var onChange: () async -> Void = {}
     @Environment(AppSession.self) private var session
+    @Environment(\.palette) private var palette
     @State private var state: Euler_V1_ApiKeyState?
     @State private var editing = false
     @State private var key = ""
+    @State private var confirmingRemove = false
+
+    /// Whether the field for a new key shows, rather than the saved key's state.
+    private var entering: Bool { editing || state?.hasKey_p == false }
 
     var body: some View {
         Section {
             if let state {
-                if state.environmentManaged {
-                    LabeledContent("API key", value: "••••••••")
-                } else if editing || !state.hasKey_p {
+                if entering, !state.environmentManaged {
                     SecureField("API key", text: $key)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                    Button("Save key") { Task { await set(key) } }
-                        .disabled(key.trimmingCharacters(in: .whitespaces).isEmpty)
-                    if state.hasKey_p {
-                        Button("Cancel") { editing = false; key = "" }
-                        Button("Remove key", role: .destructive) { Task { await set("") } }
-                    }
                 } else {
-                    LabeledContent("API key", value: "Configured")
-                    Button("Update key") { editing = true }
+                    LabeledContent("API key") {
+                        HStack(spacing: 8) {
+                            StatusDot(color: Palette.positive)
+                            Text(state.environmentManaged ? "••••••••" : "Configured")
+                        }
+                    }
                 }
             } else {
                 ProgressView()
@@ -154,9 +202,26 @@ struct ApiKeySection: View {
             Text(title)
         } footer: {
             if state?.environmentManaged == true { Text("Managed by the environment.") }
-            else if state?.hasKey_p == false { Text("Not configured") }
         }
         .task { await load() }
+        if let state, !state.environmentManaged {
+            FormActions {
+                if entering {
+                    if state.hasKey_p {
+                        Button("Cancel") { editing = false; key = "" }
+                    }
+                    Button("Save") { Task { await set(key) } }
+                        .buttonStyle(FormActionStyle(prominent: true))
+                        .disabled(key.trimmingCharacters(in: .whitespaces).isEmpty)
+                } else {
+                    Button("Remove", role: .destructive) { confirmingRemove = true }
+                        .confirmationDialog("Remove this key?", isPresented: $confirmingRemove, titleVisibility: .visible) {
+                            Button("Remove", role: .destructive) { Task { await set("") } }
+                        }
+                    Button("Update") { editing = true }
+                }
+            }
+        }
     }
 
     private func load() async {
@@ -197,7 +262,7 @@ struct ImageGenerationSettingsView: View {
                 title: "ComfyUI URL",
                 placeholder: "http://127.0.0.1:8188",
                 host: $host,
-                saved: config?.host ?? "",
+                config: config,
                 managed: managed,
                 connected: health?.connected,
                 test: { host in
@@ -213,21 +278,24 @@ struct ImageGenerationSettingsView: View {
                 }
             )
             Section("Defaults") {
-                Picker("Model", selection: $image.defaultModel) {
+                Picker("Model", selection: $image.defaultModel.ticking()) {
                     Text("None").tag("")
                     ForEach(models, id: \.self) { Text($0).tag($0) }
                     if !image.defaultModel.isEmpty, !models.contains(image.defaultModel) {
                         Text(image.defaultModel).tag(image.defaultModel)
                     }
                 }
+                .mutedPickerValue()
                 Stepper("Width \(image.defaultWidth)", value: $image.defaultWidth, in: 64...16384, step: 64)
                 Stepper("Height \(image.defaultHeight)", value: $image.defaultHeight, in: 64...16384, step: 64)
                 TextField("Negative prompt", text: $image.negativePrompt, axis: .vertical)
                     .lineLimit(2...6)
                     .accessibilityLabel("Negative prompt")
-                if image != savedImage {
-                    Button("Save settings") { Task { await saveImage() } }
-                }
+            }
+            FormActions {
+                Button("Save") { Task { await saveImage() } }
+                    .buttonStyle(FormActionStyle(prominent: true))
+                    .disabled(image == savedImage)
             }
         }
         .navigationTitle("Image Generation")

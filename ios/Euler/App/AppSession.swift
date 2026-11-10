@@ -1,3 +1,4 @@
+import Accessibility
 import EulerAPI
 import Foundation
 import Observation
@@ -127,6 +128,7 @@ final class Notices {
         case .success: Haptics.success()
         case .failure: Haptics.failure()
         }
+        AccessibilityNotification.Announcement(notice.message).post()
         dismissal?.cancel()
         dismissal = Task {
             try? await Task.sleep(for: .seconds(4))

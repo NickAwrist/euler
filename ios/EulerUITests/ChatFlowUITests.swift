@@ -113,6 +113,111 @@ final class ChatFlowUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Type / for commands or $ to use a skill."].exists)
     }
 
+    func testALongPressOnAReplyOpensItsTextForSelecting() {
+        XCTAssertTrue(message.waitForExistence(timeout: 5))
+        message.tap()
+        message.typeText("command:echo approved")
+        app.buttons["Send message"].tap()
+        XCTAssertTrue(app.buttons["Allow once"].waitForExistence(timeout: 15))
+        app.buttons["Allow once"].tap()
+
+        let reply = app.staticTexts["The script is running in the background. You can keep chatting."]
+        XCTAssertTrue(reply.waitForExistence(timeout: 20))
+        XCTAssertFalse(app.buttons["Message actions"].exists, "Actions are behind a long press, not a button")
+        reply.press(forDuration: 1)
+        app.buttons["Select text"].tap()
+        let text = app.textViews["Message text"]
+        XCTAssertTrue(text.waitForExistence(timeout: 5))
+        XCTAssertEqual(text.value as? String, "The script is running in the background. You can keep chatting.")
+    }
+
+    func testAReplysTraceShowsTheCommandThatRan() {
+        XCTAssertTrue(message.waitForExistence(timeout: 5))
+        message.tap()
+        message.typeText("command:echo approved")
+        app.buttons["Send message"].tap()
+        XCTAssertTrue(app.buttons["Allow once"].waitForExistence(timeout: 15))
+        app.buttons["Allow once"].tap()
+
+        let reply = app.staticTexts["The script is running in the background. You can keep chatting."]
+        XCTAssertTrue(reply.waitForExistence(timeout: 20))
+        reply.press(forDuration: 1)
+        app.buttons["View trace"].tap()
+        XCTAssertTrue(app.navigationBars["Execution Trace"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["bash"].exists)
+        XCTAssertTrue(app.staticTexts["echo approved"].exists, "The command reads as typed, not as JSON")
+        app.buttons["Close"].tap()
+        XCTAssertTrue(app.navigationBars["Execution Trace"].waitForNonExistence(timeout: 5))
+    }
+
+    func testSwipingAChatAwayAsksFirstAndThenDeletesIt() {
+        XCTAssertTrue(message.waitForExistence(timeout: 5))
+        message.tap()
+        message.typeText("command:echo hello")
+        app.buttons["Send message"].tap()
+        XCTAssertTrue(app.buttons["New chat"].waitForExistence(timeout: 10))
+
+        app.buttons["Chats"].tap()
+        let row = app.buttons.matching(identifier: "Drawer chat").firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.swipeLeft()
+        app.buttons["Delete"].tap()
+        XCTAssertTrue(app.staticTexts["Delete this chat?"].waitForExistence(timeout: 5))
+        app.buttons["Delete"].tap()
+        XCTAssertTrue(row.waitForNonExistence(timeout: 10))
+    }
+
+    func testCustomizationOpensOnItsOwnAndASkillSaysWhatItIsMissing() {
+        app.buttons["Chats"].tap()
+        app.buttons["Customization"].tap()
+        let bar = app.navigationBars["Customization"]
+        XCTAssertTrue(bar.waitForExistence(timeout: 5))
+        XCTAssertEqual(bar.buttons.count, 1, "Only Close: there is no Settings page to go back to")
+
+        app.buttons["Skills"].tap()
+        app.buttons["Add"].tap()
+        app.buttons["New"].tap()
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts["Name is required\nDescription is required"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Instructions are required"].exists)
+    }
+
+    func testAddingAToolPermissionRuleKeepsSettingsOpen() {
+        app.buttons["Chats"].tap()
+        app.buttons["Settings"].tap()
+        app.buttons["Tools"].tap()
+        app.buttons["Add rule"].tap()
+        let editor = app.navigationBars["New rule"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        // The editor used to open and then take Settings down with it.
+        XCTAssertFalse(editor.waitForNonExistence(timeout: 3), "The rule editor should stay open")
+        app.buttons["Tool, All tools"].tap()
+        XCTAssertTrue(app.buttons["bash"].waitForExistence(timeout: 5), "The editor lists the server's tools")
+        app.buttons["bash"].tap()
+        app.switches["Match a field"].switches.firstMatch.tap()
+        app.buttons["Field, Field"].tap()
+        XCTAssertTrue(app.buttons["command"].waitForExistence(timeout: 5), "A tool's fields can be matched")
+        app.buttons["command"].tap()
+        let value = app.textFields["Value"]
+        value.tap()
+        value.typeText("rm")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(editor.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Tools"].exists, "Saving a rule returns to Tools")
+        XCTAssertTrue(app.staticTexts["Ask before bash"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["command is rm"].exists)
+    }
+
+    func testTappingOffAFormFieldPutsTheKeyboardAway() {
+        app.buttons["Chats"].tap()
+        app.buttons["Customization"].tap()
+        app.buttons["Personalization"].tap()
+        app.textFields["Enter your name"].tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        app.staticTexts["About you"].tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+    }
+
     func testChangingTheThemeSavesItForTheWebToo() async throws {
         app.buttons["Chats"].tap()
         app.buttons["Settings"].tap()

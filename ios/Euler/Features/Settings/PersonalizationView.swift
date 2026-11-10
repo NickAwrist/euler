@@ -22,7 +22,7 @@ struct PersonalizationView: View {
                 .font(.footnote.monospaced())
                 .frame(minHeight: 220)
                 .accessibilityLabel("System Prompt")
-                Button("Reset to default") { draft.clearSystemPrompt() }
+                Button("Reset to default", systemImage: "arrow.counterclockwise") { draft.clearSystemPrompt() }
                     .disabled(!draft.hasSystemPrompt || draft.systemPrompt.isEmpty)
             } header: {
                 Text("System Prompt")
@@ -39,7 +39,7 @@ struct PersonalizationView: View {
         }
         .navigationTitle("Personalization")
         .toolbar {
-            ToolbarItem(placement: .confirmationAction) {
+            ToolbarItem(placement: .topBarTrailing) {
                 Button("Save") { Task { await save() } }
                     .disabled(!changed || saving)
             }

@@ -17,6 +17,7 @@ struct RootView: View {
 /// Owns the session for one identity and ties its event stream to the foreground.
 private struct SignedInView: View {
     @State private var session: AppSession
+    @State private var notices = NoticeOverlay()
     @Environment(\.scenePhase) private var scenePhase
     @Environment(PushNotifications.self) private var push
 
@@ -34,6 +35,8 @@ private struct SignedInView: View {
             .tint(palette.accent)
             .toggleStyle(ThemedSwitchStyle())
             .animation(.easeInOut(duration: 0.25), value: appearance.theme)
+            .onAppear { notices.show(for: session) }
+            .onDisappear { notices.hide() }
             .task {
                 push.backend = session.backend
                 async let preferences: Void = session.preferences.load()

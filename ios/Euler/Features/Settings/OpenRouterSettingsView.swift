@@ -110,7 +110,7 @@ private struct BalanceSection: View {
             } else {
                 ProgressView()
             }
-            Button("Refresh balance") { Task { await store.loadBalance() } }
+            Button("Refresh balance", systemImage: "arrow.clockwise") { Task { await store.loadBalance() } }
         } header: {
             Text("OpenRouter credits")
         }
@@ -148,13 +148,13 @@ private struct PublishersSection: View {
                     }
                 }
                 Button("Add publisher", systemImage: "plus") { adding = true }
+                    .sheet(isPresented: $adding) { AddPublisherSheet(store: store) }
             } else {
                 ProgressView()
             }
         } header: {
             Text("Publishers")
         }
-        .sheet(isPresented: $adding) { AddPublisherSheet(store: store) }
     }
 }
 
@@ -235,7 +235,7 @@ private struct ModelRow: View {
             )) {
                 HStack(spacing: 6) {
                     Text(model.name)
-                    if model.isNew { Text("New").font(.caption2).padding(.horizontal, 5).background(.tint.opacity(0.3), in: .capsule) }
+                    if model.isNew { NewBadge() }
                 }
             }
             .disabled(model.availability == .unavailable && !model.enabled)
@@ -286,6 +286,8 @@ private struct AddPublisherSheet: View {
                                     }
                                 }
                             }
+                            .buttonStyle(.bordered)
+                            .buttonBorderShape(.capsule)
                         }
                     }
                 }
@@ -293,7 +295,7 @@ private struct AddPublisherSheet: View {
             .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always))
             .navigationTitle("Add publisher")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { CloseToolbarItem { dismiss() } }
         }
     }
 }

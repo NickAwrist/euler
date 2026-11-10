@@ -16,11 +16,9 @@ struct SkillsView: View {
                     Button {
                         editing = .existing(skill)
                     } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("$\(skill.name)").font(.body.monospaced()).foregroundStyle(.primary)
-                            Text(skill.description_p).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                        }
+                        SkillRow(skill: skill)
                     }
+                    .buttonStyle(.plain)
                 }
                 .onDelete { offsets in
                     for index in offsets { Task { await delete(skills[index]) } }
@@ -33,8 +31,8 @@ struct SkillsView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu("Add", systemImage: "plus") {
-                    Button("New", systemImage: "square.and.pencil") { editing = .new(SkillFields()) }
-                    Button("Import SKILL.md", systemImage: "doc.on.clipboard") { importing = true }
+                    Button("New", systemImage: "square.and.pencil", action: Haptics.selecting { editing = .new(SkillFields()) })
+                    Button("Import SKILL.md", systemImage: "doc.on.clipboard", action: Haptics.selecting { importing = true })
                 }
             }
         }
@@ -67,6 +65,53 @@ struct SkillsView: View {
         if await session.notices.attempt({ _ = try await session.backend.skills.deleteSkill(request: request, headers: [:]).value() }) {
             Haptics.firm()
             await load()
+        }
+    }
+}
+
+/// A skill as a title and what it is for, with how it is invoked when that
+/// isn't the default of both by people and by agents.
+private struct SkillRow: View {
+    let skill: Euler_V1_Skill
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 8) {
+                    Text("\(Text("$").foregroundStyle(palette.muted))\(skill.name)")
+                        .font(.body.weight(.medium))
+                        .foregroundStyle(palette.foreground)
+                        .lineLimit(1)
+                    if let invocation {
+                        Text(invocation)
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(palette.muted)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(palette.fill, in: .capsule)
+                            .overlay(Capsule().stroke(palette.borderSubtle))
+                            .fixedSize()
+                    }
+                }
+                Text(skill.description_p)
+                    .font(.footnote)
+                    .foregroundStyle(palette.muted)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 0)
+            RowChevron()
+        }
+        .padding(.vertical, 2)
+        .contentShape(.rect)
+    }
+
+    private var invocation: String? {
+        switch (skill.userInvocable, !skill.disableModelInvocation) {
+        case (true, true): nil
+        case (true, false): "Manual"
+        case (false, true): "Agents only"
+        case (false, false): "Off"
         }
     }
 }
@@ -109,6 +154,34 @@ struct SkillFields: Equatable {
         fields.userInvocable = userInvocable
         fields.disableModelInvocation = disableModelInvocation
         return fields
+    }
+
+    /// What keeps each field from saving, in the server's words (proto/euler/v1/skills.proto).
+    struct Problems: Equatable {
+        var name: String?
+        var description: String?
+        var instructions: String?
+
+        var isEmpty: Bool { name == nil && description == nil && instructions == nil }
+    }
+
+    var problems: Problems {
+        var problems = Problems()
+        if name.isEmpty {
+            problems.name = "Name is required"
+        } else if name.count > 64 {
+            problems.name = "Name must be 64 characters or fewer"
+        }
+        let description = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        if description.isEmpty {
+            problems.description = "Description is required"
+        } else if description.count > 500 {
+            problems.description = "Description must be 500 characters or fewer"
+        }
+        if instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            problems.instructions = "Instructions are required"
+        }
+        return problems
     }
 
     /// Lowercase letters, numbers and single hyphens, as the server requires.
@@ -166,8 +239,11 @@ private struct SkillEditor: View {
     @State private var original = SkillFields()
     @State private var saving = false
     @State private var confirmingDiscard = false
+    /// Set by a Save that found problems; from then they show beside their fields.
+    @State private var showsProblems = false
 
     var body: some View {
+        let problems = showsProblems ? fields.problems : SkillFields.Problems()
         NavigationStack {
             ThemedForm {
                 Section {
@@ -180,12 +256,18 @@ private struct SkillEditor: View {
                     TextField("Description", text: $fields.description, axis: .vertical)
                 } header: {
                     Text("Skill")
+                } footer: {
+                    problemText([problems.name, problems.description])
                 }
-                Section("Instructions") {
+                Section {
                     TextEditor(text: $fields.instructions)
                         .font(.footnote.monospaced())
                         .frame(minHeight: 240)
                         .accessibilityLabel("Instructions")
+                } header: {
+                    Text("Instructions")
+                } footer: {
+                    problemText([problems.instructions])
                 }
                 Section {
                     Toggle("Users can invoke", isOn: $fields.userInvocable)
@@ -198,12 +280,13 @@ private struct SkillEditor: View {
             .navigationTitle(isNew ? "New skill" : "$\(original.name)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { if fields != original { confirmingDiscard = true } else { dismiss() } }
+                CloseToolbarItem(label: "Cancel", placement: .cancellationAction) {
+                    if fields != original { confirmingDiscard = true } else { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
+                    // Stays enabled with fields missing, so tapping it can say which.
                     Button("Save") { Task { await save() } }
-                        .disabled(saving || fields.name.isEmpty || fields.instructions.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (!isNew && fields == original))
+                        .disabled(saving || (!isNew && fields == original))
                 }
             }
             .confirmationDialog("Discard changes?", isPresented: $confirmingDiscard) {
@@ -228,7 +311,22 @@ private struct SkillEditor: View {
         return false
     }
 
+    @ViewBuilder
+    private func problemText(_ problems: [String?]) -> some View {
+        let problems = problems.compactMap(\.self)
+        if !problems.isEmpty {
+            Text(problems.joined(separator: "\n")).foregroundStyle(.red)
+        }
+    }
+
     private func save() async {
+        // The server rejects a name that ends in a hyphen, which typing "a-b" passes through.
+        while fields.name.hasSuffix("-") { fields.name.removeLast() }
+        guard fields.problems.isEmpty else {
+            withAnimation(.snappy) { showsProblems = true }
+            Haptics.failure()
+            return
+        }
         saving = true
         defer { saving = false }
         let skills = session.backend.skills
@@ -265,14 +363,12 @@ private struct ImportSkillSheet: View {
                     .font(.footnote.monospaced())
                     .frame(minHeight: 300)
                     .accessibilityLabel("SKILL.md")
-                PasteButton(payloadType: String.self) { strings in
-                    if let pasted = strings.first { text = pasted }
-                }
+                PasteTextButton { text = $0 }
             }
             .navigationTitle("Import SKILL.md")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                CloseToolbarItem(label: "Cancel", placement: .cancellationAction) { dismiss() }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Import") { imported(SkillFields.parse(text)) }
                         .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)

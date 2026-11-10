@@ -11,43 +11,90 @@ struct TranscriptView: View {
     @State private var atBottom = true
     @State private var editing: Int?
     @State private var versionChoices: [Int: Int] = [:]
+    /// How many messages there were when the turn in progress, or the next one, began.
+    @State private var turnStart: Int?
+    /// Set while a row opens or closes where it stands.
+    @State private var resizingInPlace = false
 
     var body: some View {
+        // A message on its way into the saved ones is drawn as it will be once it is
+        // there, in the row it will have, so being saved changes nothing on screen.
+        let messages = chat.history + chat.arriving
+        let lazy = min(turnStart ?? messages.count, chat.history.count)
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(chat.history.enumerated()), id: \.offset) { index, message in
-                    MessageRow(
-                        chat: chat,
-                        message: message,
-                        index: index,
-                        editing: $editing,
-                        version: versionBinding(index, count: message.versions.count),
-                        sheet: $sheet
-                    )
-                    TaskCards(chat: chat, position: index, sheet: $sheet)
+                ForEach(0..<lazy, id: \.self) { index in
+                    row(messages[index], at: index)
                 }
-                LiveReplyView(chat: chat, sheet: $sheet)
-                    .id("live")
+                // The turn in progress is one row of the lazy stack, built whole: the stack
+                // runs no transition for a row it builds, and here a sent message and the
+                // reply to it unfold.
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(lazy..<messages.count, id: \.self) { index in
+                        row(messages[index], at: index)
+                            .transition(messages[index].role == .user ? .unfold : .identity)
+                    }
+                    LiveReplyView(chat: chat, sheet: $sheet)
+                        .id("live")
+                }
+                // A finished reply replaces the streamed one where it stands, so only a
+                // message being sent is animated.
+                .animation(messages.last?.role == .user ? .snappy(duration: 0.3) : nil, value: messages.count)
             }
             .padding(.horizontal, 16)
             .padding(.top, 8)
             .padding(.bottom, 12)
         }
         .scrollPosition($position)
+        // New text keeps the bottom edge in place. A row opened by hand keeps its own
+        // place instead and pushes what follows down, or it would run off the top.
+        .defaultScrollAnchor(resizingInPlace ? .top : .bottom, for: .sizeChanges)
         .defaultScrollAnchor(.bottom)
+        .environment(\.resizeInPlace) { change in
+            resizingInPlace = true
+            // A turn of the run loop later, once the scroll view has the new anchor.
+            Task {
+                withAnimation(.smooth(duration: 0.3), change) { resizingInPlace = false }
+            }
+        }
         .scrollDismissesKeyboard(.interactively)
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.containerSize.height >= geometry.contentSize.height - 80
         } action: { _, isAtBottom in
             atBottom = isAtBottom
         }
-        .onChange(of: chat.live.activation?.content) { follow() }
+        .onAppear { turnStart = chat.history.count }
+        // Between turns every saved message is a lazy row again.
+        .onChange(of: chat.running) { _, running in
+            if !running { turnStart = chat.history.count }
+        }
+        .onChange(of: chat.live.activation?.content) { old, new in
+            if (new?.utf8.count ?? 0) > (old?.utf8.count ?? 0) { Haptics.streaming() }
+            follow()
+        }
         .onChange(of: chat.live.activation?.steps.count) { follow() }
+        .onChange(of: chat.arriving.count) { old, new in
+            if new > old { atBottom = true }
+            follow()
+        }
         .onChange(of: chat.history.count) { old, new in
             // A message the user just sent always comes into view.
             if new > old, chat.history.last?.role == .user { atBottom = true }
             follow()
         }
+    }
+
+    @ViewBuilder
+    private func row(_ message: Euler_V1_Message, at index: Int) -> some View {
+        MessageRow(
+            chat: chat,
+            message: message,
+            index: index,
+            editing: $editing,
+            version: versionBinding(index, count: message.versions.count),
+            sheet: $sheet
+        )
+        TaskCards(chat: chat, position: index, sheet: $sheet)
     }
 
     private func follow() {
@@ -64,6 +111,13 @@ struct TranscriptView: View {
     }
 }
 
+extension EnvironmentValues {
+    /// Animates a change to a transcript row's height, such as opening its thoughts.
+    @Entry var resizeInPlace: (@escaping () -> Void) -> Void = { change in
+        withAnimation(.smooth(duration: 0.3), change)
+    }
+}
+
 /// The main agent's turn in progress: its thinking, steps and text so far.
 private struct LiveReplyView: View {
     let chat: ChatStore
@@ -71,23 +125,30 @@ private struct LiveReplyView: View {
     @Environment(\.palette) private var palette
 
     var body: some View {
-        if let activation = chat.live.activation {
-            let steps = chat.live.steps
-            VStack(alignment: .leading, spacing: 10) {
-                ReplyDivider()
-                if !activation.thinking.isEmpty, activation.content.isEmpty {
-                    ThinkingDisclosure(text: activation.thinking, duration: nil, live: true)
+        let activation = chat.live.activation
+        // Always a row of the transcript, empty between turns, so a turn starting is a
+        // change inside the row and can unfold; a row that appears has no transition.
+        VStack(alignment: .leading, spacing: 0) {
+            if let activation {
+                let steps = chat.live.steps
+                VStack(alignment: .leading, spacing: 10) {
+                    ReplyDivider()
+                    if !activation.thinking.isEmpty, activation.content.isEmpty {
+                        ThinkingDisclosure(text: activation.thinking, duration: nil, live: true)
+                    }
+                    if !activation.content.isEmpty {
+                        MarkdownView(source: activation.content)
+                    }
+                    StreamingStatus(steps: steps, phase: chat.mainAgent.flatMap { chat.phases[$0.id] }) {
+                        sheet = .trace(steps)
+                    }
                 }
-                if !activation.content.isEmpty {
-                    MarkdownView(source: activation.content)
-                }
-                StreamingStatus(steps: steps, phase: chat.mainAgent.flatMap { chat.phases[$0.id] }) {
-                    sheet = .trace(steps)
-                }
+                .padding(.bottom, 8)
+                .transition(.unfold)
             }
-            .padding(.bottom, 8)
-            .transition(.opacity)
         }
+        // The finished reply replaces this one where it stands, so only its start is animated.
+        .animation(activation == nil ? nil : .snappy(duration: 0.3), value: activation == nil)
     }
 }
 

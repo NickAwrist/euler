@@ -108,3 +108,48 @@ struct RuntimeStateTests {
         #expect(AgentPhase.next(after: Events.event(1, Events.ended("t"))) == .end)
     }
 }
+
+struct ArrivalTrackerTests {
+    private func message(_ id: Int64, held: Bool = false) -> Euler_V1_InboxMessage {
+        var message = Euler_V1_InboxMessage()
+        message.id = id
+        message.held = held
+        return message
+    }
+
+    @Test func aMessageQueuedWhileIdleIsArrivingUntilItsTurnTakesIt() {
+        var tracker = ArrivalTracker()
+        tracker.noteQueued([message(1)], idle: true)
+        #expect(tracker.split([message(1)]).arriving.map(\.id) == [1])
+        // The turn started; the message is still its own until saved.
+        #expect(tracker.split([message(1)]).waiting.isEmpty)
+        #expect(tracker.split([]).arriving.isEmpty)
+    }
+
+    @Test func aMessageQueuedBehindATurnWaits() {
+        var tracker = ArrivalTracker()
+        tracker.noteQueued([message(1)], idle: false)
+        #expect(tracker.split([message(1)]).waiting.map(\.id) == [1])
+        // A later message doesn't change what an earlier one was.
+        tracker.noteQueued([message(1), message(2)], idle: true)
+        let split = tracker.split([message(1), message(2)])
+        #expect(split.waiting.map(\.id) == [1])
+        #expect(split.arriving.map(\.id) == [2])
+    }
+
+    @Test func heldAndUnannouncedMessagesWait() {
+        var tracker = ArrivalTracker()
+        tracker.noteQueued([message(1, held: true)], idle: true)
+        // Message 2 came with a refetched runtime, which doesn't say what the agent was doing.
+        let split = tracker.split([message(1, held: true), message(2)])
+        #expect(split.arriving.isEmpty)
+        #expect(split.waiting.map(\.id) == [1, 2])
+    }
+
+    @Test func aTurnThatNeverStartsLeavesItsMessagesQueued() {
+        var tracker = ArrivalTracker()
+        tracker.noteQueued([message(1)], idle: true)
+        tracker.expire()
+        #expect(tracker.split([message(1)]).waiting.map(\.id) == [1])
+    }
+}

@@ -4,7 +4,7 @@ import SwiftUI
 /// The pages Settings can open on.
 enum SettingsPage: Hashable, Identifiable {
     case root, general, appearance, ollama, openRouter, chatGpt, imageGeneration, webSearch
-    case personalization, skills, tools, usage
+    case customization, personalization, skills, tools, usage
 
     var id: Self { self }
 }
@@ -16,74 +16,84 @@ extension EnvironmentValues {
 
 /// Settings, Customization and Usage, page for page with the web.
 struct SettingsView: View {
+    /// The page the sheet opens on. It is the bottom of the stack, so leaving it
+    /// returns to wherever it was opened from rather than to the list of pages.
+    var page = SettingsPage.root
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
     @Environment(\.palette) private var palette
-    @State private var path: [SettingsPage]
-
-    /// Opens on `page`, over the list of pages.
-    init(page: SettingsPage = .root) {
-        _path = State(initialValue: page == .root ? [] : [page])
-    }
+    @State private var path: [SettingsPage] = []
 
     var body: some View {
         NavigationStack(path: $path) {
-            ThemedList {
-                Section {
-                    row(.general, "General", .system("gearshape"))
-                    row(.appearance, "Appearance", .system("paintpalette"))
-                    row(.ollama, "Ollama", .provider(.ollama))
-                    row(.openRouter, "OpenRouter", .system("point.3.filled.connected.trianglepath.dotted"))
-                    row(.chatGpt, "ChatGPT", .provider(.codex))
-                    row(.imageGeneration, "Image Generation", .system("photo.artframe"))
-                    row(.webSearch, "Web Search", .system("globe"))
+            destination(page)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar { done }
+                .navigationDestination(for: SettingsPage.self) { page in
+                    destination(page)
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar { done }
                 }
-                Section("Customization") {
-                    row(.personalization, "Personalization", .system("person.text.rectangle"))
-                    row(.skills, "Skills", .system("book"))
-                    row(.tools, "Tools", .system("wrench.and.screwdriver"))
-                }
-                Section {
-                    row(.usage, "Usage insights", .system("chart.line.uptrend.xyaxis"))
-                }
-            }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { done }
-            .navigationDestination(for: SettingsPage.self) { page in
-                destination(page)
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar { done }
-            }
         }
         .environment(\.openSettings) { page in path.append(page) }
         .presentationBackground(palette.background)
         .task { await session.preferences.load() }
     }
 
+    private var pages: some View {
+        ThemedList {
+            Section {
+                row(.general, "General", .system("gearshape.fill", Color(hex: 0x8E8E93)))
+                row(.appearance, "Appearance", .system("paintpalette.fill", Color(hex: 0x5E5CE6)))
+            }
+            Section {
+                row(.ollama, "Ollama", .provider(.ollama))
+                row(.openRouter, "OpenRouter", .provider(.openrouter))
+                row(.chatGpt, "ChatGPT", .provider(.codex))
+                row(.imageGeneration, "Image Generation", .system("photo.fill", Color(hex: 0xFF375F)))
+                row(.webSearch, "Web Search", .system("globe", Color(hex: 0x0A84FF)))
+            }
+            Section("Customization") { customizationRows }
+            Section {
+                row(.usage, "Usage insights", .system("chart.bar.fill", Color(hex: 0xBF5AF2)))
+            }
+        }
+        .navigationTitle("Settings")
+    }
+
+    @ViewBuilder
+    private var customizationRows: some View {
+        row(.personalization, "Personalization", .system("person.fill", Color(hex: 0xFF9F0A)))
+        row(.skills, "Skills", .system("book.fill", Color(hex: 0x30D158)))
+        row(.tools, "Tools", .system("wrench.and.screwdriver.fill", Color(hex: 0x40A6C8)))
+    }
+
     private var done: some ToolbarContent {
-        ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+        CloseToolbarItem { dismiss() }
     }
 
     private enum RowIcon {
-        case system(String)
+        /// A white glyph on its own color, as iOS Settings marks its pages.
+        case system(String, Color)
         case provider(ProviderIconAsset)
     }
 
     private func row(_ page: SettingsPage, _ title: String, _ icon: RowIcon) -> some View {
         NavigationLink(value: page) {
             HStack(spacing: 12) {
-                Group {
-                    switch icon {
-                    case .system(let name):
-                        Image(systemName: name).font(.system(size: 14, weight: .medium)).foregroundStyle(palette.tint)
-                    case .provider(let asset):
-                        ProviderIcon(icon: asset, size: 16)
-                    }
+                switch icon {
+                case .system(let name, let color):
+                    Image(systemName: name)
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 30, height: 30)
+                        .background(color.gradient, in: .rect(cornerRadius: 8))
+                case .provider(let asset):
+                    ProviderIcon(icon: asset, size: 16)
+                        .frame(width: 30, height: 30)
+                        .background(palette.fill, in: .rect(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(palette.borderSubtle))
                 }
-                .frame(width: 30, height: 30)
-                .background(palette.fill, in: .rect(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(palette.borderSubtle))
                 Text(title).foregroundStyle(palette.foreground)
             }
         }
@@ -92,7 +102,8 @@ struct SettingsView: View {
     @ViewBuilder
     private func destination(_ page: SettingsPage) -> some View {
         switch page {
-        case .root: EmptyView()
+        case .root: pages
+        case .customization: ThemedList { customizationRows }.navigationTitle("Customization")
         case .general: GeneralSettingsView()
         case .appearance: AppearanceSettingsView()
         case .ollama: OllamaSettingsView()
@@ -144,7 +155,9 @@ struct GeneralSettingsView: View {
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
                 }
-                Button("Change server or user") { editingIdentity = true }
+                Button { editingIdentity = true } label: {
+                    LabeledContent("Change server or user") { RowChevron() }
+                }
             }
             Section("Chat Defaults") {
                 let saved = session.preferences.settings.defaultModel
@@ -175,8 +188,10 @@ struct GeneralSettingsView: View {
                 ))
                 .disabled(push.authorization == .denied)
                 if push.authorization == .denied {
-                    Button("Allow in iOS Settings") {
+                    Button {
                         if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                    } label: {
+                        LabeledContent("Allow in iOS Settings") { RowChevron(systemName: "arrow.up.right") }
                     }
                 }
             }

@@ -51,7 +51,7 @@ struct AgentsSheet: View {
             }
             .navigationTitle("Agents and jobs")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { CloseToolbarItem { dismiss() } }
             .refreshable {
                 await chat.refresh()
                 await chat.reloadJobs()
@@ -99,7 +99,13 @@ struct AgentDetailView: View {
                 }
                 let steps = TraceView.displayed(detail.steps)
                 if !steps.isEmpty {
-                    Section("Trace") { TraceSteps(steps: steps) }
+                    Section {
+                        NavigationLink {
+                            TraceView(steps: detail.steps)
+                        } label: {
+                            LabeledContent("Trace", value: "\(steps.count)")
+                        }
+                    }
                 }
             } else if let error {
                 Text(error).foregroundStyle(.red)

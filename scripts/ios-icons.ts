@@ -28,7 +28,7 @@ const icons: { name: string; source: string; template: boolean }[] = [
       template: false,
     }),
   ),
-  ...["codex", "openai", "xai", "moonshot"].map((name) => ({
+  ...["codex", "openai", "openrouter", "xai", "moonshot"].map((name) => ({
     name,
     source: `public/icons/providers/${name}.svg`,
     template: true,

@@ -14,7 +14,7 @@ struct MessageRow: View {
     var body: some View {
         switch message.role {
         case .user:
-            UserMessage(chat: chat, message: message, index: index, editing: $editing)
+            UserMessage(chat: chat, message: message, index: index, editing: $editing, sheet: $sheet)
         case .assistant:
             AssistantMessage(chat: chat, message: message, index: index, version: $version, sheet: $sheet)
         default:
@@ -33,6 +33,7 @@ private struct UserMessage: View {
     let message: Euler_V1_Message
     let index: Int
     @Binding var editing: Int?
+    @Binding var sheet: ChatSheet?
     @Environment(AppSession.self) private var session
     @Environment(\.palette) private var palette
     @Environment(\.typography) private var typography
@@ -55,7 +56,7 @@ private struct UserMessage: View {
                 }
             }
             if editing == index {
-                editor
+                editor.transition(Self.swap)
             } else {
                 Text(message.content)
                     .font(typography.body())
@@ -64,14 +65,9 @@ private struct UserMessage: View {
                     .padding(.vertical, 10)
                     .background(palette.fill, in: .rect(cornerRadius: 16))
                     .overlay(RoundedRectangle(cornerRadius: 16).stroke(palette.borderSubtle))
+                    .contentShape(.contextMenuPreview, .rect(cornerRadius: 16))
                     .contextMenu { actions }
-                Menu { actions } label: {
-                    Image(systemName: "ellipsis")
-                        .foregroundStyle(palette.muted)
-                        .frame(width: 36, height: 28)
-                        .contentShape(.rect)
-                }
-                .accessibilityLabel("Message actions")
+                    .transition(Self.swap)
             }
         }
         .frame(maxWidth: .infinity, alignment: .trailing)
@@ -84,15 +80,24 @@ private struct UserMessage: View {
         }
     }
 
+    /// The bubble and its editor trade places from the trailing edge they share.
+    private static let swap = AnyTransition.opacity.combined(with: .scale(scale: 0.96, anchor: .trailing))
+
+    private func setEditing(_ value: Int?) {
+        withAnimation(.snappy(duration: 0.28)) { editing = value }
+    }
+
     @ViewBuilder
     private var actions: some View {
-        Button("Copy", systemImage: "doc.on.doc") { UIPasteboard.general.string = message.content }
-        if !chat.running {
-            Button("Edit", systemImage: "pencil") {
+        Button("Copy", systemImage: "doc.on.doc", action: Haptics.selecting { UIPasteboard.general.string = message.content })
+        Button("Select text", systemImage: "text.cursor", action: Haptics.selecting { sheet = .text(message.content) })
+        // A message still on its way into the transcript has no place to rerun from yet.
+        if !chat.running, index < chat.history.count {
+            Button("Edit", systemImage: "pencil", action: Haptics.selecting {
                 draft = message.content
-                editing = index
+                setEditing(index)
                 focused = true
-            }
+            })
         }
     }
 
@@ -106,13 +111,14 @@ private struct UserMessage: View {
                 .background(palette.surface, in: .rect(cornerRadius: 14))
                 .overlay(RoundedRectangle(cornerRadius: 14).stroke(palette.border))
             HStack {
-                Button("Cancel") { editing = nil }
+                Button("Cancel") { setEditing(nil) }
                     .buttonStyle(.bordered)
                 Button("Send") {
                     if chat.rerunDiscards(from: index + 1) { confirming = true } else { Task { await rerun() } }
                 }
                 .buttonStyle(.borderedProminent)
-                .foregroundStyle(palette.background)
+                .tint(palette.tint)
+                .foregroundStyle(palette.tintForeground)
                 .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || chat.running)
             }
         }
@@ -130,7 +136,7 @@ private struct UserMessage: View {
                 effort: session.models.effort(for: selected)
             )
         }
-        if ok { editing = nil }
+        if ok { setEditing(nil) }
     }
 }
 
@@ -141,7 +147,6 @@ private struct AssistantMessage: View {
     @Binding var version: Int
     @Binding var sheet: ChatSheet?
     @Environment(AppSession.self) private var session
-    @Environment(\.palette) private var palette
     @State private var confirming = false
 
     /// The kept version being viewed, or the latest reply.
@@ -161,20 +166,18 @@ private struct AssistantMessage: View {
             if let thinking {
                 ThinkingDisclosure(text: thinking.text, duration: thinking.duration, live: false)
             }
-            MarkdownView(source: shown.content)
-                .contextMenu { actions(shown) }
-            ReplyAttachments(attachments: shown.attachments, content: shown.content, sheet: $sheet)
-            HStack(spacing: 2) {
-                if !message.versions.isEmpty {
-                    VersionPager(index: $version, count: message.versions.count + 1)
-                }
-                Menu { actions(shown) } label: {
-                    Image(systemName: "ellipsis")
-                        .foregroundStyle(palette.muted)
-                        .frame(width: 36, height: 28)
-                        .contentShape(.rect)
-                }
-                .accessibilityLabel("Message actions")
+            // A long press anywhere on the reply opens its actions, so a reply with
+            // no text, only files or images, still has them.
+            VStack(alignment: .leading, spacing: 10) {
+                MarkdownView(source: shown.content)
+                ReplyAttachments(attachments: shown.attachments, content: shown.content, sheet: $sheet)
+            }
+            .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
+            .contentShape(.rect)
+            .contentShape(.contextMenuPreview, .rect(cornerRadius: 12).inset(by: -8))
+            .contextMenu { actions(shown) }
+            if !message.versions.isEmpty {
+                VersionPager(index: $version, count: message.versions.count + 1)
             }
         }
         .padding(.bottom, 4)
@@ -187,14 +190,17 @@ private struct AssistantMessage: View {
 
     @ViewBuilder
     private func actions(_ shown: (content: String, steps: [Euler_V1_Step], attachments: [Euler_V1_MessageAttachment])) -> some View {
-        Button("Copy", systemImage: "doc.on.doc") { UIPasteboard.general.string = shown.content }
+        if !shown.content.isEmpty {
+            Button("Copy", systemImage: "doc.on.doc", action: Haptics.selecting { UIPasteboard.general.string = shown.content })
+            Button("Select text", systemImage: "text.cursor", action: Haptics.selecting { sheet = .text(shown.content) })
+        }
         if !chat.running {
-            Button("Regenerate", systemImage: "arrow.clockwise") {
+            Button("Regenerate", systemImage: "arrow.clockwise", action: Haptics.selecting {
                 if chat.rerunDiscards(from: index) { confirming = true } else { Task { await regenerate() } }
-            }
+            })
         }
         if !TraceView.displayed(shown.steps).isEmpty {
-            Button("View trace", systemImage: "point.3.connected.trianglepath.dotted") { sheet = .trace(shown.steps) }
+            Button("View trace", systemImage: "point.3.connected.trianglepath.dotted", action: Haptics.selecting { sheet = .trace(shown.steps) })
         }
     }
 
@@ -251,12 +257,14 @@ struct ThinkingDisclosure: View {
     let live: Bool
     @Environment(\.palette) private var palette
     @Environment(\.typography) private var typography
+    @Environment(\.resizeInPlace) private var resizeInPlace
     @State private var expanded = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button {
-                withAnimation(.snappy) { expanded.toggle() }
+                Haptics.select()
+                resizeInPlace { expanded.toggle() }
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "brain")
@@ -278,6 +286,9 @@ struct ThinkingDisclosure: View {
                     .lineLimit(expanded ? nil : 3)
                     .padding(.leading, 12)
                     .overlay(alignment: .leading) { Rectangle().fill(palette.borderSubtle).frame(width: 2) }
+                    // Uncovered from the label down, pushing the reply ahead of it; a
+                    // fade alone drew the thoughts through the reply while it moved.
+                    .transition(.reveal)
             }
         }
     }

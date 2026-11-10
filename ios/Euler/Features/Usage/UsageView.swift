@@ -23,18 +23,19 @@ struct UsageView: View {
     var body: some View {
         ThemedList {
             Section {
-                Picker("Date range", selection: $days) {
+                Picker("Date range", selection: $days.ticking()) {
                     Text("24 hours").tag(UInt32(1))
                     Text("7 days").tag(UInt32(7))
                     Text("30 days").tag(UInt32(30))
                     Text("90 days").tag(UInt32(90))
                     Text("All time").tag(UInt32(0))
                 }
+                .mutedPickerValue()
             }
             if let usage {
                 Section { totals(usage.totals) }
                 Section {
-                    Picker("Chart metric", selection: $metric) {
+                    Picker("Chart metric", selection: $metric.ticking()) {
                         ForEach(Metric.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
@@ -149,44 +150,59 @@ struct UsageView: View {
         value.formatted(.number.notation(.compactName).precision(.fractionLength(0...1)))
     }
 
+    /// Fractions of a cent keep up to four places, as on the web.
     static func money(_ value: Double) -> String {
-        value.formatted(.currency(code: "USD"))
+        value.formatted(.currency(code: "USD").precision(.fractionLength(value > 0 && value < 0.01 ? 2...4 : 2...2)))
     }
 }
 
-/// Stacked bars per time bucket, one series per model.
+/// Stacked bars per time bucket, one series per model. Tapping a bucket shows
+/// its values per model, as hovering does on the web.
 private struct UsageChart: View {
     let chart: Euler_V1_GetUsageResponse.Chart
     let metric: UsageView.Metric
+    /// The start of the bucket whose values are shown.
+    @State private var selected: Date?
+    @Environment(\.palette) private var palette
 
     private struct Point: Identifiable {
         let id: String
+        let bucket: Int
         let date: Date
         let model: String
         let value: Double
     }
 
-    var body: some View {
-        let points = chart.series.flatMap { series in
+    private var unit: Calendar.Component { chart.intervalMs <= 3_600_000 ? .hour : .day }
+
+    private var points: [Point] {
+        chart.series.flatMap { series in
             chart.buckets.indices.map { index in
                 let values = metric == .tokens ? series.tokens : series.spend
                 return Point(
                     id: "\(series.model)|\(index)",
+                    bucket: index,
                     date: chart.buckets[index].date,
                     model: series.model.replacingOccurrences(of: "openrouter:", with: ""),
                     value: values.indices.contains(index) ? values[index] : 0
                 )
             }
         }
+    }
+
+    var body: some View {
+        let points = points
+        let shown = selected.flatMap { date in chart.buckets.firstIndex { $0.date == date } }
         if points.isEmpty {
             ContentUnavailableView("No usage in this range", systemImage: "chart.bar")
         } else {
             Chart(points) { point in
                 BarMark(
-                    x: .value("Date", point.date, unit: chart.intervalMs <= 3_600_000 ? .hour : .day),
+                    x: .value("Date", point.date, unit: unit),
                     y: .value(metric.rawValue, point.value)
                 )
                 .foregroundStyle(by: .value("Model", point.model))
+                .opacity(shown == nil || shown == point.bucket ? 1 : 0.3)
             }
             .chartLegend(position: .bottom, alignment: .leading, spacing: 8)
             .chartYAxis {
@@ -199,7 +215,87 @@ private struct UsageChart: View {
                     }
                 }
             }
+            .chartOverlay { proxy in
+                GeometryReader { geometry in
+                    if let anchor = proxy.plotFrame {
+                        let plot = geometry[anchor]
+                        // The whole column is the target, not only the bar drawn in it.
+                        Color.clear
+                            .contentShape(.rect)
+                            .onTapGesture { location in select(atX: location.x - plot.minX, proxy) }
+                        if let shown {
+                            let leading = (proxy.position(forX: chart.buckets[shown].date) ?? 0) > plot.width / 2
+                            readout(shown, points: points, proxy)
+                                .frame(width: plot.width, height: plot.height, alignment: leading ? .topLeading : .topTrailing)
+                                .offset(x: plot.minX, y: plot.minY)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                }
+            }
+            .animation(.easeOut(duration: 0.15), value: shown)
+            .sensoryFeedback(.selection, trigger: selected)
             .accessibilityLabel("\(metric.rawValue) by model over time")
+        }
+    }
+
+    /// Shows the bucket under `x`, or clears it when tapped again or outside any bucket.
+    private func select(atX x: CGFloat, _ proxy: ChartProxy) {
+        let tapped: Date? = proxy.value(atX: x)
+        let bucket = tapped.flatMap { date in
+            chart.buckets.first { Calendar.current.isDate(date, equalTo: $0.date, toGranularity: unit) }?.date
+        }
+        selected = bucket == selected ? nil : bucket
+    }
+
+    /// The bucket's date and each model's value in it, largest first.
+    private func readout(_ bucket: Int, points: [Point], _ proxy: ChartProxy) -> some View {
+        let rows = points.filter { $0.bucket == bucket && $0.value > 0 }.sorted { $0.value > $1.value }
+        let date = chart.buckets[bucket].date
+        return Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 5) {
+            Text(unit == .hour ? date.formatted(.dateTime.month(.abbreviated).day().hour()) : date.formatted(.dateTime.month(.abbreviated).day()))
+                .fontWeight(.semibold)
+                .foregroundStyle(palette.foreground)
+                .gridCellColumns(2)
+            if rows.isEmpty {
+                Text("No usage").foregroundStyle(palette.muted).gridCellColumns(2)
+            }
+            ForEach(rows.prefix(Self.readoutRows)) { row in
+                readoutRow(row.model, value: row.value, key: proxy.foregroundStyle(for: row.model))
+            }
+            if rows.count > Self.readoutRows {
+                readoutRow("\(rows.count - Self.readoutRows) more", value: rows.dropFirst(Self.readoutRows).reduce(0) { $0 + $1.value }, key: nil)
+            }
+            if rows.count > 1 {
+                Rectangle().fill(palette.borderSubtle).frame(height: 1).gridCellColumns(2).gridCellUnsizedAxes(.horizontal)
+                readoutRow("Total", value: rows.reduce(0) { $0 + $1.value }, key: nil)
+            }
+        }
+        .font(.caption)
+        .padding(10)
+        .frame(maxWidth: 240)
+        .fixedSize()
+        .background(palette.background.opacity(0.94), in: .rect(cornerRadius: 10))
+        .overlay(RoundedRectangle(cornerRadius: 10).stroke(palette.border))
+        .padding(4)
+        .accessibilityElement(children: .combine)
+    }
+
+    private static let readoutRows = 4
+
+    /// A short stroke in the series color, the model, and its exact value.
+    private func readoutRow(_ name: String, value: Double, key: AnyShapeStyle?) -> some View {
+        GridRow {
+            HStack(spacing: 6) {
+                Capsule().fill(key ?? AnyShapeStyle(.clear)).frame(width: 3, height: 11)
+                Text(name).foregroundStyle(palette.muted).lineLimit(1).truncationMode(.middle)
+            }
+            Text(metric == .tokens ? value.formatted(.number.precision(.fractionLength(0))) : UsageView.money(value))
+                .fontWeight(.semibold)
+                .monospacedDigit()
+                .foregroundStyle(palette.foreground)
+                .fixedSize()
+                .gridColumnAlignment(.trailing)
         }
     }
 }

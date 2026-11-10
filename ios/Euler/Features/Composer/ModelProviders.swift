@@ -58,7 +58,7 @@ struct ModelProviderGroup: Identifiable {
 /// A provider's logo. Monochrome logos are template images that take the
 /// foreground color, as the web inverts them (see scripts/ios-icons.ts).
 enum ProviderIconAsset: String {
-    case claude, codex, deepseek, gemini, meta, mistral, moonshot, ollama, openai, qwen, xai
+    case claude, codex, deepseek, gemini, meta, mistral, moonshot, ollama, openai, openrouter, qwen, xai
 
     /// Major labs by route organization or normalized lab name.
     private static let labs: [String: ProviderIconAsset] = [

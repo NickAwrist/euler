@@ -43,11 +43,39 @@ into the asset catalog. Run it after changing either.
   is a drawer from the leading edge (the sidebar button, or a drag from the edge),
   with the web sidebar's New chat, ephemeral chat, Usage, Customization and
   Settings. `openSettings` in the environment opens a Settings page: it pushes
-  inside Settings and presents the sheet anywhere else.
+  inside Settings and presents the sheet anywhere else, with that page at the
+  bottom of the stack, so closing it returns to where it was opened from.
+- **Notices.** `NoticeOverlay` shows `session.notices` in its own window above
+  the app's, so a failure raised from a sheet is seen over the sheet. Forms say
+  what a field is missing beside the field; a notice is for what only the
+  server can tell.
 - **Theme.** `Palette` holds the web's tokens plus `tint`, each theme's
-  signature hue (Default uses the gold of the Euler mark) for switches,
-  checkmarks and settings icons, where the pale accent would wash out.
-  `ThemedForm` and `ThemedList` give settings and sheets the theme's colors.
+  signature hue (blue in Default), for controls the pale accent would wash
+  out: switches, checkmarks, unread dots, and the buttons that send or save.
+  It is not for labels: `ThemedForm` and `ThemedList` give settings and sheets
+  the theme's colors, with rows that act in the foreground color
+  (`RowButtonStyle`). A form's Test, Save and the like sit under their section
+  in `FormActions`, in the same place whether or not they can be used yet, and
+  a result shows in the section's own status row. Sheets close with the X of
+  `CloseToolbarItem`. The mark on the new chat screen has its own color,
+  `mark`, which is gold in Default: the blue was hard to see on the dark
+  background.
+- **Forms.** A sheet opened from a form hangs off one row, never off a
+  `Section`: a section passes the modifier to every row, and the rows' sheets
+  opening together close Settings under them. A sheet also loads what it
+  shows itself: state the page reads only inside the sheet's closure reaches
+  the sheet as it was when the page was first drawn. In `ThemedForm` and
+  `ThemedList` a tap anywhere but in a text field puts the keyboard away, since
+  a field of several lines has no key that does.
+- **Haptics.** Choosing something ticks the same way everywhere
+  (`Haptics.select`): the row and form button styles tick on their action,
+  menu items through `Haptics.selecting`, and pickers through
+  `Binding.ticking()`. Switches tick on their own. Firmer taps are kept for
+  Stop and Delete, and a success or failure has the system's.
+- **Pasting images.** SwiftUI's text field pastes text only and has no hook
+  for more. `ImagePasteTarget` finds the UITextView behind the message box and
+  gives that one view a run-time subclass that offers Paste when the clipboard
+  holds an image and no text, and attaches the image.
 - **Client.** `Backend` holds one Connect `ProtocolClient` (binary encoding) at
   `<server>/api/rpc`. `UserHeaderInterceptor` sends `x-euler-user-id`.
 - **Events.** `EventStream` keeps `EventService.Subscribe` open in the
@@ -57,7 +85,20 @@ into the asset catalog. Run it after changing either.
   to push.
 - **Streaming.** `ChatStore` publishes each part of a chat separately, and
   `LiveReply` publishes token text at most once per display frame, so a long
-  transcript doesn't redraw per token.
+  transcript doesn't redraw per token. Reply text arriving on screen ticks the
+  phone (`Haptics.streaming`), spaced out so fast text is a patter, not a buzz.
+- **Sending.** A message sent to an idle agent shows in the transcript as soon
+  as the server accepts it (`ChatStore.arriving`), in the row the saved message
+  takes over. The turn in progress is one row of the transcript's lazy stack,
+  built whole, because the stack runs no transition for a row it builds; the
+  sent message and the reply unfold there. Message actions are on a long press,
+  and Select text opens the message where any part of it can be copied.
+  The transcript keeps its bottom edge in place as text arrives, but a row
+  opened by hand, such as a reply's thoughts, holds its own place and pushes
+  what follows down (`resizeInPlace`).
+- **Trace.** `TraceView` lists a reply's steps as cards: each tool call's
+  arguments under their names and its result as code, held to a few lines,
+  with longer text on a page of its own where part of it can be selected.
 - **Markdown.** swift-markdown (cmark-gfm) parses replies; single newlines are
   line breaks, as with remark-breaks. `MathDelimiters` ports the web's math
   policy, and SwiftMath typesets math; formulas it can't typeset show as source.

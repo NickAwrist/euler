@@ -39,7 +39,7 @@ struct ChatGptSettingsView: View {
             } else if let loadError {
                 Section {
                     Text(loadError).foregroundStyle(.red)
-                    Button("Retry") { Task { await load() } }
+                    Button("Retry", systemImage: "arrow.clockwise") { Task { await load() } }
                 }
             }
             if let error {
@@ -130,7 +130,7 @@ struct ChatGptSettingsView: View {
                 Link(destination: url) {
                     Label("View usage limits", systemImage: "arrow.up.right.square")
                 }
-                .foregroundStyle(palette.accent)
+                .foregroundStyle(palette.foreground)
             }
         }
         Section {
@@ -158,38 +158,26 @@ struct ChatGptSettingsView: View {
                 .autocorrectionDisabled()
                 .onSubmit { Task { await finish() } }
             if callback.isEmpty {
-                PasteButton(payloadType: String.self) { strings in
-                    callback = strings.first ?? ""
-                }
-                .labelStyle(.titleAndIcon)
-                .buttonBorderShape(.capsule)
-                .tint(palette.fill)
-                .foregroundStyle(palette.foreground)
+                PasteTextButton { callback = $0 }
             }
         } header: {
             Text("Callback URL")
         }
-        Section {
-            Button { Task { await finish() } } label: {
-                HStack {
-                    Spacer()
-                    if busy { ProgressView().tint(palette.accentForeground) } else { Text("Connect").fontWeight(.semibold) }
-                    Spacer()
-                }
-                .foregroundStyle(palette.accentForeground)
-            }
-            .listRowBackground(palette.accent.opacity(callback.contains("code=") ? 1 : 0.35))
-            .disabled(!callback.contains("code=") || busy)
-        }
-        Section {
-            Button("Use another account") { Task { await start(newAccount: true) } }
-                .disabled(busy)
+        FormActions {
             Button("Cancel", role: .cancel) {
                 authorizationURL = nil
                 callback = ""
                 error = nil
             }
-            .foregroundStyle(palette.muted)
+            Button { Task { await finish() } } label: {
+                if busy { ProgressView().tint(palette.tintForeground) } else { Text("Connect") }
+            }
+            .buttonStyle(FormActionStyle(prominent: true))
+            .disabled(!callback.contains("code=") || busy)
+        }
+        Section {
+            Button("Use another account", systemImage: "person.2") { Task { await start(newAccount: true) } }
+                .disabled(busy)
         }
     }
 

@@ -126,7 +126,7 @@ struct SourcesSheet: View {
             }
             .navigationTitle("Sources")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { CloseToolbarItem { dismiss() } }
         }
         .presentationDetents([.medium, .large])
     }
