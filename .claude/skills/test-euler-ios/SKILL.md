@@ -9,8 +9,8 @@ The iPhone app in `ios/` is a client of the same Connect API as the web app.
 While a change is in progress, the simulator and the phone talk to a separate
 **iOS test server** on `spaceheater` that runs the branch, never to
 production. Read `ios/README.md` for the app's layout and
-`docs/ios-connect-migration.md` for what is built. The web app and the server
-have their own skill, `test-euler-web`.
+`docs/connect-api.md` for the API, the event stream and push. The web app and
+the server have their own skill, `test-euler-web`.
 
 ## Pick the check
 

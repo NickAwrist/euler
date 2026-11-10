@@ -1,74 +1,18 @@
-# Background tools and shared session networking
+# Shared session networking for sandbox workspaces
 
-Background tool execution is implemented. Directory workspaces use host
-networking through the development permission policy. Shared private session
-networking and browser service exposure for sandbox workspaces remain proposals.
+A proposal. None of it is implemented.
 
-## Feature 1: background tool execution
+Today each command in a private sandbox workspace gets its own isolated
+network, so a server started by one command cannot be reached by the next
+command or by a browser. Directory workspaces share the host's network
+instead, through the development permission policy. Background jobs, which
+keep such a server running, are implemented in `src/jobs/JobManager.ts` and
+`src/tools/background.ts`.
 
-Tools opt in through [BackgroundCapable](../../src/tools/background.ts).
-The dispatcher adds `background: boolean` to their model-facing definition,
-validates it, and returns a job handle immediately when requested. Unsupported
-tools reject the argument. Bash uses the same process runner in both modes.
+This design gives the commands of one sandbox session a shared private
+network, then lets the user's browser reach a service inside it.
 
-```text
-bash({ command: "echo READY; sleep 10; echo DONE", background: true })
-  -> { jobId: "job_123", status: "running" }
-
-get_job({ jobId: "job_123" })
-  -> { status: "running", output: { blocks: [{ kind: "code", text: "READY\n" }] }, ... }
-
-cancel_job({ jobId: "job_123" })
-  -> { status: "cancelled", ... }
-```
-
-`get_job` returns the current status and retained output snapshot. The starting
-agent and its same-session ancestors can inspect or cancel the job. Completion
-also sends one durable runtime inbox message to its owner, using the existing
-[agent scheduler](async-agents.md). A normal reply ending leaves the job running.
-Stop, dismissal, rewind, and session deletion cancel affected jobs and await
-process cleanup. Backend restart marks unfinished jobs interrupted, with a
-non-waking notification; it never restarts work automatically.
-
-Tools own their Input, optional Progress, Output, and optional Metadata through
-[ToolContent](../../src/schemas/toolContent.ts), which supports text, code, and
-fields. Progress and Output accept append or replace updates and retain bounded
-64 KiB snapshots. The shared renderer does not branch on tool names. Bash
-streams stdout/stderr into one Output block, retained at completion, and returns
-the real process exit code as Metadata. Nothing infers status from printed text.
-
-The [job manager](../../src/jobs/JobManager.ts) owns IDs, agent/session ownership,
-status, timestamps, cancellation, limits, persistence, and notifications. All
-jobs, including ephemeral-chat jobs, use SQLite. Live handles and intermediate
-output are memory-only, so a crash can lose recent logs. Runtime boundaries and
-stored records use shared Zod schemas. Defaults allow four active jobs per
-session and sixteen per user, including starting jobs.
-
-The Jobs sidebar and inline job cards open the same modal. It polls running jobs
-once per second, shows one output block and collapsed Metadata, and keeps timing
-separate from tool content. Elapsed time updates while active and freezes when
-finished. Requests live in `ui/persist/jobs.ts`; reload restores runtime state.
-
-Background Bash drains output even after old logs are discarded, keeps filesystem
-and PID isolation, and cancels descendants. It removes the foreground wall/CPU
-timeouts so a service can keep running. Foreground limits are unchanged. Commands
-in private sandbox workspaces still use separate isolated networks; a service
-started in one command is not reachable from another command or a host browser.
-Directory workspaces instead share host networking, so background services are
-reachable from other directory commands and the host. They also have internet
-and local-network access and share host ports across chats.
-
-Verification lives in `tests/e2e/backgroundJobs.test.ts`, `tests/jobs/`,
-`tests/sandbox/background.test.ts`, and `tests/browser/jobs.pw.ts`. It covers real
-Bash completion, live inspection, attachments, failure, admission limits, output
-bounds, descendant cleanup, ephemeral sessions, rewind, deletion, restart, and UI
-reload/cancellation. The browser fixture uses deterministic model replies with
-the actual HTTP server, SQLite, and Bash runner. Screenshots and recordings are
-under `.cache/jobs-evidence` and `.cache/browser-results`.
-
-## Feature 2: shared private networking per sandbox session/workspace
-
-### Scope and architecture
+## Scope and architecture
 
 Use a runtime environment key of `{ ownerUuid, sessionId, workspaceGeneration }`.
 The generation changes when the resolved workspace changes or its environment
@@ -115,7 +59,7 @@ If setup is unsupported, return an actionable diagnostic. Existing isolated
 foreground commands can remain available when their capability probe succeeds,
 but do not silently claim they have shared networking or fall back to host net.
 
-### Lifetime and concurrency
+## Lifetime and concurrency
 
 Create the environment lazily, with a single in-flight creation per key. Both
 foreground commands and background jobs hold leases. Keep it alive while any
@@ -132,7 +76,7 @@ Ephemeral-chat expiry and workspace switching already wait for running jobs.
 Explicit session deletion still overrides a lease and cancels it. A later idle-expiry policy
 for abandoned servers can be added separately.
 
-### Connectivity contract
+## Connectivity contract
 
 - Every command in the same live environment sees the same loopback services.
 - Identical ports in separate sessions do not collide.
@@ -142,7 +86,7 @@ for abandoned servers can be added separately.
 - No host sockets, host LAN, other-session network, or outbound internet access
   becomes available. External dependency installation remains a separate policy.
 
-### Browser access and explicit service exposure
+## Browser access and explicit service exposure
 
 Implement a narrow service bridge as a separate stage of this feature. Proposed
 shared operations are `expose_service({ port })` and `close_service({ serviceId })`.
@@ -174,10 +118,11 @@ Until this stage ships, state that command-to-command networking works while
 host/remote browser access is unavailable. Do not call the entire dev-server
 workflow complete without browser reachability and HMR verification.
 
-## Proposed networking integration and acceptance checks
+## Integration and acceptance checks
 
-Service state should extend the existing runtime snapshots and use the same
-user-scoped APIs, shared schemas, and `ui/persist/` request helpers as jobs.
+Service state should extend the existing runtime snapshot and events in
+`proto/euler/v1/`, with user-scoped RPCs and `ui/persist/` request helpers
+like those for jobs.
 Service URLs need authenticated access and revocation when their leases end.
 
 1. Prove namespace joining with a loopback server started in one isolated command
