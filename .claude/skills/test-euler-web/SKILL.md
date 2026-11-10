@@ -160,7 +160,7 @@ When it fails:
   new number with `bun run perf:check --update` only when the change is meant
   to cost that, and say why in the PR.
 - **"improved".** The check passes. Lock a lower number in only after several
-  runs agree on it. See the two noisy counts below.
+  runs agree on it, including one on two cores with `taskset -c 0,1`.
 
 ## Run the app without a provider
 
@@ -299,12 +299,14 @@ with `LOG_LEVEL=error`, so those lines are all they print.
 - **A stub in the old REST shape.** Three browser tests still answer
   `**/api/**` with JSON from before Connect and pass, because unknown fields
   are ignored. They prove less than they look like they do. Use `mockRpc`.
-- **Two render counts that depend on timing.** When a reply finishes, the app
-  refreshes the chat list three times. Whether two of those answers land in
-  one React commit or two moves `finishReply.renders` between 116 and 123.
-  `openChat.renders` moves by up to 3 between runs. Their `slack` in
-  `baseline.json` covers what a dozen runs showed. Don't narrow it from one
-  run, and run the check several times before trusting a change to either.
+- **A render count that depends on which answer arrives first.** Opening a
+  chat sends `GetSession` and `GetRuntime` together, and a finished reply
+  refreshes the chat list three times. React renders two answers in one
+  commit or two depending on their timing, which moved `openChat.renders`
+  between 647 and 724 and failed CI on a slower machine. The check now
+  answers calls one at a time in those two windows (`answerInTurn`). Wrap a
+  new measurement the same way when its window has calls in flight together,
+  and prove it with `taskset -c 0,1 bun run perf:check` before trusting it.
 - **A screenshot of a fade.** Messages animate in. A capture taken as soon as
   the text exists shows it half transparent.
 - **A stale bundle.** `perf:check` and the performance fixture serve `dist/`.

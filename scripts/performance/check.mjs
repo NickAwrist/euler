@@ -316,6 +316,36 @@ async function holdPolls(page, names, action) {
   }
 }
 
+/**
+ * Answers the app's calls one at a time for the duration of `action`, in the
+ * order it sent them, each after the page has rendered the one before. Calls
+ * sent together otherwise race, and React renders their answers in one commit
+ * or two depending on which arrives first.
+ */
+async function answerInTurn(page, action) {
+  let previous = Promise.resolve();
+  const matches = (url) =>
+    url.pathname.startsWith(RPC) &&
+    url.pathname !== EVENT_STREAM &&
+    !pollName(url.href);
+  const handler = (route) => {
+    previous = previous
+      .then(async () => {
+        await route.fulfill({ response: await route.fetch() });
+        await nextFrames(page);
+      })
+      .catch(() => {});
+    return previous;
+  };
+  await page.route(matches, handler);
+  try {
+    return await action();
+  } finally {
+    await previous;
+    await page.unroute(matches, handler);
+  }
+}
+
 /** Scrolls the conversation, the tallest scroll container in `<main>`. */
 async function scrollToFraction(page, fraction) {
   await page.evaluate((value) => {
@@ -486,17 +516,21 @@ async function measureCounts(page, fixture) {
     ),
   );
   metrics["finishReply.renders"] = await holdPolls(page, ["health"], () =>
-    countRenders(page, () => finishReply(page, fixture)),
+    answerInTurn(page, () =>
+      countRenders(page, () => finishReply(page, fixture)),
+    ),
   );
 
   await page.getByRole("button", { name: "Toggle chats" }).click();
   await settle(page);
   metrics["openChat.renders"] = await holdPolls(page, ["health"], () =>
-    countRenders(page, async () => {
-      await page.getByRole("button", { name: "Session 98" }).click();
-      await page.waitForURL(`**/run/${fixture.longSessions[1]}`);
-      await waitForText(page, `Reply ${WORKLOAD.longSessionMessages - 1}`);
-    }),
+    answerInTurn(page, () =>
+      countRenders(page, async () => {
+        await page.getByRole("button", { name: "Session 98" }).click();
+        await page.waitForURL(`**/run/${fixture.longSessions[1]}`);
+        await waitForText(page, `Reply ${WORKLOAD.longSessionMessages - 1}`);
+      }),
+    ),
   );
 
   metrics["api.sessionResponseBytes"] = await responseBytes(
