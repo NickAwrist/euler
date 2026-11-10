@@ -31,7 +31,9 @@ uses team `66LT3G6V44`.
 | `EulerUITests/` | XCUITest flows against the scripted fixture backend. |
 
 The web's fonts in `public/fonts/` are bundled as they are and registered at
-launch, so both clients render the same faces. The provider logos come from
+launch, so both clients render the same faces. They are WOFF2, which CoreText
+decompresses the first time it looks for a face in a file, so launch looks up
+every file's faces off the main thread; otherwise the first chat opened hangs. The provider logos come from
 `public/icons/` and the thinking-level brains from
 `ui/components/ThinkingLevelBar.tsx`: `bun run ios:icons` rewrites them for
 CoreSVG (which misreads compact arc flags and gradients defined after use)
@@ -45,6 +47,11 @@ into the asset catalog. Run it after changing either.
   Settings. `openSettings` in the environment opens a Settings page: it pushes
   inside Settings and presents the sheet anywhere else, with that page at the
   bottom of the stack, so closing it returns to where it was opened from.
+  Opening a chat from the drawer swaps it in under the drawer, which then
+  slides away; elsewhere the old screen fades out before the new one fades in
+  (`HomeView.go`), since a transition on the stack's root view doesn't run. A
+  chat not loaded yet gets up to 300 ms to load first, so it arrives with its
+  messages.
 - **Notices.** `NoticeOverlay` shows `session.notices` in its own window above
   the app's, so a failure raised from a sheet is seen over the sheet. Forms say
   what a field is missing beside the field; a notice is for what only the
@@ -91,7 +98,10 @@ into the asset catalog. Run it after changing either.
   as the server accepts it (`ChatStore.arriving`), in the row the saved message
   takes over. The turn in progress is one row of the transcript's lazy stack,
   built whole, because the stack runs no transition for a row it builds; the
-  sent message and the reply unfold there. Message actions are on a long press,
+  sent message and the reply unfold there. The last few messages when the
+  chat opens, and every one after, are built whole in that row too: the lazy
+  stack keeps stale heights for rows that change or move, which near the
+  bottom left the view scrolled past the end of the content. Message actions are on a long press,
   and Select text opens the message where any part of it can be copied.
   The transcript keeps its bottom edge in place as text arrives, but a row
   opened by hand, such as a reply's thoughts, holds its own place and pushes

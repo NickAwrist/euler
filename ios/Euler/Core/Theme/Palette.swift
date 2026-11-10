@@ -131,6 +131,20 @@ struct Typography: Equatable {
     static func registerBundledFonts() {
         let urls = Bundle.main.urls(forResourcesWithExtension: "woff2", subdirectory: "fonts") ?? []
         CTFontManagerRegisterFontURLs(urls as CFArray, .process, true, nil)
+        // CoreText decompresses a WOFF2 file the first time it looks for a face in it, as
+        // for a reply's bold or italic text; the first chat opened hung a third of a second
+        // while it did. Looking for each file's faces here does it off the main thread.
+        Task.detached(priority: .utility) {
+            for url in urls {
+                let descriptors = CTFontManagerCreateFontDescriptorsFromURL(url as CFURL) as? [CTFontDescriptor] ?? []
+                for descriptor in descriptors {
+                    let font = CTFontCreateWithFontDescriptor(descriptor, 16, nil)
+                    for traits: CTFontSymbolicTraits in [.traitBold, .traitItalic, [.traitBold, .traitItalic]] {
+                        _ = CTFontCreateCopyWithSymbolicTraits(font, 16, nil, traits, traits)
+                    }
+                }
+            }
+        }
     }
 }
 

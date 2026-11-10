@@ -40,6 +40,7 @@ final class ChatStore {
     /// how long the transcript was when it was sent.
     @ObservationIgnored private var sent: (message: Euler_V1_Message, position: Int)?
     @ObservationIgnored private var arrivalTimeout: Task<Void, Never>?
+    @ObservationIgnored private var loading: Task<Void, Never>?
 
     init(id: String, backend: Backend, session app: AppSession?) {
         self.id = id
@@ -56,8 +57,32 @@ final class ChatStore {
         agents.first { $0.id == id }
     }
 
-    /// Loads the stored chat and its runtime.
+    /// Loads the stored chat and its runtime. A load already on its way is joined.
     func load() async {
+        await startLoading().value
+    }
+
+    /// Loads the chat if it isn't yet, waiting at most `limit`; the load carries on after.
+    func load(waitingAtMost limit: Duration) async {
+        guard !loaded else { return }
+        _ = startLoading()
+        let deadline = ContinuousClock.now + limit
+        while !loaded, ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(16))
+        }
+    }
+
+    private func startLoading() -> Task<Void, Never> {
+        if let loading { return loading }
+        let task = Task {
+            await fetchSession()
+            loading = nil
+        }
+        loading = task
+        return task
+    }
+
+    private func fetchSession() async {
         var request = Euler_V1_GetSessionRequest()
         request.id = id
         do {

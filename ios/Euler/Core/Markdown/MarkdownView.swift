@@ -104,6 +104,14 @@ struct InlineText: View {
     }
 
     private var text: Text {
+        // Interpolating into Text makes a localized string key, which SwiftUI scans when it
+        // lays the text out: a sixth of the time it took to open a long reply. Text alone is
+        // one attributed string; only math, drawn as images, needs interpolation.
+        if inline.segments.allSatisfy({ if case .text = $0 { true } else { false } }) {
+            return Text(inline.segments.reduce(into: AttributedString()) { text, segment in
+                if case .text(let attributed) = segment { text += styled(attributed) }
+            })
+        }
         let scaled = UIFontMetrics.default.scaledValue(for: size)
         return inline.segments.reduce(Text(verbatim: "")) { partial, segment in
             switch segment {

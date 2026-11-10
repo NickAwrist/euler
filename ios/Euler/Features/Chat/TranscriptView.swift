@@ -11,24 +11,36 @@ struct TranscriptView: View {
     @State private var atBottom = true
     @State private var editing: Int?
     @State private var versionChoices: [Int: Int] = [:]
-    /// How many messages there were when the turn in progress, or the next one, began.
-    @State private var turnStart: Int?
+    /// The first message built whole rather than lazily: the last few when the chat
+    /// opened, and every one after. The lazy stack keeps stale heights for rows that
+    /// change or move, and near the bottom anchor that left the view scrolled past the
+    /// end of the content, showing nothing until it was scrolled.
+    @State private var builtWholeFrom: Int
     /// Set while a row opens or closes where it stands.
     @State private var resizingInPlace = false
+
+    /// Enough messages to fill the screen when a chat opens.
+    private static let recentBuiltWhole = 10
+
+    init(chat: ChatStore, sheet: Binding<ChatSheet?>) {
+        self.chat = chat
+        _sheet = sheet
+        _builtWholeFrom = State(initialValue: max(0, chat.history.count - Self.recentBuiltWhole))
+    }
 
     var body: some View {
         // A message on its way into the saved ones is drawn as it will be once it is
         // there, in the row it will have, so being saved changes nothing on screen.
         let messages = chat.history + chat.arriving
-        let lazy = min(turnStart ?? messages.count, chat.history.count)
+        let lazy = min(builtWholeFrom, chat.history.count)
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(0..<lazy, id: \.self) { index in
                     row(messages[index], at: index)
                 }
-                // The turn in progress is one row of the lazy stack, built whole: the stack
-                // runs no transition for a row it builds, and here a sent message and the
-                // reply to it unfold.
+                // Recent messages and the turn in progress are one row of the lazy stack,
+                // built whole: the stack runs no transition for a row it builds, and here a
+                // sent message and the reply to it unfold.
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(lazy..<messages.count, id: \.self) { index in
                         row(messages[index], at: index)
@@ -63,11 +75,6 @@ struct TranscriptView: View {
         } action: { _, isAtBottom in
             atBottom = isAtBottom
         }
-        .onAppear { turnStart = chat.history.count }
-        // Between turns every saved message is a lazy row again.
-        .onChange(of: chat.running) { _, running in
-            if !running { turnStart = chat.history.count }
-        }
         .onChange(of: chat.live.activation?.content) { old, new in
             if (new?.utf8.count ?? 0) > (old?.utf8.count ?? 0) { Haptics.streaming() }
             follow()
@@ -78,6 +85,9 @@ struct TranscriptView: View {
             follow()
         }
         .onChange(of: chat.history.count) { old, new in
+            // An edit or regeneration drops messages; the ones that replace them are built
+            // whole too, or they would move into the lazy rows as they are saved.
+            if new < builtWholeFrom { builtWholeFrom = new }
             // A message the user just sent always comes into view.
             if new > old, chat.history.last?.role == .user { atBottom = true }
             follow()

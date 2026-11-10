@@ -12,6 +12,9 @@ struct HomeView: View {
     @State private var drag: CGFloat = 0
     /// Whether the drawer is still sliding shut, which keeps it on screen until it has.
     @State private var closing = false
+    /// The screen's opacity while one screen fades into the next.
+    @State private var contentOpacity = 1.0
+    @State private var switching: Task<Void, Never>?
 
     enum Screen: Hashable {
         /// Each new chat has its own identity, so starting another resets the draft.
@@ -46,7 +49,7 @@ struct HomeView: View {
                 NavigationStack {
                     content
                         .id(screen)
-                        .transition(.opacity)
+                        .opacity(contentOpacity)
                         .toolbar { toolbar }
                 }
                 // Full screen, so the content runs under the bars.
@@ -142,18 +145,38 @@ struct HomeView: View {
     }
 
     private func show(_ id: String) {
-        if screen != .chat(id) { go(to: .chat(id)) }
-        settle(open: false)
+        guard screen != .chat(id) else { return settle(open: false) }
+        go(to: .chat(id), loading: session.chat(id))
     }
 
     private func newChat(ephemeral: Bool) {
         go(to: .newChat(UUID(), ephemeral: ephemeral))
-        settle(open: false)
     }
 
-    /// Screens trade places in a short fade rather than a cut.
-    private func go(to next: Screen) {
-        withAnimation(.easeInOut(duration: 0.22)) { screen = next }
+    /// Under the open drawer the new screen is simply there as the drawer slides away.
+    /// Otherwise the old screen fades out and the new one in, never both at once: a
+    /// transition on the stack's root view doesn't run. A chat not loaded yet gets a
+    /// moment to load first, so it arrives with its messages rather than a spinner.
+    private func go(to next: Screen, loading chat: ChatStore? = nil) {
+        switching?.cancel()
+        let underDrawer = drawerOpen
+        if !underDrawer { withAnimation(.easeIn(duration: 0.12)) { contentOpacity = 0 } }
+        switching = Task {
+            let faded = ContinuousClock.now + .milliseconds(underDrawer ? 0 : 120)
+            await chat?.load(waitingAtMost: .milliseconds(300))
+            try? await Task.sleep(until: faded)
+            guard !Task.isCancelled else { return }
+            screen = next
+            if underDrawer {
+                contentOpacity = 1
+                settle(open: false)
+            } else {
+                // Once the new screen has drawn its first frame, which for a long chat takes
+                // a while, so the fade isn't spent before anything shows.
+                try? await Task.sleep(for: .milliseconds(16))
+                withAnimation(.easeOut(duration: 0.2)) { contentOpacity = 1 }
+            }
+        }
     }
 
     private func settle(open: Bool) {

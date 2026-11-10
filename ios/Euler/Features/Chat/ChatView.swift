@@ -49,11 +49,11 @@ struct ChatView: View {
                 .ignoresSafeArea()
             }
         }
-        .navigationTitle(title)
+        // No title: the bar's buttons float over the transcript.
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             if let summary = session.sessions.summary(chat.id), summary.hasExpiresAt {
-                ToolbarItem(placement: .principal) { EphemeralTitle(summary: summary) }
+                ToolbarItem(placement: .principal) { EphemeralExpiry(summary: summary) }
             }
             ToolbarItem(placement: .topBarTrailing) { ChatMenu(chat: chat, sheet: $sheet) }
         }
@@ -76,31 +76,19 @@ struct ChatView: View {
             if phase == .active { Task { await chat.refresh() } }
         }
     }
-
-    private var title: String {
-        session.sessions.summary(chat.id)?.title ?? "Chat"
-    }
 }
 
-/// An ephemeral chat's title with when it expires, as the web's amber header chip.
-private struct EphemeralTitle: View {
+/// When an ephemeral chat expires, as the web's amber header chip.
+private struct EphemeralExpiry: View {
     let summary: Euler_V1_SessionSummary
-    @Environment(\.palette) private var palette
 
     var body: some View {
-        VStack(spacing: 1) {
-            Text(summary.title)
-                .font(.headline)
-                .foregroundStyle(palette.foreground)
-                .lineLimit(1)
-            TimelineView(.periodic(from: .now, by: 60)) { context in
-                Label(Format.expiresIn(summary.expiresAt.date, now: context.date), systemImage: "eye.slash")
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(Palette.ephemeral)
-                    .labelStyle(.titleAndIcon)
-            }
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            Label(Format.expiresIn(summary.expiresAt.date, now: context.date), systemImage: "eye.slash")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Palette.ephemeral)
+                .labelStyle(.titleAndIcon)
         }
-        .accessibilityElement(children: .combine)
     }
 }
 
