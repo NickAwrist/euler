@@ -104,16 +104,23 @@ const REPLY_BODY = [
   "| Name | Value |\n| --- | --- |\n| Example | 42 |\n\n- one\n- two\n- three",
 ].join("");
 const reply = (index: number) => `Reply ${index}\n\n${REPLY_BODY}`;
+// Fixed times keep the session response the same size on every run.
+const stepTimes = {
+  startedAt: "2026-01-01T00:00:00.000Z",
+  endedAt: "2026-01-01T00:00:01.000Z",
+};
 const steps = [
-  { kind: "llm_call", status: "completed", turnIndex: 0 },
+  { kind: "llm_call", status: "done", turnIndex: 0, ...stepTimes },
   {
     kind: "tool_call",
-    status: "completed",
+    status: "done",
+    turnIndex: 0,
     toolName: "read_file",
     args: { path: "README.md" },
     result: "ok",
+    ...stepTimes,
   },
-  { kind: "llm_call", status: "completed", turnIndex: 1 },
+  { kind: "llm_call", status: "done", turnIndex: 1, ...stepTimes },
 ];
 
 ensureUserData(USER_ID);

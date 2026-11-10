@@ -31,6 +31,8 @@ const COMPOSER = "Send a message...";
 const TIMING_RUNS = 3;
 // Roughly a mid-range phone; applies to the reported timings only.
 const TIMING_CPU_SLOWDOWN = 4;
+const RPC = "/api/rpc/euler.v1.";
+const EVENT_STREAM = `${RPC}EventService/Subscribe`;
 
 const update = process.argv.includes("--update");
 
@@ -176,7 +178,7 @@ function trackRequests(page) {
     const { pathname } = new URL(request.url());
     if (
       pathname.startsWith("/api/") &&
-      pathname !== "/api/events" &&
+      pathname !== EVENT_STREAM &&
       !pollName(request.url())
     )
       requestsInFlight.add(request);
@@ -252,7 +254,7 @@ async function countRenders(page, action) {
 }
 
 /** The app's timer-driven requests, by path. They render on their own schedule. */
-const POLLS = { health: "/api/ollama/health" };
+const POLLS = { health: `${RPC}ProviderService/GetOllamaHealth` };
 const pollsInFlight = new Map();
 
 function pollName(url) {
@@ -377,10 +379,17 @@ async function bundleSizes(loadedScripts) {
   return sizes;
 }
 
-async function responseBytes(fixture, path) {
-  const response = await fetch(`${fixture.url}${path}`, {
-    headers: { "X-Euler-User-ID": fixture.userId },
+/** The size of an RPC's JSON response, the format the web app asks for. */
+async function responseBytes(fixture, method, request) {
+  const response = await fetch(`${fixture.url}${RPC}${method}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Euler-User-ID": fixture.userId,
+    },
+    body: JSON.stringify(request),
   });
+  if (!response.ok) throw new Error(`${method} returned ${response.status}`);
   return (await response.arrayBuffer()).byteLength;
 }
 
@@ -442,7 +451,7 @@ async function measureCounts(page, fixture) {
   await composer.fill("");
   let fileRequests = 0;
   const countFileRequest = (request) => {
-    if (new URL(request.url()).pathname.endsWith("/workspace/files"))
+    if (new URL(request.url()).pathname === `${RPC}WorkspaceService/ListFiles`)
       fileRequests++;
   };
   page.on("request", countFileRequest);
@@ -492,11 +501,13 @@ async function measureCounts(page, fixture) {
 
   metrics["api.sessionResponseBytes"] = await responseBytes(
     fixture,
-    `/api/sessions/${fixture.longSessions[0]}`,
+    "SessionService/GetSession",
+    { id: fixture.longSessions[0] },
   );
   metrics["api.sessionsResponseBytes"] = await responseBytes(
     fixture,
-    "/api/sessions",
+    "SessionService/ListSessions",
+    {},
   );
   return { metrics, scrollSamples };
 }
