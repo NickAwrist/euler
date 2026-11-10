@@ -302,9 +302,10 @@ with `LOG_LEVEL=error`, so those lines are all they print.
 - **A render count that depends on which answer arrives first.** Opening a
   chat sends `GetSession` and `GetRuntime` together, and a finished reply
   refreshes the chat list three times. React renders two answers in one
-  commit or two depending on their timing, which moved `openChat.renders`
-  between 647 and 724 and failed CI on a slower machine. The check now
-  answers calls one at a time in those two windows (`answerInTurn`). Wrap a
+  commit or two depending on their timing. Opening a chat counted about 648
+  renders when the answers shared a commit and about 724 when they did not,
+  and CI failed at 653. The check now answers calls one at a time in those
+  two windows (`answerInTurn`). Wrap a
   new measurement the same way when its window has calls in flight together,
   and prove it with `taskset -c 0,1 bun run perf:check` before trusting it.
 - **A screenshot of a fade.** Messages animate in. A capture taken as soon as
