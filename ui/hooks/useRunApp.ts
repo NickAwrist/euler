@@ -28,6 +28,7 @@ export function useRunApp() {
   const activeSessionIdRef = useRef<string | null>(null);
   const settings = useSettings(
     ollama.setOllamaHost,
+    ollama.setOllamaContextWindow,
     ollama.fetchOllamaHealth,
     ollama.refreshOllamaModels,
     comfy.fetchComfyUIHealth,
@@ -182,6 +183,7 @@ export function useRunApp() {
     activeExpiresAt: sessions.activeExpiresAt,
     userSettings: settings.userSettings,
     ollamaHost: ollama.ollamaHost,
+    ollamaContextWindow: ollama.ollamaContextWindow,
     comfyuiHost: comfy.comfyuiHost,
     comfyuiConnected: comfy.comfyuiConnected,
     comfyuiDefaultModel: comfy.comfyuiDefaultModel,

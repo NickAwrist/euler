@@ -1,11 +1,26 @@
+import { OllamaContextWindow } from "../../../src/gen/euler/v1/providers_pb";
 import { cx, eyebrowText } from "../../styles";
 import {
   ConnectionTestFeedback,
   connectionFeedback,
 } from "./ConnectionTestFeedback";
 import { EnvironmentSettingHint } from "./EnvironmentSettingHint";
+import { type Option, OptionSelect } from "./OptionSelect";
 import { inputClass, labelClass } from "./constants";
 import type { ConnectionTestState } from "./types";
+
+const contextWindows: Option<OllamaContextWindow>[] = [
+  { id: OllamaContextWindow.LOW, name: "Low - 32k" },
+  { id: OllamaContextWindow.MEDIUM, name: "Medium - 128k" },
+  { id: OllamaContextWindow.HIGH, name: "High - 256k" },
+];
+
+const CONTEXT_WINDOW_SLUGS: Record<OllamaContextWindow, string> = {
+  [OllamaContextWindow.UNSPECIFIED]: "low",
+  [OllamaContextWindow.LOW]: "low",
+  [OllamaContextWindow.MEDIUM]: "medium",
+  [OllamaContextWindow.HIGH]: "high",
+};
 
 export function OllamaSettingsTab({
   environmentManaged,
@@ -14,6 +29,7 @@ export function OllamaSettingsTab({
   ollamaConnected,
   testState,
   onTestOllama,
+  contextWindow,
 }: {
   environmentManaged: boolean | undefined;
   ollamaUri: string;
@@ -21,6 +37,11 @@ export function OllamaSettingsTab({
   ollamaConnected: boolean | null;
   testState: ConnectionTestState;
   onTestOllama: () => void;
+  /** Omitted where only the address is set up. */
+  contextWindow?: {
+    value: OllamaContextWindow;
+    onChange: (value: OllamaContextWindow) => void;
+  };
 }) {
   return (
     <section className="space-y-4">
@@ -63,6 +84,17 @@ export function OllamaSettingsTab({
           {...connectionFeedback(testState, ollamaConnected)}
         />
       </div>
+
+      {contextWindow && (
+        <OptionSelect
+          id="ollamaContextWindow"
+          label="Context window"
+          value={contextWindow.value}
+          options={contextWindows}
+          slugs={CONTEXT_WINDOW_SLUGS}
+          onChange={contextWindow.onChange}
+        />
+      )}
     </section>
   );
 }

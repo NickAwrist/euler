@@ -17,6 +17,7 @@ export const DATA_ROOT =
 
 export const DEFAULT_SKILLS_SEEDED_KEY_PREFIX = "default_skills_seeded:";
 export const OLLAMA_HOST_KEY = "ollama_host";
+export const OLLAMA_CONTEXT_WINDOW_KEY = "ollama_context_window";
 export const COMFYUI_HOST_KEY = "comfyui_host";
 export const OPENROUTER_API_KEY_KEY = "openrouter_api_key";
 export const BRAVE_SEARCH_API_KEY_KEY = "brave_search_api_key";

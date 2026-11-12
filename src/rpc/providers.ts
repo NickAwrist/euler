@@ -9,9 +9,11 @@ import {
 } from "../comfyui/client";
 import {
   getBraveSearchApiKey,
+  getOllamaContextWindow,
   getOpenRouterApiKey,
   setBraveSearchApiKey,
   setComfyUIHost,
+  setOllamaContextWindow,
   setOllamaHost,
   setOpenRouterApiKey,
 } from "../db/index";
@@ -29,6 +31,7 @@ import {
 import { envConfig } from "../env";
 import {
   ApiKeyProvider,
+  OllamaContextWindow,
   type ProviderService,
 } from "../gen/euler/v1/providers_pb";
 import { canEditEnvironmentSetting } from "../http/environmentSettings";
@@ -59,7 +62,8 @@ import {
 import { openRouterCatalog } from "../models/openRouterWire";
 import { OperationError } from "../observability/errors";
 import { logEvent } from "../observability/logger";
-import { imagePatch } from "../preferences/wire";
+import { choices, imagePatch } from "../preferences/wire";
+import type { OllamaContextWindow as ContextWindow } from "../schemas/ollama";
 import { errorMessage } from "../utils/errors";
 import { ownerOf } from "./context";
 
@@ -78,6 +82,12 @@ const API_KEYS = {
 
 const apiKey = (provider: ApiKeyProvider) =>
   API_KEYS[provider as keyof typeof API_KEYS];
+
+const contextWindows = choices<ContextWindow, OllamaContextWindow>({
+  low: OllamaContextWindow.LOW,
+  medium: OllamaContextWindow.MEDIUM,
+  high: OllamaContextWindow.HIGH,
+});
 
 function comfyConfig(owner: string) {
   return {
@@ -109,7 +119,10 @@ async function requireCatalog() {
 
 export const providerService: ServiceImpl<typeof ProviderService> = {
   getOllamaConfig() {
-    return { config: getOllamaHostConfig() };
+    return {
+      config: getOllamaHostConfig(),
+      contextWindow: contextWindows.toProto(getOllamaContextWindow()),
+    };
   },
   updateOllamaConfig(request) {
     const host = request.host.trim();
@@ -117,6 +130,11 @@ export const providerService: ServiceImpl<typeof ProviderService> = {
       setOllamaHost(host);
     invalidateOllamaClientCache();
     return { config: getOllamaHostConfig() };
+  },
+  setOllamaContextWindow(request) {
+    const contextWindow = contextWindows.fromProto(request.contextWindow);
+    if (contextWindow) setOllamaContextWindow(contextWindow);
+    return { contextWindow: contextWindows.toProto(getOllamaContextWindow()) };
   },
   async getOllamaHealth() {
     try {

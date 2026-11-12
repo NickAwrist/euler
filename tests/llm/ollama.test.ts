@@ -2,11 +2,13 @@ import "../setup";
 import { expect, test } from "bun:test";
 import { setOllamaHost } from "../../src/db";
 import { getUsageDashboard, recordUsage } from "../../src/db/usage";
+import { OllamaContextWindow } from "../../src/gen/euler/v1/providers_pb";
 import {
   ollamaReasoning,
   streamOllamaChat,
 } from "../../src/llm/ollamaProvider";
 import { UsageQuery } from "../../src/usage";
+import { Code, rpc, rpcCode } from "../helpers/rpc";
 
 test("Ollama reports local tokens and zero API spend to usage tracking", async () => {
   const server = Bun.serve({
@@ -61,6 +63,58 @@ test("Ollama maps the selected thinking level to the think option", async () => 
       for await (const _ of stream);
     }
     expect(thinks).toEqual([false, true, "low", undefined, undefined]);
+  } finally {
+    server.stop(true);
+  }
+});
+
+test("Ollama loads models with the saved context window", async () => {
+  const sizes: unknown[] = [];
+  const server = Bun.serve({
+    port: 0,
+    hostname: "127.0.0.1",
+    fetch: async (req) => {
+      const body = (await req.json()) as { options?: { num_ctx?: unknown } };
+      sizes.push(body.options?.num_ctx);
+      return new Response(
+        `${JSON.stringify({ model: "m", message: { role: "assistant", content: "" }, done: true })}\n`,
+        { headers: { "Content-Type": "application/x-ndjson" } },
+      );
+    },
+  });
+  const { providers } = rpc();
+  const chat = async () => {
+    const stream = await streamOllamaChat({
+      model: "m",
+      messages: [{ role: "user", content: "Hello" }],
+      tools: [],
+    });
+    for await (const _ of stream);
+  };
+  try {
+    setOllamaHost(`http://127.0.0.1:${server.port}`);
+    expect((await providers.getOllamaConfig({})).contextWindow).toBe(
+      OllamaContextWindow.LOW,
+    );
+    await chat();
+    for (const contextWindow of [
+      OllamaContextWindow.MEDIUM,
+      OllamaContextWindow.HIGH,
+    ]) {
+      await providers.setOllamaContextWindow({ contextWindow });
+      expect((await providers.getOllamaConfig({})).contextWindow).toBe(
+        contextWindow,
+      );
+      await chat();
+    }
+    expect(sizes).toEqual([32_768, 131_072, 262_144]);
+    expect(
+      await rpcCode(
+        providers.setOllamaContextWindow({
+          contextWindow: OllamaContextWindow.UNSPECIFIED,
+        }),
+      ),
+    ).toBe(Code.InvalidArgument);
   } finally {
     server.stop(true);
   }

@@ -8,13 +8,14 @@ import "euler/v1/preferences.proto";
 import "google/protobuf/timestamp.proto";
 
 // Model and tool providers: Ollama, ComfyUI, OpenRouter, ChatGPT and Brave
-// Search. Addresses and keys are server-wide; ComfyUI image defaults and the
-// ChatGPT connection belong to the user.
+// Search. Addresses, keys and the Ollama context window are server-wide;
+// ComfyUI image defaults and the ChatGPT connection belong to the user.
 service ProviderService {
   rpc GetOllamaConfig(GetOllamaConfigRequest) returns (GetOllamaConfigResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   rpc UpdateOllamaConfig(UpdateOllamaConfigRequest) returns (UpdateOllamaConfigResponse);
+  rpc SetOllamaContextWindow(SetOllamaContextWindowRequest) returns (SetOllamaContextWindowResponse);
   rpc GetOllamaHealth(GetOllamaHealthRequest) returns (GetOllamaHealthResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
@@ -77,10 +78,19 @@ message HostTest {
   optional string error = 3;
 }
 
+// How much context Ollama loads a model with: 32K, 128K or 256K tokens.
+enum OllamaContextWindow {
+  OLLAMA_CONTEXT_WINDOW_UNSPECIFIED = 0;
+  OLLAMA_CONTEXT_WINDOW_LOW = 1;
+  OLLAMA_CONTEXT_WINDOW_MEDIUM = 2;
+  OLLAMA_CONTEXT_WINDOW_HIGH = 3;
+}
+
 message GetOllamaConfigRequest {}
 
 message GetOllamaConfigResponse {
   HostConfig config = 1;
+  OllamaContextWindow context_window = 2;
 }
 
 message UpdateOllamaConfigRequest {
@@ -90,6 +100,17 @@ message UpdateOllamaConfigRequest {
 
 message UpdateOllamaConfigResponse {
   HostConfig config = 1;
+}
+
+message SetOllamaContextWindowRequest {
+  OllamaContextWindow context_window = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+}
+
+message SetOllamaContextWindowResponse {
+  OllamaContextWindow context_window = 1;
 }
 
 message GetOllamaHealthRequest {}

@@ -1,4 +1,5 @@
 import type { GetEnvironmentResponse } from "../../src/gen/euler/v1/preferences_pb";
+import type { OllamaContextWindow } from "../../src/gen/euler/v1/providers_pb";
 import { preferenceClient, providerClient, withErrorMessage } from "../lib/rpc";
 import type { MessageFields } from "../types";
 
@@ -18,6 +19,17 @@ export async function saveOllamaConfig(host: string) {
       "Failed to save Ollama URL",
     )
   ).config!;
+}
+
+export async function saveOllamaContextWindow(
+  contextWindow: OllamaContextWindow,
+) {
+  return (
+    await withErrorMessage(
+      providerClient.setOllamaContextWindow({ contextWindow }),
+      "Failed to save Ollama context window",
+    )
+  ).contextWindow;
 }
 
 export async function loadComfyUIModels(): Promise<string[]> {
