@@ -35,6 +35,8 @@ import type { McpOAuthConfig } from "../schemas/mcp";
 import { errorMessage } from "../utils/errors";
 
 export const MCP_OAUTH_CALLBACK_PATH = "/api/mcp/oauth/callback";
+/** Where the callback sends the iPhone app's sign-in sheet; the app listens for this scheme. */
+export const MCP_OAUTH_APP_RETURN_URL = "euler://mcp-oauth";
 const PENDING_TTL_MS = 10 * 60_000;
 const REFRESH_SKEW_MS = 60_000;
 const OAUTH_TIMEOUT_MS = 20_000;
@@ -48,6 +50,7 @@ type PendingOAuthAttempt = {
   codeVerifier: string;
   resourceMetadataUrl?: URL;
   scope?: string;
+  returnToApp: boolean;
   expiresAt: number;
   completing?: boolean;
 };
@@ -505,7 +508,7 @@ export function isMcpAuthorizationRequired(
 export async function startMcpServerOAuth(
   ownerUuid: string,
   serverId: string,
-  redirectOrigin?: string,
+  options: { redirectOrigin?: string; returnToApp: boolean },
   signal?: AbortSignal,
 ): Promise<{
   authorizationUrl: string;
@@ -521,7 +524,10 @@ export async function startMcpServerOAuth(
 
   const existing = getMcpServerOAuth(ownerUuid, serverId);
   const config = existing?.config ?? row.oauthConfig;
-  const redirectUri = resolveMcpOAuthRedirectUri(config, redirectOrigin);
+  const redirectUri = resolveMcpOAuthRedirectUri(
+    config,
+    options.redirectOrigin,
+  );
   const state = randomToken();
 
   // Starting an interactive sign-in clears dead tokens so auth() begins fresh consent.
@@ -583,6 +589,7 @@ export async function startMcpServerOAuth(
     codeVerifier: provider.codeVerifier(),
     resourceMetadataUrl: challenge.resourceMetadataUrl,
     scope: challenge.scope,
+    returnToApp: options.returnToApp,
     expiresAt: Date.now() + PENDING_TTL_MS,
   });
 
@@ -710,8 +717,8 @@ export async function finishMcpServerOAuth(
 export async function completeMcpOAuthHttpCallback(
   params: URLSearchParams,
 ): Promise<
-  | { ok: true; serverId: string; serverName: string }
-  | { ok: false; serverId?: string; message: string }
+  | { ok: true; serverId: string; serverName: string; returnToApp: boolean }
+  | { ok: false; serverId?: string; message: string; returnToApp: boolean }
 > {
   pruneExpiredPending();
   const state = params.get("state");
@@ -720,16 +727,24 @@ export async function completeMcpOAuthHttpCallback(
     return {
       ok: false,
       message: "Invalid or expired MCP sign-in. Return to Euler and try again.",
+      returnToApp: false,
     };
   }
+  const { returnToApp } = attempt;
   try {
     const server = await exchangePendingAttempt(attempt, params);
-    return { ok: true, serverId: server.id, serverName: server.name };
+    return {
+      ok: true,
+      serverId: server.id,
+      serverName: server.name,
+      returnToApp,
+    };
   } catch (error) {
     return {
       ok: false,
       serverId: attempt.serverId,
       message: errorMessage(error),
+      returnToApp,
     };
   }
 }

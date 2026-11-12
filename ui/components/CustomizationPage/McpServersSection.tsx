@@ -18,10 +18,7 @@ import { RefreshButton } from "../RefreshButton";
 import { ServiceIcon } from "../ServiceIcon";
 import { TruncateConfirmModal } from "../TruncateConfirmModal";
 import { AddMcpServersModal } from "./AddMcpServersModal";
-import { useMcpServers } from "./useMcpServers";
-
-const errorText = (cause: unknown, fallback: string) =>
-  cause instanceof Error ? cause.message : fallback;
+import { message, useMcpServers } from "./useMcpServers";
 
 export function McpServersSection() {
   const p = useMcpServers();
@@ -113,7 +110,7 @@ function McpServerItem({
         setCheck({
           result: {
             case: "error",
-            value: errorText(error, "Check failed"),
+            value: message(error, "Check failed"),
           },
           authorizationRequired: false,
         });
@@ -204,7 +201,7 @@ function McpServerItem({
         });
         window.open(started.authorizationUrl, "_blank", "noopener");
       } catch (cause: unknown) {
-        setOauthError(errorText(cause, "Failed to start MCP sign-in"));
+        setOauthError(message(cause, "Failed to start MCP sign-in"));
       }
     });
 
@@ -221,7 +218,7 @@ function McpServerItem({
         setCallbackUrl("");
         await runCheck();
       } catch (cause: unknown) {
-        setOauthError(errorText(cause, "Failed to finish MCP sign-in"));
+        setOauthError(message(cause, "Failed to finish MCP sign-in"));
       }
     });
 
@@ -237,7 +234,7 @@ function McpServerItem({
         setCallbackUrl("");
         await runCheck();
       } catch (cause: unknown) {
-        setOauthError(errorText(cause, "Failed to disconnect MCP server"));
+        setOauthError(message(cause, "Failed to disconnect MCP server"));
       }
     });
 

@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { Icon } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
@@ -8,7 +11,7 @@ export const MCP_TEST_TOKEN = "test-token";
 export const MCP_CONFIDENTIAL_CLIENT_ID = "pre-registered-client";
 export const MCP_CONFIDENTIAL_CLIENT_SECRET = "super-secret-client-value";
 
-async function serveMcpTools(request: Request, icons?: Icon[]) {
+function createTestMcp(icons?: Icon[]) {
   const mcp = new McpServer({ name: "test", version: "1.0.0", icons });
   mcp.registerTool(
     "echo",
@@ -19,6 +22,11 @@ async function serveMcpTools(request: Request, icons?: Icon[]) {
     content: [{ type: "text", text: "boom" }],
     isError: true,
   }));
+  return mcp;
+}
+
+async function serveMcpTools(request: Request, icons?: Icon[]) {
+  const mcp = createTestMcp(icons);
   const transport = new WebStandardStreamableHTTPServerTransport({
     enableJsonResponse: true,
   });
@@ -40,6 +48,49 @@ export function startMcpTestServer(icons?: Icon[]) {
   return {
     url: `http://127.0.0.1:${server.port}/mcp`,
     close: () => server.stop(true),
+  };
+}
+
+/** An MCP server that speaks only the older HTTP+SSE transport, behind a bearer token. */
+export async function startSseMcpTestServer() {
+  const transports = new Map<string, SSEServerTransport>();
+  const server = createServer(async (request, response) => {
+    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    // A Streamable HTTP client's first POST lands here, before any token check.
+    if (request.method === "POST" && url.pathname === "/sse") {
+      response.writeHead(405).end();
+      return;
+    }
+    if (request.headers.authorization !== `Bearer ${MCP_TEST_TOKEN}`) {
+      response.writeHead(401).end();
+      return;
+    }
+    if (request.method === "GET" && url.pathname === "/sse") {
+      const transport = new SSEServerTransport("/messages", response);
+      transports.set(transport.sessionId, transport);
+      response.on("close", () => transports.delete(transport.sessionId));
+      await createTestMcp().connect(transport);
+      return;
+    }
+    const transport = transports.get(url.searchParams.get("sessionId") ?? "");
+    if (
+      request.method === "POST" &&
+      url.pathname === "/messages" &&
+      transport
+    ) {
+      await transport.handlePostMessage(request, response);
+      return;
+    }
+    response.writeHead(404).end();
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  return {
+    url: `http://127.0.0.1:${port}/sse`,
+    close: () => {
+      server.closeAllConnections();
+      server.close();
+    },
   };
 }
 

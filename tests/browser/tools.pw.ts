@@ -118,8 +118,6 @@ test("tools desktop: authorize MCP server via BroadcastChannel callback and disc
             connected: true,
             configured: false,
             grantType: McpServerOAuth_GrantType.AUTHORIZATION_CODE,
-            hasClientSecret: false,
-            scopes: ["mcp:tools"],
           },
         }
       : {}),
@@ -225,9 +223,6 @@ test("tools desktop: finish MCP OAuth by pasting callback URL and surface callba
       connected,
       configured: true,
       grantType: McpServerOAuth_GrantType.AUTHORIZATION_CODE,
-      clientId: "sentry-client",
-      hasClientSecret: true,
-      scopes: [],
     },
   });
 

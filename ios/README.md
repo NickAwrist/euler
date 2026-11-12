@@ -114,7 +114,13 @@ into the asset catalog. Run it after changing either.
   policy, and SwiftMath typesets math; formulas it can't typeset show as source.
 - **Identity.** The server address lives in defaults, the user ID in the
   Keychain. Onboarding takes a pasted ID, a scanned QR (web Settings › General ›
-  Show QR) or a new one.
+  Show QR) or a new one. An address typed without a scheme is taken as `https`.
+- **MCP sign-in.** Authorize opens the provider's page in a system sheet
+  (`webAuthenticationSession`). The server finishes the sign-in on its own
+  callback and redirects to `euler://mcp-oauth`, which closes the sheet. That
+  callback has to be an address the phone can reach, so the server needs an
+  HTTPS address: the one the app is set to, or `EULER_PUBLIC_URL`. Without one
+  the app says so and opens nothing.
 
 ## Tests
 

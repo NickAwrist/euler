@@ -8,7 +8,7 @@ import {
   setMcpServerEnabledApi,
 } from "../../persist/mcpServers";
 
-function message(error: unknown, fallback: string): string {
+export function message(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 

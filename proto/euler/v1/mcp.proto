@@ -42,9 +42,6 @@ message McpServerOAuth {
   bool connected = 1;
   bool configured = 2;
   GrantType grant_type = 3;
-  optional string client_id = 4;
-  bool has_client_secret = 5;
-  repeated string scopes = 6;
 }
 
 // Header values hold credentials, so only their names leave the server.
@@ -124,8 +121,12 @@ message TestServerResponse {
 
 message StartServerOAuthRequest {
   string id = 1 [(buf.validate.field).string.min_len = 1];
-  // Browser origin when https or loopback, used to build an automatic callback.
+  // The address the client reaches the server at. When it is https or
+  // loopback, the sign-in redirects to the callback there.
   optional string redirect_origin = 2 [(buf.validate.field).string.max_len = 2048];
+  // Set by the iPhone app. The callback then redirects to the app's URL
+  // scheme, which closes its sign-in sheet, instead of showing a page.
+  bool return_to_app = 3;
 }
 
 message StartServerOAuthResponse {

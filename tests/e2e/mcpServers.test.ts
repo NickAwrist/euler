@@ -13,6 +13,7 @@ import {
   MCP_TEST_TOKEN,
   startMcpTestServer,
   startOAuthMcpTestServer,
+  startSseMcpTestServer,
 } from "../helpers/mcpServer";
 import { Code, rpc, rpcCode, rpcError } from "../helpers/rpc";
 import { TEST_USER_ID, startTestServer } from "../helpers/server";
@@ -106,6 +107,54 @@ test("MCP server configs are validated, user scoped, and never return header val
   }
 });
 
+test("MCP servers that only speak HTTP+SSE connect through the fallback transport", async () => {
+  const mcp = await startSseMcpTestServer();
+  const api = rpc().mcp;
+
+  try {
+    const created = await api.createServers({
+      config: JSON.stringify({
+        mcpServers: {
+          legacy: {
+            url: mcp.url,
+            headers: { Authorization: `Bearer ${MCP_TEST_TOKEN}` },
+          },
+          unauthorized: { url: mcp.url },
+        },
+      }),
+    });
+    const [legacy, unauthorized] = created.servers;
+    if (!legacy || !unauthorized) throw new Error("expected two servers");
+
+    const check = await api.testServer({ id: legacy.id });
+    if (check.result.case !== "connected") throw new Error("expected tools");
+    expect(check.result.value.tools.map((tool) => tool.name)).toEqual([
+      "echo",
+      "fail",
+    ]);
+
+    // The SSE stream's 401 is reported, not the 405 that caused the fallback.
+    const denied = await api.testServer({ id: unauthorized.id });
+    expect(denied.authorizationRequired).toBe(true);
+
+    const toolSet = await openUserMcpTools(
+      TEST_USER_ID,
+      new AbortController().signal,
+    );
+    try {
+      const echo = toolSet.tools.find((t) => t.name === "mcp__legacy__echo");
+      expect(await echo?.execute({ text: "hello sse" })).toEqual({
+        text: "hello sse",
+        failed: false,
+      });
+    } finally {
+      await toolSet.close();
+    }
+  } finally {
+    mcp.close();
+  }
+});
+
 test("MCP OAuth supports zero-config DCR + PKCE HTTP callback, refresh rotation, and revocation", async () => {
   const oauthMcp = startOAuthMcpTestServer();
   const appServer = await startTestServer();
@@ -175,7 +224,6 @@ test("MCP OAuth supports zero-config DCR + PKCE HTTP callback, refresh rotation,
       configured: false,
       connected: true,
       grantType: McpServerOAuth_GrantType.AUTHORIZATION_CODE,
-      hasClientSecret: false,
     });
 
     // Connected check and agent tool execution succeed.
@@ -223,6 +271,51 @@ test("MCP OAuth supports zero-config DCR + PKCE HTTP callback, refresh rotation,
   }
 });
 
+test("MCP OAuth callback hands the iPhone app back to its URL scheme", async () => {
+  const oauthMcp = startOAuthMcpTestServer();
+  const appServer = await startTestServer();
+  const api = rpc().mcp;
+
+  try {
+    const created = await api.createServers({
+      config: JSON.stringify({ mcpServers: { remote: { url: oauthMcp.url } } }),
+    });
+    const [server] = created.servers;
+    if (!server) throw new Error("expected server");
+    const start = () =>
+      api.startServerOAuth({
+        id: server.id,
+        redirectOrigin: appServer.url,
+        returnToApp: true,
+      });
+
+    // A refused sign-in still returns to the app, with the reason.
+    const started = await start();
+    const refused = new URL(started.redirectUri);
+    refused.searchParams.set("error", "access_denied");
+    refused.searchParams.set(
+      "state",
+      new URL(started.authorizationUrl).searchParams.get("state") ?? "",
+    );
+    const refusedRes = await fetch(refused, { redirect: "manual" });
+    expect(refusedRes.status).toBe(302);
+    expect(refusedRes.headers.get("location")).toBe(
+      "euler://mcp-oauth?error=OAuth%20authorization%20failed%3A%20access_denied",
+    );
+
+    const callbackUrl = oauthMcp.approveAuthorization(
+      (await start()).authorizationUrl,
+    );
+    const res = await fetch(callbackUrl, { redirect: "manual" });
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("euler://mcp-oauth");
+    expect((await api.listServers({})).servers[0]?.oauth?.connected).toBe(true);
+  } finally {
+    await appServer.close();
+    oauthMcp.close();
+  }
+});
+
 test("MCP OAuth supports pre-registered confidential clients, manual FinishServerOAuth, and client_credentials", async () => {
   const oauthMcp = startOAuthMcpTestServer();
   const api = rpc().mcp;
@@ -264,16 +357,11 @@ test("MCP OAuth supports pre-registered confidential clients, manual FinishServe
       configured: true,
       connected: false,
       grantType: McpServerOAuth_GrantType.AUTHORIZATION_CODE,
-      clientId: MCP_CONFIDENTIAL_CLIENT_ID,
-      hasClientSecret: true,
-      scopes: ["mcp:tools"],
     });
     expect(m2m.oauth).toMatchObject({
       configured: true,
       connected: false,
       grantType: McpServerOAuth_GrantType.CLIENT_CREDENTIALS,
-      clientId: MCP_CONFIDENTIAL_CLIENT_ID,
-      hasClientSecret: true,
     });
 
     // Non-HTTPS non-loopback LAN origins fall back to loopback for RFC 8252 compliance,

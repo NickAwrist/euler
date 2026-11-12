@@ -33,19 +33,6 @@ public nonisolated struct Euler_V1_McpServerOAuth: Sendable {
 
   public var grantType: Euler_V1_McpServerOAuth.GrantType = .unspecified
 
-  public var clientID: String {
-    get {_clientID ?? String()}
-    set {_clientID = newValue}
-  }
-  /// Returns true if `clientID` has been explicitly set.
-  public var hasClientID: Bool {self._clientID != nil}
-  /// Clears the value of `clientID`. Subsequent reads from it will return its default value.
-  public mutating func clearClientID() {self._clientID = nil}
-
-  public var hasClientSecret_p: Bool = false
-
-  public var scopes: [String] = []
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated enum GrantType: SwiftProtobuf.Enum, Swift.CaseIterable {
@@ -87,8 +74,6 @@ public nonisolated struct Euler_V1_McpServerOAuth: Sendable {
   }
 
   public init() {}
-
-  fileprivate var _clientID: String? = nil
 }
 
 /// Header values hold credentials, so only their names leave the server.
@@ -357,7 +342,8 @@ public nonisolated struct Euler_V1_StartServerOAuthRequest: Sendable {
 
   public var id: String = String()
 
-  /// Browser origin when https or loopback, used to build an automatic callback.
+  /// The address the client reaches the server at. When it is https or
+  /// loopback, the sign-in redirects to the callback there.
   public var redirectOrigin: String {
     get {_redirectOrigin ?? String()}
     set {_redirectOrigin = newValue}
@@ -367,6 +353,10 @@ public nonisolated struct Euler_V1_StartServerOAuthRequest: Sendable {
   /// Clears the value of `redirectOrigin`. Subsequent reads from it will return its default value.
   public mutating func clearRedirectOrigin() {self._redirectOrigin = nil}
 
+  /// Set by the iPhone app. The callback then redirects to the app's URL
+  /// scheme, which closes its sign-in sheet, instead of showing a page.
+  public var returnToApp: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -374,36 +364,30 @@ public nonisolated struct Euler_V1_StartServerOAuthRequest: Sendable {
   fileprivate var _redirectOrigin: String? = nil
 }
 
-public nonisolated struct Euler_V1_StartServerOAuthResponse: @unchecked Sendable {
+public nonisolated struct Euler_V1_StartServerOAuthResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Empty when non-interactive credentials authorized without a redirect.
-  public var authorizationURL: String {
-    get {_storage._authorizationURL}
-    set {_uniqueStorage()._authorizationURL = newValue}
-  }
+  public var authorizationURL: String = String()
 
-  public var redirectUri: String {
-    get {_storage._redirectUri}
-    set {_uniqueStorage()._redirectUri = newValue}
-  }
+  public var redirectUri: String = String()
 
   public var server: Euler_V1_McpServer {
-    get {_storage._server ?? Euler_V1_McpServer()}
-    set {_uniqueStorage()._server = newValue}
+    get {_server ?? Euler_V1_McpServer()}
+    set {_server = newValue}
   }
   /// Returns true if `server` has been explicitly set.
-  public var hasServer: Bool {_storage._server != nil}
+  public var hasServer: Bool {self._server != nil}
   /// Clears the value of `server`. Subsequent reads from it will return its default value.
-  public mutating func clearServer() {_uniqueStorage()._server = nil}
+  public mutating func clearServer() {self._server = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _server: Euler_V1_McpServer? = nil
 }
 
 public nonisolated struct Euler_V1_FinishServerOAuthRequest: Sendable {
@@ -483,7 +467,7 @@ fileprivate nonisolated let _protobuf_package = "euler.v1"
 
 nonisolated extension Euler_V1_McpServerOAuth: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".McpServerOAuth"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}connected\0\u{1}configured\0\u{3}grant_type\0\u{3}client_id\0\u{3}has_client_secret\0\u{1}scopes\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}connected\0\u{1}configured\0\u{3}grant_type\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -494,19 +478,12 @@ nonisolated extension Euler_V1_McpServerOAuth: SwiftProtobuf.Message, SwiftProto
       case 1: try { try decoder.decodeSingularBoolField(value: &self.connected) }()
       case 2: try { try decoder.decodeSingularBoolField(value: &self.configured) }()
       case 3: try { try decoder.decodeSingularEnumField(value: &self.grantType) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._clientID) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self.hasClientSecret_p) }()
-      case 6: try { try decoder.decodeRepeatedStringField(value: &self.scopes) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
     if self.connected != false {
       try visitor.visitSingularBoolField(value: self.connected, fieldNumber: 1)
     }
@@ -516,15 +493,6 @@ nonisolated extension Euler_V1_McpServerOAuth: SwiftProtobuf.Message, SwiftProto
     if self.grantType != .unspecified {
       try visitor.visitSingularEnumField(value: self.grantType, fieldNumber: 3)
     }
-    try { if let v = self._clientID {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
-    } }()
-    if self.hasClientSecret_p != false {
-      try visitor.visitSingularBoolField(value: self.hasClientSecret_p, fieldNumber: 5)
-    }
-    if !self.scopes.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.scopes, fieldNumber: 6)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -532,9 +500,6 @@ nonisolated extension Euler_V1_McpServerOAuth: SwiftProtobuf.Message, SwiftProto
     if lhs.connected != rhs.connected {return false}
     if lhs.configured != rhs.configured {return false}
     if lhs.grantType != rhs.grantType {return false}
-    if lhs._clientID != rhs._clientID {return false}
-    if lhs.hasClientSecret_p != rhs.hasClientSecret_p {return false}
-    if lhs.scopes != rhs.scopes {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1063,7 +1028,7 @@ nonisolated extension Euler_V1_TestServerResponse.Connected: SwiftProtobuf.Messa
 
 nonisolated extension Euler_V1_StartServerOAuthRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StartServerOAuthRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}redirect_origin\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}redirect_origin\0\u{3}return_to_app\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1073,6 +1038,7 @@ nonisolated extension Euler_V1_StartServerOAuthRequest: SwiftProtobuf.Message, S
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self._redirectOrigin) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.returnToApp) }()
       default: break
       }
     }
@@ -1089,12 +1055,16 @@ nonisolated extension Euler_V1_StartServerOAuthRequest: SwiftProtobuf.Message, S
     try { if let v = self._redirectOrigin {
       try visitor.visitSingularStringField(value: v, fieldNumber: 2)
     } }()
+    if self.returnToApp != false {
+      try visitor.visitSingularBoolField(value: self.returnToApp, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Euler_V1_StartServerOAuthRequest, rhs: Euler_V1_StartServerOAuthRequest) -> Bool {
     if lhs.id != rhs.id {return false}
     if lhs._redirectOrigin != rhs._redirectOrigin {return false}
+    if lhs.returnToApp != rhs.returnToApp {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1104,81 +1074,41 @@ nonisolated extension Euler_V1_StartServerOAuthResponse: SwiftProtobuf.Message, 
   public static let protoMessageName: String = _protobuf_package + ".StartServerOAuthResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}authorization_url\0\u{3}redirect_uri\0\u{1}server\0")
 
-  fileprivate class _StorageClass {
-    var _authorizationURL: String = String()
-    var _redirectUri: String = String()
-    var _server: Euler_V1_McpServer? = nil
-
-      // This property is used as the initial default value for new instances of the type.
-      // The type itself is protecting the reference to its storage via CoW semantics.
-      // This will force a copy to be made of this reference when the first mutation occurs;
-      // hence, it is safe to mark this as `nonisolated(unsafe)`.
-      static nonisolated(unsafe) let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _authorizationURL = source._authorizationURL
-      _redirectUri = source._redirectUri
-      _server = source._server
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularStringField(value: &_storage._authorizationURL) }()
-        case 2: try { try decoder.decodeSingularStringField(value: &_storage._redirectUri) }()
-        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._server) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.authorizationURL) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.redirectUri) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._server) }()
+      default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      if !_storage._authorizationURL.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._authorizationURL, fieldNumber: 1)
-      }
-      if !_storage._redirectUri.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._redirectUri, fieldNumber: 2)
-      }
-      try { if let v = _storage._server {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-      } }()
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.authorizationURL.isEmpty {
+      try visitor.visitSingularStringField(value: self.authorizationURL, fieldNumber: 1)
     }
+    if !self.redirectUri.isEmpty {
+      try visitor.visitSingularStringField(value: self.redirectUri, fieldNumber: 2)
+    }
+    try { if let v = self._server {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Euler_V1_StartServerOAuthResponse, rhs: Euler_V1_StartServerOAuthResponse) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._authorizationURL != rhs_storage._authorizationURL {return false}
-        if _storage._redirectUri != rhs_storage._redirectUri {return false}
-        if _storage._server != rhs_storage._server {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs.authorizationURL != rhs.authorizationURL {return false}
+    if lhs.redirectUri != rhs.redirectUri {return false}
+    if lhs._server != rhs._server {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

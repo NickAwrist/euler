@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { asyncRoute } from "../http/asyncRoute";
-import { completeMcpOAuthHttpCallback } from "../mcp/oauth";
+import {
+  MCP_OAUTH_APP_RETURN_URL,
+  completeMcpOAuthHttpCallback,
+} from "../mcp/oauth";
 
 const router = Router();
 
@@ -71,6 +74,16 @@ router.get(
     res.setHeader("Cache-Control", "no-store");
     res.setHeader("Referrer-Policy", "no-referrer");
     res.setHeader("X-Content-Type-Options", "nosniff");
+    if (outcome.returnToApp) {
+      // Percent-encoded, since iOS reads a "+" in a query as a plus sign.
+      res.redirect(
+        302,
+        outcome.ok
+          ? MCP_OAUTH_APP_RETURN_URL
+          : `${MCP_OAUTH_APP_RETURN_URL}?error=${encodeURIComponent(outcome.message)}`,
+      );
+      return;
+    }
     if (outcome.ok) {
       res.status(200).send(
         renderCallbackPage({

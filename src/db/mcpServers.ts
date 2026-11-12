@@ -19,7 +19,6 @@ export type McpServerRow = Omit<McpServerWrite, "oauth"> & {
   updated_at: number;
   oauthConfig: McpOAuthConfig | null;
   oauthConnected: boolean;
-  oauthScopes: string[];
 };
 
 export type McpServerOAuthRecord = {
@@ -76,7 +75,6 @@ function parseJson<T>(raw: string | null, schema: z.ZodType<T>): T | null {
 function toMcpServerRow(row: JoinedMcpServerRow): McpServerRow {
   const oauthConfig = parseJson(row.oauth_config, McpOAuthConfigSchema);
   const tokens = parseJson(row.oauth_tokens, StoredMcpTokensSchema);
-  const tokenScopes = tokens?.scope?.split(/\s+/).filter(Boolean);
   return {
     id: row.id,
     owner_uuid: row.owner_uuid,
@@ -88,7 +86,6 @@ function toMcpServerRow(row: JoinedMcpServerRow): McpServerRow {
     updated_at: row.updated_at,
     oauthConfig,
     oauthConnected: tokens !== null,
-    oauthScopes: tokenScopes ?? oauthConfig?.scopes ?? [],
   };
 }
 
@@ -128,7 +125,6 @@ export function createMcpServers(
       updated_at: now,
       oauthConfig: oauth ?? null,
       oauthConnected: false,
-      oauthScopes: oauth?.scopes ?? [],
     }),
   );
   const db = getDb();

@@ -1,3 +1,4 @@
+import AuthenticationServices
 import EulerAPI
 import SwiftProtobuf
 import SwiftUI
@@ -83,15 +84,15 @@ private struct McpServerView: View {
     @State var server: Euler_V1_McpServer
     let changed: () async -> Void
     @Environment(AppSession.self) private var session
-    @Environment(\.openURL) private var openURL
+    @Environment(\.webAuthenticationSession) private var webAuthenticationSession
     @Environment(\.dismiss) private var dismiss
     @State private var enabled: Bool?
     @State private var check: Euler_V1_TestServerResponse?
-    @State private var authorizationURL: URL?
-    @State private var redirectUri = ""
-    @State private var callback = ""
     @State private var oauthBusy = false
     @State private var oauthError: String?
+
+    /// The scheme of the address the server's callback redirects to (`MCP_OAUTH_APP_RETURN_URL`).
+    private static let returnScheme = "euler"
 
     private var isClientCredentials: Bool {
         server.hasOauth && server.oauth.grantType == .clientCredentials
@@ -123,30 +124,7 @@ private struct McpServerView: View {
                     set: { value in Task { await setEnabled(value) } }
                 ))
             }
-            if let authorizationURL {
-                Section("Authorization") {
-                    Link(destination: authorizationURL) {
-                        Label("Open sign-in page", systemImage: "arrow.up.right.square")
-                    }
-                    TextField("\(redirectUri.isEmpty ? "http://127.0.0.1" : redirectUri)?code=...", text: $callback, axis: .vertical)
-                        .font(.footnote.monospaced())
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                        .onSubmit { Task { await finishOAuth() } }
-                    if callback.isEmpty {
-                        PasteTextButton { callback = $0 }
-                    }
-                    Button("Connect") { Task { await finishOAuth() } }
-                        .disabled(callback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || oauthBusy)
-                    Button("Cancel", role: .cancel) {
-                        self.authorizationURL = nil
-                        callback = ""
-                        oauthError = nil
-                    }
-                    .disabled(oauthBusy)
-                }
-            } else if needsAuthorize {
+            if needsAuthorize {
                 Section {
                     Button("Authorize") { Task { await startOAuth() } }
                         .disabled(oauthBusy)
@@ -208,45 +186,40 @@ private struct McpServerView: View {
         }
     }
 
+    /// Signs in on a system sheet. The server finishes the sign-in on its own
+    /// callback, then redirects to the app's scheme, which closes the sheet.
     private func startOAuth() async {
         var request = Euler_V1_StartServerOAuthRequest()
         request.id = server.id
+        request.redirectOrigin = session.backend.baseURL.absoluteString
+        request.returnToApp = true
         oauthBusy = true
         defer { oauthBusy = false }
         do {
             let response = try await session.backend.mcpServers.startServerOauth(request: request, headers: [:]).value()
             if response.hasServer { server = response.server }
             oauthError = nil
-            callback = ""
-            redirectUri = response.redirectUri
-            if response.authorizationURL.isEmpty {
-                authorizationURL = nil
-                await changed()
-                await test()
-            } else if let url = URL(string: response.authorizationURL) {
-                authorizationURL = url
-                openURL(url)
+            if !response.authorizationURL.isEmpty, let url = URL(string: response.authorizationURL) {
+                // Any other callback is a loopback address, which on a phone is the phone.
+                guard response.redirectUri.hasPrefix("https://") || response.redirectUri.hasPrefix(request.redirectOrigin) else {
+                    oauthError = "Sign-in needs Euler at an HTTPS address."
+                    return
+                }
+                let returned = try await webAuthenticationSession.authenticate(
+                    using: url, callback: .customScheme(Self.returnScheme), additionalHeaderFields: [:]
+                )
+                if let message = URLComponents(url: returned, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "error" })?.value {
+                    oauthError = message
+                    return
+                }
+                let servers = try await session.backend.mcpServers.listServers(request: .init(), headers: [:]).value().servers
+                if let current = servers.first(where: { $0.id == server.id }) { server = current }
+                Haptics.success()
             }
-        } catch {
-            oauthError = error.displayMessage
-        }
-    }
-
-    private func finishOAuth() async {
-        var request = Euler_V1_FinishServerOAuthRequest()
-        request.id = server.id
-        request.callbackURL = callback.trimmingCharacters(in: .whitespacesAndNewlines)
-        oauthBusy = true
-        defer { oauthBusy = false }
-        do {
-            let response = try await session.backend.mcpServers.finishServerOauth(request: request, headers: [:]).value()
-            if response.hasServer { server = response.server }
-            authorizationURL = nil
-            callback = ""
-            oauthError = nil
-            Haptics.success()
             await changed()
             await test()
+        } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+            // Closing the sheet leaves the server as it was.
         } catch {
             oauthError = error.displayMessage
         }
@@ -260,8 +233,6 @@ private struct McpServerView: View {
         do {
             let response = try await session.backend.mcpServers.disconnectServerOauth(request: request, headers: [:]).value()
             if response.hasServer { server = response.server }
-            authorizationURL = nil
-            callback = ""
             oauthError = nil
             await changed()
             await test()

@@ -50,11 +50,6 @@ function server(row: McpServerRow) {
               row.oauthConfig?.grantType === "client_credentials"
                 ? McpServerOAuth_GrantType.CLIENT_CREDENTIALS
                 : McpServerOAuth_GrantType.AUTHORIZATION_CODE,
-            ...(row.oauthConfig?.clientId
-              ? { clientId: row.oauthConfig.clientId }
-              : {}),
-            hasClientSecret: Boolean(row.oauthConfig?.clientSecret),
-            scopes: row.oauthScopes,
           },
         }
       : {}),
@@ -170,7 +165,10 @@ export const mcpServerService: ServiceImpl<typeof McpServerService> = {
     const started = await startMcpServerOAuth(
       ownerOf(context),
       request.id,
-      request.redirectOrigin,
+      {
+        redirectOrigin: request.redirectOrigin,
+        returnToApp: request.returnToApp,
+      },
       context.signal,
     );
     return {
