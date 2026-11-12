@@ -33,6 +33,19 @@ public protocol Euler_V1_McpServerServiceClientInterface: Sendable {
     /// result of the test, not a failed call.
     @available(iOS 13, *)
     func `testServer`(request: Euler_V1_TestServerRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_TestServerResponse>
+
+    /// Starts an OAuth flow for the server, returning an authorization URL when
+    /// user consent is needed.
+    @available(iOS 13, *)
+    func `startServerOauth`(request: Euler_V1_StartServerOAuthRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_StartServerOAuthResponse>
+
+    /// Completes a pending OAuth sign-in from a redirected callback URL.
+    @available(iOS 13, *)
+    func `finishServerOauth`(request: Euler_V1_FinishServerOAuthRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_FinishServerOAuthResponse>
+
+    /// Clears saved OAuth tokens for the server and revokes them when supported.
+    @available(iOS 13, *)
+    func `disconnectServerOauth`(request: Euler_V1_DisconnectServerOAuthRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_DisconnectServerOAuthResponse>
 }
 
 /// Concrete implementation of `Euler_V1_McpServerServiceClientInterface`.
@@ -73,6 +86,21 @@ public final class Euler_V1_McpServerServiceClient: Euler_V1_McpServerServiceCli
         return await self.client.unary(path: "/euler.v1.McpServerService/TestServer", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
+    @available(iOS 13, *)
+    public func `startServerOauth`(request: Euler_V1_StartServerOAuthRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_StartServerOAuthResponse> {
+        return await self.client.unary(path: "/euler.v1.McpServerService/StartServerOAuth", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `finishServerOauth`(request: Euler_V1_FinishServerOAuthRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_FinishServerOAuthResponse> {
+        return await self.client.unary(path: "/euler.v1.McpServerService/FinishServerOAuth", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `disconnectServerOauth`(request: Euler_V1_DisconnectServerOAuthRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_DisconnectServerOAuthResponse> {
+        return await self.client.unary(path: "/euler.v1.McpServerService/DisconnectServerOAuth", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
     public enum Metadata {
         public enum Methods {
             public static let listServers = Connect.MethodSpec(name: "ListServers", service: "euler.v1.McpServerService", type: .unary)
@@ -81,6 +109,9 @@ public final class Euler_V1_McpServerServiceClient: Euler_V1_McpServerServiceCli
             public static let updateServer = Connect.MethodSpec(name: "UpdateServer", service: "euler.v1.McpServerService", type: .unary)
             public static let deleteServer = Connect.MethodSpec(name: "DeleteServer", service: "euler.v1.McpServerService", type: .unary)
             public static let testServer = Connect.MethodSpec(name: "TestServer", service: "euler.v1.McpServerService", type: .unary)
+            public static let startServerOauth = Connect.MethodSpec(name: "StartServerOAuth", service: "euler.v1.McpServerService", type: .unary)
+            public static let finishServerOauth = Connect.MethodSpec(name: "FinishServerOAuth", service: "euler.v1.McpServerService", type: .unary)
+            public static let disconnectServerOauth = Connect.MethodSpec(name: "DisconnectServerOAuth", service: "euler.v1.McpServerService", type: .unary)
         }
     }
 }

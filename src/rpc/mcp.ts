@@ -8,9 +8,18 @@ import {
   listMcpServers,
   setMcpServerEnabled,
 } from "../db/mcpServers";
-import type { McpServerService } from "../gen/euler/v1/mcp_pb";
+import {
+  McpServerOAuth_GrantType,
+  type McpServerService,
+} from "../gen/euler/v1/mcp_pb";
 import { connectMcpServer } from "../mcp/client";
 import { safeMcpIcons } from "../mcp/icons";
+import {
+  disconnectMcpServerOAuth,
+  finishMcpServerOAuth,
+  isMcpAuthorizationRequired,
+  startMcpServerOAuth,
+} from "../mcp/oauth";
 import { openUserMcpTools } from "../mcp/userTools";
 import { OperationError } from "../observability/errors";
 import { McpConfigSchema } from "../schemas/mcp";
@@ -22,7 +31,7 @@ import { icon, millis } from "./wire";
 const notFound = () =>
   new OperationError("NOT_FOUND", { message: "MCP server not found" });
 
-/** Header values hold credentials, so only their names leave the server. */
+/** Header values and OAuth secrets stay on the server. */
 function server(row: McpServerRow) {
   return {
     id: row.id,
@@ -32,6 +41,23 @@ function server(row: McpServerRow) {
     enabled: row.enabled,
     createdAt: millis(row.created_at),
     updatedAt: millis(row.updated_at),
+    ...(row.oauthConfig || row.oauthConnected
+      ? {
+          oauth: {
+            connected: row.oauthConnected,
+            configured: row.oauthConfig !== null,
+            grantType:
+              row.oauthConfig?.grantType === "client_credentials"
+                ? McpServerOAuth_GrantType.CLIENT_CREDENTIALS
+                : McpServerOAuth_GrantType.AUTHORIZATION_CODE,
+            ...(row.oauthConfig?.clientId
+              ? { clientId: row.oauthConfig.clientId }
+              : {}),
+            hasClientSecret: Boolean(row.oauthConfig?.clientSecret),
+            scopes: row.oauthScopes,
+          },
+        }
+      : {}),
   };
 }
 
@@ -100,7 +126,7 @@ export const mcpServerService: ServiceImpl<typeof McpServerService> = {
     const row = getMcpServer(ownerOf(context), request.id);
     if (!row) throw notFound();
     try {
-      const { client, tools } = await connectMcpServer(row);
+      const { client, tools } = await connectMcpServer(row, context.signal);
       try {
         return {
           result: {
@@ -122,12 +148,55 @@ export const mcpServerService: ServiceImpl<typeof McpServerService> = {
               })),
             },
           },
+          authorizationRequired: false,
         };
       } finally {
         await client.close();
       }
     } catch (error) {
-      return { result: { case: "error", value: errorMessage(error) } };
+      const authorizationRequired = isMcpAuthorizationRequired(row, error);
+      return {
+        result: {
+          case: "error",
+          value: authorizationRequired
+            ? "Authorization required"
+            : errorMessage(error),
+        },
+        authorizationRequired,
+      };
     }
+  },
+  async startServerOAuth(request, context) {
+    const started = await startMcpServerOAuth(
+      ownerOf(context),
+      request.id,
+      request.redirectOrigin,
+      context.signal,
+    );
+    return {
+      authorizationUrl: started.authorizationUrl,
+      redirectUri: started.redirectUri,
+      server: server(started.server),
+    };
+  },
+  async finishServerOAuth(request, context) {
+    const updated = await finishMcpServerOAuth(
+      ownerOf(context),
+      request.id,
+      request.callbackUrl,
+      context.signal,
+    );
+    return { server: server(updated) };
+  },
+  async disconnectServerOAuth(request, context) {
+    const disconnected = await disconnectMcpServerOAuth(
+      ownerOf(context),
+      request.id,
+      context.signal,
+    );
+    return {
+      server: server(disconnected.server),
+      revoked: disconnected.revoked,
+    };
   },
 };

@@ -12,6 +12,7 @@ import {
 } from "./observability/http";
 import comfyuiRoutes from "./routes/comfyui";
 import faviconsRoutes from "./routes/favicons";
+import mcpOAuthRoutes from "./routes/mcpOAuth";
 import { rpcMiddleware } from "./rpc/routes";
 import { startSessionExpiry } from "./sessions/lifecycle";
 import { workspaceService } from "./workspaces/WorkspaceService";
@@ -49,6 +50,7 @@ app.use(
 app.use(rpcMiddleware());
 app.use("/api/comfyui", comfyuiRoutes);
 app.use("/api/favicons", faviconsRoutes);
+app.use("/api/mcp/oauth", mcpOAuthRoutes);
 
 const distPath = join(process.cwd(), "dist");
 const indexPath = join(distPath, "index.html");

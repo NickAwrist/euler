@@ -56,6 +56,7 @@ export const envConfig = {
     ["EULER_FRONTEND_PORT", "FRONTEND_PORT"],
     DEFAULT_FRONTEND_PORT,
   ),
+  publicUrl: getFirstEnv(["EULER_PUBLIC_URL"]),
   ollamaHost: getFirstEnv(["EULER_OLLAMA_HOST", "OLLAMA_HOST"]),
   comfyuiHost: getFirstEnv(["EULER_COMFYUI_HOST", "COMFYUI_HOST"]),
   jinaApiKey: getFirstEnv(["JINA_API_KEY", "EULER_JINA_API_KEY"]),

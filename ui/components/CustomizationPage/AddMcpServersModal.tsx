@@ -87,7 +87,7 @@ export function AddMcpServersModal({
           )}
         >
           {error ??
-            "Paste an mcpServers config for remote servers. Header values are stored but never shown again."}
+            "Paste an mcpServers config for remote servers. Secrets in headers and oauth are stored but never shown again."}
         </p>
         <div className="mt-[14px] flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose} disabled={saving}>

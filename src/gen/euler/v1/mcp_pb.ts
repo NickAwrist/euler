@@ -2,8 +2,8 @@
 // @generated from file euler/v1/mcp.proto (package euler.v1, syntax proto3)
 /* eslint-disable */
 
-import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
-import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
+import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
 import type { DisplayIcon } from "./common_pb";
 import { file_euler_v1_common } from "./common_pb";
@@ -15,7 +15,78 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file euler/v1/mcp.proto.
  */
 export const file_euler_v1_mcp: GenFile = /*@__PURE__*/
-  fileDesc("ChJldWxlci92MS9tY3AucHJvdG8SCGV1bGVyLnYxIrkBCglNY3BTZXJ2ZXISCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRILCgN1cmwYAyABKAkSFAoMaGVhZGVyX25hbWVzGAQgAygJEg8KB2VuYWJsZWQYBSABKAgSLgoKY3JlYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXAiUgoHTWNwVG9vbBIMCgRuYW1lGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJEiQKBWljb25zGAMgAygLMhUuZXVsZXIudjEuRGlzcGxheUljb24iFAoSTGlzdFNlcnZlcnNSZXF1ZXN0IjsKE0xpc3RTZXJ2ZXJzUmVzcG9uc2USJAoHc2VydmVycxgBIAMoCzITLmV1bGVyLnYxLk1jcFNlcnZlciISChBMaXN0VG9vbHNSZXF1ZXN0IjUKEUxpc3RUb29sc1Jlc3BvbnNlEiAKBXRvb2xzGAEgAygLMhEuZXVsZXIudjEuTWNwVG9vbCIzChRDcmVhdGVTZXJ2ZXJzUmVxdWVzdBIbCgZjb25maWcYASABKAlCC7pICHIGEAEYoI0GIj0KFUNyZWF0ZVNlcnZlcnNSZXNwb25zZRIkCgdzZXJ2ZXJzGAEgAygLMhMuZXVsZXIudjEuTWNwU2VydmVyIjsKE1VwZGF0ZVNlcnZlclJlcXVlc3QSEwoCaWQYASABKAlCB7pIBHICEAESDwoHZW5hYmxlZBgCIAEoCCI7ChRVcGRhdGVTZXJ2ZXJSZXNwb25zZRIjCgZzZXJ2ZXIYASABKAsyEy5ldWxlci52MS5NY3BTZXJ2ZXIiKgoTRGVsZXRlU2VydmVyUmVxdWVzdBITCgJpZBgBIAEoCUIHukgEcgIQASIWChREZWxldGVTZXJ2ZXJSZXNwb25zZSIoChFUZXN0U2VydmVyUmVxdWVzdBITCgJpZBgBIAEoCUIHukgEcgIQASLBAQoSVGVzdFNlcnZlclJlc3BvbnNlEjsKCWNvbm5lY3RlZBgBIAEoCzImLmV1bGVyLnYxLlRlc3RTZXJ2ZXJSZXNwb25zZS5Db25uZWN0ZWRIABIPCgVlcnJvchgCIAEoCUgAGlMKCUNvbm5lY3RlZBIkCgVpY29ucxgBIAMoCzIVLmV1bGVyLnYxLkRpc3BsYXlJY29uEiAKBXRvb2xzGAIgAygLMhEuZXVsZXIudjEuTWNwVG9vbEIICgZyZXN1bHQy5wMKEE1jcFNlcnZlclNlcnZpY2USTwoLTGlzdFNlcnZlcnMSHC5ldWxlci52MS5MaXN0U2VydmVyc1JlcXVlc3QaHS5ldWxlci52MS5MaXN0U2VydmVyc1Jlc3BvbnNlIgOQAgESSQoJTGlzdFRvb2xzEhouZXVsZXIudjEuTGlzdFRvb2xzUmVxdWVzdBobLmV1bGVyLnYxLkxpc3RUb29sc1Jlc3BvbnNlIgOQAgESUAoNQ3JlYXRlU2VydmVycxIeLmV1bGVyLnYxLkNyZWF0ZVNlcnZlcnNSZXF1ZXN0Gh8uZXVsZXIudjEuQ3JlYXRlU2VydmVyc1Jlc3BvbnNlEk0KDFVwZGF0ZVNlcnZlchIdLmV1bGVyLnYxLlVwZGF0ZVNlcnZlclJlcXVlc3QaHi5ldWxlci52MS5VcGRhdGVTZXJ2ZXJSZXNwb25zZRJNCgxEZWxldGVTZXJ2ZXISHS5ldWxlci52MS5EZWxldGVTZXJ2ZXJSZXF1ZXN0Gh4uZXVsZXIudjEuRGVsZXRlU2VydmVyUmVzcG9uc2USRwoKVGVzdFNlcnZlchIbLmV1bGVyLnYxLlRlc3RTZXJ2ZXJSZXF1ZXN0GhwuZXVsZXIudjEuVGVzdFNlcnZlclJlc3BvbnNlYgZwcm90bzM", [file_buf_validate_validate, file_euler_v1_common, file_google_protobuf_timestamp]);
+  fileDesc("ChJldWxlci92MS9tY3AucHJvdG8SCGV1bGVyLnYxIq8CCg5NY3BTZXJ2ZXJPQXV0aBIRCgljb25uZWN0ZWQYASABKAgSEgoKY29uZmlndXJlZBgCIAEoCBI2CgpncmFudF90eXBlGAMgASgOMiIuZXVsZXIudjEuTWNwU2VydmVyT0F1dGguR3JhbnRUeXBlEhYKCWNsaWVudF9pZBgEIAEoCUgAiAEBEhkKEWhhc19jbGllbnRfc2VjcmV0GAUgASgIEg4KBnNjb3BlcxgGIAMoCSJtCglHcmFudFR5cGUSGgoWR1JBTlRfVFlQRV9VTlNQRUNJRklFRBAAEiEKHUdSQU5UX1RZUEVfQVVUSE9SSVpBVElPTl9DT0RFEAESIQodR1JBTlRfVFlQRV9DTElFTlRfQ1JFREVOVElBTFMQAkIMCgpfY2xpZW50X2lkIvEBCglNY3BTZXJ2ZXISCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRILCgN1cmwYAyABKAkSFAoMaGVhZGVyX25hbWVzGAQgAygJEg8KB2VuYWJsZWQYBSABKAgSLgoKY3JlYXRlZF9hdBgGIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLgoKdXBkYXRlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASLAoFb2F1dGgYCCABKAsyGC5ldWxlci52MS5NY3BTZXJ2ZXJPQXV0aEgAiAEBQggKBl9vYXV0aCJSCgdNY3BUb29sEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSJAoFaWNvbnMYAyADKAsyFS5ldWxlci52MS5EaXNwbGF5SWNvbiIUChJMaXN0U2VydmVyc1JlcXVlc3QiOwoTTGlzdFNlcnZlcnNSZXNwb25zZRIkCgdzZXJ2ZXJzGAEgAygLMhMuZXVsZXIudjEuTWNwU2VydmVyIhIKEExpc3RUb29sc1JlcXVlc3QiNQoRTGlzdFRvb2xzUmVzcG9uc2USIAoFdG9vbHMYASADKAsyES5ldWxlci52MS5NY3BUb29sIjMKFENyZWF0ZVNlcnZlcnNSZXF1ZXN0EhsKBmNvbmZpZxgBIAEoCUILukgIcgYQARigjQYiPQoVQ3JlYXRlU2VydmVyc1Jlc3BvbnNlEiQKB3NlcnZlcnMYASADKAsyEy5ldWxlci52MS5NY3BTZXJ2ZXIiOwoTVXBkYXRlU2VydmVyUmVxdWVzdBITCgJpZBgBIAEoCUIHukgEcgIQARIPCgdlbmFibGVkGAIgASgIIjsKFFVwZGF0ZVNlcnZlclJlc3BvbnNlEiMKBnNlcnZlchgBIAEoCzITLmV1bGVyLnYxLk1jcFNlcnZlciIqChNEZWxldGVTZXJ2ZXJSZXF1ZXN0EhMKAmlkGAEgASgJQge6SARyAhABIhYKFERlbGV0ZVNlcnZlclJlc3BvbnNlIigKEVRlc3RTZXJ2ZXJSZXF1ZXN0EhMKAmlkGAEgASgJQge6SARyAhABIuEBChJUZXN0U2VydmVyUmVzcG9uc2USOwoJY29ubmVjdGVkGAEgASgLMiYuZXVsZXIudjEuVGVzdFNlcnZlclJlc3BvbnNlLkNvbm5lY3RlZEgAEg8KBWVycm9yGAIgASgJSAASHgoWYXV0aG9yaXphdGlvbl9yZXF1aXJlZBgDIAEoCBpTCglDb25uZWN0ZWQSJAoFaWNvbnMYASADKAsyFS5ldWxlci52MS5EaXNwbGF5SWNvbhIgCgV0b29scxgCIAMoCzIRLmV1bGVyLnYxLk1jcFRvb2xCCAoGcmVzdWx0ImoKF1N0YXJ0U2VydmVyT0F1dGhSZXF1ZXN0EhMKAmlkGAEgASgJQge6SARyAhABEiYKD3JlZGlyZWN0X29yaWdpbhgCIAEoCUIIukgFcgMYgBBIAIgBAUISChBfcmVkaXJlY3Rfb3JpZ2luInAKGFN0YXJ0U2VydmVyT0F1dGhSZXNwb25zZRIZChFhdXRob3JpemF0aW9uX3VybBgBIAEoCRIUCgxyZWRpcmVjdF91cmkYAiABKAkSIwoGc2VydmVyGAMgASgLMhMuZXVsZXIudjEuTWNwU2VydmVyIlMKGEZpbmlzaFNlcnZlck9BdXRoUmVxdWVzdBITCgJpZBgBIAEoCUIHukgEcgIQARIiCgxjYWxsYmFja191cmwYAiABKAlCDLpICXIHGICAAYgBASJAChlGaW5pc2hTZXJ2ZXJPQXV0aFJlc3BvbnNlEiMKBnNlcnZlchgBIAEoCzITLmV1bGVyLnYxLk1jcFNlcnZlciIzChxEaXNjb25uZWN0U2VydmVyT0F1dGhSZXF1ZXN0EhMKAmlkGAEgASgJQge6SARyAhABIlUKHURpc2Nvbm5lY3RTZXJ2ZXJPQXV0aFJlc3BvbnNlEiMKBnNlcnZlchgBIAEoCzITLmV1bGVyLnYxLk1jcFNlcnZlchIPCgdyZXZva2VkGAIgASgIMooGChBNY3BTZXJ2ZXJTZXJ2aWNlEk8KC0xpc3RTZXJ2ZXJzEhwuZXVsZXIudjEuTGlzdFNlcnZlcnNSZXF1ZXN0Gh0uZXVsZXIudjEuTGlzdFNlcnZlcnNSZXNwb25zZSIDkAIBEkkKCUxpc3RUb29scxIaLmV1bGVyLnYxLkxpc3RUb29sc1JlcXVlc3QaGy5ldWxlci52MS5MaXN0VG9vbHNSZXNwb25zZSIDkAIBElAKDUNyZWF0ZVNlcnZlcnMSHi5ldWxlci52MS5DcmVhdGVTZXJ2ZXJzUmVxdWVzdBofLmV1bGVyLnYxLkNyZWF0ZVNlcnZlcnNSZXNwb25zZRJNCgxVcGRhdGVTZXJ2ZXISHS5ldWxlci52MS5VcGRhdGVTZXJ2ZXJSZXF1ZXN0Gh4uZXVsZXIudjEuVXBkYXRlU2VydmVyUmVzcG9uc2USTQoMRGVsZXRlU2VydmVyEh0uZXVsZXIudjEuRGVsZXRlU2VydmVyUmVxdWVzdBoeLmV1bGVyLnYxLkRlbGV0ZVNlcnZlclJlc3BvbnNlEkcKClRlc3RTZXJ2ZXISGy5ldWxlci52MS5UZXN0U2VydmVyUmVxdWVzdBocLmV1bGVyLnYxLlRlc3RTZXJ2ZXJSZXNwb25zZRJZChBTdGFydFNlcnZlck9BdXRoEiEuZXVsZXIudjEuU3RhcnRTZXJ2ZXJPQXV0aFJlcXVlc3QaIi5ldWxlci52MS5TdGFydFNlcnZlck9BdXRoUmVzcG9uc2USXAoRRmluaXNoU2VydmVyT0F1dGgSIi5ldWxlci52MS5GaW5pc2hTZXJ2ZXJPQXV0aFJlcXVlc3QaIy5ldWxlci52MS5GaW5pc2hTZXJ2ZXJPQXV0aFJlc3BvbnNlEmgKFURpc2Nvbm5lY3RTZXJ2ZXJPQXV0aBImLmV1bGVyLnYxLkRpc2Nvbm5lY3RTZXJ2ZXJPQXV0aFJlcXVlc3QaJy5ldWxlci52MS5EaXNjb25uZWN0U2VydmVyT0F1dGhSZXNwb25zZWIGcHJvdG8z", [file_buf_validate_validate, file_euler_v1_common, file_google_protobuf_timestamp]);
+
+/**
+ * Non-secret OAuth state for an MCP server. Client secrets and tokens stay on
+ * the server.
+ *
+ * @generated from message euler.v1.McpServerOAuth
+ */
+export type McpServerOAuth = Message<"euler.v1.McpServerOAuth"> & {
+  /**
+   * @generated from field: bool connected = 1;
+   */
+  connected: boolean;
+
+  /**
+   * @generated from field: bool configured = 2;
+   */
+  configured: boolean;
+
+  /**
+   * @generated from field: euler.v1.McpServerOAuth.GrantType grant_type = 3;
+   */
+  grantType: McpServerOAuth_GrantType;
+
+  /**
+   * @generated from field: optional string client_id = 4;
+   */
+  clientId?: string | undefined;
+
+  /**
+   * @generated from field: bool has_client_secret = 5;
+   */
+  hasClientSecret: boolean;
+
+  /**
+   * @generated from field: repeated string scopes = 6;
+   */
+  scopes: string[];
+};
+
+/**
+ * Describes the message euler.v1.McpServerOAuth.
+ * Use `create(McpServerOAuthSchema)` to create a new message.
+ */
+export const McpServerOAuthSchema: GenMessage<McpServerOAuth> = /*@__PURE__*/
+  messageDesc(file_euler_v1_mcp, 0);
+
+/**
+ * @generated from enum euler.v1.McpServerOAuth.GrantType
+ */
+export enum McpServerOAuth_GrantType {
+  /**
+   * @generated from enum value: GRANT_TYPE_UNSPECIFIED = 0;
+   */
+  UNSPECIFIED = 0,
+
+  /**
+   * @generated from enum value: GRANT_TYPE_AUTHORIZATION_CODE = 1;
+   */
+  AUTHORIZATION_CODE = 1,
+
+  /**
+   * @generated from enum value: GRANT_TYPE_CLIENT_CREDENTIALS = 2;
+   */
+  CLIENT_CREDENTIALS = 2,
+}
+
+/**
+ * Describes the enum euler.v1.McpServerOAuth.GrantType.
+ */
+export const McpServerOAuth_GrantTypeSchema: GenEnum<McpServerOAuth_GrantType> = /*@__PURE__*/
+  enumDesc(file_euler_v1_mcp, 0, 0);
 
 /**
  * Header values hold credentials, so only their names leave the server.
@@ -57,6 +128,11 @@ export type McpServer = Message<"euler.v1.McpServer"> & {
    * @generated from field: google.protobuf.Timestamp updated_at = 7;
    */
   updatedAt?: Timestamp | undefined;
+
+  /**
+   * @generated from field: optional euler.v1.McpServerOAuth oauth = 8;
+   */
+  oauth?: McpServerOAuth | undefined;
 };
 
 /**
@@ -64,7 +140,7 @@ export type McpServer = Message<"euler.v1.McpServer"> & {
  * Use `create(McpServerSchema)` to create a new message.
  */
 export const McpServerSchema: GenMessage<McpServer> = /*@__PURE__*/
-  messageDesc(file_euler_v1_mcp, 0);
+  messageDesc(file_euler_v1_mcp, 1);
 
 /**
  * @generated from message euler.v1.McpTool
@@ -91,7 +167,7 @@ export type McpTool = Message<"euler.v1.McpTool"> & {
  * Use `create(McpToolSchema)` to create a new message.
  */
 export const McpToolSchema: GenMessage<McpTool> = /*@__PURE__*/
-  messageDesc(file_euler_v1_mcp, 1);
+  messageDesc(file_euler_v1_mcp, 2);
 
 /**
  * @generated from message euler.v1.ListServersRequest
@@ -104,7 +180,7 @@ export type ListServersRequest = Message<"euler.v1.ListServersRequest"> & {
  * Use `create(ListServersRequestSchema)` to create a new message.
  */
 export const ListServersRequestSchema: GenMessage<ListServersRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_mcp, 2);
+  messageDesc(file_euler_v1_mcp, 3);
 
 /**
  * @generated from message euler.v1.ListServersResponse
@@ -121,7 +197,7 @@ export type ListServersResponse = Message<"euler.v1.ListServersResponse"> & {
  * Use `create(ListServersResponseSchema)` to create a new message.
  */
 export const ListServersResponseSchema: GenMessage<ListServersResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_mcp, 3);
+  messageDesc(file_euler_v1_mcp, 4);
 
 /**
  * @generated from message euler.v1.ListToolsRequest
@@ -134,7 +210,7 @@ export type ListToolsRequest = Message<"euler.v1.ListToolsRequest"> & {
  * Use `create(ListToolsRequestSchema)` to create a new message.
  */
 export const ListToolsRequestSchema: GenMessage<ListToolsRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_mcp, 4);
+  messageDesc(file_euler_v1_mcp, 5);
 
 /**
  * @generated from message euler.v1.ListToolsResponse
@@ -151,7 +227,7 @@ export type ListToolsResponse = Message<"euler.v1.ListToolsResponse"> & {
  * Use `create(ListToolsResponseSchema)` to create a new message.
  */
 export const ListToolsResponseSchema: GenMessage<ListToolsResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_mcp, 5);
+  messageDesc(file_euler_v1_mcp, 6);
 
 /**
  * @generated from message euler.v1.CreateServersRequest
@@ -170,7 +246,7 @@ export type CreateServersRequest = Message<"euler.v1.CreateServersRequest"> & {
  * Use `create(CreateServersRequestSchema)` to create a new message.
  */
 export const CreateServersRequestSchema: GenMessage<CreateServersRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_mcp, 6);
+  messageDesc(file_euler_v1_mcp, 7);
 
 /**
  * @generated from message euler.v1.CreateServersResponse
@@ -187,7 +263,7 @@ export type CreateServersResponse = Message<"euler.v1.CreateServersResponse"> & 
  * Use `create(CreateServersResponseSchema)` to create a new message.
  */
 export const CreateServersResponseSchema: GenMessage<CreateServersResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_mcp, 7);
+  messageDesc(file_euler_v1_mcp, 8);
 
 /**
  * @generated from message euler.v1.UpdateServerRequest
@@ -209,7 +285,7 @@ export type UpdateServerRequest = Message<"euler.v1.UpdateServerRequest"> & {
  * Use `create(UpdateServerRequestSchema)` to create a new message.
  */
 export const UpdateServerRequestSchema: GenMessage<UpdateServerRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_mcp, 8);
+  messageDesc(file_euler_v1_mcp, 9);
 
 /**
  * @generated from message euler.v1.UpdateServerResponse
@@ -226,7 +302,7 @@ export type UpdateServerResponse = Message<"euler.v1.UpdateServerResponse"> & {
  * Use `create(UpdateServerResponseSchema)` to create a new message.
  */
 export const UpdateServerResponseSchema: GenMessage<UpdateServerResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_mcp, 9);
+  messageDesc(file_euler_v1_mcp, 10);
 
 /**
  * @generated from message euler.v1.DeleteServerRequest
@@ -243,7 +319,7 @@ export type DeleteServerRequest = Message<"euler.v1.DeleteServerRequest"> & {
  * Use `create(DeleteServerRequestSchema)` to create a new message.
  */
 export const DeleteServerRequestSchema: GenMessage<DeleteServerRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_mcp, 10);
+  messageDesc(file_euler_v1_mcp, 11);
 
 /**
  * @generated from message euler.v1.DeleteServerResponse
@@ -256,7 +332,7 @@ export type DeleteServerResponse = Message<"euler.v1.DeleteServerResponse"> & {
  * Use `create(DeleteServerResponseSchema)` to create a new message.
  */
 export const DeleteServerResponseSchema: GenMessage<DeleteServerResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_mcp, 11);
+  messageDesc(file_euler_v1_mcp, 12);
 
 /**
  * @generated from message euler.v1.TestServerRequest
@@ -273,7 +349,7 @@ export type TestServerRequest = Message<"euler.v1.TestServerRequest"> & {
  * Use `create(TestServerRequestSchema)` to create a new message.
  */
 export const TestServerRequestSchema: GenMessage<TestServerRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_mcp, 12);
+  messageDesc(file_euler_v1_mcp, 13);
 
 /**
  * @generated from message euler.v1.TestServerResponse
@@ -297,6 +373,13 @@ export type TestServerResponse = Message<"euler.v1.TestServerResponse"> & {
     value: string;
     case: "error";
   } | { case: undefined; value?: undefined };
+
+  /**
+   * True when the server requires OAuth authorization before it can connect.
+   *
+   * @generated from field: bool authorization_required = 3;
+   */
+  authorizationRequired: boolean;
 };
 
 /**
@@ -304,7 +387,7 @@ export type TestServerResponse = Message<"euler.v1.TestServerResponse"> & {
  * Use `create(TestServerResponseSchema)` to create a new message.
  */
 export const TestServerResponseSchema: GenMessage<TestServerResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_mcp, 13);
+  messageDesc(file_euler_v1_mcp, 14);
 
 /**
  * @generated from message euler.v1.TestServerResponse.Connected
@@ -326,7 +409,140 @@ export type TestServerResponse_Connected = Message<"euler.v1.TestServerResponse.
  * Use `create(TestServerResponse_ConnectedSchema)` to create a new message.
  */
 export const TestServerResponse_ConnectedSchema: GenMessage<TestServerResponse_Connected> = /*@__PURE__*/
-  messageDesc(file_euler_v1_mcp, 13, 0);
+  messageDesc(file_euler_v1_mcp, 14, 0);
+
+/**
+ * @generated from message euler.v1.StartServerOAuthRequest
+ */
+export type StartServerOAuthRequest = Message<"euler.v1.StartServerOAuthRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * Browser origin when https or loopback, used to build an automatic callback.
+   *
+   * @generated from field: optional string redirect_origin = 2;
+   */
+  redirectOrigin?: string | undefined;
+};
+
+/**
+ * Describes the message euler.v1.StartServerOAuthRequest.
+ * Use `create(StartServerOAuthRequestSchema)` to create a new message.
+ */
+export const StartServerOAuthRequestSchema: GenMessage<StartServerOAuthRequest> = /*@__PURE__*/
+  messageDesc(file_euler_v1_mcp, 15);
+
+/**
+ * @generated from message euler.v1.StartServerOAuthResponse
+ */
+export type StartServerOAuthResponse = Message<"euler.v1.StartServerOAuthResponse"> & {
+  /**
+   * Empty when non-interactive credentials authorized without a redirect.
+   *
+   * @generated from field: string authorization_url = 1;
+   */
+  authorizationUrl: string;
+
+  /**
+   * @generated from field: string redirect_uri = 2;
+   */
+  redirectUri: string;
+
+  /**
+   * @generated from field: euler.v1.McpServer server = 3;
+   */
+  server?: McpServer | undefined;
+};
+
+/**
+ * Describes the message euler.v1.StartServerOAuthResponse.
+ * Use `create(StartServerOAuthResponseSchema)` to create a new message.
+ */
+export const StartServerOAuthResponseSchema: GenMessage<StartServerOAuthResponse> = /*@__PURE__*/
+  messageDesc(file_euler_v1_mcp, 16);
+
+/**
+ * @generated from message euler.v1.FinishServerOAuthRequest
+ */
+export type FinishServerOAuthRequest = Message<"euler.v1.FinishServerOAuthRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string callback_url = 2;
+   */
+  callbackUrl: string;
+};
+
+/**
+ * Describes the message euler.v1.FinishServerOAuthRequest.
+ * Use `create(FinishServerOAuthRequestSchema)` to create a new message.
+ */
+export const FinishServerOAuthRequestSchema: GenMessage<FinishServerOAuthRequest> = /*@__PURE__*/
+  messageDesc(file_euler_v1_mcp, 17);
+
+/**
+ * @generated from message euler.v1.FinishServerOAuthResponse
+ */
+export type FinishServerOAuthResponse = Message<"euler.v1.FinishServerOAuthResponse"> & {
+  /**
+   * @generated from field: euler.v1.McpServer server = 1;
+   */
+  server?: McpServer | undefined;
+};
+
+/**
+ * Describes the message euler.v1.FinishServerOAuthResponse.
+ * Use `create(FinishServerOAuthResponseSchema)` to create a new message.
+ */
+export const FinishServerOAuthResponseSchema: GenMessage<FinishServerOAuthResponse> = /*@__PURE__*/
+  messageDesc(file_euler_v1_mcp, 18);
+
+/**
+ * @generated from message euler.v1.DisconnectServerOAuthRequest
+ */
+export type DisconnectServerOAuthRequest = Message<"euler.v1.DisconnectServerOAuthRequest"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+};
+
+/**
+ * Describes the message euler.v1.DisconnectServerOAuthRequest.
+ * Use `create(DisconnectServerOAuthRequestSchema)` to create a new message.
+ */
+export const DisconnectServerOAuthRequestSchema: GenMessage<DisconnectServerOAuthRequest> = /*@__PURE__*/
+  messageDesc(file_euler_v1_mcp, 19);
+
+/**
+ * @generated from message euler.v1.DisconnectServerOAuthResponse
+ */
+export type DisconnectServerOAuthResponse = Message<"euler.v1.DisconnectServerOAuthResponse"> & {
+  /**
+   * @generated from field: euler.v1.McpServer server = 1;
+   */
+  server?: McpServer | undefined;
+
+  /**
+   * Whether the authorization server confirmed token revocation.
+   *
+   * @generated from field: bool revoked = 2;
+   */
+  revoked: boolean;
+};
+
+/**
+ * Describes the message euler.v1.DisconnectServerOAuthResponse.
+ * Use `create(DisconnectServerOAuthResponseSchema)` to create a new message.
+ */
+export const DisconnectServerOAuthResponseSchema: GenMessage<DisconnectServerOAuthResponse> = /*@__PURE__*/
+  messageDesc(file_euler_v1_mcp, 20);
 
 /**
  * Remote MCP servers whose tools agents can call.
@@ -388,6 +604,37 @@ export const McpServerService: GenService<{
     methodKind: "unary";
     input: typeof TestServerRequestSchema;
     output: typeof TestServerResponseSchema;
+  },
+  /**
+   * Starts an OAuth flow for the server, returning an authorization URL when
+   * user consent is needed.
+   *
+   * @generated from rpc euler.v1.McpServerService.StartServerOAuth
+   */
+  startServerOAuth: {
+    methodKind: "unary";
+    input: typeof StartServerOAuthRequestSchema;
+    output: typeof StartServerOAuthResponseSchema;
+  },
+  /**
+   * Completes a pending OAuth sign-in from a redirected callback URL.
+   *
+   * @generated from rpc euler.v1.McpServerService.FinishServerOAuth
+   */
+  finishServerOAuth: {
+    methodKind: "unary";
+    input: typeof FinishServerOAuthRequestSchema;
+    output: typeof FinishServerOAuthResponseSchema;
+  },
+  /**
+   * Clears saved OAuth tokens for the server and revokes them when supported.
+   *
+   * @generated from rpc euler.v1.McpServerService.DisconnectServerOAuth
+   */
+  disconnectServerOAuth: {
+    methodKind: "unary";
+    input: typeof DisconnectServerOAuthRequestSchema;
+    output: typeof DisconnectServerOAuthResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_euler_v1_mcp, 0);

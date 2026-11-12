@@ -1,12 +1,18 @@
-import type {
-  McpServer,
-  McpTool,
-  TestServerResponse,
+import {
+  type McpServer,
+  McpServerOAuth_GrantType,
+  type McpTool,
+  type StartServerOAuthResponse,
+  type TestServerResponse,
 } from "../../src/gen/euler/v1/mcp_pb";
 import { mcpServerClient, withErrorMessage } from "../lib/rpc";
 
-export type { McpServer, McpTool };
-export type McpServerCheck = TestServerResponse["result"];
+export { McpServerOAuth_GrantType };
+export type { McpServer, McpTool, StartServerOAuthResponse };
+export type McpServerCheck = {
+  result: TestServerResponse["result"];
+  authorizationRequired: boolean;
+};
 
 export async function fetchMcpServers(): Promise<McpServer[]> {
   return (
@@ -47,12 +53,49 @@ export async function deleteMcpServerApi(id: string): Promise<void> {
 }
 
 export async function checkMcpServerApi(id: string): Promise<McpServerCheck> {
+  const response = await withErrorMessage(
+    mcpServerClient.testServer({ id }),
+    "Failed to check MCP server",
+  );
+  return {
+    result: response.result,
+    authorizationRequired: response.authorizationRequired,
+  };
+}
+
+export async function startMcpServerOAuthApi(
+  id: string,
+  redirectOrigin?: string,
+): Promise<StartServerOAuthResponse> {
+  return withErrorMessage(
+    mcpServerClient.startServerOAuth({
+      id,
+      ...(redirectOrigin ? { redirectOrigin } : {}),
+    }),
+    "Failed to start MCP sign-in",
+  );
+}
+
+export async function finishMcpServerOAuthApi(
+  id: string,
+  callbackUrl: string,
+): Promise<McpServer> {
   return (
     await withErrorMessage(
-      mcpServerClient.testServer({ id }),
-      "Failed to check MCP server",
+      mcpServerClient.finishServerOAuth({ id, callbackUrl }),
+      "Failed to finish MCP sign-in",
     )
-  ).result;
+  ).server!;
+}
+
+export async function disconnectMcpServerOAuthApi(
+  id: string,
+): Promise<{ server: McpServer; revoked: boolean }> {
+  const response = await withErrorMessage(
+    mcpServerClient.disconnectServerOAuth({ id }),
+    "Failed to disconnect MCP server",
+  );
+  return { server: response.server!, revoked: response.revoked };
 }
 
 export async function fetchMcpTools(signal?: AbortSignal): Promise<McpTool[]> {

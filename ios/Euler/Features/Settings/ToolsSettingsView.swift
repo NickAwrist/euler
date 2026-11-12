@@ -80,12 +80,30 @@ private struct McpServersSection: View {
 }
 
 private struct McpServerView: View {
-    let server: Euler_V1_McpServer
+    @State var server: Euler_V1_McpServer
     let changed: () async -> Void
     @Environment(AppSession.self) private var session
+    @Environment(\.openURL) private var openURL
     @Environment(\.dismiss) private var dismiss
     @State private var enabled: Bool?
-    @State private var check: Euler_V1_TestServerResponse.OneOf_Result?
+    @State private var check: Euler_V1_TestServerResponse?
+    @State private var authorizationURL: URL?
+    @State private var redirectUri = ""
+    @State private var callback = ""
+    @State private var oauthBusy = false
+    @State private var oauthError: String?
+
+    private var isClientCredentials: Bool {
+        server.hasOauth && server.oauth.grantType == .clientCredentials
+    }
+
+    private var needsAuthorize: Bool {
+        !isClientCredentials && (check?.authorizationRequired == true || (server.hasOauth && server.oauth.configured && !server.oauth.connected))
+    }
+
+    private var showDisconnect: Bool {
+        !isClientCredentials && server.hasOauth && server.oauth.connected && check?.authorizationRequired != true
+    }
 
     var body: some View {
         ThemedForm {
@@ -94,26 +112,77 @@ private struct McpServerView: View {
                 if !server.headerNames.isEmpty {
                     LabeledContent("Headers", value: server.headerNames.joined(separator: ", "))
                 }
+                if server.hasOauth {
+                    LabeledContent(
+                        "OAuth",
+                        value: isClientCredentials ? "Client credentials" : showDisconnect ? "Connected" : "Not connected"
+                    )
+                }
                 Toggle("Enabled", isOn: Binding(
                     get: { enabled ?? server.enabled },
                     set: { value in Task { await setEnabled(value) } }
                 ))
             }
+            if let authorizationURL {
+                Section("Authorization") {
+                    Link(destination: authorizationURL) {
+                        Label("Open sign-in page", systemImage: "arrow.up.right.square")
+                    }
+                    TextField("\(redirectUri.isEmpty ? "http://127.0.0.1" : redirectUri)?code=...", text: $callback, axis: .vertical)
+                        .font(.footnote.monospaced())
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onSubmit { Task { await finishOAuth() } }
+                    if callback.isEmpty {
+                        PasteTextButton { callback = $0 }
+                    }
+                    Button("Connect") { Task { await finishOAuth() } }
+                        .disabled(callback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || oauthBusy)
+                    Button("Cancel", role: .cancel) {
+                        self.authorizationURL = nil
+                        callback = ""
+                        oauthError = nil
+                    }
+                    .disabled(oauthBusy)
+                }
+            } else if needsAuthorize {
+                Section {
+                    Button("Authorize") { Task { await startOAuth() } }
+                        .disabled(oauthBusy)
+                }
+            } else if showDisconnect {
+                Section {
+                    Button("Disconnect OAuth", role: .destructive) { Task { await disconnectOAuth() } }
+                        .disabled(oauthBusy)
+                }
+            }
+            if let oauthError {
+                Section { Text(oauthError).foregroundStyle(.red) }
+            }
             Section("Tools") {
-                switch check {
-                case .connected(let connected):
-                    if connected.tools.isEmpty { Text("No tools.").foregroundStyle(.secondary) }
-                    ForEach(connected.tools, id: \.name) { tool in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(tool.name).font(.body.monospaced())
-                            if !tool.description_p.isEmpty {
-                                Text(tool.description_p).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                if let check {
+                    if check.authorizationRequired {
+                        Text("Authorization required.").foregroundStyle(.secondary)
+                    } else {
+                        switch check.result {
+                        case .connected(let connected):
+                            if connected.tools.isEmpty { Text("No tools.").foregroundStyle(.secondary) }
+                            ForEach(connected.tools, id: \.name) { tool in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(tool.name).font(.body.monospaced())
+                                    if !tool.description_p.isEmpty {
+                                        Text(tool.description_p).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                                    }
+                                }
                             }
+                        case .error(let message):
+                            Text(message).foregroundStyle(.red)
+                        case nil:
+                            ProgressView()
                         }
                     }
-                case .error(let message):
-                    Text(message).foregroundStyle(.red)
-                case nil:
+                } else {
                     ProgressView()
                 }
             }
@@ -131,9 +200,73 @@ private struct McpServerView: View {
         var request = Euler_V1_TestServerRequest()
         request.id = server.id
         do {
-            check = try await session.backend.mcpServers.testServer(request: request, headers: [:]).value().result
+            check = try await session.backend.mcpServers.testServer(request: request, headers: [:]).value()
         } catch {
-            check = .error(error.displayMessage)
+            var failed = Euler_V1_TestServerResponse()
+            failed.error = error.displayMessage
+            check = failed
+        }
+    }
+
+    private func startOAuth() async {
+        var request = Euler_V1_StartServerOAuthRequest()
+        request.id = server.id
+        oauthBusy = true
+        defer { oauthBusy = false }
+        do {
+            let response = try await session.backend.mcpServers.startServerOauth(request: request, headers: [:]).value()
+            if response.hasServer { server = response.server }
+            oauthError = nil
+            callback = ""
+            redirectUri = response.redirectUri
+            if response.authorizationURL.isEmpty {
+                authorizationURL = nil
+                await changed()
+                await test()
+            } else if let url = URL(string: response.authorizationURL) {
+                authorizationURL = url
+                openURL(url)
+            }
+        } catch {
+            oauthError = error.displayMessage
+        }
+    }
+
+    private func finishOAuth() async {
+        var request = Euler_V1_FinishServerOAuthRequest()
+        request.id = server.id
+        request.callbackURL = callback.trimmingCharacters(in: .whitespacesAndNewlines)
+        oauthBusy = true
+        defer { oauthBusy = false }
+        do {
+            let response = try await session.backend.mcpServers.finishServerOauth(request: request, headers: [:]).value()
+            if response.hasServer { server = response.server }
+            authorizationURL = nil
+            callback = ""
+            oauthError = nil
+            Haptics.success()
+            await changed()
+            await test()
+        } catch {
+            oauthError = error.displayMessage
+        }
+    }
+
+    private func disconnectOAuth() async {
+        var request = Euler_V1_DisconnectServerOAuthRequest()
+        request.id = server.id
+        oauthBusy = true
+        defer { oauthBusy = false }
+        do {
+            let response = try await session.backend.mcpServers.disconnectServerOauth(request: request, headers: [:]).value()
+            if response.hasServer { server = response.server }
+            authorizationURL = nil
+            callback = ""
+            oauthError = nil
+            await changed()
+            await test()
+        } catch {
+            oauthError = error.displayMessage
         }
     }
 
