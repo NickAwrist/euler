@@ -265,6 +265,11 @@ this worktree. A port tells you nothing about who owns it.
 and `navigator.clipboard` can be missing there while they work on
 `127.0.0.1`. Check anything that uses them at the address the user will open.
 
+MCP OAuth sign-in cannot return to the app from `http://spaceheater:<port>`.
+The redirect goes to `127.0.0.1` on the browser's machine and the callback
+address has to be pasted under the server. It returns unaided from
+`http://127.0.0.1:<port>` and from an HTTPS address.
+
 ## Calling an RPC by hand
 
 Every call is a POST to `/api/rpc/euler.v1.<Service>/<Method>` with a JSON

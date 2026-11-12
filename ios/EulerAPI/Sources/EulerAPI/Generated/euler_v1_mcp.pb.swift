@@ -20,6 +20,62 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
+/// Non-secret OAuth state for an MCP server. Client secrets and tokens stay on
+/// the server.
+public nonisolated struct Euler_V1_McpServerOAuth: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var connected: Bool = false
+
+  public var configured: Bool = false
+
+  public var grantType: Euler_V1_McpServerOAuth.GrantType = .unspecified
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public nonisolated enum GrantType: SwiftProtobuf.Enum, Swift.CaseIterable {
+    public typealias RawValue = Int
+    case unspecified // = 0
+    case authorizationCode // = 1
+    case clientCredentials // = 2
+    case UNRECOGNIZED(Int)
+
+    public init() {
+      self = .unspecified
+    }
+
+    public init?(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .unspecified
+      case 1: self = .authorizationCode
+      case 2: self = .clientCredentials
+      default: self = .UNRECOGNIZED(rawValue)
+      }
+    }
+
+    public var rawValue: Int {
+      switch self {
+      case .unspecified: return 0
+      case .authorizationCode: return 1
+      case .clientCredentials: return 2
+      case .UNRECOGNIZED(let i): return i
+      }
+    }
+
+    // The compiler won't synthesize support with the UNRECOGNIZED case.
+    public static let allCases: [Euler_V1_McpServerOAuth.GrantType] = [
+      .unspecified,
+      .authorizationCode,
+      .clientCredentials,
+    ]
+
+  }
+
+  public init() {}
+}
+
 /// Header values hold credentials, so only their names leave the server.
 public nonisolated struct Euler_V1_McpServer: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
@@ -54,12 +110,22 @@ public nonisolated struct Euler_V1_McpServer: Sendable {
   /// Clears the value of `updatedAt`. Subsequent reads from it will return its default value.
   public mutating func clearUpdatedAt() {self._updatedAt = nil}
 
+  public var oauth: Euler_V1_McpServerOAuth {
+    get {_oauth ?? Euler_V1_McpServerOAuth()}
+    set {_oauth = newValue}
+  }
+  /// Returns true if `oauth` has been explicitly set.
+  public var hasOauth: Bool {self._oauth != nil}
+  /// Clears the value of `oauth`. Subsequent reads from it will return its default value.
+  public mutating func clearOauth() {self._oauth = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _createdAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
   fileprivate var _updatedAt: SwiftProtobuf.Google_Protobuf_Timestamp? = nil
+  fileprivate var _oauth: Euler_V1_McpServerOAuth? = nil
 }
 
 public nonisolated struct Euler_V1_McpTool: Sendable {
@@ -240,6 +306,9 @@ public nonisolated struct Euler_V1_TestServerResponse: Sendable {
     set {result = .error(newValue)}
   }
 
+  /// True when the server requires OAuth authorization before it can connect.
+  public var authorizationRequired: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated enum OneOf_Result: Equatable, Sendable {
@@ -266,13 +335,183 @@ public nonisolated struct Euler_V1_TestServerResponse: Sendable {
   public init() {}
 }
 
+public nonisolated struct Euler_V1_StartServerOAuthRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String = String()
+
+  /// The address the client reaches the server at. When it is https or
+  /// loopback, the sign-in redirects to the callback there.
+  public var redirectOrigin: String {
+    get {_redirectOrigin ?? String()}
+    set {_redirectOrigin = newValue}
+  }
+  /// Returns true if `redirectOrigin` has been explicitly set.
+  public var hasRedirectOrigin: Bool {self._redirectOrigin != nil}
+  /// Clears the value of `redirectOrigin`. Subsequent reads from it will return its default value.
+  public mutating func clearRedirectOrigin() {self._redirectOrigin = nil}
+
+  /// Set by the iPhone app. The callback then redirects to the app's URL
+  /// scheme, which closes its sign-in sheet, instead of showing a page.
+  public var returnToApp: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _redirectOrigin: String? = nil
+}
+
+public nonisolated struct Euler_V1_StartServerOAuthResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Empty when non-interactive credentials authorized without a redirect.
+  public var authorizationURL: String = String()
+
+  public var redirectUri: String = String()
+
+  public var server: Euler_V1_McpServer {
+    get {_server ?? Euler_V1_McpServer()}
+    set {_server = newValue}
+  }
+  /// Returns true if `server` has been explicitly set.
+  public var hasServer: Bool {self._server != nil}
+  /// Clears the value of `server`. Subsequent reads from it will return its default value.
+  public mutating func clearServer() {self._server = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _server: Euler_V1_McpServer? = nil
+}
+
+public nonisolated struct Euler_V1_FinishServerOAuthRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String = String()
+
+  public var callbackURL: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Euler_V1_FinishServerOAuthResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var server: Euler_V1_McpServer {
+    get {_server ?? Euler_V1_McpServer()}
+    set {_server = newValue}
+  }
+  /// Returns true if `server` has been explicitly set.
+  public var hasServer: Bool {self._server != nil}
+  /// Clears the value of `server`. Subsequent reads from it will return its default value.
+  public mutating func clearServer() {self._server = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _server: Euler_V1_McpServer? = nil
+}
+
+public nonisolated struct Euler_V1_DisconnectServerOAuthRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Euler_V1_DisconnectServerOAuthResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var server: Euler_V1_McpServer {
+    get {_server ?? Euler_V1_McpServer()}
+    set {_server = newValue}
+  }
+  /// Returns true if `server` has been explicitly set.
+  public var hasServer: Bool {self._server != nil}
+  /// Clears the value of `server`. Subsequent reads from it will return its default value.
+  public mutating func clearServer() {self._server = nil}
+
+  /// Whether the authorization server confirmed token revocation.
+  public var revoked: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _server: Euler_V1_McpServer? = nil
+}
+
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "euler.v1"
 
+nonisolated extension Euler_V1_McpServerOAuth: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".McpServerOAuth"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}connected\0\u{1}configured\0\u{3}grant_type\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.connected) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.configured) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.grantType) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.connected != false {
+      try visitor.visitSingularBoolField(value: self.connected, fieldNumber: 1)
+    }
+    if self.configured != false {
+      try visitor.visitSingularBoolField(value: self.configured, fieldNumber: 2)
+    }
+    if self.grantType != .unspecified {
+      try visitor.visitSingularEnumField(value: self.grantType, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Euler_V1_McpServerOAuth, rhs: Euler_V1_McpServerOAuth) -> Bool {
+    if lhs.connected != rhs.connected {return false}
+    if lhs.configured != rhs.configured {return false}
+    if lhs.grantType != rhs.grantType {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Euler_V1_McpServerOAuth.GrantType: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0GRANT_TYPE_UNSPECIFIED\0\u{1}GRANT_TYPE_AUTHORIZATION_CODE\0\u{1}GRANT_TYPE_CLIENT_CREDENTIALS\0")
+}
+
 nonisolated extension Euler_V1_McpServer: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".McpServer"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}url\0\u{3}header_names\0\u{1}enabled\0\u{3}created_at\0\u{3}updated_at\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}url\0\u{3}header_names\0\u{1}enabled\0\u{3}created_at\0\u{3}updated_at\0\u{1}oauth\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -287,6 +526,7 @@ nonisolated extension Euler_V1_McpServer: SwiftProtobuf.Message, SwiftProtobuf._
       case 5: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
       case 6: try { try decoder.decodeSingularMessageField(value: &self._createdAt) }()
       case 7: try { try decoder.decodeSingularMessageField(value: &self._updatedAt) }()
+      case 8: try { try decoder.decodeSingularMessageField(value: &self._oauth) }()
       default: break
       }
     }
@@ -318,6 +558,9 @@ nonisolated extension Euler_V1_McpServer: SwiftProtobuf.Message, SwiftProtobuf._
     try { if let v = self._updatedAt {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
     } }()
+    try { if let v = self._oauth {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -329,6 +572,7 @@ nonisolated extension Euler_V1_McpServer: SwiftProtobuf.Message, SwiftProtobuf._
     if lhs.enabled != rhs.enabled {return false}
     if lhs._createdAt != rhs._createdAt {return false}
     if lhs._updatedAt != rhs._updatedAt {return false}
+    if lhs._oauth != rhs._oauth {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -682,7 +926,7 @@ nonisolated extension Euler_V1_TestServerRequest: SwiftProtobuf.Message, SwiftPr
 
 nonisolated extension Euler_V1_TestServerResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".TestServerResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}connected\0\u{1}error\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}connected\0\u{1}error\0\u{3}authorization_required\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -711,6 +955,7 @@ nonisolated extension Euler_V1_TestServerResponse: SwiftProtobuf.Message, SwiftP
           self.result = .error(v)
         }
       }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.authorizationRequired) }()
       default: break
       }
     }
@@ -732,11 +977,15 @@ nonisolated extension Euler_V1_TestServerResponse: SwiftProtobuf.Message, SwiftP
     }()
     case nil: break
     }
+    if self.authorizationRequired != false {
+      try visitor.visitSingularBoolField(value: self.authorizationRequired, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Euler_V1_TestServerResponse, rhs: Euler_V1_TestServerResponse) -> Bool {
     if lhs.result != rhs.result {return false}
+    if lhs.authorizationRequired != rhs.authorizationRequired {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -772,6 +1021,232 @@ nonisolated extension Euler_V1_TestServerResponse.Connected: SwiftProtobuf.Messa
   public static func ==(lhs: Euler_V1_TestServerResponse.Connected, rhs: Euler_V1_TestServerResponse.Connected) -> Bool {
     if lhs.icons != rhs.icons {return false}
     if lhs.tools != rhs.tools {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Euler_V1_StartServerOAuthRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".StartServerOAuthRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}redirect_origin\0\u{3}return_to_app\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._redirectOrigin) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.returnToApp) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    try { if let v = self._redirectOrigin {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    if self.returnToApp != false {
+      try visitor.visitSingularBoolField(value: self.returnToApp, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Euler_V1_StartServerOAuthRequest, rhs: Euler_V1_StartServerOAuthRequest) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs._redirectOrigin != rhs._redirectOrigin {return false}
+    if lhs.returnToApp != rhs.returnToApp {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Euler_V1_StartServerOAuthResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".StartServerOAuthResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}authorization_url\0\u{3}redirect_uri\0\u{1}server\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.authorizationURL) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.redirectUri) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._server) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.authorizationURL.isEmpty {
+      try visitor.visitSingularStringField(value: self.authorizationURL, fieldNumber: 1)
+    }
+    if !self.redirectUri.isEmpty {
+      try visitor.visitSingularStringField(value: self.redirectUri, fieldNumber: 2)
+    }
+    try { if let v = self._server {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Euler_V1_StartServerOAuthResponse, rhs: Euler_V1_StartServerOAuthResponse) -> Bool {
+    if lhs.authorizationURL != rhs.authorizationURL {return false}
+    if lhs.redirectUri != rhs.redirectUri {return false}
+    if lhs._server != rhs._server {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Euler_V1_FinishServerOAuthRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FinishServerOAuthRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{3}callback_url\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.callbackURL) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if !self.callbackURL.isEmpty {
+      try visitor.visitSingularStringField(value: self.callbackURL, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Euler_V1_FinishServerOAuthRequest, rhs: Euler_V1_FinishServerOAuthRequest) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.callbackURL != rhs.callbackURL {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Euler_V1_FinishServerOAuthResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".FinishServerOAuthResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}server\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._server) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._server {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Euler_V1_FinishServerOAuthResponse, rhs: Euler_V1_FinishServerOAuthResponse) -> Bool {
+    if lhs._server != rhs._server {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Euler_V1_DisconnectServerOAuthRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DisconnectServerOAuthRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Euler_V1_DisconnectServerOAuthRequest, rhs: Euler_V1_DisconnectServerOAuthRequest) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Euler_V1_DisconnectServerOAuthResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DisconnectServerOAuthResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}server\0\u{1}revoked\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._server) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.revoked) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._server {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    if self.revoked != false {
+      try visitor.visitSingularBoolField(value: self.revoked, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Euler_V1_DisconnectServerOAuthResponse, rhs: Euler_V1_DisconnectServerOAuthResponse) -> Bool {
+    if lhs._server != rhs._server {return false}
+    if lhs.revoked != rhs.revoked {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

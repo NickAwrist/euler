@@ -36,7 +36,7 @@ struct IdentityFields: View {
 
     var body: some View {
         Section("Server") {
-            TextField("http://spaceheater:3000", text: $draft.server)
+            TextField("https://euler.example.ts.net", text: $draft.server)
                 .textContentType(.URL)
                 .keyboardType(.URL)
                 .textInputAutocapitalization(.never)

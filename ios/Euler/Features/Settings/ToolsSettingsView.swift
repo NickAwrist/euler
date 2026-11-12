@@ -1,3 +1,4 @@
+import AuthenticationServices
 import EulerAPI
 import SwiftProtobuf
 import SwiftUI
@@ -80,12 +81,30 @@ private struct McpServersSection: View {
 }
 
 private struct McpServerView: View {
-    let server: Euler_V1_McpServer
+    @State var server: Euler_V1_McpServer
     let changed: () async -> Void
     @Environment(AppSession.self) private var session
+    @Environment(\.webAuthenticationSession) private var webAuthenticationSession
     @Environment(\.dismiss) private var dismiss
     @State private var enabled: Bool?
-    @State private var check: Euler_V1_TestServerResponse.OneOf_Result?
+    @State private var check: Euler_V1_TestServerResponse?
+    @State private var oauthBusy = false
+    @State private var oauthError: String?
+
+    /// The scheme of the address the server's callback redirects to (`MCP_OAUTH_APP_RETURN_URL`).
+    private static let returnScheme = "euler"
+
+    private var isClientCredentials: Bool {
+        server.hasOauth && server.oauth.grantType == .clientCredentials
+    }
+
+    private var needsAuthorize: Bool {
+        !isClientCredentials && (check?.authorizationRequired == true || (server.hasOauth && server.oauth.configured && !server.oauth.connected))
+    }
+
+    private var showDisconnect: Bool {
+        !isClientCredentials && server.hasOauth && server.oauth.connected && check?.authorizationRequired != true
+    }
 
     var body: some View {
         ThemedForm {
@@ -94,26 +113,54 @@ private struct McpServerView: View {
                 if !server.headerNames.isEmpty {
                     LabeledContent("Headers", value: server.headerNames.joined(separator: ", "))
                 }
+                if server.hasOauth {
+                    LabeledContent(
+                        "OAuth",
+                        value: isClientCredentials ? "Client credentials" : showDisconnect ? "Connected" : "Not connected"
+                    )
+                }
                 Toggle("Enabled", isOn: Binding(
                     get: { enabled ?? server.enabled },
                     set: { value in Task { await setEnabled(value) } }
                 ))
             }
+            if needsAuthorize {
+                Section {
+                    Button("Authorize") { Task { await startOAuth() } }
+                        .disabled(oauthBusy)
+                }
+            } else if showDisconnect {
+                Section {
+                    Button("Disconnect OAuth", role: .destructive) { Task { await disconnectOAuth() } }
+                        .disabled(oauthBusy)
+                }
+            }
+            if let oauthError {
+                Section { Text(oauthError).foregroundStyle(.red) }
+            }
             Section("Tools") {
-                switch check {
-                case .connected(let connected):
-                    if connected.tools.isEmpty { Text("No tools.").foregroundStyle(.secondary) }
-                    ForEach(connected.tools, id: \.name) { tool in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(tool.name).font(.body.monospaced())
-                            if !tool.description_p.isEmpty {
-                                Text(tool.description_p).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                if let check {
+                    if check.authorizationRequired {
+                        Text("Authorization required.").foregroundStyle(.secondary)
+                    } else {
+                        switch check.result {
+                        case .connected(let connected):
+                            if connected.tools.isEmpty { Text("No tools.").foregroundStyle(.secondary) }
+                            ForEach(connected.tools, id: \.name) { tool in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(tool.name).font(.body.monospaced())
+                                    if !tool.description_p.isEmpty {
+                                        Text(tool.description_p).font(.caption).foregroundStyle(.secondary).lineLimit(3)
+                                    }
+                                }
                             }
+                        case .error(let message):
+                            Text(message).foregroundStyle(.red)
+                        case nil:
+                            ProgressView()
                         }
                     }
-                case .error(let message):
-                    Text(message).foregroundStyle(.red)
-                case nil:
+                } else {
                     ProgressView()
                 }
             }
@@ -131,9 +178,66 @@ private struct McpServerView: View {
         var request = Euler_V1_TestServerRequest()
         request.id = server.id
         do {
-            check = try await session.backend.mcpServers.testServer(request: request, headers: [:]).value().result
+            check = try await session.backend.mcpServers.testServer(request: request, headers: [:]).value()
         } catch {
-            check = .error(error.displayMessage)
+            var failed = Euler_V1_TestServerResponse()
+            failed.error = error.displayMessage
+            check = failed
+        }
+    }
+
+    /// Signs in on a system sheet. The server finishes the sign-in on its own
+    /// callback, then redirects to the app's scheme, which closes the sheet.
+    private func startOAuth() async {
+        var request = Euler_V1_StartServerOAuthRequest()
+        request.id = server.id
+        request.redirectOrigin = session.backend.baseURL.absoluteString
+        request.returnToApp = true
+        oauthBusy = true
+        defer { oauthBusy = false }
+        do {
+            let response = try await session.backend.mcpServers.startServerOauth(request: request, headers: [:]).value()
+            if response.hasServer { server = response.server }
+            oauthError = nil
+            if !response.authorizationURL.isEmpty, let url = URL(string: response.authorizationURL) {
+                // Any other callback is a loopback address, which on a phone is the phone.
+                guard response.redirectUri.hasPrefix("https://") || response.redirectUri.hasPrefix(request.redirectOrigin) else {
+                    oauthError = "Sign-in needs Euler at an HTTPS address."
+                    return
+                }
+                let returned = try await webAuthenticationSession.authenticate(
+                    using: url, callback: .customScheme(Self.returnScheme), additionalHeaderFields: [:]
+                )
+                if let message = URLComponents(url: returned, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "error" })?.value {
+                    oauthError = message
+                    return
+                }
+                let servers = try await session.backend.mcpServers.listServers(request: .init(), headers: [:]).value().servers
+                if let current = servers.first(where: { $0.id == server.id }) { server = current }
+                Haptics.success()
+            }
+            await changed()
+            await test()
+        } catch let error as ASWebAuthenticationSessionError where error.code == .canceledLogin {
+            // Closing the sheet leaves the server as it was.
+        } catch {
+            oauthError = error.displayMessage
+        }
+    }
+
+    private func disconnectOAuth() async {
+        var request = Euler_V1_DisconnectServerOAuthRequest()
+        request.id = server.id
+        oauthBusy = true
+        defer { oauthBusy = false }
+        do {
+            let response = try await session.backend.mcpServers.disconnectServerOauth(request: request, headers: [:]).value()
+            if response.hasServer { server = response.server }
+            oauthError = nil
+            await changed()
+            await test()
+        } catch {
+            oauthError = error.displayMessage
         }
     }
 

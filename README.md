@@ -25,13 +25,38 @@ skill management off for that user's agents, for example to use an MCP server's 
 instead.
 
 Remote [MCP](https://modelcontextprotocol.io/) servers are listed on the same tab. **Add** reads a pasted `mcpServers`
-config with a `url` and optional `headers` for each server, such as an
-`Authorization` token. Header values are stored but never returned by the API.
+config with a `url` for each server and optional `headers`, such as an
+`Authorization` token, or `oauth` settings. Header values, OAuth client secrets,
+and tokens are stored but never returned by the API.
 Local servers configured with `command` are rejected because they would run
 outside the shell sandbox. Each agent activation connects to the enabled servers
-over Streamable HTTP and offers their tools as `mcp__<server>__<tool>`. A server
+over Streamable HTTP, or over HTTP+SSE when a server answers the first request
+with 404 or 405, and offers their tools as `mcp__<server>__<tool>`. A server
 that fails to connect is skipped and logged. The tab connects to each server
 to list its tools, or shows why it could not connect.
+
+A server that asks for OAuth shows **Authorize**. With no `oauth` settings,
+Euler finds the authorization server and registers itself as a client. For a
+client you registered yourself, set `oauth.clientId`, `oauth.clientSecret`, and
+`oauth.scopes`. `oauth.grantType: "client_credentials"` signs in with the
+client's ID and secret and needs no browser. **Disconnect** deletes the saved
+tokens and revokes them when the authorization server supports it.
+
+Sign-in ends at `/api/mcp/oauth/callback` on the address you opened Euler at,
+which is why Euler should be [served over HTTPS](#deployment-deployctl). The web app
+then connects when the sign-in tab closes, and the iPhone app signs in on a
+sheet that closes itself. `oauth.redirectUri` sets a different address for one
+server.
+
+Most authorization servers take only HTTPS and loopback addresses for that redirect.
+Opened at a plain `http://host:port` address, Euler falls back to
+`EULER_PUBLIC_URL`, and without an HTTPS one there to
+`http://127.0.0.1:<EULER_BACKEND_PORT>`. That address is the machine the
+browser runs on, so:
+
+- On the web, the sign-in ends on a page that fails to load. Copy its address
+  and paste it into the field under the server.
+- The iPhone app refuses to start the sign-in. It has nowhere to paste.
 
 ## Artifacts and appearance
 
@@ -167,7 +192,27 @@ deployctl deploy agents --build
 
 In production, the backend server serves both the built UI and API from a single
 process on `EULER_BACKEND_HOST:EULER_BACKEND_PORT` (default `127.0.0.1:3000`).
-Set `EULER_BACKEND_HOST` to accept remote connections.
+Leave it on loopback and reach it over HTTPS through
+[Tailscale Serve](https://tailscale.com/kb/1312/serve), then tell Euler that
+address:
+
+```bash
+tailscale serve --bg --https=443 http://127.0.0.1:3000
+deployctl env set agents EULER_PUBLIC_URL=https://<machine>.<tailnet>.ts.net
+deployctl restart agents
+```
+
+Open Euler at that address in the browser and in the iPhone app. Serve connects
+from loopback and names the caller in `X-Forwarded-For`, so revealing a file
+stays limited to the server's own machine. A browser keeps its user UUID per
+address, so the first visit at the new address starts as a new user. Copy the
+UUID from Settings > General at the old address and switch to it at the new one.
+
+Plain HTTP still works: set `EULER_BACKEND_HOST=0.0.0.0` and open
+`http://<host>:<port>`. MCP OAuth sign-in is what it costs. The web app needs
+the callback address pasted by hand and the iPhone app can't sign in at all,
+as the MCP paragraphs above describe. An `EULER_PUBLIC_URL` that is
+plain `http` on anything but a loopback host is ignored.
 
 `deployctl.yaml` specifies build commands and runtime service configuration:
 - `build.commands`: installs dependencies and runs `bun run build` to generate `dist/`.

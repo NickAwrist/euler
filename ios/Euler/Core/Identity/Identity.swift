@@ -12,10 +12,10 @@ struct Identity: Hashable, Sendable {
         value.wholeMatch(of: /(?i)[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/) != nil
     }
 
-    /// The server's address, normalized to its origin. Without a scheme it is taken as `http`.
+    /// The server's address, normalized to its origin. Without a scheme it is taken as `https`.
     static func serverURL(from text: String) -> URL? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let withScheme = trimmed.contains("://") ? trimmed : "http://\(trimmed)"
+        let withScheme = trimmed.contains("://") ? trimmed : "https://\(trimmed)"
         guard var components = URLComponents(string: withScheme),
               components.scheme == "https" || components.scheme == "http",
               components.host?.isEmpty == false

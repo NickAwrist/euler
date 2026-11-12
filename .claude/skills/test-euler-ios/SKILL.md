@@ -42,7 +42,7 @@ the server have their own skill, `test-euler-web`.
 | Server | Runs | Files and data | Address |
 | --- | --- | --- | --- |
 | Production | deployctl service `deployctl-9ecaeef3-…-euler`, from `main` | `~/.deployctl/workloads/9ecaeef3-f295-4e84-a970-7732d04f89b5/` | `http://spaceheater:3100` |
-| iOS test server | systemd user unit `euler-ios.service`, from the branch under test | `~/euler-ios/app` (a plain copy, no git), data in `~/euler-ios/data` | `http://spaceheater:3200` |
+| iOS test server | systemd user unit `euler-ios.service`, from the branch under test | `~/euler-ios/app` (a plain copy, no git), data in `~/euler-ios/data` | `https://spaceheater.tail95018.ts.net:3201`, a Tailscale Serve entry in front of `http://spaceheater:3200` |
 
 **Never restart, edit, or read secrets out of production, its environment
 file, or its data.** The test server's database started as a copy of
@@ -121,9 +121,10 @@ xcrun devicectl device process launch --device <device id> net.spaceheater.euler
   locked; ask the user to open the app.
 - "Developer Mode disabled" or "Manual pairing … in progress": the user must
   turn on Developer Mode and tap Trust on the phone. You cannot.
-- On first launch the app asks for the server (`http://spaceheater:3200`) and
-  a user ID. The user scans it from the web at `http://spaceheater:3200`,
-  Settings › General › Show QR. You cannot drive the phone's screen; ask.
+- On first launch the app asks for the server
+  (`https://spaceheater.tail95018.ts.net:3201`) and a user ID. The user scans
+  it from the web at that address, Settings › General › Show QR. You cannot
+  drive the phone's screen; ask.
 - Install the app built from the commit the test server runs, so the client
   and server contracts match.
 
@@ -182,6 +183,28 @@ than taking it over. Haptics, real push and the camera scanner need the iPhone.
 
 A local dev server (`bun run dev`, ports from `.env`) is reachable from the
 simulator at `http://127.0.0.1:<EULER_FRONTEND_PORT>`.
+
+## MCP sign-in
+
+Authorize needs the server at an HTTPS address the simulator or phone can
+reach. Against plain `http://spaceheater:3200` the app answers "Sign-in needs
+Euler at an HTTPS address." and opens nothing. The test server's HTTPS
+address works. To test a sign-in without deploying there:
+
+- Run the branch on a spare port on spaceheater, bound to loopback, with its
+  own `EULER_DB_PATH` and `EULER_DATA_ROOT` and `EULER_PUBLIC_URL` set to the
+  address below.
+- Check `tailscale serve status`, add
+  `tailscale serve --bg --https=<port> http://127.0.0.1:<port>`, and point the
+  app at `https://spaceheater.<tailnet>.ts.net:<port>`. Remove the entry with
+  `tailscale serve --https=<port> off` when done.
+- `startOAuthMcpTestServer` in `tests/helpers/mcpServer.ts` is an OAuth MCP
+  server without a sign-in page. Wrap it with an `/authorize` route that
+  redirects to `approveAuthorization(request.url)`, and bind it to `0.0.0.0`
+  so the simulator's sheet reaches it.
+- The system asks before the sheet opens: `alert accept`. The page in the
+  sheet is outside the app's accessibility tree, so tap it by coordinates
+  taken from a screenshot.
 
 ## Push notifications
 

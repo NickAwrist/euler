@@ -8,7 +8,7 @@ import {
   setMcpServerEnabledApi,
 } from "../../persist/mcpServers";
 
-function message(error: unknown, fallback: string): string {
+export function message(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
@@ -20,15 +20,24 @@ export function useMcpServers() {
 
   const load = useCallback(async () => {
     try {
-      setServers(await fetchMcpServers());
+      const next = await fetchMcpServers();
+      setServers(next);
+      return next;
     } catch (loadError: unknown) {
       setError(message(loadError, "Failed to load MCP servers"));
+      return null;
     }
   }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const replaceServer = useCallback((updated: McpServer) => {
+    setServers((current) =>
+      current.map((s) => (s.id === updated.id ? updated : s)),
+    );
+  }, []);
 
   /** Throws so the add form can show the reason next to the pasted config. */
   const add = async (config: string) => {
@@ -40,9 +49,7 @@ export function useMcpServers() {
     setError(null);
     try {
       const updated = await setMcpServerEnabledApi(server.id, enabled);
-      setServers((current) =>
-        current.map((s) => (s.id === updated.id ? updated : s)),
-      );
+      replaceServer(updated);
     } catch (updateError: unknown) {
       setError(message(updateError, "Failed to update MCP server"));
     }
@@ -67,6 +74,8 @@ export function useMcpServers() {
   return {
     servers,
     error,
+    load,
+    replaceServer,
     add,
     setEnabled,
     pendingDelete,

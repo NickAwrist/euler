@@ -55,6 +55,12 @@ A few RPCs worth knowing:
 - `WorkspaceService.DownloadFile` streams a file from sandbox and local
   workspaces alike.
 - `McpServerService.CreateServers` takes the pasted config text.
+- `McpServerService.StartServerOAuth` returns the provider's sign-in address.
+  The sign-in ends at `GET /api/mcp/oauth/callback`, which is not an RPC and
+  takes no user header: the `state` it carries names the attempt. With
+  `return_to_app` it answers with a redirect to `euler://mcp-oauth` in place
+  of a page. `FinishServerOAuth` takes a pasted callback address, for a web
+  app opened at an address the provider could not redirect to.
 - `ProviderService.GetOpenRouterCatalog` has no side effects.
   `RefreshOpenRouterCatalog` fetches the catalog again.
 

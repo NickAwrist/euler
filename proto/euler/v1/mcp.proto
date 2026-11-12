@@ -22,6 +22,26 @@ service McpServerService {
   // Connects to the server and lists its tools. An unreachable server is a
   // result of the test, not a failed call.
   rpc TestServer(TestServerRequest) returns (TestServerResponse);
+  // Starts an OAuth flow for the server, returning an authorization URL when
+  // user consent is needed.
+  rpc StartServerOAuth(StartServerOAuthRequest) returns (StartServerOAuthResponse);
+  // Completes a pending OAuth sign-in from a redirected callback URL.
+  rpc FinishServerOAuth(FinishServerOAuthRequest) returns (FinishServerOAuthResponse);
+  // Clears saved OAuth tokens for the server and revokes them when supported.
+  rpc DisconnectServerOAuth(DisconnectServerOAuthRequest) returns (DisconnectServerOAuthResponse);
+}
+
+// Non-secret OAuth state for an MCP server. Client secrets and tokens stay on
+// the server.
+message McpServerOAuth {
+  enum GrantType {
+    GRANT_TYPE_UNSPECIFIED = 0;
+    GRANT_TYPE_AUTHORIZATION_CODE = 1;
+    GRANT_TYPE_CLIENT_CREDENTIALS = 2;
+  }
+  bool connected = 1;
+  bool configured = 2;
+  GrantType grant_type = 3;
 }
 
 // Header values hold credentials, so only their names leave the server.
@@ -33,6 +53,7 @@ message McpServer {
   bool enabled = 5;
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
+  optional McpServerOAuth oauth = 8;
 }
 
 message McpTool {
@@ -94,4 +115,45 @@ message TestServerResponse {
     // Why the server could not be reached.
     string error = 2;
   }
+  // True when the server requires OAuth authorization before it can connect.
+  bool authorization_required = 3;
+}
+
+message StartServerOAuthRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+  // The address the client reaches the server at. When it is https or
+  // loopback, the sign-in redirects to the callback there.
+  optional string redirect_origin = 2 [(buf.validate.field).string.max_len = 2048];
+  // Set by the iPhone app. The callback then redirects to the app's URL
+  // scheme, which closes its sign-in sheet, instead of showing a page.
+  bool return_to_app = 3;
+}
+
+message StartServerOAuthResponse {
+  // Empty when non-interactive credentials authorized without a redirect.
+  string authorization_url = 1;
+  string redirect_uri = 2;
+  McpServer server = 3;
+}
+
+message FinishServerOAuthRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+  string callback_url = 2 [(buf.validate.field).string = {
+    uri: true
+    max_len: 16384
+  }];
+}
+
+message FinishServerOAuthResponse {
+  McpServer server = 1;
+}
+
+message DisconnectServerOAuthRequest {
+  string id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+message DisconnectServerOAuthResponse {
+  McpServer server = 1;
+  // Whether the authorization server confirmed token revocation.
+  bool revoked = 2;
 }

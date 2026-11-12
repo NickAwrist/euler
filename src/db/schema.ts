@@ -73,6 +73,16 @@ CREATE TABLE IF NOT EXISTS mcp_servers (
   updated_at INTEGER NOT NULL,
   UNIQUE(owner_uuid, name)
 );
+CREATE TABLE IF NOT EXISTS mcp_server_oauth (
+  server_id TEXT PRIMARY KEY REFERENCES mcp_servers(id) ON DELETE CASCADE,
+  owner_uuid TEXT NOT NULL,
+  config TEXT,
+  client_info TEXT,
+  tokens TEXT,
+  discovery_state TEXT,
+  expires_at INTEGER,
+  updated_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY NOT NULL,
   value TEXT NOT NULL
