@@ -1,6 +1,10 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import type { OllamaContextWindow } from "../../../src/gen/euler/v1/providers_pb";
 import { saveComfyUIConfig } from "../../persist/comfyui";
-import { saveOllamaConfig } from "../../persist/services";
+import {
+  saveOllamaConfig,
+  saveOllamaContextWindow,
+} from "../../persist/services";
 import {
   type UserSettings,
   loadUserSettings,
@@ -9,11 +13,13 @@ import {
 import type {
   ComfyUIConfigPayload,
   ComfyUIConfigState,
+  OllamaConfigPayload,
   Personalization,
 } from "../../types";
 
 export function useSettings(
   setOllamaHost: (host: string) => void,
+  setOllamaContextWindow: (contextWindow: OllamaContextWindow) => void,
   fetchOllamaHealth: () => Promise<void>,
   refreshOllamaModels: () => Promise<void>,
   fetchComfyUIHealth: () => Promise<void>,
@@ -57,15 +63,23 @@ export function useSettings(
   const saveUserSettings = useCallback(
     async (
       settings: Partial<UserSettings>,
-      ollamaHostToSave: string | undefined,
+      ollama?: OllamaConfigPayload,
       comfyui?: ComfyUIConfigPayload,
     ) => {
       await savePreferences(settings);
-      if (ollamaHostToSave !== undefined)
-        await saveOllamaHost(ollamaHostToSave);
+      if (ollama?.host !== undefined) await saveOllamaHost(ollama.host);
+      if (ollama?.contextWindow !== undefined)
+        setOllamaContextWindow(
+          await saveOllamaContextWindow(ollama.contextWindow),
+        );
       if (comfyui) await saveComfyUISettings(comfyui);
     },
-    [savePreferences, saveOllamaHost, saveComfyUISettings],
+    [
+      savePreferences,
+      saveOllamaHost,
+      setOllamaContextWindow,
+      saveComfyUISettings,
+    ],
   );
 
   return {

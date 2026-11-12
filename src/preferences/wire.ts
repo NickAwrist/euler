@@ -19,7 +19,9 @@ import type {
 // the server's handlers and browser test fixtures share one conversion.
 
 /** Pairs each domain value with its proto enum value, both ways. */
-function choices<D extends string, P extends number>(pairs: Record<D, P>) {
+export function choices<D extends string, P extends number>(
+  pairs: Record<D, P>,
+) {
   const reverse = new Map(
     Object.entries(pairs).map(([key, value]) => [value as P, key as D]),
   );

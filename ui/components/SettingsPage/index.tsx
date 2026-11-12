@@ -88,6 +88,10 @@ export function SettingsPage(props: SettingsPageProps) {
               ollamaConnected={p.ollama.connected}
               testState={p.ollama.testState}
               onTestOllama={p.ollama.test}
+              contextWindow={{
+                value: p.contextWindow,
+                onChange: p.setContextWindow,
+              }}
             />
           )}
 

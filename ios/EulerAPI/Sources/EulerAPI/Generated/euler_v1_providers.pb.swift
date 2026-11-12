@@ -20,6 +20,49 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
+/// How much context Ollama loads a model with: 32K, 128K or 256K tokens.
+public nonisolated enum Euler_V1_OllamaContextWindow: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case low // = 1
+  case medium // = 2
+  case high // = 3
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .low
+    case 2: self = .medium
+    case 3: self = .high
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .low: return 1
+    case .medium: return 2
+    case .high: return 3
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [Euler_V1_OllamaContextWindow] = [
+    .unspecified,
+    .low,
+    .medium,
+    .high,
+  ]
+
+}
+
 public nonisolated enum Euler_V1_ApiKeyProvider: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -131,6 +174,8 @@ public nonisolated struct Euler_V1_GetOllamaConfigResponse: Sendable {
   /// Clears the value of `config`. Subsequent reads from it will return its default value.
   public mutating func clearConfig() {self._config = nil}
 
+  public var contextWindow: Euler_V1_OllamaContextWindow = .unspecified
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -170,6 +215,30 @@ public nonisolated struct Euler_V1_UpdateOllamaConfigResponse: Sendable {
   public init() {}
 
   fileprivate var _config: Euler_V1_HostConfig? = nil
+}
+
+public nonisolated struct Euler_V1_SetOllamaContextWindowRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var contextWindow: Euler_V1_OllamaContextWindow = .unspecified
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Euler_V1_SetOllamaContextWindowResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var contextWindow: Euler_V1_OllamaContextWindow = .unspecified
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
 }
 
 public nonisolated struct Euler_V1_GetOllamaHealthRequest: Sendable {
@@ -1214,6 +1283,10 @@ public nonisolated struct Euler_V1_DisconnectChatGptResponse: Sendable {
 
 fileprivate nonisolated let _protobuf_package = "euler.v1"
 
+nonisolated extension Euler_V1_OllamaContextWindow: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0OLLAMA_CONTEXT_WINDOW_UNSPECIFIED\0\u{1}OLLAMA_CONTEXT_WINDOW_LOW\0\u{1}OLLAMA_CONTEXT_WINDOW_MEDIUM\0\u{1}OLLAMA_CONTEXT_WINDOW_HIGH\0")
+}
+
 nonisolated extension Euler_V1_ApiKeyProvider: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0API_KEY_PROVIDER_UNSPECIFIED\0\u{1}API_KEY_PROVIDER_OPENROUTER\0\u{1}API_KEY_PROVIDER_BRAVE\0")
 }
@@ -1318,7 +1391,7 @@ nonisolated extension Euler_V1_GetOllamaConfigRequest: SwiftProtobuf.Message, Sw
 
 nonisolated extension Euler_V1_GetOllamaConfigResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetOllamaConfigResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}config\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}config\0\u{3}context_window\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1327,6 +1400,7 @@ nonisolated extension Euler_V1_GetOllamaConfigResponse: SwiftProtobuf.Message, S
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._config) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self.contextWindow) }()
       default: break
       }
     }
@@ -1340,11 +1414,15 @@ nonisolated extension Euler_V1_GetOllamaConfigResponse: SwiftProtobuf.Message, S
     try { if let v = self._config {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
+    if self.contextWindow != .unspecified {
+      try visitor.visitSingularEnumField(value: self.contextWindow, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Euler_V1_GetOllamaConfigResponse, rhs: Euler_V1_GetOllamaConfigResponse) -> Bool {
     if lhs._config != rhs._config {return false}
+    if lhs.contextWindow != rhs.contextWindow {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1409,6 +1487,66 @@ nonisolated extension Euler_V1_UpdateOllamaConfigResponse: SwiftProtobuf.Message
 
   public static func ==(lhs: Euler_V1_UpdateOllamaConfigResponse, rhs: Euler_V1_UpdateOllamaConfigResponse) -> Bool {
     if lhs._config != rhs._config {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Euler_V1_SetOllamaContextWindowRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SetOllamaContextWindowRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}context_window\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.contextWindow) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.contextWindow != .unspecified {
+      try visitor.visitSingularEnumField(value: self.contextWindow, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Euler_V1_SetOllamaContextWindowRequest, rhs: Euler_V1_SetOllamaContextWindowRequest) -> Bool {
+    if lhs.contextWindow != rhs.contextWindow {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Euler_V1_SetOllamaContextWindowResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SetOllamaContextWindowResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}context_window\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.contextWindow) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.contextWindow != .unspecified {
+      try visitor.visitSingularEnumField(value: self.contextWindow, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Euler_V1_SetOllamaContextWindowResponse, rhs: Euler_V1_SetOllamaContextWindowResponse) -> Bool {
+    if lhs.contextWindow != rhs.contextWindow {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

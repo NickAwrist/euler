@@ -1,11 +1,12 @@
 import EulerAPI
 import SwiftUI
 
-/// Ollama: the server's address, a connection test, and its state.
+/// Ollama: the server's address, a connection test, its state, and the context window.
 struct OllamaSettingsView: View {
     @Environment(AppSession.self) private var session
     @State private var host = ""
     @State private var config: Euler_V1_HostConfig?
+    @State private var contextWindow = Euler_V1_OllamaContextWindow.low
     @State private var health: Euler_V1_GetOllamaHealthResponse?
 
     var body: some View {
@@ -31,15 +32,47 @@ struct OllamaSettingsView: View {
                     await loadHealth()
                 }
             )
+            Section {
+                Picker("Context window", selection: contextWindowBinding) {
+                    ForEach(Self.contextWindows, id: \.0) { window, name in Text(name).tag(window) }
+                }
+                .mutedPickerValue()
+                .disabled(config == nil)
+            }
         }
         .navigationTitle("Ollama")
         .task {
             if let response = try? await session.backend.providers.getOllamaConfig(request: .init(), headers: [:]).value() {
                 config = response.config
                 host = response.config.host.isEmpty ? response.config.effectiveHost : response.config.host
+                contextWindow = response.contextWindow
             }
             await loadHealth()
         }
+    }
+
+    static let contextWindows: [(Euler_V1_OllamaContextWindow, String)] = [
+        (.low, "Low - 32k"), (.medium, "Medium - 128k"), (.high, "High - 256k"),
+    ]
+
+    /// The saved choice, with a setter that saves and goes back to it on failure.
+    private var contextWindowBinding: Binding<Euler_V1_OllamaContextWindow> {
+        Binding(
+            get: { contextWindow },
+            set: { value in
+                Haptics.select()
+                let saved = contextWindow
+                contextWindow = value
+                Task {
+                    var request = Euler_V1_SetOllamaContextWindowRequest()
+                    request.contextWindow = value
+                    let ok = await session.notices.attempt {
+                        contextWindow = try await session.backend.providers.setOllamaContextWindow(request: request, headers: [:]).value().contextWindow
+                    }
+                    if !ok { contextWindow = saved }
+                }
+            }
+        )
     }
 
     private func loadHealth() async {

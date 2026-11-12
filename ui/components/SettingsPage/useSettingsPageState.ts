@@ -12,6 +12,7 @@ type Args = Pick<
   SettingsPageProps,
   | "currentSettings"
   | "ollamaHost"
+  | "ollamaContextWindow"
   | "ollamaConnected"
   | "comfyuiHost"
   | "comfyuiConnected"
@@ -25,6 +26,7 @@ type Args = Pick<
 export function useSettingsPageState({
   currentSettings,
   ollamaHost,
+  ollamaContextWindow,
   ollamaConnected,
   comfyuiHost,
   comfyuiConnected,
@@ -37,6 +39,8 @@ export function useSettingsPageState({
   const appearance = useAppearanceDraft();
   const settings = useSavedDraft(currentSettings);
   const ollama = useOllamaDraft(ollamaHost, ollamaConnected);
+  const contextWindow = useSavedDraft(ollamaContextWindow);
+  const contextWindowDirty = contextWindow.value !== ollamaContextWindow;
   const comfy = useComfyUIDraft(
     {
       host: comfyuiHost,
@@ -69,7 +73,10 @@ export function useSettingsPageState({
         : []),
     ]),
     ...tabChanges("appearance", appearance.changes),
-    ...tabChanges("ollama", ollama.dirty ? ["Ollama server URL"] : []),
+    ...tabChanges("ollama", [
+      ...(ollama.dirty ? ["Ollama server URL"] : []),
+      ...(contextWindowDirty ? ["Ollama context window"] : []),
+    ]),
     ...tabChanges("image-generation", comfy.changes),
   ];
   const isDirty = changes.length > 0;
@@ -78,6 +85,7 @@ export function useSettingsPageState({
     appearance.reset();
     settings.reset();
     ollama.reset();
+    contextWindow.reset();
     comfy.reset();
     setError(null);
   };
@@ -88,11 +96,17 @@ export function useSettingsPageState({
       if (changes.some((change) => change.tab !== "appearance")) {
         await onSave(
           changedFields(settings.value, currentSettings),
-          ollama.dirty ? ollama.host : undefined,
+          {
+            ...(ollama.dirty ? { host: ollama.host } : {}),
+            ...(contextWindowDirty
+              ? { contextWindow: contextWindow.value }
+              : {}),
+          },
           comfy.changes.length > 0 ? comfy.patch : undefined,
         );
         settings.accept();
         ollama.accept();
+        contextWindow.accept();
         comfy.accept();
       }
       if (appearance.changes.length > 0) await appearance.save();
@@ -116,6 +130,8 @@ export function useSettingsPageState({
     settings: settings.value,
     handleChange,
     ollama,
+    contextWindow: contextWindow.value,
+    setContextWindow: contextWindow.setValue,
     comfy,
     isSaving,
     changes,

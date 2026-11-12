@@ -1,6 +1,7 @@
 import { create } from "@bufbuild/protobuf";
 import { useState } from "react";
 import { UserSettingsSchema } from "../../src/gen/euler/v1/preferences_pb";
+import { OllamaContextWindow } from "../../src/gen/euler/v1/providers_pb";
 import { SettingsPage } from "../components/SettingsPage";
 import type { UserSettings } from "../persist/userSettings";
 import type { SettingsTab } from "../types";
@@ -27,6 +28,7 @@ export default function SettingsDemo() {
         currentSettings={settings}
         ollamaModels={[]}
         ollamaHost="http://ollama.test"
+        ollamaContextWindow={OllamaContextWindow.LOW}
         ollamaConnected={false}
         comfyuiHost="http://comfyui.test"
         comfyuiConnected={false}

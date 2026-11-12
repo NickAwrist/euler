@@ -2,6 +2,7 @@ import { MethodOptions_IdempotencyLevel } from "@bufbuild/protobuf/wkt";
 import { type Page, expect, test } from "@playwright/test";
 import {
   CatalogFreshness_Status,
+  OllamaContextWindow,
   ProviderService,
 } from "../../src/gen/euler/v1/providers_pb";
 import type { UserPreferences } from "../../src/schemas/userPreferences";
@@ -154,6 +155,39 @@ test("settings save desktop: saving a user preference does not rewrite shared pr
   expect(
     [...preferences.values()].map((saved) => saved.settings.showDebugButton),
   ).toEqual([true]);
+});
+
+test("settings save desktop: the Ollama context window saves without rewriting the address", async ({
+  page,
+}) => {
+  const writes: string[] = [];
+  const saved: OllamaContextWindow[] = [];
+  await mockSettings(page, writes);
+  await mockRpc(page, [
+    on(ProviderService.method.setOllamaContextWindow, ({ contextWindow }) => {
+      saved.push(contextWindow);
+      return { contextWindow };
+    }),
+  ]);
+  await page.goto("/");
+  for (let step = 0; step < 8; step++)
+    await page.getByRole("button", { name: "Skip", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Toggle chats", exact: true })
+    .waitFor();
+  await page.goto("/settings/ollama");
+  const contextWindow = page.getByLabel("Context window");
+  await expect(contextWindow).toHaveValue("low");
+  await contextWindow.selectOption({ label: "High - 256k" });
+  const save = page.getByRole("button", { name: "Save settings", exact: true });
+  await expect(page.locator("footer")).toContainText(
+    "Unsaved changes in Ollama",
+  );
+  await save.click();
+  await expect(save).toBeHidden();
+  await expect(contextWindow).toHaveValue("high");
+  expect(saved).toEqual([OllamaContextWindow.HIGH]);
+  expect(writes).toEqual(["ProviderService/SetOllamaContextWindow"]);
 });
 
 test("settings save desktop: Show QR displays the saved user ID", async ({

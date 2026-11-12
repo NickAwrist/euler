@@ -1,8 +1,13 @@
 import { envConfig } from "../env";
+import {
+  type OllamaContextWindow,
+  ollamaContextWindowSchema,
+} from "../schemas/ollama";
 import { getDb } from "./connection";
 import {
   BRAVE_SEARCH_API_KEY_KEY,
   COMFYUI_HOST_KEY,
+  OLLAMA_CONTEXT_WINDOW_KEY,
   OLLAMA_HOST_KEY,
   OPENROUTER_API_KEY_KEY,
 } from "./constants";
@@ -28,6 +33,16 @@ export function getOllamaHost(): string {
 
 export function setOllamaHost(host: string): void {
   setAppSetting(OLLAMA_HOST_KEY, host);
+}
+
+export function getOllamaContextWindow(): OllamaContextWindow {
+  return ollamaContextWindowSchema.parse(
+    getAppSetting(OLLAMA_CONTEXT_WINDOW_KEY),
+  );
+}
+
+export function setOllamaContextWindow(value: OllamaContextWindow): void {
+  setAppSetting(OLLAMA_CONTEXT_WINDOW_KEY, value);
 }
 
 export function getComfyUIHost(): string {

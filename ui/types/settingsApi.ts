@@ -1,4 +1,5 @@
 import type { ImagePreferences } from "../../src/gen/euler/v1/preferences_pb";
+import type { OllamaContextWindow } from "../../src/gen/euler/v1/providers_pb";
 import type { MessageFields } from "./messageFields";
 
 type ImageFields = MessageFields<ImagePreferences>;
@@ -10,4 +11,10 @@ export type ComfyUIConfigPayload = Partial<ImageFields> & { host?: string };
 export type ComfyUIConfigState = ImageFields & {
   host: string;
   effectiveHost: string;
+};
+
+/** The Ollama form's edited fields, both server-wide. */
+export type OllamaConfigPayload = {
+  host?: string;
+  contextWindow?: OllamaContextWindow;
 };

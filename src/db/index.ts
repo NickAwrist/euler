@@ -30,9 +30,11 @@ export {
   getBraveSearchApiKey,
   setBraveSearchApiKey,
   getComfyUIHost,
+  getOllamaContextWindow,
   getOllamaHost,
   getOpenRouterApiKey,
   setComfyUIHost,
+  setOllamaContextWindow,
   setOllamaHost,
   setOpenRouterApiKey,
 } from "./settings";

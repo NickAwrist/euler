@@ -1,6 +1,8 @@
 import type { ChatRequest, ChatResponse, Message, ToolCall } from "ollama";
+import { getOllamaContextWindow } from "../db/index";
 import type { ModelReasoning } from "../models/modelCapabilities";
 import { getOllamaClient } from "../models/ollamaClient";
+import type { OllamaContextWindow } from "../schemas/ollama";
 import type {
   LlmChatRequest,
   LlmChatStream,
@@ -102,6 +104,13 @@ function ollamaThink(effort: string | undefined): ChatRequest["think"] {
   return GPT_OSS_EFFORTS.find((level) => level === effort);
 }
 
+/** Tokens of context each setting loads a model with. */
+const CONTEXT_WINDOW_TOKENS: Record<OllamaContextWindow, number> = {
+  low: 32_768,
+  medium: 131_072,
+  high: 262_144,
+};
+
 export async function streamOllamaChat(
   request: LlmChatRequest,
 ): Promise<LlmChatStream> {
@@ -111,6 +120,7 @@ export async function streamOllamaChat(
     tools: request.tools,
     stream: true,
     think: ollamaThink(request.reasoningEffort),
+    options: { num_ctx: CONTEXT_WINDOW_TOKENS[getOllamaContextWindow()] },
   });
 
   return {

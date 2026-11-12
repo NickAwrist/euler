@@ -763,6 +763,7 @@ export default function App() {
               ollamaModels={app.ollamaModels}
               currentSettings={app.userSettings}
               ollamaHost={app.ollamaHost}
+              ollamaContextWindow={app.ollamaContextWindow}
               ollamaConnected={app.ollamaConnected}
               comfyuiHost={app.comfyuiHost}
               comfyuiConnected={app.comfyuiConnected}

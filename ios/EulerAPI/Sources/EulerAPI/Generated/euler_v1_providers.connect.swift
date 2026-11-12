@@ -10,8 +10,8 @@ import Foundation
 import SwiftProtobuf
 
 /// Model and tool providers: Ollama, ComfyUI, OpenRouter, ChatGPT and Brave
-/// Search. Addresses and keys are server-wide; ComfyUI image defaults and the
-/// ChatGPT connection belong to the user.
+/// Search. Addresses, keys and the Ollama context window are server-wide;
+/// ComfyUI image defaults and the ChatGPT connection belong to the user.
 public protocol Euler_V1_ProviderServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
@@ -19,6 +19,9 @@ public protocol Euler_V1_ProviderServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
     func `updateOllamaConfig`(request: Euler_V1_UpdateOllamaConfigRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_UpdateOllamaConfigResponse>
+
+    @available(iOS 13, *)
+    func `setOllamaContextWindow`(request: Euler_V1_SetOllamaContextWindowRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_SetOllamaContextWindowResponse>
 
     @available(iOS 13, *)
     func `getOllamaHealth`(request: Euler_V1_GetOllamaHealthRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_GetOllamaHealthResponse>
@@ -104,6 +107,11 @@ public final class Euler_V1_ProviderServiceClient: Euler_V1_ProviderServiceClien
     @available(iOS 13, *)
     public func `updateOllamaConfig`(request: Euler_V1_UpdateOllamaConfigRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_UpdateOllamaConfigResponse> {
         return await self.client.unary(path: "/euler.v1.ProviderService/UpdateOllamaConfig", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `setOllamaContextWindow`(request: Euler_V1_SetOllamaContextWindowRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_SetOllamaContextWindowResponse> {
+        return await self.client.unary(path: "/euler.v1.ProviderService/SetOllamaContextWindow", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
@@ -210,6 +218,7 @@ public final class Euler_V1_ProviderServiceClient: Euler_V1_ProviderServiceClien
         public enum Methods {
             public static let getOllamaConfig = Connect.MethodSpec(name: "GetOllamaConfig", service: "euler.v1.ProviderService", type: .unary)
             public static let updateOllamaConfig = Connect.MethodSpec(name: "UpdateOllamaConfig", service: "euler.v1.ProviderService", type: .unary)
+            public static let setOllamaContextWindow = Connect.MethodSpec(name: "SetOllamaContextWindow", service: "euler.v1.ProviderService", type: .unary)
             public static let getOllamaHealth = Connect.MethodSpec(name: "GetOllamaHealth", service: "euler.v1.ProviderService", type: .unary)
             public static let testOllamaHost = Connect.MethodSpec(name: "TestOllamaHost", service: "euler.v1.ProviderService", type: .unary)
             public static let getComfyUiConfig = Connect.MethodSpec(name: "GetComfyUiConfig", service: "euler.v1.ProviderService", type: .unary)

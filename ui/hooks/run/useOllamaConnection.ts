@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ListModelsResponse } from "../../../src/gen/euler/v1/models_pb";
+import { OllamaContextWindow } from "../../../src/gen/euler/v1/providers_pb";
 import { modelClient, providerClient } from "../../lib/rpc";
 import type { ModelOption } from "../../types";
 import { OLLAMA_HEALTH_POLL_MS } from "./constants";
@@ -15,6 +16,9 @@ export function useOllamaConnection() {
     null,
   );
   const [ollamaHost, setOllamaHost] = useState("");
+  const [ollamaContextWindow, setOllamaContextWindow] = useState(
+    OllamaContextWindow.LOW,
+  );
   const [ollamaConnected, setOllamaConnected] = useState<boolean | null>(null);
 
   const fetchOllamaHealth = useCallback(async () => {
@@ -70,9 +74,12 @@ export function useOllamaConnection() {
     let cancelled = false;
     (async () => {
       try {
-        const { config } = await providerClient.getOllamaConfig({});
+        const { config, contextWindow } = await providerClient.getOllamaConfig(
+          {},
+        );
         if (cancelled) return;
         if (config) setOllamaHost(config.host);
+        if (contextWindow) setOllamaContextWindow(contextWindow);
       } catch {
         /* ignore */
       }
@@ -89,6 +96,8 @@ export function useOllamaConnection() {
     chatgptCatalogError,
     ollamaHost,
     setOllamaHost,
+    ollamaContextWindow,
+    setOllamaContextWindow,
     ollamaConnected,
     fetchOllamaHealth,
     refreshOllamaModels,
