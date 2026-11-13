@@ -6,7 +6,7 @@ import UserNotifications
 /// Without the address or a reachable server, the notification arrives as text.
 final class NotificationService: UNNotificationServiceExtension {
     /// Keys the app writes in `SharedSettings`; keep the two in step.
-    private static let suiteName = "group.net.spaceheater.euler"
+    private static let suiteName = Bundle.main.object(forInfoDictionaryKey: "EulerAppGroup") as! String
     private static let serverURLKey = "EulerServerURL"
 
     private var content: UNMutableNotificationContent?

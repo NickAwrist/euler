@@ -6,7 +6,7 @@
 	<string>development</string>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.net.spaceheater.euler</string>
+		<string>group.$(EULER_BUNDLE_ID)</string>
 	</array>
 </dict>
 </plist>

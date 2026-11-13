@@ -8,7 +8,10 @@ description: Test and verify changes to the Euler iPhone app. Covers choosing be
 The iPhone app in `ios/` is a client of the same Connect API as the web app.
 While a change is in progress, the simulator and the phone talk to a separate
 **iOS test server** on `spaceheater` that runs the branch, never to
-production. Read `ios/README.md` for the app's layout and
+production. The phone has two apps side by side: **Euler - Dev** (scheme
+`EulerDev`, `net.spaceheater.euler.dev`) for the test server, and **Euler**
+(scheme `Euler`, `net.spaceheater.euler`) for production. Branches install
+only as Euler - Dev; Euler is installed from `main` when shipping. Read `ios/README.md` for the app's layout and
 `docs/connect-api.md` for the API, the event stream and push. The web app and
 the server have their own skill, `test-euler-web`.
 
@@ -30,8 +33,8 @@ the server have their own skill, `test-euler-web`.
 2. Run the unit tests on a simulator, and the checks in `test-euler-web` for
    the server and the web app.
 3. Commit, then deploy the branch to the iOS test server.
-4. Run the app on a simulator or the iPhone, pointed at the test server, and
-   check the changed flow there.
+4. Run Euler - Dev on a simulator or the iPhone, pointed at the test server,
+   and check the changed flow there.
 
 ## Machines and servers
 
@@ -41,7 +44,7 @@ the server have their own skill, `test-euler-web`.
 
 | Server | Runs | Files and data | Address |
 | --- | --- | --- | --- |
-| Production | deployctl service `deployctl-9ecaeef3-…-euler`, from `main` | `~/.deployctl/workloads/9ecaeef3-f295-4e84-a970-7732d04f89b5/` | `http://spaceheater:3100` |
+| Production | deployctl service `deployctl-9ecaeef3-…-euler`, from `main` | `~/.deployctl/workloads/9ecaeef3-f295-4e84-a970-7732d04f89b5/` | `https://euler.tail95018.ts.net`, a Tailscale Service in front of `http://spaceheater:3100` |
 | iOS test server | systemd user unit `euler-ios.service`, from the branch under test | `~/euler-ios/app` (a plain copy, no git), data in `~/euler-ios/data` | `https://spaceheater.tail95018.ts.net:3201`, a Tailscale Serve entry in front of `http://spaceheater:3200` |
 
 **Never restart, edit, or read secrets out of production, its environment
@@ -107,26 +110,37 @@ Both units must be active, production still on 3100, the test server on 3200.
 
 ## The app on the iPhone
 
+Euler - Dev, from the branch under test:
+
 ```bash
 xcrun devicectl list devices            # the phone's identifier; "available (paired)"
 cd ios && bun run ios:project
-xcodebuild -project Euler.xcodeproj -scheme Euler -destination 'id=<device id>' \
+xcodebuild -project Euler.xcodeproj -scheme EulerDev -destination 'id=<device id>' \
   -derivedDataPath build/DeviceData -allowProvisioningUpdates build
 xcrun devicectl device install app --device <device id> \
-  build/DeviceData/Build/Products/Debug-iphoneos/Euler.app
-xcrun devicectl device process launch --device <device id> net.spaceheater.euler
+  build/DeviceData/Build/Products/Dev-iphoneos/Euler.app
+xcrun devicectl device process launch --device <device id> net.spaceheater.euler.dev
 ```
+
+When shipping, Euler is built the same way from the `main` checkout at
+`origin/main`, with `-scheme Euler`, installed from
+`Debug-iphoneos/Euler.app`, and launched as `net.spaceheater.euler`. It points
+at production. Never install a branch as Euler.
+
+- Signing runs outside the command sandbox; inside it, xcodebuild reports
+  "No Accounts".
 
 - A launch that fails with "could not be unlocked" only means the phone is
   locked; ask the user to open the app.
 - "Developer Mode disabled" or "Manual pairing … in progress": the user must
   turn on Developer Mode and tap Trust on the phone. You cannot.
-- On first launch the app asks for the server
-  (`https://spaceheater.tail95018.ts.net:3201`) and a user ID. The user scans
+- On first launch the app asks for the server and a user ID: Euler - Dev uses
+  `https://spaceheater.tail95018.ts.net:3201`, Euler uses
+  `https://euler.tail95018.ts.net`. The user scans
   it from the web at that address, Settings › General › Show QR. You cannot
   drive the phone's screen; ask.
-- Install the app built from the commit the test server runs, so the client
-  and server contracts match.
+- Install Euler - Dev built from the commit the test server runs, so the
+  client and server contracts match.
 
 ### Crash logs from the phone
 
