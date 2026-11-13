@@ -16,6 +16,12 @@ open ios/Euler.xcodeproj
 `Euler.xcodeproj` is generated from `project.yml` and never committed. Signing
 uses team `66LT3G6V44`.
 
+One target builds two apps that install side by side. The `Euler` scheme
+builds Euler (`net.spaceheater.euler`), for production. The `EulerDev` scheme
+builds Euler - Dev (`net.spaceheater.euler.dev`, the `Dev` configuration), for
+the iOS test server, with the blueprint icon `AppIconDev`. Each has its own
+server address, user ID and app group.
+
 ## Layout
 
 | Path | What lives there |

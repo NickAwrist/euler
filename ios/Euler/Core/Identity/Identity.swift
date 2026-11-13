@@ -77,8 +77,8 @@ final class IdentityStore {
 
 /// Values the notification service extension reads through the shared app group.
 enum SharedSettings {
-    /// Keep in step with `NotificationService`.
-    static let suiteName = "group.net.spaceheater.euler"
+    /// Each app's own group, from `project.yml`. Keep in step with `NotificationService`.
+    static let suiteName = Bundle.main.object(forInfoDictionaryKey: "EulerAppGroup") as! String
     static let serverURLKey = "EulerServerURL"
 
     static func setServerURL(_ url: URL) {

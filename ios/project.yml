@@ -5,6 +5,11 @@ options:
     iOS: "26.0"
   developmentLanguage: en
   createIntermediateGroups: true
+configs:
+  Debug: debug
+  Release: release
+  # Euler - Dev: a second app beside Euler for the iOS test server.
+  Dev: debug
 settings:
   base:
     DEVELOPMENT_TEAM: 66LT3G6V44
@@ -16,6 +21,14 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
+    EULER_BUNDLE_ID: net.spaceheater.euler
+    EULER_DISPLAY_NAME: Euler
+    EULER_APP_ICON: AppIcon
+  configs:
+    Dev:
+      EULER_BUNDLE_ID: net.spaceheater.euler.dev
+      EULER_DISPLAY_NAME: Euler - Dev
+      EULER_APP_ICON: AppIconDev
 packages:
   EulerAPI:
     path: EulerAPI
@@ -49,11 +62,12 @@ targets:
       properties:
         aps-environment: development
         com.apple.security.application-groups:
-          - group.net.spaceheater.euler
+          - group.$(EULER_BUNDLE_ID)
     info:
       path: Euler/Info.plist
       properties:
-        CFBundleDisplayName: Euler
+        CFBundleDisplayName: $(EULER_DISPLAY_NAME)
+        EulerAppGroup: group.$(EULER_BUNDLE_ID)
         UILaunchScreen: {}
         UIApplicationSupportsIndirectInputEvents: true
         UISupportedInterfaceOrientations:
@@ -68,9 +82,9 @@ targets:
           - remote-notification
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: net.spaceheater.euler
+        PRODUCT_BUNDLE_IDENTIFIER: $(EULER_BUNDLE_ID)
         SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
-        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_APPICON_NAME: $(EULER_APP_ICON)
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
   EulerNotificationService:
@@ -82,11 +96,12 @@ targets:
       path: EulerNotificationService/EulerNotificationService.entitlements
       properties:
         com.apple.security.application-groups:
-          - group.net.spaceheater.euler
+          - group.$(EULER_BUNDLE_ID)
     info:
       path: EulerNotificationService/Info.plist
       properties:
         CFBundleDisplayName: Euler Notifications
+        EulerAppGroup: group.$(EULER_BUNDLE_ID)
         NSExtension:
           NSExtensionPointIdentifier: com.apple.usernotifications.service
           NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).NotificationService
@@ -94,7 +109,7 @@ targets:
           NSAllowsArbitraryLoads: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: net.spaceheater.euler.notifications
+        PRODUCT_BUNDLE_IDENTIFIER: $(EULER_BUNDLE_ID).notifications
   EulerTests:
     type: bundle.unit-test
     platform: iOS
@@ -128,3 +143,9 @@ schemes:
       targets:
         - EulerTests
         - EulerUITests
+  EulerDev:
+    build:
+      targets:
+        Euler: all
+    run:
+      config: Dev
