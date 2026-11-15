@@ -73,10 +73,10 @@ final class PushNotifications: NSObject {
 
     /// Saves the token on the server for the signed-in user.
     func register(with backend: Backend) async {
-        guard isEnabled, let token else { return }
+        guard isEnabled, let token, let bundleID = Bundle.main.bundleIdentifier else { return }
         var request = Euler_V1_RegisterDeviceRequest()
         request.token = token
-        request.bundleID = Bundle.main.bundleIdentifier ?? "net.spaceheater.euler"
+        request.bundleID = bundleID
         #if DEBUG
         request.environment = .sandbox
         #else
