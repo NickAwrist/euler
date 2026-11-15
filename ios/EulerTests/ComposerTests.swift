@@ -150,7 +150,7 @@ struct SkillFieldsTests {
 struct IdentityTests {
     @Test func normalizesServerAddresses() {
         #expect(Identity.serverURL(from: "euler.example:3200")?.absoluteString == "https://euler.example:3200")
-        #expect(Identity.serverURL(from: "http://spaceheater:3200")?.absoluteString == "http://spaceheater:3200")
+        #expect(Identity.serverURL(from: "http://euler-host:3200")?.absoluteString == "http://euler-host:3200")
         #expect(Identity.serverURL(from: "https://euler.example/path?x")?.absoluteString == "https://euler.example")
         #expect(Identity.serverURL(from: "ftp://x") == nil)
     }

@@ -17,7 +17,7 @@ const device: DeviceRow = {
   token: "abc123",
   owner_uuid: OWNER,
   environment: "sandbox",
-  bundle_id: "net.spaceheater.euler",
+  bundle_id: "com.example.euler",
   updated_at: 1,
 };
 
@@ -99,7 +99,7 @@ test("a finished main turn pushes its reply as plain text", async () => {
     {
       token: "abc123",
       environment: "sandbox",
-      topic: "net.spaceheater.euler",
+      topic: "com.example.euler",
       payload: {
         aps: {
           alert: {

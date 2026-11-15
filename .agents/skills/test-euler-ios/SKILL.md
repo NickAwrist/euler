@@ -1,18 +1,19 @@
 ---
 name: test-euler-ios
-description: Test and verify changes to the Euler iPhone app. Covers choosing between the Swift unit tests, the UI tests on the fixture backend, the simulator and the user's iPhone, deploying a branch to the iOS test server on spaceheater, push notification checks, and device crash logs. Use for any iOS change that needs proof it works, and for any server or proto change the phone has to test against.
+description: Test and verify changes to the Euler iPhone app. Covers choosing between the Swift unit tests, the UI tests on the fixture backend, the simulator and the user's iPhone, deploying a branch to the iOS test server, push notification checks, and device crash logs. Use for any iOS change that needs proof it works, and for any server or proto change the phone has to test against.
 ---
 
 # Testing the iPhone app
 
 The iPhone app in `ios/` is a client of the same Connect API as the web app.
 While a change is in progress, the simulator and the phone talk to a separate
-**iOS test server** on `spaceheater` that runs the branch, never to
-production. The phone has two apps side by side: **Euler - Dev** (scheme
-`EulerDev`, `net.spaceheater.euler.dev`) for the test server, and **Euler**
-(scheme `Euler`, `net.spaceheater.euler`) for production. Branches install
-only as Euler - Dev; Euler is installed from `main` when shipping. Read `ios/README.md` for the app's layout and
-`docs/connect-api.md` for the API, the event stream and push. The web app and
+**iOS test server** that runs the branch, never to production. The phone has
+two apps side by side: **Euler - Dev** (scheme `EulerDev`,
+`<bundle prefix>.euler.dev`) for the test server, and **Euler** (scheme
+`Euler`, `<bundle prefix>.euler`) for production. Branches install only as
+Euler - Dev; Euler is installed from `main` when shipping. Read
+`ios/README.md` for the app's layout and `docs/connect-api.md` for the API,
+the event stream and push. The web app and
 the server have their own skill, `test-euler-web`.
 
 ## Pick the check
@@ -36,36 +37,43 @@ the server have their own skill, `test-euler-web`.
 4. Run Euler - Dev on a simulator or the iPhone, pointed at the test server,
    and check the changed flow there.
 
-## Machines and servers
+## The test server
 
-- **This Mac**: Xcode (team `66LT3G6V44`), the simulators, and the user's
-  iPhone over USB. `ssh -o BatchMode=yes spaceheater …` works.
-- **spaceheater** (Linux) runs two Eulers:
+Xcode, the simulators and the iPhone are on a Mac. The server's shell and file
+tools need Linux, so the test server runs on a Linux machine the Mac reaches
+over ssh. It is a second Euler beside production, with its own port and data.
 
-| Server | Runs | Files and data | Address |
-| --- | --- | --- | --- |
-| Production | deployctl service `deployctl-9ecaeef3-…-euler`, from `main` | `~/.deployctl/workloads/9ecaeef3-f295-4e84-a970-7732d04f89b5/` | `https://euler.tail95018.ts.net`, a Tailscale Service in front of `http://spaceheater:3100` |
-| iOS test server | systemd user unit `euler-ios.service`, from the branch under test | `~/euler-ios/app` (a plain copy, no git), data in `~/euler-ios/data` | `https://spaceheater.tail95018.ts.net:3201`, a Tailscale Serve entry in front of `http://spaceheater:3200` |
+This skill names that setup with placeholders. Their values come from the
+user's own instructions, not from this repository. Ask the user for any you
+can't find.
+
+| Placeholder | Meaning |
+| --- | --- |
+| `<test-host>` | The ssh name of the machine the test server runs on |
+| `<test-dir>` | The test server's directory on that machine |
+| `<test-unit>` | The systemd user unit that runs it |
+| `<test-http-url>` | Its plain HTTP address |
+| `<test-url>` | Its HTTPS address, which the app uses |
+| `<production-url>` | Production's address |
+| `<bundle prefix>` | `EULER_IOS_BUNDLE_PREFIX` in `.env` |
 
 **Never restart, edit, or read secrets out of production, its environment
-file, or its data.** The test server's database started as a copy of
-production and is never synced back.
+file, or its data.** The test server's data is its own and is never synced
+back.
 
-The test server's layout under `~/euler-ios/`:
+The layout under `<test-dir>`:
 
-- `app/`: the deployed tree, with `bun run build` output in `dist/` (it serves
-  the branch's web app too, so web and iPhone share one address and database).
-- `app/.env`: `EULER_BACKEND_PORT=3200`, `EULER_BACKEND_HOST=0.0.0.0`,
-  `EULER_SERVE_FRONTEND=true`, `EULER_DB_PATH` and `EULER_DATA_ROOT` under
-  `~/euler-ios/data`, the `APNS_*` lines, and the provider keys. Keep a backup
-  before editing it; never print it.
-- `apns/AuthKey_353ZGVLXL9.p8`: the team's APNs key. Never copy it into the repo
-  or print it.
+- `app/`: the deployed tree, a plain copy with no git, with `bun run build`
+  output in `dist/` (it serves the branch's web app too, so web and iPhone
+  share one address and database).
+- `app/.env`: its own `EULER_BACKEND_PORT`, `EULER_BACKEND_HOST=0.0.0.0`,
+  `EULER_SERVE_FRONTEND=true`, its own `EULER_DB_PATH` and `EULER_DATA_ROOT`,
+  the `APNS_*` lines, and the provider keys. Keep a backup before editing it;
+  never print it.
 - `DEPLOYED_COMMIT`: the commit the server runs. Update it on every deploy.
-- `ci/`: a scratch copy for running `bun test` and Playwright on Linux.
 
-ChatGPT connections are not copied with the data; reconnect in Settings ›
-ChatGPT.
+The key that `APNS_KEY_FILE` names lives outside the repo. Never copy it in
+or print it.
 
 ## Deploy the branch to the test server
 
@@ -76,7 +84,7 @@ contains `origin/main`. Otherwise stop and ask the user.
 
 ```bash
 # Quote remote paths: an unquoted ~ expands to this Mac's home.
-DEPLOYED=$(ssh -o BatchMode=yes spaceheater 'cat ~/euler-ios/DEPLOYED_COMMIT')
+DEPLOYED=$(ssh -o BatchMode=yes <test-host> 'cat <test-dir>/DEPLOYED_COMMIT')
 git fetch -q origin main
 git merge-base --is-ancestor "$DEPLOYED" HEAD \
   || { git merge-base --is-ancestor "$DEPLOYED" origin/main && git merge-base --is-ancestor origin/main HEAD; } \
@@ -84,29 +92,29 @@ git merge-base --is-ancestor "$DEPLOYED" HEAD \
 
 # Files the branch deleted since the last deploy; tar does not remove them.
 git diff --name-only --diff-filter=D "$DEPLOYED" HEAD \
-  | ssh -o BatchMode=yes spaceheater 'cd ~/euler-ios/app && xargs -r rm -f --'
+  | ssh -o BatchMode=yes <test-host> 'cd <test-dir>/app && xargs -r rm -f --'
 
-git archive HEAD | ssh -o BatchMode=yes spaceheater '
+git archive HEAD | ssh -o BatchMode=yes <test-host> '
   set -e
-  cd ~/euler-ios/app
+  cd <test-dir>/app
   tar -x -C .
   ~/.bun/bin/bun install --frozen-lockfile
   PATH=$HOME/.bun/bin:$PATH bun run build
-  systemctl --user restart euler-ios.service
+  systemctl --user restart <test-unit>
 '
-git rev-parse HEAD | ssh -o BatchMode=yes spaceheater 'cat > ~/euler-ios/DEPLOYED_COMMIT'
+git rev-parse HEAD | ssh -o BatchMode=yes <test-host> 'cat > <test-dir>/DEPLOYED_COMMIT'
 ```
 
 Then verify before handing the server off:
 
 ```bash
-bun scripts/rpc-smoke.ts http://spaceheater:3200 <user id>                 # list + event stream
-bun scripts/rpc-smoke.ts http://spaceheater:3200 <user id> --chat gemma4:e4b # streams a real reply
-ssh -o BatchMode=yes spaceheater 'systemctl --user is-active euler-ios.service \
-  deployctl-9ecaeef3-f295-4e84-a970-7732d04f89b5-euler.service; ss -ltn | grep -E ":(3100|3200) "'
+bun scripts/rpc-smoke.ts <test-http-url> <user id>                        # list + event stream
+bun scripts/rpc-smoke.ts <test-http-url> <user id> --chat <local model>   # streams a real reply
+ssh -o BatchMode=yes <test-host> 'systemctl --user is-active <test-unit>'
 ```
 
-Both units must be active, production still on 3100, the test server on 3200.
+The unit must be active. When production runs on the same machine, confirm it
+is still up on its own port.
 
 ## The app on the iPhone
 
@@ -119,13 +127,13 @@ xcodebuild -project Euler.xcodeproj -scheme EulerDev -destination 'id=<device id
   -derivedDataPath build/DeviceData -allowProvisioningUpdates build
 xcrun devicectl device install app --device <device id> \
   build/DeviceData/Build/Products/Dev-iphoneos/Euler.app
-xcrun devicectl device process launch --device <device id> net.spaceheater.euler.dev
+xcrun devicectl device process launch --device <device id> <bundle prefix>.euler.dev
 ```
 
 When shipping, Euler is built the same way from the `main` checkout at
 `origin/main`, with `-scheme Euler`, installed from
-`Debug-iphoneos/Euler.app`, and launched as `net.spaceheater.euler`. It points
-at production. Never install a branch as Euler.
+`Debug-iphoneos/Euler.app`, and launched as `<bundle prefix>.euler`. It
+points at production. Never install a branch as Euler.
 
 - Signing runs outside the command sandbox; inside it, xcodebuild reports
   "No Accounts".
@@ -135,10 +143,9 @@ at production. Never install a branch as Euler.
 - "Developer Mode disabled" or "Manual pairing … in progress": the user must
   turn on Developer Mode and tap Trust on the phone. You cannot.
 - On first launch the app asks for the server and a user ID: Euler - Dev uses
-  `https://spaceheater.tail95018.ts.net:3201`, Euler uses
-  `https://euler.tail95018.ts.net`. The user scans
-  it from the web at that address, Settings › General › Show QR. You cannot
-  drive the phone's screen; ask.
+  `<test-url>`, Euler uses `<production-url>`. The user scans it from the web
+  at that address, Settings › General › Show QR. You cannot drive the phone's
+  screen; ask.
 - Install Euler - Dev built from the commit the test server runs, so the
   client and server contracts match.
 
@@ -201,17 +208,16 @@ simulator at `http://127.0.0.1:<EULER_FRONTEND_PORT>`.
 ## MCP sign-in
 
 Authorize needs the server at an HTTPS address the simulator or phone can
-reach. Against plain `http://spaceheater:3200` the app answers "Sign-in needs
-Euler at an HTTPS address." and opens nothing. The test server's HTTPS
+reach. Against a plain HTTP address such as `<test-http-url>` the app answers
+"Sign-in needs Euler at an HTTPS address." and opens nothing. The test server's HTTPS
 address works. To test a sign-in without deploying there:
 
-- Run the branch on a spare port on spaceheater, bound to loopback, with its
+- Run the branch on a spare port on `<test-host>`, bound to loopback, with its
   own `EULER_DB_PATH` and `EULER_DATA_ROOT` and `EULER_PUBLIC_URL` set to the
   address below.
-- Check `tailscale serve status`, add
-  `tailscale serve --bg --https=<port> http://127.0.0.1:<port>`, and point the
-  app at `https://spaceheater.<tailnet>.ts.net:<port>`. Remove the entry with
-  `tailscale serve --https=<port> off` when done.
+- Put an HTTPS address in front of that port and point the app at it.
+  `docs/deployment.md` shows one way, with Tailscale Serve. Remove what you
+  added when done.
 - `startOAuthMcpTestServer` in `tests/helpers/mcpServer.ts` is an OAuth MCP
   server without a sign-in page. Wrap it with an `/authorize` route that
   redirects to `approveAuthorization(request.url)`, and bind it to `0.0.0.0`
@@ -230,7 +236,7 @@ notifications carry Allow once and Deny actions. Code:
 
 ```bash
 # Did the server send, skip, or fail?
-ssh -o BatchMode=yes spaceheater 'journalctl --user -u euler-ios.service --since "-30min" --no-pager | grep -E "push\."'
+ssh -o BatchMode=yes <test-host> 'journalctl --user -u <test-unit> --since "-30min" --no-pager | grep -E "push\."'
 # push.enabled: the key loaded at startup. push.sent: APNs accepted it.
 # push.rejected: APNs refused (reason; a dead token deletes the device).
 # No line: the app was in front, notifications are off, or the device never registered
@@ -241,7 +247,7 @@ Is the key accepted by Apple? A push to a fake token must answer
 `400 BadDeviceToken` (403 means the key, key ID or team is wrong):
 
 ```bash
-ssh -o BatchMode=yes spaceheater 'cd ~/euler-ios/app && ~/.bun/bin/bun -e "
+ssh -o BatchMode=yes <test-host> 'cd <test-dir>/app && ~/.bun/bin/bun -e "
 const { readFileSync } = require(\"node:fs\");
 const { createPrivateKey } = require(\"node:crypto\");
 const { createProviderToken } = await import(\"./src/notifications/apns.ts\");
@@ -250,7 +256,7 @@ const key = createPrivateKey(readFileSync(process.env.APNS_KEY_FILE, \"utf8\"));
 const jwt = createProviderToken(key, process.env.APNS_KEY_ID, process.env.APNS_TEAM_ID);
 const s = http2.connect(\"https://api.sandbox.push.apple.com\");
 const r = s.request({ \":method\": \"POST\", \":path\": \"/3/device/\" + \"00\".repeat(32),
-  authorization: \"bearer \" + jwt, \"apns-topic\": \"net.spaceheater.euler\", \"apns-push-type\": \"alert\" });
+  authorization: \"bearer \" + jwt, \"apns-topic\": \"<bundle prefix>.euler\", \"apns-push-type\": \"alert\" });
 let status, body = \"\";
 r.on(\"response\", (x) => { status = x[\":status\"]; });
 r.on(\"data\", (d) => { body += d; });
@@ -265,6 +271,6 @@ calls on the main thread.
 
 ## Production rollout (only when the user asks)
 
-Push reaches production only after the branch merges to `main` and deployctl
-deploys it. Production then needs the key and the three `APNS_*` settings.
-Ask the user before touching anything under `~/.deployctl`.
+Push reaches production only after the branch merges to `main` and production
+is redeployed. Production then needs the key and the three `APNS_*` settings.
+Ask the user before changing anything in production.

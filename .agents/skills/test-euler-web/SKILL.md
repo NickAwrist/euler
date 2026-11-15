@@ -51,21 +51,23 @@ Workspace file tools and shell tools need Linux. On macOS, about 40 tests in
 suggestions. `main` fails the same way there, so compare against it before
 blaming a change. CI runs on Linux.
 
-On spaceheater, run everything in the worktree. From the Mac, copy the working
-tree to a temporary directory on spaceheater and run there:
+On Linux, run everything in the worktree. From a Mac, copy the working tree to
+a temporary directory on a Linux machine you reach over ssh, and run there.
+`<linux-host>` is that machine's ssh name. It comes from the user's own
+instructions; ask the user if you can't find it.
 
 ```bash
-R=$(ssh -o BatchMode=yes spaceheater 'mktemp -d /tmp/euler-ci-XXXXXX')
+R=$(ssh -o BatchMode=yes <linux-host> 'mktemp -d /tmp/euler-ci-XXXXXX')
 # Without the two tar settings, macOS adds ._ files that Biome and bun test trip on.
 git ls-files -z --cached --others --exclude-standard \
   | COPYFILE_DISABLE=1 tar --no-xattrs --null -T - -cf - \
-  | ssh -o BatchMode=yes spaceheater "cd $R && tar -xf -"
+  | ssh -o BatchMode=yes <linux-host> "cd $R && tar -xf -"
 # A plain ssh command has no bun, bunx or node. The login shell and ~/.bun/bin add them.
-run() { ssh -o BatchMode=yes spaceheater "cd $R && PATH=\$HOME/.bun/bin:\$PATH bash -lc '$1'"; }
+run() { ssh -o BatchMode=yes <linux-host> "cd $R && PATH=\$HOME/.bun/bin:\$PATH bash -lc '$1'"; }
 run 'bun install --frozen-lockfile && bun test'
 run 'bun run test:browser'
 run 'bun run build && bun run perf:check'
-ssh -o BatchMode=yes spaceheater "rm -rf $R"
+ssh -o BatchMode=yes <linux-host> "rm -rf $R"
 ```
 
 The copy has your uncommitted edits and no `.git`. Without git, `bun run lint`
@@ -261,11 +263,11 @@ pick a local Ollama model when the change does not depend on the provider.
 Before reusing a server that is already up, confirm its working directory is
 this worktree. A port tells you nothing about who owns it.
 
-`http://spaceheater:<port>` is not a secure context, so `crypto.randomUUID`
+`http://<hostname>:<port>` is not a secure context, so `crypto.randomUUID`
 and `navigator.clipboard` can be missing there while they work on
 `127.0.0.1`. Check anything that uses them at the address the user will open.
 
-MCP OAuth sign-in cannot return to the app from `http://spaceheater:<port>`.
+MCP OAuth sign-in cannot return to the app from `http://<hostname>:<port>`.
 The redirect goes to `127.0.0.1` on the browser's machine and the callback
 address has to be pasted under the server. It returns unaided from
 `http://127.0.0.1:<port>` and from an HTTPS address.
@@ -286,7 +288,7 @@ the server is up. For a deployed server, `scripts/rpc-smoke.ts` checks a unary
 call and the event stream, and with `--chat <model>` streams a real reply:
 
 ```bash
-bun scripts/rpc-smoke.ts http://spaceheater:<port> <uuid>
+bun scripts/rpc-smoke.ts http://<hostname>:<port> <uuid>
 ```
 
 A failed call logs `rpc.failed` on the server with the stack. The fixtures run

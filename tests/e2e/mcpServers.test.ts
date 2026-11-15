@@ -368,7 +368,7 @@ test("MCP OAuth supports pre-registered confidential clients, manual FinishServe
     // while HTTPS origins use the HTTPS origin directly.
     const lanStarted = await api.startServerOAuth({
       id: confidential.id,
-      redirectOrigin: "http://spaceheater:8194",
+      redirectOrigin: "http://euler-host:8194",
     });
     expect(lanStarted.redirectUri).toMatch(
       /^http:\/\/127\.0\.0\.1:\d+\/api\/mcp\/oauth\/callback$/,

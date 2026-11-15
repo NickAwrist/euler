@@ -33,7 +33,7 @@ These conventions supplement the general engineering instructions.
 - Use the ports in the worktree's `.env`. Don't pass other ports on the
   command line: the user ID lives in browser storage per origin, so a new
   port opens an empty app.
-- Give the user `http://spaceheater:<EULER_FRONTEND_PORT>` and leave the
+- Give the user the app's address on `EULER_FRONTEND_PORT` and leave the
   server running.
 - Before handing it over, open it and confirm it shows the copied chats
   and a ready model provider. Values in `.env` override saved settings,
@@ -74,7 +74,7 @@ These conventions supplement the general engineering instructions.
 - Run `bun run build` for changes affecting the UI build and
   `bun run test:browser` for browser interaction changes. Run the full
   relevant suites for broad changes.
-- .claude/skills/test-euler-web/SKILL.md covers choosing a check, the
+- .agents/skills/test-euler-web/SKILL.md covers choosing a check, the
   checks that need Linux, the fixture servers, and driving the app in a
   browser. Read it before verifying web or server work.
 - Review the diff for duplicated behavior, unnecessary abstractions,
@@ -86,5 +86,6 @@ These conventions supplement the general engineering instructions.
 ## iOS
 
 - The iPhone app lives in ios/. Read ios/README.md before changing it and
-  .claude/skills/test-euler-ios/SKILL.md before testing it, running it
-  on a device, or deploying the iOS test server. The phone never points at production.
+  .agents/skills/test-euler-ios/SKILL.md before testing it, running it
+  on a device, or deploying the iOS test server. A branch never runs against
+  production.
