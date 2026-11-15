@@ -56,8 +56,9 @@ as the server user.
 **Fix:**
 - Add Express middleware before all routes that rejects requests whose `Host`
   (without port) is not in an allowlist: `localhost`, `127.0.0.1`, `[::1]`,
-  `spaceheater`, `spaceheater.tail95018.ts.net`. Make the list configurable,
-  for example `EULER_ALLOWED_HOSTS`, read through `envConfig`.
+  plus the machine's own names, such as `<machine>` and
+  `<machine>.<tailnet>.ts.net`. Make the list configurable, for example
+  `EULER_ALLOWED_HOSTS`, read through `envConfig`.
 - Replace Vite's `allowedHosts: true` with the same list.
 - Return the standard `FORBIDDEN` error envelope.
 
@@ -353,8 +354,7 @@ startup outcome and does not escape as an unhandled rejection.
 
 ## 4. Legacy and dead code
 
-This app has one deployment. The items below are code and documents that no
-longer serve a current requirement.
+The items below are code that no longer serves a current requirement.
 
 ### LEG-6. Docker networking hints after Docker was removed (Low, S)
 
@@ -384,17 +384,8 @@ for the provider API keys that `.env.example` already documents.
   (only ever called as `run("", ctx)`), the `userMessage`/`userImages` path, and
   the unused `name`/`description` fields if nothing reads them after
   `RunContext.agentName` (check before removing)
-- `src/http/asyncRoute.ts`, used by the two image routes in `src/routes/`:
+- `src/http/asyncRoute.ts`, used by the three routes in `src/routes/`:
   Express 5 already forwards rejected promises
-
-### LEG-10. Stale root documents (Low, S)
-
-**Where:** `BUG_TRIAGE.md` and `wishlist.md`. Both are hand-maintained snapshots
-of GitHub issues and source state. Within five weeks the triage had dropped an
-open issue, listed a closed one, and missed a new bug.
-
-**Fix:** Move open items to GitHub issues and delete `BUG_TRIAGE.md`. Keep
-`wishlist.md` only if it is maintained, or move it to `docs/`.
 
 ### LEG-11. Unused imports remain in two tests (Low, S)
 
@@ -993,7 +984,7 @@ invalid configured values cannot silently select a different port or limit.
 
 1. **Security day:** `SEC-1`, `SEC-3`, then `SEC-2`.
 2. **Agent quality:** `TOOL-1`, `TOOL-2`, `LLM-1`, `LLM-2`, `OBS-2`.
-3. **Cleanup:** `LEG-6` through `LEG-11`, `TEST-8`, `DX-5`.
+3. **Cleanup:** `LEG-6`, `LEG-7`, `LEG-9`, `LEG-11`, `TEST-8`, `DX-5`.
 4. **Safety net:** `TEST-1`, `TEST-2`.
 5. **Contracts:** `TYPE-1`, `TYPE-2`.
 6. **Structural:** `ARCH-2` with `FE-1`.

@@ -1,16 +1,16 @@
 # The Connect API
 
-Every call the web app and the iPhone app make is an RPC defined in
-`proto/euler/v1/` and served by [Connect](https://connectrpc.com/) at
-`/api/rpc`. The Express app mounts it before any JSON body parser. Two plain
-GET routes remain, for `<img src>`: ComfyUI outputs and favicons.
+The web app and the iPhone app call RPCs defined in `proto/euler/v1/` and
+served by [Connect](https://connectrpc.com/) at `/api/rpc`. Three plain GET
+routes remain. ComfyUI outputs and favicons serve `<img src>`, and the third is
+the MCP OAuth callback.
 
 ## Contract and generated code
 
 - `bun run proto` runs buf, which writes TypeScript to `src/gen/` and Swift to
   `ios/EulerAPI/Sources/EulerAPI/Generated/`. Both are committed.
-- `bun run lint` runs buf lint, buf breaking against `origin/main`, and a check
-  that the committed code matches a fresh generation.
+- `bun run lint` runs Biome, buf lint, buf breaking against `origin/main`, and
+  a check that the committed code matches a fresh generation.
 - Handlers live in `src/rpc/`, one file per service, and call the domain code.
   `src/rpc/wire.ts` converts between the runtime's records and the generated
   messages. `src/schemas/` holds stored data and domain values, not API shapes.
@@ -25,8 +25,8 @@ GET routes remain, for `<img src>`: ComfyUI outputs and favicons.
 
 Interceptors in `src/rpc/interceptors.ts` run on every call:
 
-- `x-euler-user-id` must be a valid user ID. It separates users' data and does
-  not prove identity.
+- `x-euler-user-id` must be a valid user ID when present. RPCs for a user's
+  own data require it. It separates users' data and does not prove identity.
 - `buf.validate` rules in the protos are enforced. A CEL rule whose ID starts
   with `euler.` carries the message people see.
 - Euler error codes map to Connect codes, with the Euler code attached as an
@@ -57,7 +57,7 @@ A few RPCs worth knowing:
 - `McpServerService.CreateServers` takes the pasted config text.
 - `McpServerService.StartServerOAuth` returns the provider's sign-in address.
   The sign-in ends at `GET /api/mcp/oauth/callback`, which is not an RPC and
-  takes no user header: the `state` it carries names the attempt. With
+  takes no user header. Its `state` parameter names the attempt. With
   `return_to_app` it answers with a redirect to `euler://mcp-oauth` in place
   of a page. `FinishServerOAuth` takes a pasted callback address, for a web
   app opened at an address the provider could not redirect to.
@@ -85,20 +85,5 @@ notification service extension attaches a reply's generated image.
 
 Devices register per user, so a push reaches all of a user's phones. The
 server skips them all while any client of that user holds the event stream
-open, including a web tab left open. Code: `src/notifications/` and
+open, including a web tab left open. The code is in `src/notifications/` and
 `src/rpc/devices.ts`.
-
-## The iPhone app
-
-[`ios/README.md`](../ios/README.md) covers the app. It targets iOS 26.0 and
-bundles the web's font files from `public/fonts/`. Two things render
-differently from the web:
-
-- The web's Default font, IBM Plex Sans, is not bundled on either client. On
-  iOS it maps to the system font.
-- An equation alone in its paragraph is a centered block on iOS. The web
-  renders a single-line `$$…$$` inline.
-
-The phone talks to a separate iOS test server on spaceheater, never to
-production. Deploying it, running the app on a device, and push checks are in
-`.claude/skills/test-euler-ios/SKILL.md`.

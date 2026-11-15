@@ -1,34 +1,46 @@
 # Performance check
 
-CI runs `perf:check` against the production build. It drives the real React
-bundle against the real Express API and SQLite in a temporary workspace. A fake
-Ollama streams replies one token at a time through a loopback control port, so
-no model runs and each token is observed before the next arrives.
+CI runs `bun run perf:check` against the production build. The check drives
+the real React bundle, Express API, and SQLite in a phone-sized Chromium, with
+a temporary database and workspace. It then compares what it measured with
+`baseline.json`.
 
-The fixture seeds 100 chats, two of them 200 messages long with Markdown, code
-blocks, and tool steps. The check opens a long chat in a phone-sized Chromium
-and compares what it measures with `baseline.json`.
+## Running locally
 
-The fixture uses the app's bundled Geist and Geist Mono fonts, including
-inline code, and waits for them to load before measuring. System fonts have
-different glyph widths across hosts, which changes message heights and the
-virtual rows mounted at each scroll step.
+```bash
+bunx playwright install chromium
+bun run build
+bun run perf:check
+```
 
-The long chats also have eight files in their real sandbox workspaces.
-Autocomplete types `@src/perf`, waits for those eight suggestions, and counts
-renders and requests. The 150 ms debounce should combine that typing burst
-into one request. Links to `example.com` receive a local PNG response through
-Playwright routing, so scrolling exercises image previews without external
-network timing or failures.
+The check needs Node.js as well as Bun, and Linux, because the file
+suggestions read a sandbox workspace. It writes its results to
+`/tmp/euler-performance-check`.
 
-Virtualization mounts only nearby messages. Browser find and screen readers
-see those mounted messages, and Tab reaches the composer after the last
-mounted row rather than traversing the entire history.
+To see whether a count depends on machine speed, run it on two cores with
+`taskset -c 0,1 bun run perf:check`.
 
-It gates on **counts, not milliseconds.** Wall-clock timings on shared CI
-runners vary by more than the regressions worth catching. Counts are more
-repeatable when inputs, typography, and interaction steps are controlled.
-Every metric is "lower is better":
+## Fixture
+
+- 100 chats, two of them 200 messages long with Markdown, code blocks, and
+  tool steps. The check opens one of the long chats.
+- A fake Ollama streams replies one token at a time through a loopback control
+  port. No model runs, and the check observes each token before the next
+  arrives.
+- The app's bundled Geist and Geist Mono fonts, loaded before measuring.
+  System fonts have different glyph widths across hosts, which changes message
+  heights and the virtual rows mounted at each scroll step.
+- Eight files in each long chat's real sandbox workspace. Autocomplete types
+  `@src/perf` and waits for those eight suggestions. The 150 ms debounce should
+  turn that typing burst into one request.
+- Links to `example.com` get a local PNG through Playwright routing, so
+  scrolling exercises image previews without external network timing.
+
+## Metrics
+
+The check gates on counts, not milliseconds. Wall-clock timings on shared CI
+runners vary by more than the regressions worth catching. Lower is better for
+every metric:
 
 | Metric | What a regression means |
 | --- | --- |
@@ -45,67 +57,70 @@ Every metric is "lower is better":
 | `bundle.jsGzipBytes`, `bundle.cssGzipBytes` | The scripts and styles the app loads grew |
 | `api.sessionResponseBytes`, `api.sessionsResponseBytes` | Chat and chat-list payloads grew |
 
-Component renders are counted through the DevTools global hook, which
-production React calls on every commit: each component React actually rendered
-counts once. Renders, not commits, are what a broken memo or an unstable prop
-multiplies. The Ollama health poll is held during every window that does not
-measure it, and each window starts and ends quiescent: images and fonts loaded,
-finite CSS animations finished, and renders and scroll geometry unchanged
-across three two-frame samples. This lets image load, intersection, and resize
-callbacks finish before the next action. Streaming waits for each token to
-render before sending the next, so a slower machine cannot batch tokens into
-fewer commits. Finishing a reply and opening a chat each send several calls
-at once: three chat list refreshes, or `GetSession` with `GetRuntime`. React
-renders two answers in one commit or two depending on which arrives first, so
-those two windows answer the app's calls one at a time, each after the page
-has rendered the one before (`answerInTurn`). The scroll count traverses the thread from bottom to top in
-200 settled steps. Timing samples use a 40-step traversal
-without those settling waits. The count gate covers small scroll steps, not
-remount work during large jumps; the 40-step timing pass reports
-`scroll.worstFrameMs` without gating it.
-
 `bundle.jsGzipBytes` counts only scripts the app loaded during the check.
-Shiki ships a lazy chunk per language, and summing all of them would measure
+Shiki ships a lazy chunk per language, and summing them all would measure
 grammars no user downloads.
 
+Wall-clock medians under 4× CPU throttling go to the CI job summary for trend
+reading and are never gated: idle main-thread time, typing and streaming
+main-thread time, worst frame, and worst typing interaction.
+
+CI uploads the raw results as an artifact. The artifact also records the
+resolved text and code fonts and, per scroll step, the cumulative render
+count, row mount counts, mounted rows, row heights, and scroll geometry, to
+diagnose differences between hosts.
+
+## How the counts stay repeatable
+
+- **Renders, not commits.** The check counts renders through the DevTools
+  global hook, which production React calls on every commit. Each component
+  React rendered counts once. Renders are what a broken memo or an unstable
+  prop multiplies.
+- **Quiescent windows.** Each measurement window starts and ends with images
+  and fonts loaded, finite CSS animations finished, and renders and scroll
+  geometry unchanged across three two-frame samples. Image load, intersection,
+  and resize callbacks finish before the next action. The Ollama health poll
+  is held during every window that doesn't measure it.
+- **One token at a time.** Streaming waits for each token to render before
+  sending the next, so a slower machine can't batch tokens into fewer commits.
+- **Calls answered in turn.** Finishing a reply sends three chat list
+  refreshes at once, and opening a chat sends `GetSession` with `GetRuntime`.
+  If the answers raced, React would render two of them in one commit on some
+  runs and two on others. `answerInTurn` releases each answer only after the
+  page has rendered the one before.
+- **Scroll.** The count pass crosses the thread from bottom to top in 200
+  settled steps. It covers small scroll steps, not remount work during large
+  jumps. A separate 40-step pass without the settling waits reports
+  `scroll.worstFrameMs`, which isn't gated.
+
+## Baseline
+
 Each baseline entry has a `value` plus an optional relative `tolerance` and
-absolute `slack`, set only where runs of one build differ. Interaction render
-counts allow 2 renders: one-second display timers, such as live elapsed times,
-can tick inside a window, which moved single counts by one render on GitHub's
-runner. Scrolling uses the same 2-render allowance. Bundle and payload bytes
-allow 1% for build hosts and generated IDs. The gate reports:
+absolute `slack`, set only where runs of one build differ:
 
-- `regressed` — the PR fails. Fix it, or accept it deliberately with
+- Interaction and scroll render counts allow 2 renders. One-second display
+  timers, such as live elapsed times, can tick inside a window, which moved
+  single counts by one render on GitHub's runner.
+- Bundle and payload bytes allow 1% for build hosts and generated IDs.
+
+The gate reports one of three results for a metric outside its band:
+
+- `regressed` fails the check. Fix it, or accept it on purpose with
   `bun run perf:check --update` and explain the baseline change in review.
-- `improved` — run `--update` to lock the improvement in. Baselines only move
-  with a reviewed diff, so small increases cannot accumulate unnoticed.
+- `new` means the metric has no baseline yet. It fails the check until
+  `--update` records one.
+- `improved` passes and asks you to run `--update` to lock the improvement in.
 
-`--update` rewrites only metrics outside their band; values within it are noise
-and leave the baseline unchanged.
-
-Wall-clock medians under 4× CPU throttling (idle main-thread time, typing and
-streaming main-thread time, worst frame, worst typing interaction) go to the CI
-job summary for trend reading and are never gated. Raw results are uploaded as
-a CI artifact. The artifact also records resolved text/code fonts and each
-scroll step's cumulative render count, row mount counts, mounted rows, row
-heights, and scroll geometry to diagnose differences between hosts.
-
-## Running locally
-
-```bash
-bunx playwright install chromium
-bun run build
-bun run perf:check
-```
-
-The check needs Linux, because the file suggestions read a sandbox workspace.
-To see whether a count depends on machine speed, run it on two cores with
-`taskset -c 0,1 bun run perf:check`.
+`--update` rewrites only metrics outside their band. Baselines move only with
+a reviewed diff, so small increases can't pile up unnoticed.
 
 ## Coverage
 
-These scenarios cover chat interactions, not settings-page performance or
-searching a large workspace. The autocomplete endpoint still walks the entire
+These scenarios cover chat interactions. They don't cover settings pages or
+searching a large workspace. The autocomplete endpoint still walks the whole
 workspace per query and returns up to 200 files, while suggestions use eight.
-A large-workspace measurement would establish whether traversal or payload
-size warrants another optimization.
+See `PERF-3` in [the audit](../../docs/audit-issues.md).
+
+Virtualization mounts only nearby messages. Browser find and screen readers
+see only those, and Tab reaches the composer after the last mounted row
+without crossing the whole history.
