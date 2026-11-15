@@ -33,7 +33,6 @@ message UserPreferences {
   UserSettings settings = 3;
   Appearance appearance = 4;
   Layout layout = 5;
-  Capabilities capabilities = 6;
 }
 
 message ImagePreferences {
@@ -110,15 +109,6 @@ message Layout {
   ArtifactState artifact_state = 3;
 }
 
-// Built-in agent capabilities a user can turn off, e.g. in favor of an MCP server.
-message Capabilities {
-  bool web = 1;
-  bool image_generation = 2;
-  bool shell = 3;
-  bool files = 4;
-  bool skills = 5;
-}
-
 message GetPreferencesRequest {}
 
 message GetPreferencesResponse {
@@ -178,18 +168,10 @@ message UpdatePreferencesRequest {
     }];
     optional Layout.ArtifactState artifact_state = 3;
   }
-  message CapabilitiesPatch {
-    optional bool web = 1;
-    optional bool image_generation = 2;
-    optional bool shell = 3;
-    optional bool files = 4;
-    optional bool skills = 5;
-  }
   optional ImagePatch image = 1;
   optional SettingsPatch settings = 2;
   optional AppearancePatch appearance = 3;
   optional LayoutPatch layout = 4;
-  optional CapabilitiesPatch capabilities = 5;
 }
 
 message UpdatePreferencesResponse {

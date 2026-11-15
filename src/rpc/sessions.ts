@@ -5,7 +5,6 @@ import { agentRuntime } from "../agents/runtime/AgentRuntime";
 import { withoutImageData } from "../db/agents";
 import {
   createSessionRow,
-  deleteSessionRow,
   findWorkspaceUser,
   getMessagesForSession,
   listSessionSummaries,
@@ -93,19 +92,13 @@ export const sessionService: ServiceImpl<typeof SessionService> = {
       },
     };
   },
-  async createSession(request, context) {
+  createSession(request, context) {
     const owner = ownerOf(context);
     const id = crypto.randomUUID();
     const now = Date.now();
     const model = request.model?.trim() || null;
     const expiresAt = request.ephemeral ? ephemeralExpiry(now) : null;
     createSessionRow(owner, id, now, model, expiresAt);
-    try {
-      await workspaceService.provisionRetained(owner, id);
-    } catch (error) {
-      deleteSessionRow(owner, id);
-      throw error;
-    }
     agentRuntime.main(owner, id);
     return { id, createdAt: millis(now), expiresAt: optionalMillis(expiresAt) };
   },

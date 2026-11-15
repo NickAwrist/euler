@@ -6,12 +6,14 @@ export function SwitchField({
   label,
   hint,
   checked,
+  disabled,
   onChange,
 }: {
   id: string;
   label: string;
   hint: string;
   checked: boolean;
+  disabled?: boolean;
   onChange: (checked: boolean) => void;
 }) {
   return (
@@ -20,6 +22,7 @@ export function SwitchField({
         id={id}
         label={label}
         checked={checked}
+        disabled={disabled}
         onChange={onChange}
       />
       <label htmlFor={id}>

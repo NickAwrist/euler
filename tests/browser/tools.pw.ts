@@ -1,10 +1,14 @@
 import { expect, test } from "@playwright/test";
 import {
+  FeatureId,
+  type FeatureSchema,
+  FeatureService,
+} from "../../src/gen/euler/v1/features_pb";
+import {
   McpServerOAuth_GrantType,
   type McpServerSchema,
   McpServerService,
 } from "../../src/gen/euler/v1/mcp_pb";
-import type { UserPreferences } from "../../src/schemas/userPreferences";
 import { type Init, at } from "./appFixture";
 import { RpcFailure, mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
@@ -292,10 +296,44 @@ test("tools desktop: finish MCP OAuth by pasting callback URL and surface callba
   ).toHaveText(["list_events"]);
 });
 
-test("tools desktop: built-in capabilities save per user", async ({ page }) => {
-  const store = new Map<string, UserPreferences>();
+test("tools desktop: features save, and one the server cannot run stays off", async ({
+  page,
+}) => {
+  let features: Init<typeof FeatureSchema>[] = [
+    {
+      id: FeatureId.IMAGE_GENERATION,
+      label: "Image generation",
+      description: "Generate images with ComfyUI.",
+      toggleable: true,
+      enabled: true,
+    },
+    {
+      id: FeatureId.SANDBOX,
+      label: "Sandbox",
+      description: "Run commands in the active workspace.",
+      toggleable: true,
+      enabled: true,
+      unavailableReason: "bubblewrap is not installed",
+    },
+    {
+      id: FeatureId.SKILLS,
+      label: "Skills",
+      description: "Instructions the agent loads for specialized tasks.",
+      toggleable: false,
+      enabled: true,
+    },
+  ];
   await mockRpc(page, [], { empty: true });
-  await mockUserPreferences(page, store);
+  await mockUserPreferences(page);
+  await mockRpc(page, [
+    on(FeatureService.method.listFeatures, () => ({ features })),
+    on(FeatureService.method.setFeatureEnabled, ({ id, enabled }) => {
+      features = features.map((feature) =>
+        feature.id === id ? { ...feature, enabled } : feature,
+      );
+      return { features };
+    }),
+  ]);
 
   await page.goto("/customization");
   await page.getByRole("button", { name: "Tools" }).click();
@@ -305,15 +343,12 @@ test("tools desktop: built-in capabilities save per user", async ({ page }) => {
   await expect(imageGeneration).toHaveAttribute("aria-checked", "true");
   await imageGeneration.click();
   await expect(imageGeneration).toHaveAttribute("aria-checked", "false");
-  await expect
-    .poll(() => [...store.values()][0]?.capabilities)
-    .toEqual({
-      web: true,
-      imageGeneration: false,
-      shell: true,
-      files: true,
-      skills: true,
-    });
+
+  const sandbox = page.getByRole("switch", { name: "Sandbox" });
+  await expect(sandbox).toBeDisabled();
+  await expect(sandbox).toHaveAttribute("aria-checked", "false");
+  await expect(page.getByText("bubblewrap is not installed")).toBeVisible();
+  await expect(page.getByRole("switch", { name: "Skills" })).toHaveCount(0);
 
   await page.reload();
   await page.getByRole("button", { name: "Tools" }).click();

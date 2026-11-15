@@ -29,7 +29,11 @@ import { FilePicker } from "./RunArea/FilePicker";
 import { IntegrationPicker } from "./RunArea/IntegrationPicker";
 import { ThinkingLevelBar } from "./ThinkingLevelBar";
 import { completeFileToken, findActiveFileToken } from "./filePicker";
-import { type RunCommandName, exactRunCommand } from "./runCommands";
+import {
+  type RunCommand,
+  type RunCommandName,
+  exactRunCommand,
+} from "./runCommands";
 
 const touchKeyboardQuery = "(pointer: coarse)";
 const getTouchKeyboardSnapshot = () =>
@@ -68,6 +72,7 @@ export function RunInputDock({
   attachmentsSendReady,
   workspace,
   linkedLabel,
+  commands,
   onRunCommand,
   onFooterHeightChange,
 }: {
@@ -99,6 +104,8 @@ export function RunInputDock({
   workspace: SessionWorkspace;
   /** The chat whose sandbox this chat is linked to, if any. */
   linkedLabel: string | null;
+  /** The "/" commands the running features add. */
+  commands: readonly RunCommand[];
   onRunCommand: (command: RunCommandName) => void | Promise<void>;
   onFooterHeightChange: (heightPx: number) => void;
 }) {
@@ -154,6 +161,7 @@ export function RunInputDock({
     dismissed: integrationPickerDismissed,
     busy: isBusy,
     workspace,
+    commands,
     runCommand,
     complete: (completed) => {
       setIntegrationPickerDismissed(true);
@@ -249,7 +257,7 @@ export function RunInputDock({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          const command = exactRunCommand(input);
+          const command = exactRunCommand(commands, input);
           if (command) {
             runCommand(command);
             return;

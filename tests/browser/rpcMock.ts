@@ -17,6 +17,7 @@ import { DebugService } from "../../src/gen/euler/v1/debug_pb";
 import { DeviceService } from "../../src/gen/euler/v1/devices_pb";
 import { DirectoryService } from "../../src/gen/euler/v1/directories_pb";
 import { EventService } from "../../src/gen/euler/v1/events_pb";
+import { FeatureService } from "../../src/gen/euler/v1/features_pb";
 import { JobService } from "../../src/gen/euler/v1/jobs_pb";
 import { McpServerService } from "../../src/gen/euler/v1/mcp_pb";
 import { ModelService } from "../../src/gen/euler/v1/models_pb";
@@ -38,6 +39,7 @@ const SERVICES = [
   DeviceService,
   DirectoryService,
   EventService,
+  FeatureService,
   JobService,
   McpServerService,
   ModelService,

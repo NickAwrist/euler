@@ -47,7 +47,8 @@ private struct ApprovalCard: View {
                         .background(palette.borderSubtle, in: .rect(cornerRadius: 4))
                 }
             }
-            Text("\(approval.reason) In \(approval.workspacePath)")
+            // A run with no workspace feature has no path to name.
+            Text(approval.workspacePath.isEmpty ? approval.reason : "\(approval.reason) In \(approval.workspacePath)")
                 .font(.caption)
                 .foregroundStyle(palette.muted)
                 .lineLimit(2)

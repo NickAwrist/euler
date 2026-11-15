@@ -122,6 +122,11 @@ function ApprovalRequest({
     await reload();
   };
 
+  // A run with no workspace feature has no path to name.
+  const detail = approval.workspacePath
+    ? `${approval.reason} In ${approval.workspacePath}`
+    : approval.reason;
+
   return (
     <article
       aria-labelledby={titleId}
@@ -153,11 +158,8 @@ function ApprovalRequest({
               </span>
             )}
           </div>
-          <p
-            className="truncate text-muted-foreground"
-            title={`${approval.reason} In ${approval.workspacePath}`}
-          >
-            {approval.reason} In {approval.workspacePath}
+          <p className="truncate text-muted-foreground" title={detail}>
+            {detail}
           </p>
           <pre
             aria-label={`${approval.tool} arguments`}

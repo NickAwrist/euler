@@ -4,13 +4,10 @@ import { BaseAgent } from "../../src/agents/BaseAgent";
 import { JobManager } from "../../src/jobs/JobManager";
 import * as llm from "../../src/llm";
 import type { LlmChatRequest } from "../../src/llm/types";
-import {
-  enabledBuiltinTools,
-  permissionService,
-} from "../../src/permissions/PermissionService";
-import { capabilitiesSchema } from "../../src/schemas/userPreferences";
+import { permissionService } from "../../src/permissions/PermissionService";
 import { BaseTool } from "../../src/tools/BaseTool";
 import type { JobContext } from "../../src/tools/background";
+import { featuresExcept } from "../helpers/features";
 
 afterEach(() => {
   streamSpy?.mockRestore();
@@ -19,21 +16,24 @@ let streamSpy:
   | ReturnType<typeof spyOn<typeof llm, "streamModelChat">>
   | undefined;
 
-test("workspace policies preserve user capability denials and MCP tools", () => {
-  const capabilities = capabilitiesSchema.parse({
-    shell: false,
-    files: false,
-    web: false,
-    skills: false,
-  });
+test("workspace policies refuse the tools of features that are off, but not MCP tools", () => {
+  const features = featuresExcept(
+    "sandbox",
+    "files",
+    "web",
+    "skills",
+    "subagents",
+  );
   for (const kind of ["sandbox", "local"] as const) {
-    const policy = permissionService.resolve({ kind }, capabilities);
+    const policy = permissionService.resolve({ kind }, features);
     for (const tool of [
       "bash",
+      "get_job",
       "read_file",
       "create_file",
       "web_search",
       "manage_skills",
+      "spawn_agent",
     ]) {
       expect(permissionService.toolDecision(policy, tool).allowed).toBe(false);
     }
@@ -42,12 +42,14 @@ test("workspace policies preserve user capability denials and MCP tools", () => 
     ).toBe(true);
   }
   expect(
-    enabledBuiltinTools(permissionService.resolve(undefined, capabilities)),
-  ).toEqual(["generate_image"]);
-  capabilities.shell = true;
+    permissionService.toolDecision(
+      permissionService.resolve(undefined, features),
+      "generate_image",
+    ).allowed,
+  ).toBe(true);
   expect(
     permissionService.toolDecision(
-      permissionService.resolve({ kind: "local" }, capabilities),
+      permissionService.resolve({ kind: "local" }, featuresExcept("files")),
       "bash",
     ).allowed,
   ).toBe(true);
@@ -111,10 +113,7 @@ for (const background of [false, true]) {
     };
     const ctx = new RunContext(
       agent,
-      permissionService.resolve(
-        workspace,
-        capabilitiesSchema.parse({ shell: false }),
-      ),
+      permissionService.resolve(workspace, featuresExcept("sandbox")),
       undefined,
       undefined,
       undefined,
@@ -136,7 +135,7 @@ for (const background of [false, true]) {
     expect(jobs).toBe(0);
     expect(
       agent.history.find((message) => message.role === "tool")?.content,
-    ).toContain("shell capability is disabled");
+    ).toContain("sandbox feature is disabled");
   });
 }
 
@@ -155,10 +154,7 @@ test("background job admission enforces permissions before creating a job", asyn
   const tool = new ShellFixture();
   const ctx = new RunContext(
     new BaseAgent("test", "test"),
-    permissionService.resolve(
-      workspace,
-      capabilitiesSchema.parse({ shell: false }),
-    ),
+    permissionService.resolve(workspace, featuresExcept("sandbox")),
     undefined,
     undefined,
     undefined,
@@ -169,7 +165,7 @@ test("background job admission enforces permissions before creating a job", asyn
   );
   await expect(
     manager.executor("agent", "session", "activation").start(tool, {}, ctx),
-  ).rejects.toThrow("shell capability is disabled");
+  ).rejects.toThrow("sandbox feature is disabled");
   expect(tool.calls).toBe(0);
   expect(manager.list("owner", "session")).toEqual([]);
 });

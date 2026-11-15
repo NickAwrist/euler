@@ -63,7 +63,7 @@ test("allow matching saves narrow rules, duplicate/foreign responses cannot gran
   const prefs = effectiveUserPreferences(owner);
   const policy = permissionService.resolve(
     context.workspace,
-    prefs.capabilities,
+    undefined,
     prefs.toolPermissions,
   );
   expect(
@@ -110,19 +110,19 @@ test("cancellation removes pending requests and cannot persist a matching grant"
     allToolsRule(),
   ]);
 });
-test("capabilities and workspace are rechecked while a user is considering approval", async () => {
+test("feature switches and workspace are rechecked while a user is considering approval", async () => {
   const { owner, id, coordinator, context, controller } = await fixture();
   const pending = coordinator.authorize(context, "bash", { command: "build" });
   void pending.catch(() => {});
   const approval = coordinator.list(owner, id)[0]!;
-  updateUserPreferences(owner, { capabilities: { shell: false } });
+  updateUserPreferences(owner, { features: { sandbox: false } });
   await expect(
     coordinator.respond(owner, id, approval.id, { decision: "allow_matching" }),
   ).rejects.toThrow("disabled");
   expect(effectiveUserPreferences(owner).toolPermissions.rules).toEqual([
     allToolsRule(),
   ]);
-  updateUserPreferences(owner, { capabilities: { shell: true } });
+  updateUserPreferences(owner, { features: { sandbox: true } });
   patchSessionRow(owner, id, {
     workspace_kind: "local",
     session_directory: "/tmp",

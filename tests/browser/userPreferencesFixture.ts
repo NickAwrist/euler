@@ -28,7 +28,7 @@ function merge(
     appearance: { ...current.appearance, ...patch.appearance },
     layout: { ...current.layout, ...patch.layout },
     image: { ...current.image, ...patch.image },
-    capabilities: { ...current.capabilities, ...patch.capabilities },
+    features: { ...current.features, ...patch.features },
     toolPermissions: { ...current.toolPermissions, ...patch.toolPermissions },
   });
 }

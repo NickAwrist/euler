@@ -39,9 +39,14 @@ export class BubblewrapSandboxRunner {
     diagnostic?: string;
   }>;
 
-  capability(): Promise<{ available: boolean; diagnostic?: string }> {
+  async capability(): Promise<{ available: boolean; diagnostic?: string }> {
     this.capabilityPromise ??= this.probe();
-    return this.capabilityPromise;
+    const probe = this.capabilityPromise;
+    const capability = await probe;
+    // Bubblewrap can be installed while the server runs, so a failure is rechecked.
+    if (!capability.available && this.capabilityPromise === probe)
+      this.capabilityPromise = undefined;
+    return capability;
   }
 
   async spawn(options: SandboxRunOptions): Promise<SandboxExecution> {

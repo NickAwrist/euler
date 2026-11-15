@@ -14,6 +14,9 @@ Vite proxies `/api` to the backend. Their ports come from `.env`. See
 
 - `proto/`: the API contract. See [The Connect API](connect-api.md).
 - `src/`: backend server, RPC handlers, agent loop, tools, and session storage
+- `src/features/`: one class per feature. A feature checks its own
+  requirements and adds its tools and prompt text to a run, and can declare a
+  sidebar tab and composer `/` commands for the clients to draw.
 - `ui/`: React frontend
 - `ios/`: the iPhone app
 - `tests/`: unit, integration, and Playwright browser tests

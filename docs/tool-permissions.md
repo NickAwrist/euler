@@ -5,8 +5,8 @@ denies a tool call.
 
 ## Rules
 
-The tool picker lists the enabled built-in, agent, skill, and connected MCP
-tools. To require approval for everything, add an **Ask** rule for **All
+The tool picker lists the tools of your active features, including connected
+MCP servers. To require approval for everything, add an **Ask** rule for **All
 tools**, then add **Allow** rules for the exceptions.
 
 A rule matches one of three things:
@@ -33,7 +33,7 @@ most specific rule wins, compared in this order:
    arguments**
 4. Position: the rule lower in the list
 
-A call that matches no rule is allowed. A disabled built-in capability stays
+A call that matches no rule is allowed. A tool whose feature is off stays
 denied whatever the rules say.
 
 Rules apply to MCP tools too. They don't change the MCP server's own access.

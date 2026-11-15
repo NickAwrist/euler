@@ -4,7 +4,7 @@ import {
   composerSuggestionSources,
   findActiveToolToken,
 } from "../components/composerSuggestions";
-import type { RunCommandName } from "../components/runCommands";
+import type { RunCommand, RunCommandName } from "../components/runCommands";
 import { findActiveSkillToken } from "../components/skillPicker";
 import type { McpTool } from "../persist/mcpServers";
 import { fetchMcpTools } from "../persist/mcpServers";
@@ -17,6 +17,7 @@ export function useComposerSuggestions({
   dismissed,
   busy,
   workspace,
+  commands,
   complete,
   runCommand,
 }: {
@@ -25,6 +26,7 @@ export function useComposerSuggestions({
   dismissed: boolean;
   busy: boolean;
   workspace: SessionWorkspace;
+  commands: readonly RunCommand[];
   complete: (completion: { value: string; caret: number }) => void;
   runCommand: (command: RunCommandName) => void;
 }) {
@@ -76,6 +78,7 @@ export function useComposerSuggestions({
         input,
         workspace,
         busy,
+        commands,
         skills,
         tools,
         skillToken,

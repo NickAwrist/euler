@@ -2,6 +2,7 @@ import type { MessageInitShape } from "@bufbuild/protobuf";
 import { type Page, expect, test } from "@playwright/test";
 import { WorkspaceFileAttachment_WorkspaceKind } from "../../src/gen/euler/v1/attachments_pb";
 import { DirectoryService } from "../../src/gen/euler/v1/directories_pb";
+import { FeatureId, FeatureService } from "../../src/gen/euler/v1/features_pb";
 import {
   Appearance_ChatWidth,
   type UpdatePreferencesRequest_AppearancePatchSchema,
@@ -15,6 +16,7 @@ import { userPreferencesSchema } from "../../src/schemas/userPreferences";
 import {
   type MessageInit,
   at,
+  chatFeatures,
   message,
   mockApp as mockChatApp,
 } from "./appFixture";
@@ -644,6 +646,54 @@ test("chat sidebar desktop keeps a remembered files panel closed for an empty wo
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
   await page.getByRole("button", { name: "Refresh files" }).press("Escape");
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
+});
+
+test("chat sidebar desktop draws tabs and commands from running features and hides without one", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mockApp(page);
+  await mockUserPreferences(page);
+  // Files is switched off and Subagents cannot run, so only Sandbox adds anything.
+  let features = chatFeatures.map((feature) =>
+    feature.id === FeatureId.FILES
+      ? { ...feature, enabled: false }
+      : feature.id === FeatureId.SUBAGENTS
+        ? { ...feature, unavailableReason: "unavailable" }
+        : feature,
+  );
+  let listings = 0;
+  await mockRpc(page, [
+    on(FeatureService.method.listFeatures, () => ({ features })),
+    on(WorkspaceService.method.listArtifacts, () => {
+      listings++;
+      return { entries: [] };
+    }),
+  ]);
+  await page.goto("/run/sidebar-test");
+  const toggle = page.getByRole("button", { name: "Toggle artifacts" });
+  await toggle.click();
+  await expect(
+    page.getByRole("group", { name: "Sidebar view" }).getByRole("button"),
+  ).toHaveText(["Jobs"]);
+  expect(listings).toBe(0);
+
+  // Sandbox still adds the workspace commands, but not the one for showing files.
+  const composer = page.getByPlaceholder("Send a message...");
+  await composer.fill("/");
+  const picker = page.locator("#command-picker");
+  await expect(picker.getByRole("button")).toHaveText([
+    /\/directory/,
+    /\/link/,
+  ]);
+
+  features = [];
+  await page.reload();
+  await expect(composer).toBeVisible();
+  await expect(toggle).toHaveCount(0);
+  await expect(page.locator("#artifact-sidebar")).toHaveCount(0);
+  await composer.fill("/");
+  await expect(picker.getByRole("button")).toHaveCount(0);
 });
 
 test("chat sidebar desktop jumps to the latest message after scrolling up", async ({

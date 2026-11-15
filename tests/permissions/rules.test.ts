@@ -4,7 +4,7 @@ import {
   type ToolPermissionRule,
   ToolPermissionsSchema,
 } from "../../src/schemas/toolPermissions";
-import { capabilitiesSchema } from "../../src/schemas/userPreferences";
+import { featuresExcept } from "../helpers/features";
 import { allToolsRule } from "../helpers/toolPermissions";
 
 const rule = (
@@ -18,7 +18,7 @@ const rule = (
 });
 const evaluate = (rules: ToolPermissionRule[], command: string) =>
   permissionService.callDecision(
-    permissionService.resolve({ kind: "local" }, capabilitiesSchema.parse({}), {
+    permissionService.resolve({ kind: "local" }, undefined, {
       rules: [allToolsRule(), ...rules],
     }),
     "bash",
@@ -54,13 +54,9 @@ test("All tools rules match builtin and MCP calls, with specific tool exceptions
   const allow = rule("allow", { kind: "any" });
   expect(evaluate([allow, ask], "bun test").action).toBe("allow");
   expect(evaluate([ask, allow], "bun test").action).toBe("allow");
-  const policy = permissionService.resolve(
-    undefined,
-    capabilitiesSchema.parse({}),
-    {
-      rules: [ask],
-    },
-  );
+  const policy = permissionService.resolve(undefined, undefined, {
+    rules: [ask],
+  });
   expect(
     permissionService.callDecision(policy, "read_file", { path: "README.md" })
       .action,
@@ -71,13 +67,9 @@ test("All tools rules match builtin and MCP calls, with specific tool exceptions
   expect(evaluate([{ ...ask, action: "deny" }, allow], "bun test").action).toBe(
     "deny",
   );
-  const scopedPolicy = permissionService.resolve(
-    undefined,
-    capabilitiesSchema.parse({}),
-    {
-      rules: [{ ...ask, sessionId: "chat" }],
-    },
-  );
+  const scopedPolicy = permissionService.resolve(undefined, undefined, {
+    rules: [{ ...ask, sessionId: "chat" }],
+  });
   expect(
     permissionService.callDecision(
       scopedPolicy,
@@ -110,11 +102,9 @@ test("matching calls bind all arguments and their chat/workspace; object key ord
     sessionId: "chat",
     workspacePath: "/project",
   };
-  const policy = permissionService.resolve(
-    undefined,
-    capabilitiesSchema.parse({}),
-    { rules: [allToolsRule(), allow] },
-  );
+  const policy = permissionService.resolve(undefined, undefined, {
+    rules: [allToolsRule(), allow],
+  });
   const args = {
     options: { second: true, first: 1 },
     background: false,
@@ -142,11 +132,9 @@ test("argument rules read only own fields, and capability denials cannot be appr
     match: "exact",
     value: "build",
   });
-  const policy = permissionService.resolve(
-    undefined,
-    capabilitiesSchema.parse({}),
-    { rules: [allToolsRule(), allow] },
-  );
+  const policy = permissionService.resolve(undefined, undefined, {
+    rules: [allToolsRule(), allow],
+  });
   expect(
     permissionService.callDecision(policy, "bash", {
       options: { command: "build" },
@@ -159,7 +147,7 @@ test("argument rules read only own fields, and capability denials cannot be appr
   ).toBe("ask");
   const disabled = permissionService.resolve(
     undefined,
-    capabilitiesSchema.parse({ shell: false }),
+    featuresExcept("sandbox"),
     { rules: [rule("allow", { kind: "any" })] },
   );
   expect(permissionService.callDecision(disabled, "bash", {}).action).toBe(
@@ -183,11 +171,9 @@ test("schema-selected boolean and numeric fields use typed equality and reject n
     }),
     tool: "web_search",
   };
-  const policy = permissionService.resolve(
-    undefined,
-    capabilitiesSchema.parse({}),
-    { rules: [background, count] },
-  );
+  const policy = permissionService.resolve(undefined, undefined, {
+    rules: [background, count],
+  });
   expect(
     permissionService.callDecision(policy, "bash", { background: false })
       .action,

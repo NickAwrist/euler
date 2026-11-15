@@ -1,22 +1,16 @@
+import type { FeatureId } from "../features/Feature";
+import { FEATURES, featureIds, featureOwning } from "../features/index";
 import {
   type ToolPermissions,
   ToolPermissionsSchema,
 } from "../schemas/toolPermissions";
-import {
-  type Capabilities,
-  capabilitiesSchema,
-} from "../schemas/userPreferences";
-import {
-  BUILTIN_TOOLS,
-  BUILTIN_TOOL_REGISTRY,
-  type BuiltinTool,
-} from "../tools/builtinTools";
 import type { Workspace } from "../workspaces/WorkspaceService";
 import { type PermissionScope, matchesRule, ruleSpecificity } from "./rules";
 
 export type RunPermissions = {
   readonly toolPermissions: ToolPermissions;
-  readonly capabilities: Readonly<Capabilities>;
+  /** The features whose tools the run may call. */
+  readonly features: ReadonlySet<FeatureId>;
   readonly shell: {
     readonly network: "isolated" | "host";
     readonly hostToolchains: boolean;
@@ -38,12 +32,12 @@ export type ToolCallDecision =
 export class PermissionService {
   resolve(
     workspace?: Pick<Workspace, "kind">,
-    capabilities: Capabilities = capabilitiesSchema.parse({}),
+    features: Iterable<FeatureId> = featureIds(FEATURES),
     toolPermissions: ToolPermissions = ToolPermissionsSchema.parse({}),
   ): RunPermissions {
     const development = workspace?.kind === "local";
     return {
-      capabilities: { ...capabilities },
+      features: new Set(features),
       toolPermissions: structuredClone(toolPermissions),
       shell: {
         network: development ? "host" : "isolated",
@@ -60,16 +54,12 @@ export class PermissionService {
     permissions: RunPermissions,
     toolName: string,
   ): PermissionDecision {
-    // User capabilities gate built-ins and skill management, not MCP tools.
-    const capability =
-      toolName === "manage_skills"
-        ? "skills"
-        : BUILTIN_TOOL_REGISTRY.find((tool) => tool.name === toolName)
-            ?.capability;
-    if (capability && !permissions.capabilities[capability]) {
+    // MCP tools have no owning feature here; their servers have their own switch.
+    const feature = featureOwning(toolName);
+    if (feature && !permissions.features.has(feature.id)) {
       return {
         allowed: false,
-        reason: `The ${capability} capability is disabled for this run`,
+        reason: `The ${feature.id} feature is disabled for this run`,
       };
     }
     return { allowed: true };
@@ -86,9 +76,8 @@ export class PermissionService {
     args: Record<string, unknown>,
     scope: PermissionScope = {},
   ): ToolCallDecision {
-    const capability = this.toolDecision(permissions, tool);
-    if (!capability.allowed)
-      return { action: "deny", reason: capability.reason };
+    const feature = this.toolDecision(permissions, tool);
+    if (!feature.allowed) return { action: "deny", reason: feature.reason };
     const matches = permissions.toolPermissions.rules.filter((rule) =>
       matchesRule(rule, tool, args, scope),
     );
@@ -116,11 +105,3 @@ export class PermissionService {
 }
 
 export const permissionService = new PermissionService();
-
-export function enabledBuiltinTools(
-  permissions: RunPermissions,
-): BuiltinTool[] {
-  return BUILTIN_TOOLS.filter(
-    (tool) => permissionService.toolDecision(permissions, tool).allowed,
-  );
-}

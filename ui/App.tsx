@@ -46,6 +46,7 @@ import { WelcomeHome } from "./components/WelcomeHome";
 import { WorkspaceModal } from "./components/WorkspaceModal";
 import type { RunCommandName } from "./components/runCommands";
 import { useAppKeybinds } from "./hooks/useAppKeybinds";
+import { type SidebarView, useChatFeatures } from "./hooks/useChatFeatures";
 import { useMobileLayout } from "./hooks/useMobileLayout";
 import { useRunApp } from "./hooks/useRunApp";
 import { useViewportWidth } from "./hooks/useViewportWidth";
@@ -117,9 +118,12 @@ function ChatView({
   } = app;
   const localPath = localWorkspace(app.workspace)?.path;
   const workspaceKey = `${app.activeSessionId}:${localPath ?? linkedWorkspace(app.workspace)?.workspaceId ?? "sandbox"}`;
-  const [artifactView, setArtifactView] = useState<"files" | "agents" | "jobs">(
-    "files",
-  );
+  const { sidebarTabs, commands } = useChatFeatures();
+  const [artifactView, setArtifactView] = useState<SidebarView>("files");
+  const sidebarView = sidebarTabs.some((tab) => tab.value === artifactView)
+    ? artifactView
+    : sidebarTabs[0]?.value;
+  const showsFiles = sidebarTabs.some((tab) => tab.value === "files");
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const savedRuleNotice = useSavedRuleNotice(app.activeSessionId);
   const selectedJob = app.jobs.find((job) => job.id === selectedJobId);
@@ -208,7 +212,7 @@ function ChatView({
   const hasFiles = useWorkspaceHasFiles(
     source,
     workspaceKey,
-    workspaceReady && artifactsOpen,
+    workspaceReady && artifactsOpen && showsFiles,
   );
   // The remembered open state applies only to workspaces with files; an
   // explicit open in this chat shows the panel even when it is empty.
@@ -216,6 +220,7 @@ function ChatView({
   const subagents = app.agents.filter((a) => a.kind !== Agent_Kind.MAIN);
   const workingAgentCount = subagents.filter(isWorkingAgent).length;
   const filesOpen =
+    sidebarTabs.length > 0 &&
     artifactsOpen &&
     (hasFiles === true ||
       subagents.length > 0 ||
@@ -353,7 +358,7 @@ function ChatView({
               onToggle={toggleChats}
               className={filesOpen ? "max-[900px]:hidden" : undefined}
             />
-            {app.activeSessionId && (
+            {app.activeSessionId && sidebarTabs.length > 0 && (
               <SidebarToggle
                 side="right"
                 open={filesOpen}
@@ -572,36 +577,35 @@ function ChatView({
                 attachmentsSendReady={app.attachmentsSendReady}
                 workspace={app.workspace}
                 linkedLabel={app.linkedLabel}
+                commands={commands}
                 onRunCommand={runCommand}
                 onFooterHeightChange={setRunFooterInset}
               />
             </main>
-            {app.activeSessionId && workspaceReady && (
+            {app.activeSessionId && workspaceReady && sidebarView && (
               <WorkspaceArtifacts
                 key={workspaceKey}
                 header={
                   <div className="p-3">
                     <SegmentedControl
                       label="Sidebar view"
-                      value={artifactView}
+                      value={sidebarView}
                       onChange={setArtifactView}
-                      options={[
-                        { value: "files", label: "Files" },
-                        { value: "jobs", label: "Jobs" },
-                        {
-                          value: "agents",
-                          label: workingAgentCount
-                            ? `Agents (${workingAgentCount})`
-                            : "Agents",
-                        },
-                      ]}
+                      options={sidebarTabs.map((tab) =>
+                        tab.value === "agents" && workingAgentCount
+                          ? {
+                              ...tab,
+                              label: `${tab.label} (${workingAgentCount})`,
+                            }
+                          : tab,
+                      )}
                     />
                   </div>
                 }
                 alternate={
-                  artifactView === "jobs" ? (
+                  sidebarView === "jobs" ? (
                     <JobsList />
-                  ) : artifactView === "agents" ? (
+                  ) : sidebarView === "agents" ? (
                     <AgentsList />
                   ) : undefined
                 }

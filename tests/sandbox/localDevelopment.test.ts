@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { permissionService } from "../../src/permissions/PermissionService";
 import { BubblewrapSandboxRunner } from "../../src/sandbox/SandboxRunner";
 import { discoverToolchains } from "../../src/sandbox/toolchains";
-import { capabilitiesSchema } from "../../src/schemas/userPreferences";
+import { featuresExcept } from "../helpers/features";
 
 const runner = new BubblewrapSandboxRunner();
 const capability = await runner.capability();
@@ -53,10 +53,10 @@ test.skipIf(
           command: "true",
           permissions: permissionService.resolve(
             workspace,
-            capabilitiesSchema.parse({ shell: false }),
+            featuresExcept("sandbox"),
           ),
         }),
-      ).rejects.toThrow("shell capability is disabled");
+      ).rejects.toThrow("sandbox feature is disabled");
     } finally {
       if (previousSecret === undefined)
         Reflect.deleteProperty(process.env, "EULER_DEVELOPMENT_TEST_SECRET");

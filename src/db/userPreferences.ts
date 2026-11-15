@@ -23,7 +23,7 @@ export function updateUserPreferences(
       settings: { ...current.settings, ...patch.settings },
       appearance: { ...current.appearance, ...patch.appearance },
       layout: { ...current.layout, ...patch.layout },
-      capabilities: { ...current.capabilities, ...patch.capabilities },
+      features: { ...current.features, ...patch.features },
       toolPermissions: { ...current.toolPermissions, ...patch.toolPermissions },
     });
     getDb().run(

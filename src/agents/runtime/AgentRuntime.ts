@@ -13,6 +13,7 @@ import {
 import { envConfig } from "../../env";
 import { eventHub } from "../../events/eventHub";
 import type { Activation, AgentEvent } from "../../events/types";
+import type { RunHost } from "../../features/Feature";
 import { JobManager } from "../../jobs/JobManager";
 import { OperationError } from "../../observability/errors";
 import { logEvent, withBackgroundLogContext } from "../../observability/logger";
@@ -28,19 +29,8 @@ import {
 } from "../../schemas/agents";
 import type { DisplayIcon } from "../../schemas/icons";
 import type { WireMessageInput } from "../../schemas/run";
-import type { BaseTool } from "../../tools/BaseTool";
-import { AskParentTool } from "../../tools/ask_parent";
-import { CancelAgentTool } from "../../tools/cancel_agent";
-import { JobTool } from "../../tools/jobs";
-import {
-  type AgentMessageRequest,
-  SendMessageTool,
-} from "../../tools/send_message";
-import {
-  SpawnAgentTool,
-  type SpawnRequest,
-  type SpawnResult,
-} from "../../tools/spawn_agent";
+import type { AgentMessageRequest } from "../../tools/send_message";
+import type { SpawnRequest, SpawnResult } from "../../tools/spawn_agent";
 import type { Workspace } from "../../workspaces/WorkspaceService";
 import { RuntimeTransaction } from "./RuntimeTransaction";
 import { runActivation } from "./activation";
@@ -527,8 +517,8 @@ export class AgentRuntime {
         isDeleting: (sessionId) => this.deleting.has(sessionId),
         transcriptLength: (sessionId) => this.transcriptLength(sessionId),
         allowModelCall: (record) => this.allowModelCall(record),
-        tools: (record, abort, wait, model) =>
-          this.tools(record, abort, wait, model),
+        runHost: (record, abort, wait, model) =>
+          this.runHost(record, abort, wait, model),
         enqueue: (record, sender, kind, content, attachments) =>
           this.enqueue(record, sender, kind, content, [], attachments),
       },
@@ -539,7 +529,7 @@ export class AgentRuntime {
   }
   private async authorizeToolCall(
     agent: AgentRecord,
-    workspace: Workspace,
+    workspace: Workspace | undefined,
     signal: AbortSignal,
     tool: string,
     args: Record<string, unknown>,
@@ -586,28 +576,25 @@ export class AgentRuntime {
       if (current.action === "deny") throw new Error(current.reason);
     }
   }
-  /** Metadata from the same tools used by main agents and subagents; no run is saved. */
-  toolCatalog(ownerUuid: string): BaseTool[] {
-    const signal = new AbortController().signal;
-    return (["main", "general"] as const).flatMap((kind) => {
-      const agent: AgentRecord = {
-        ...createMainAgentRecord(ownerUuid, "", DEFAULT_RUN_MODEL),
-        kind,
-      };
-      return this.tools(
-        agent,
-        signal,
-        () => {},
-        () => agent.model,
-      );
-    });
+  /** A host for listing tools as either kind of agent would get them; no run is saved. */
+  catalogHost(ownerUuid: string, kind: AgentRecord["kind"]): RunHost {
+    const agent: AgentRecord = {
+      ...createMainAgentRecord(ownerUuid, "", DEFAULT_RUN_MODEL),
+      kind,
+    };
+    return this.runHost(
+      agent,
+      new AbortController().signal,
+      () => {},
+      () => agent.model,
+    );
   }
-  private tools(
+  private runHost(
     agent: AgentRecord,
     signal: AbortSignal,
     wait: () => void,
     currentModel: () => string,
-  ): BaseTool[] {
+  ): RunHost {
     const authorizeJob = (jobId: string) => {
       const job = this.jobs.read(agent.ownerUuid, agent.sessionId, jobId);
       let owner = this.store.get(job.agentId);
@@ -615,44 +602,30 @@ export class AgentRuntime {
         owner = owner.parentId ? this.store.get(owner.parentId) : undefined;
       if (!owner) throw new Error("Unknown job");
     };
-    const jobTools = [
-      new JobTool("get_job", (id) => {
+    return {
+      readJob: (id) => {
         authorizeJob(id);
         return this.jobs.read(agent.ownerUuid, agent.sessionId, id);
-      }),
-      new JobTool("cancel_job", async (id) => {
+      },
+      cancelJob: async (id) => {
         authorizeJob(id);
         return this.jobs.cancel(agent.ownerUuid, agent.sessionId, id);
-      }),
-    ];
-    const message = new SendMessageTool(
-      (request) => this.sendMessage(agent, request),
-      agent.kind !== "main",
-    );
-    if (agent.kind !== "main")
-      return [
-        ...jobTools,
-        message,
-        new AskParentTool((question) => {
-          const parent = this.store.get(agent.parentId ?? "");
-          if (!parent) throw new Error("Parent unavailable");
-          this.enqueue(parent, agent.id, "question", question);
-          wait();
-        }),
-      ];
-    return [
-      ...jobTools,
-      message,
-      new SpawnAgentTool((request) =>
-        this.spawn(agent, request, currentModel(), signal),
-      ),
-      new CancelAgentTool(async (agentId, reason) => {
+      },
+      sendMessage: (request) => this.sendMessage(agent, request),
+      askParent: (question) => {
+        const parent = this.store.get(agent.parentId ?? "");
+        if (!parent) throw new Error("Parent unavailable");
+        this.enqueue(parent, agent.id, "question", question);
+        wait();
+      },
+      spawn: (request) => this.spawn(agent, request, currentModel(), signal),
+      cancelAgent: async (agentId, reason) => {
         const child = this.store.get(agentId);
         if (!child || child.parentId !== agent.id)
           throw new Error("Unknown subagent");
         await this.cancel(child, reason);
-      }),
-    ];
+      },
+    };
   }
   private sendMessage(
     agent: AgentRecord,

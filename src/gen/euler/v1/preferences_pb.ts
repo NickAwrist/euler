@@ -17,7 +17,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file euler/v1/preferences.proto.
  */
 export const file_euler_v1_preferences: GenFile = /*@__PURE__*/
-  fileDesc("ChpldWxlci92MS9wcmVmZXJlbmNlcy5wcm90bxIIZXVsZXIudjEinQIKD1VzZXJQcmVmZXJlbmNlcxI7ChV0b29sX3Blcm1pc3Npb25fcnVsZXMYASADKAsyHC5ldWxlci52MS5Ub29sUGVybWlzc2lvblJ1bGUSKQoFaW1hZ2UYAiABKAsyGi5ldWxlci52MS5JbWFnZVByZWZlcmVuY2VzEigKCHNldHRpbmdzGAMgASgLMhYuZXVsZXIudjEuVXNlclNldHRpbmdzEigKCmFwcGVhcmFuY2UYBCABKAsyFC5ldWxlci52MS5BcHBlYXJhbmNlEiAKBmxheW91dBgFIAEoCzIQLmV1bGVyLnYxLkxheW91dBIsCgxjYXBhYmlsaXRpZXMYBiABKAsyFi5ldWxlci52MS5DYXBhYmlsaXRpZXMicQoQSW1hZ2VQcmVmZXJlbmNlcxIVCg1kZWZhdWx0X21vZGVsGAEgASgJEhUKDWRlZmF1bHRfd2lkdGgYAiABKA0SFgoOZGVmYXVsdF9oZWlnaHQYAyABKA0SFwoPbmVnYXRpdmVfcHJvbXB0GAQgASgJIscBCgxVc2VyU2V0dGluZ3MSGgoNc3lzdGVtX3Byb21wdBgBIAEoCUgAiAEBEgwKBG5hbWUYAiABKAkSGQoRcHJlZmVycmVkX2Zvcm1hdHMYAyABKAkSEAoIbG9jYXRpb24YBCABKAkSFQoNZGVmYXVsdF9tb2RlbBgFIAEoCRIcChRpbmNsdWRlX2N1cnJlbnRfZGF0ZRgGIAEoCBIZChFzaG93X2RlYnVnX2J1dHRvbhgHIAEoCEIQCg5fc3lzdGVtX3Byb21wdCLuBgoKQXBwZWFyYW5jZRIpCgV0aGVtZRgBIAEoDjIaLmV1bGVyLnYxLkFwcGVhcmFuY2UuVGhlbWUSJwoEZm9udBgCIAEoDjIZLmV1bGVyLnYxLkFwcGVhcmFuY2UuRm9udBIyCgpjaGF0X3dpZHRoGAMgASgOMh4uZXVsZXIudjEuQXBwZWFyYW5jZS5DaGF0V2lkdGgSMAoJY29kZV9mb250GAQgASgOMh0uZXVsZXIudjEuQXBwZWFyYW5jZS5Db2RlRm9udBIbChNzaGlmdF9mb3JfY2hhdF9saXN0GAUgASgIEhsKE3NoaWZ0X2Zvcl9hcnRpZmFjdHMYBiABKAgSHAoUc2lkZWJhcl9hbmltYXRpb25fbXMYByABKA0ikAEKBVRoZW1lEhUKEVRIRU1FX1VOU1BFQ0lGSUVEEAASEQoNVEhFTUVfREVGQVVMVBABEhIKDlRIRU1FX09ORV9EQVJLEAISEQoNVEhFTUVfRFJBQ1VMQRADEg4KClRIRU1FX05PUkQQBBIUChBUSEVNRV9DQVRQUFVDQ0lOEAUSEAoMVEhFTUVfR0lUSFVCEAYinwEKBEZvbnQSFAoQRk9OVF9VTlNQRUNJRklFRBAAEhAKDEZPTlRfREVGQVVMVBABEg4KCkZPTlRfU0VSSUYQAhIPCgtGT05UX1NZU1RFTRADEg4KCkZPTlRfR0VJU1QQBBIUChBGT05UX1NPVVJDRV9TQU5TEAUSEQoNRk9OVF9BVEtJTlNPThAGEhUKEUZPTlRfT1BFTkRZU0xFWElDEAcihgEKCUNoYXRXaWR0aBIaChZDSEFUX1dJRFRIX1VOU1BFQ0lGSUVEEAASFwoTQ0hBVF9XSURUSF9TVEFOREFSRBABEhoKFkNIQVRfV0lEVEhfQ09NRk9SVEFCTEUQAhITCg9DSEFUX1dJRFRIX1dJREUQAxITCg9DSEFUX1dJRFRIX0ZVTEwQBCKPAQoIQ29kZUZvbnQSGQoVQ09ERV9GT05UX1VOU1BFQ0lGSUVEEAASFQoRQ09ERV9GT05UX0RFRkFVTFQQARIYChRDT0RFX0ZPTlRfR0VJU1RfTU9OTxACEhwKGENPREVfRk9OVF9KRVRCUkFJTlNfTU9OTxADEhkKFUNPREVfRk9OVF9TT1VSQ0VfQ09ERRAEItkBCgZMYXlvdXQSGQoRc2lkZWJhcl9jb2xsYXBzZWQYASABKAgSGwoOYXJ0aWZhY3Rfd2lkdGgYAiABKAFIAIgBARI2Cg5hcnRpZmFjdF9zdGF0ZRgDIAEoCzIeLmV1bGVyLnYxLkxheW91dC5BcnRpZmFjdFN0YXRlGkwKDUFydGlmYWN0U3RhdGUSDAoEb3BlbhgBIAEoCBIRCgl3b3Jrc3BhY2UYAiABKAkSEQoEcGF0aBgDIAEoCUgAiAEBQgcKBV9wYXRoQhEKD19hcnRpZmFjdF93aWR0aCJjCgxDYXBhYmlsaXRpZXMSCwoDd2ViGAEgASgIEhgKEGltYWdlX2dlbmVyYXRpb24YAiABKAgSDQoFc2hlbGwYAyABKAgSDQoFZmlsZXMYBCABKAgSDgoGc2tpbGxzGAUgASgIIhcKFUdldFByZWZlcmVuY2VzUmVxdWVzdCJIChZHZXRQcmVmZXJlbmNlc1Jlc3BvbnNlEi4KC3ByZWZlcmVuY2VzGAEgASgLMhkuZXVsZXIudjEuVXNlclByZWZlcmVuY2VzIuQPChhVcGRhdGVQcmVmZXJlbmNlc1JlcXVlc3QSQQoFaW1hZ2UYASABKAsyLS5ldWxlci52MS5VcGRhdGVQcmVmZXJlbmNlc1JlcXVlc3QuSW1hZ2VQYXRjaEgAiAEBEkcKCHNldHRpbmdzGAIgASgLMjAuZXVsZXIudjEuVXBkYXRlUHJlZmVyZW5jZXNSZXF1ZXN0LlNldHRpbmdzUGF0Y2hIAYgBARJLCgphcHBlYXJhbmNlGAMgASgLMjIuZXVsZXIudjEuVXBkYXRlUHJlZmVyZW5jZXNSZXF1ZXN0LkFwcGVhcmFuY2VQYXRjaEgCiAEBEkMKBmxheW91dBgEIAEoCzIuLmV1bGVyLnYxLlVwZGF0ZVByZWZlcmVuY2VzUmVxdWVzdC5MYXlvdXRQYXRjaEgDiAEBEk8KDGNhcGFiaWxpdGllcxgFIAEoCzI0LmV1bGVyLnYxLlVwZGF0ZVByZWZlcmVuY2VzUmVxdWVzdC5DYXBhYmlsaXRpZXNQYXRjaEgEiAEBGvkBCgpJbWFnZVBhdGNoEiQKDWRlZmF1bHRfbW9kZWwYASABKAlCCLpIBXIDGOgHSACIAQESJwoNZGVmYXVsdF93aWR0aBgCIAEoDUILukgIKgYYgIABKAFIAYgBARIoCg5kZWZhdWx0X2hlaWdodBgDIAEoDUILukgIKgYYgIABKAFIAogBARInCg9uZWdhdGl2ZV9wcm9tcHQYBCABKAlCCbpIBnIEGKCNBkgDiAEBQhAKDl9kZWZhdWx0X21vZGVsQhAKDl9kZWZhdWx0X3dpZHRoQhEKD19kZWZhdWx0X2hlaWdodEISChBfbmVnYXRpdmVfcHJvbXB0GoYDCg1TZXR0aW5nc1BhdGNoEiUKDXN5c3RlbV9wcm9tcHQYASABKAlCCbpIBnIEGKCNBkgAiAEBEhsKBG5hbWUYAiABKAlCCLpIBXIDGOgHSAGIAQESKAoRcHJlZmVycmVkX2Zvcm1hdHMYAyABKAlCCLpIBXIDGJBOSAKIAQESHwoIbG9jYXRpb24YBCABKAlCCLpIBXIDGOgHSAOIAQESJAoNZGVmYXVsdF9tb2RlbBgFIAEoCUIIukgFcgMYyAFIBIgBARIhChRpbmNsdWRlX2N1cnJlbnRfZGF0ZRgGIAEoCEgFiAEBEh4KEXNob3dfZGVidWdfYnV0dG9uGAcgASgISAaIAQFCEAoOX3N5c3RlbV9wcm9tcHRCBwoFX25hbWVCFAoSX3ByZWZlcnJlZF9mb3JtYXRzQgsKCV9sb2NhdGlvbkIQCg5fZGVmYXVsdF9tb2RlbEIXChVfaW5jbHVkZV9jdXJyZW50X2RhdGVCFAoSX3Nob3dfZGVidWdfYnV0dG9uGvkDCg9BcHBlYXJhbmNlUGF0Y2gSOgoFdGhlbWUYASABKA4yGi5ldWxlci52MS5BcHBlYXJhbmNlLlRoZW1lQgq6SAeCAQQQASAASACIAQESOAoEZm9udBgCIAEoDjIZLmV1bGVyLnYxLkFwcGVhcmFuY2UuRm9udEIKukgHggEEEAEgAEgBiAEBEkMKCmNoYXRfd2lkdGgYAyABKA4yHi5ldWxlci52MS5BcHBlYXJhbmNlLkNoYXRXaWR0aEIKukgHggEEEAEgAEgCiAEBEkEKCWNvZGVfZm9udBgEIAEoDjIdLmV1bGVyLnYxLkFwcGVhcmFuY2UuQ29kZUZvbnRCCrpIB4IBBBABIABIA4gBARIgChNzaGlmdF9mb3JfY2hhdF9saXN0GAUgASgISASIAQESIAoTc2hpZnRfZm9yX2FydGlmYWN0cxgGIAEoCEgFiAEBEisKFHNpZGViYXJfYW5pbWF0aW9uX21zGAcgASgNQgi6SAUqAxjYBEgGiAEBQggKBl90aGVtZUIHCgVfZm9udEINCgtfY2hhdF93aWR0aEIMCgpfY29kZV9mb250QhYKFF9zaGlmdF9mb3JfY2hhdF9saXN0QhYKFF9zaGlmdF9mb3JfYXJ0aWZhY3RzQhcKFV9zaWRlYmFyX2FuaW1hdGlvbl9tcxrVAQoLTGF5b3V0UGF0Y2gSHgoRc2lkZWJhcl9jb2xsYXBzZWQYASABKAhIAIgBARItCg5hcnRpZmFjdF93aWR0aBgCIAEoAUIQukgNEgtAASkAAAAAAAAAAEgBiAEBEjsKDmFydGlmYWN0X3N0YXRlGAMgASgLMh4uZXVsZXIudjEuTGF5b3V0LkFydGlmYWN0U3RhdGVIAogBAUIUChJfc2lkZWJhcl9jb2xsYXBzZWRCEQoPX2FydGlmYWN0X3dpZHRoQhEKD19hcnRpZmFjdF9zdGF0ZRq9AQoRQ2FwYWJpbGl0aWVzUGF0Y2gSEAoDd2ViGAEgASgISACIAQESHQoQaW1hZ2VfZ2VuZXJhdGlvbhgCIAEoCEgBiAEBEhIKBXNoZWxsGAMgASgISAKIAQESEgoFZmlsZXMYBCABKAhIA4gBARITCgZza2lsbHMYBSABKAhIBIgBAUIGCgRfd2ViQhMKEV9pbWFnZV9nZW5lcmF0aW9uQggKBl9zaGVsbEIICgZfZmlsZXNCCQoHX3NraWxsc0IICgZfaW1hZ2VCCwoJX3NldHRpbmdzQg0KC19hcHBlYXJhbmNlQgkKB19sYXlvdXRCDwoNX2NhcGFiaWxpdGllcyJLChlVcGRhdGVQcmVmZXJlbmNlc1Jlc3BvbnNlEi4KC3ByZWZlcmVuY2VzGAEgASgLMhkuZXVsZXIudjEuVXNlclByZWZlcmVuY2VzIk4KGFB1dFBlcm1pc3Npb25SdWxlUmVxdWVzdBIyCgRydWxlGAEgASgLMhwuZXVsZXIudjEuVG9vbFBlcm1pc3Npb25SdWxlQga6SAPIAQEiSwoZUHV0UGVybWlzc2lvblJ1bGVSZXNwb25zZRIuCgtwcmVmZXJlbmNlcxgBIAEoCzIZLmV1bGVyLnYxLlVzZXJQcmVmZXJlbmNlcyI3ChtEZWxldGVQZXJtaXNzaW9uUnVsZVJlcXVlc3QSGAoHcnVsZV9pZBgBIAEoCUIHukgEcgIQASJOChxEZWxldGVQZXJtaXNzaW9uUnVsZVJlc3BvbnNlEi4KC3ByZWZlcmVuY2VzGAEgASgLMhkuZXVsZXIudjEuVXNlclByZWZlcmVuY2VzIvEBCg9QZXJtaXNzaW9uRmllbGQSDAoEcGF0aBgBIAEoCRIsCgR0eXBlGAIgASgOMh4uZXVsZXIudjEuUGVybWlzc2lvbkZpZWxkLlR5cGUSGAoLZGVzY3JpcHRpb24YAyABKAlIAIgBARImCgZ2YWx1ZXMYBCADKAsyFi5nb29nbGUucHJvdG9idWYuVmFsdWUiUAoEVHlwZRIUChBUWVBFX1VOU1BFQ0lGSUVEEAASDwoLVFlQRV9TVFJJTkcQARIPCgtUWVBFX05VTUJFUhACEhAKDFRZUEVfQk9PTEVBThADQg4KDF9kZXNjcmlwdGlvbiKEAQoOUGVybWlzc2lvblRvb2wSDAoEbmFtZRgBIAEoCRITCgtkZXNjcmlwdGlvbhgCIAEoCRIpCgZmaWVsZHMYAyADKAsyGS5ldWxlci52MS5QZXJtaXNzaW9uRmllbGQSJAoFaWNvbnMYBCADKAsyFS5ldWxlci52MS5EaXNwbGF5SWNvbiIcChpMaXN0UGVybWlzc2lvblRvb2xzUmVxdWVzdCJGChtMaXN0UGVybWlzc2lvblRvb2xzUmVzcG9uc2USJwoFdG9vbHMYASADKAsyGC5ldWxlci52MS5QZXJtaXNzaW9uVG9vbCIXChVHZXRFbnZpcm9ubWVudFJlcXVlc3QiQwoWR2V0RW52aXJvbm1lbnRSZXNwb25zZRITCgtvbGxhbWFfaG9zdBgBIAEoCBIUCgxjb21meXVpX2hvc3QYAiABKAgy0wQKEVByZWZlcmVuY2VTZXJ2aWNlElgKDkdldFByZWZlcmVuY2VzEh8uZXVsZXIudjEuR2V0UHJlZmVyZW5jZXNSZXF1ZXN0GiAuZXVsZXIudjEuR2V0UHJlZmVyZW5jZXNSZXNwb25zZSIDkAIBElwKEVVwZGF0ZVByZWZlcmVuY2VzEiIuZXVsZXIudjEuVXBkYXRlUHJlZmVyZW5jZXNSZXF1ZXN0GiMuZXVsZXIudjEuVXBkYXRlUHJlZmVyZW5jZXNSZXNwb25zZRJcChFQdXRQZXJtaXNzaW9uUnVsZRIiLmV1bGVyLnYxLlB1dFBlcm1pc3Npb25SdWxlUmVxdWVzdBojLmV1bGVyLnYxLlB1dFBlcm1pc3Npb25SdWxlUmVzcG9uc2USZQoURGVsZXRlUGVybWlzc2lvblJ1bGUSJS5ldWxlci52MS5EZWxldGVQZXJtaXNzaW9uUnVsZVJlcXVlc3QaJi5ldWxlci52MS5EZWxldGVQZXJtaXNzaW9uUnVsZVJlc3BvbnNlEmcKE0xpc3RQZXJtaXNzaW9uVG9vbHMSJC5ldWxlci52MS5MaXN0UGVybWlzc2lvblRvb2xzUmVxdWVzdBolLmV1bGVyLnYxLkxpc3RQZXJtaXNzaW9uVG9vbHNSZXNwb25zZSIDkAIBElgKDkdldEVudmlyb25tZW50Eh8uZXVsZXIudjEuR2V0RW52aXJvbm1lbnRSZXF1ZXN0GiAuZXVsZXIudjEuR2V0RW52aXJvbm1lbnRSZXNwb25zZSIDkAIBYgZwcm90bzM", [file_buf_validate_validate, file_euler_v1_common, file_euler_v1_permissions, file_google_protobuf_struct]);
+  fileDesc("ChpldWxlci92MS9wcmVmZXJlbmNlcy5wcm90bxIIZXVsZXIudjEi7wEKD1VzZXJQcmVmZXJlbmNlcxI7ChV0b29sX3Blcm1pc3Npb25fcnVsZXMYASADKAsyHC5ldWxlci52MS5Ub29sUGVybWlzc2lvblJ1bGUSKQoFaW1hZ2UYAiABKAsyGi5ldWxlci52MS5JbWFnZVByZWZlcmVuY2VzEigKCHNldHRpbmdzGAMgASgLMhYuZXVsZXIudjEuVXNlclNldHRpbmdzEigKCmFwcGVhcmFuY2UYBCABKAsyFC5ldWxlci52MS5BcHBlYXJhbmNlEiAKBmxheW91dBgFIAEoCzIQLmV1bGVyLnYxLkxheW91dCJxChBJbWFnZVByZWZlcmVuY2VzEhUKDWRlZmF1bHRfbW9kZWwYASABKAkSFQoNZGVmYXVsdF93aWR0aBgCIAEoDRIWCg5kZWZhdWx0X2hlaWdodBgDIAEoDRIXCg9uZWdhdGl2ZV9wcm9tcHQYBCABKAkixwEKDFVzZXJTZXR0aW5ncxIaCg1zeXN0ZW1fcHJvbXB0GAEgASgJSACIAQESDAoEbmFtZRgCIAEoCRIZChFwcmVmZXJyZWRfZm9ybWF0cxgDIAEoCRIQCghsb2NhdGlvbhgEIAEoCRIVCg1kZWZhdWx0X21vZGVsGAUgASgJEhwKFGluY2x1ZGVfY3VycmVudF9kYXRlGAYgASgIEhkKEXNob3dfZGVidWdfYnV0dG9uGAcgASgIQhAKDl9zeXN0ZW1fcHJvbXB0Iu4GCgpBcHBlYXJhbmNlEikKBXRoZW1lGAEgASgOMhouZXVsZXIudjEuQXBwZWFyYW5jZS5UaGVtZRInCgRmb250GAIgASgOMhkuZXVsZXIudjEuQXBwZWFyYW5jZS5Gb250EjIKCmNoYXRfd2lkdGgYAyABKA4yHi5ldWxlci52MS5BcHBlYXJhbmNlLkNoYXRXaWR0aBIwCgljb2RlX2ZvbnQYBCABKA4yHS5ldWxlci52MS5BcHBlYXJhbmNlLkNvZGVGb250EhsKE3NoaWZ0X2Zvcl9jaGF0X2xpc3QYBSABKAgSGwoTc2hpZnRfZm9yX2FydGlmYWN0cxgGIAEoCBIcChRzaWRlYmFyX2FuaW1hdGlvbl9tcxgHIAEoDSKQAQoFVGhlbWUSFQoRVEhFTUVfVU5TUEVDSUZJRUQQABIRCg1USEVNRV9ERUZBVUxUEAESEgoOVEhFTUVfT05FX0RBUksQAhIRCg1USEVNRV9EUkFDVUxBEAMSDgoKVEhFTUVfTk9SRBAEEhQKEFRIRU1FX0NBVFBQVUNDSU4QBRIQCgxUSEVNRV9HSVRIVUIQBiKfAQoERm9udBIUChBGT05UX1VOU1BFQ0lGSUVEEAASEAoMRk9OVF9ERUZBVUxUEAESDgoKRk9OVF9TRVJJRhACEg8KC0ZPTlRfU1lTVEVNEAMSDgoKRk9OVF9HRUlTVBAEEhQKEEZPTlRfU09VUkNFX1NBTlMQBRIRCg1GT05UX0FUS0lOU09OEAYSFQoRRk9OVF9PUEVORFlTTEVYSUMQByKGAQoJQ2hhdFdpZHRoEhoKFkNIQVRfV0lEVEhfVU5TUEVDSUZJRUQQABIXChNDSEFUX1dJRFRIX1NUQU5EQVJEEAESGgoWQ0hBVF9XSURUSF9DT01GT1JUQUJMRRACEhMKD0NIQVRfV0lEVEhfV0lERRADEhMKD0NIQVRfV0lEVEhfRlVMTBAEIo8BCghDb2RlRm9udBIZChVDT0RFX0ZPTlRfVU5TUEVDSUZJRUQQABIVChFDT0RFX0ZPTlRfREVGQVVMVBABEhgKFENPREVfRk9OVF9HRUlTVF9NT05PEAISHAoYQ09ERV9GT05UX0pFVEJSQUlOU19NT05PEAMSGQoVQ09ERV9GT05UX1NPVVJDRV9DT0RFEAQi2QEKBkxheW91dBIZChFzaWRlYmFyX2NvbGxhcHNlZBgBIAEoCBIbCg5hcnRpZmFjdF93aWR0aBgCIAEoAUgAiAEBEjYKDmFydGlmYWN0X3N0YXRlGAMgASgLMh4uZXVsZXIudjEuTGF5b3V0LkFydGlmYWN0U3RhdGUaTAoNQXJ0aWZhY3RTdGF0ZRIMCgRvcGVuGAEgASgIEhEKCXdvcmtzcGFjZRgCIAEoCRIRCgRwYXRoGAMgASgJSACIAQFCBwoFX3BhdGhCEQoPX2FydGlmYWN0X3dpZHRoIhcKFUdldFByZWZlcmVuY2VzUmVxdWVzdCJIChZHZXRQcmVmZXJlbmNlc1Jlc3BvbnNlEi4KC3ByZWZlcmVuY2VzGAEgASgLMhkuZXVsZXIudjEuVXNlclByZWZlcmVuY2VzIsINChhVcGRhdGVQcmVmZXJlbmNlc1JlcXVlc3QSQQoFaW1hZ2UYASABKAsyLS5ldWxlci52MS5VcGRhdGVQcmVmZXJlbmNlc1JlcXVlc3QuSW1hZ2VQYXRjaEgAiAEBEkcKCHNldHRpbmdzGAIgASgLMjAuZXVsZXIudjEuVXBkYXRlUHJlZmVyZW5jZXNSZXF1ZXN0LlNldHRpbmdzUGF0Y2hIAYgBARJLCgphcHBlYXJhbmNlGAMgASgLMjIuZXVsZXIudjEuVXBkYXRlUHJlZmVyZW5jZXNSZXF1ZXN0LkFwcGVhcmFuY2VQYXRjaEgCiAEBEkMKBmxheW91dBgEIAEoCzIuLmV1bGVyLnYxLlVwZGF0ZVByZWZlcmVuY2VzUmVxdWVzdC5MYXlvdXRQYXRjaEgDiAEBGvkBCgpJbWFnZVBhdGNoEiQKDWRlZmF1bHRfbW9kZWwYASABKAlCCLpIBXIDGOgHSACIAQESJwoNZGVmYXVsdF93aWR0aBgCIAEoDUILukgIKgYYgIABKAFIAYgBARIoCg5kZWZhdWx0X2hlaWdodBgDIAEoDUILukgIKgYYgIABKAFIAogBARInCg9uZWdhdGl2ZV9wcm9tcHQYBCABKAlCCbpIBnIEGKCNBkgDiAEBQhAKDl9kZWZhdWx0X21vZGVsQhAKDl9kZWZhdWx0X3dpZHRoQhEKD19kZWZhdWx0X2hlaWdodEISChBfbmVnYXRpdmVfcHJvbXB0GoYDCg1TZXR0aW5nc1BhdGNoEiUKDXN5c3RlbV9wcm9tcHQYASABKAlCCbpIBnIEGKCNBkgAiAEBEhsKBG5hbWUYAiABKAlCCLpIBXIDGOgHSAGIAQESKAoRcHJlZmVycmVkX2Zvcm1hdHMYAyABKAlCCLpIBXIDGJBOSAKIAQESHwoIbG9jYXRpb24YBCABKAlCCLpIBXIDGOgHSAOIAQESJAoNZGVmYXVsdF9tb2RlbBgFIAEoCUIIukgFcgMYyAFIBIgBARIhChRpbmNsdWRlX2N1cnJlbnRfZGF0ZRgGIAEoCEgFiAEBEh4KEXNob3dfZGVidWdfYnV0dG9uGAcgASgISAaIAQFCEAoOX3N5c3RlbV9wcm9tcHRCBwoFX25hbWVCFAoSX3ByZWZlcnJlZF9mb3JtYXRzQgsKCV9sb2NhdGlvbkIQCg5fZGVmYXVsdF9tb2RlbEIXChVfaW5jbHVkZV9jdXJyZW50X2RhdGVCFAoSX3Nob3dfZGVidWdfYnV0dG9uGvkDCg9BcHBlYXJhbmNlUGF0Y2gSOgoFdGhlbWUYASABKA4yGi5ldWxlci52MS5BcHBlYXJhbmNlLlRoZW1lQgq6SAeCAQQQASAASACIAQESOAoEZm9udBgCIAEoDjIZLmV1bGVyLnYxLkFwcGVhcmFuY2UuRm9udEIKukgHggEEEAEgAEgBiAEBEkMKCmNoYXRfd2lkdGgYAyABKA4yHi5ldWxlci52MS5BcHBlYXJhbmNlLkNoYXRXaWR0aEIKukgHggEEEAEgAEgCiAEBEkEKCWNvZGVfZm9udBgEIAEoDjIdLmV1bGVyLnYxLkFwcGVhcmFuY2UuQ29kZUZvbnRCCrpIB4IBBBABIABIA4gBARIgChNzaGlmdF9mb3JfY2hhdF9saXN0GAUgASgISASIAQESIAoTc2hpZnRfZm9yX2FydGlmYWN0cxgGIAEoCEgFiAEBEisKFHNpZGViYXJfYW5pbWF0aW9uX21zGAcgASgNQgi6SAUqAxjYBEgGiAEBQggKBl90aGVtZUIHCgVfZm9udEINCgtfY2hhdF93aWR0aEIMCgpfY29kZV9mb250QhYKFF9zaGlmdF9mb3JfY2hhdF9saXN0QhYKFF9zaGlmdF9mb3JfYXJ0aWZhY3RzQhcKFV9zaWRlYmFyX2FuaW1hdGlvbl9tcxrVAQoLTGF5b3V0UGF0Y2gSHgoRc2lkZWJhcl9jb2xsYXBzZWQYASABKAhIAIgBARItCg5hcnRpZmFjdF93aWR0aBgCIAEoAUIQukgNEgtAASkAAAAAAAAAAEgBiAEBEjsKDmFydGlmYWN0X3N0YXRlGAMgASgLMh4uZXVsZXIudjEuTGF5b3V0LkFydGlmYWN0U3RhdGVIAogBAUIUChJfc2lkZWJhcl9jb2xsYXBzZWRCEQoPX2FydGlmYWN0X3dpZHRoQhEKD19hcnRpZmFjdF9zdGF0ZUIICgZfaW1hZ2VCCwoJX3NldHRpbmdzQg0KC19hcHBlYXJhbmNlQgkKB19sYXlvdXQiSwoZVXBkYXRlUHJlZmVyZW5jZXNSZXNwb25zZRIuCgtwcmVmZXJlbmNlcxgBIAEoCzIZLmV1bGVyLnYxLlVzZXJQcmVmZXJlbmNlcyJOChhQdXRQZXJtaXNzaW9uUnVsZVJlcXVlc3QSMgoEcnVsZRgBIAEoCzIcLmV1bGVyLnYxLlRvb2xQZXJtaXNzaW9uUnVsZUIGukgDyAEBIksKGVB1dFBlcm1pc3Npb25SdWxlUmVzcG9uc2USLgoLcHJlZmVyZW5jZXMYASABKAsyGS5ldWxlci52MS5Vc2VyUHJlZmVyZW5jZXMiNwobRGVsZXRlUGVybWlzc2lvblJ1bGVSZXF1ZXN0EhgKB3J1bGVfaWQYASABKAlCB7pIBHICEAEiTgocRGVsZXRlUGVybWlzc2lvblJ1bGVSZXNwb25zZRIuCgtwcmVmZXJlbmNlcxgBIAEoCzIZLmV1bGVyLnYxLlVzZXJQcmVmZXJlbmNlcyLxAQoPUGVybWlzc2lvbkZpZWxkEgwKBHBhdGgYASABKAkSLAoEdHlwZRgCIAEoDjIeLmV1bGVyLnYxLlBlcm1pc3Npb25GaWVsZC5UeXBlEhgKC2Rlc2NyaXB0aW9uGAMgASgJSACIAQESJgoGdmFsdWVzGAQgAygLMhYuZ29vZ2xlLnByb3RvYnVmLlZhbHVlIlAKBFR5cGUSFAoQVFlQRV9VTlNQRUNJRklFRBAAEg8KC1RZUEVfU1RSSU5HEAESDwoLVFlQRV9OVU1CRVIQAhIQCgxUWVBFX0JPT0xFQU4QA0IOCgxfZGVzY3JpcHRpb24ihAEKDlBlcm1pc3Npb25Ub29sEgwKBG5hbWUYASABKAkSEwoLZGVzY3JpcHRpb24YAiABKAkSKQoGZmllbGRzGAMgAygLMhkuZXVsZXIudjEuUGVybWlzc2lvbkZpZWxkEiQKBWljb25zGAQgAygLMhUuZXVsZXIudjEuRGlzcGxheUljb24iHAoaTGlzdFBlcm1pc3Npb25Ub29sc1JlcXVlc3QiRgobTGlzdFBlcm1pc3Npb25Ub29sc1Jlc3BvbnNlEicKBXRvb2xzGAEgAygLMhguZXVsZXIudjEuUGVybWlzc2lvblRvb2wiFwoVR2V0RW52aXJvbm1lbnRSZXF1ZXN0IkMKFkdldEVudmlyb25tZW50UmVzcG9uc2USEwoLb2xsYW1hX2hvc3QYASABKAgSFAoMY29tZnl1aV9ob3N0GAIgASgIMtMEChFQcmVmZXJlbmNlU2VydmljZRJYCg5HZXRQcmVmZXJlbmNlcxIfLmV1bGVyLnYxLkdldFByZWZlcmVuY2VzUmVxdWVzdBogLmV1bGVyLnYxLkdldFByZWZlcmVuY2VzUmVzcG9uc2UiA5ACARJcChFVcGRhdGVQcmVmZXJlbmNlcxIiLmV1bGVyLnYxLlVwZGF0ZVByZWZlcmVuY2VzUmVxdWVzdBojLmV1bGVyLnYxLlVwZGF0ZVByZWZlcmVuY2VzUmVzcG9uc2USXAoRUHV0UGVybWlzc2lvblJ1bGUSIi5ldWxlci52MS5QdXRQZXJtaXNzaW9uUnVsZVJlcXVlc3QaIy5ldWxlci52MS5QdXRQZXJtaXNzaW9uUnVsZVJlc3BvbnNlEmUKFERlbGV0ZVBlcm1pc3Npb25SdWxlEiUuZXVsZXIudjEuRGVsZXRlUGVybWlzc2lvblJ1bGVSZXF1ZXN0GiYuZXVsZXIudjEuRGVsZXRlUGVybWlzc2lvblJ1bGVSZXNwb25zZRJnChNMaXN0UGVybWlzc2lvblRvb2xzEiQuZXVsZXIudjEuTGlzdFBlcm1pc3Npb25Ub29sc1JlcXVlc3QaJS5ldWxlci52MS5MaXN0UGVybWlzc2lvblRvb2xzUmVzcG9uc2UiA5ACARJYCg5HZXRFbnZpcm9ubWVudBIfLmV1bGVyLnYxLkdldEVudmlyb25tZW50UmVxdWVzdBogLmV1bGVyLnYxLkdldEVudmlyb25tZW50UmVzcG9uc2UiA5ACAWIGcHJvdG8z", [file_buf_validate_validate, file_euler_v1_common, file_euler_v1_permissions, file_google_protobuf_struct]);
 
 /**
  * @generated from message euler.v1.UserPreferences
@@ -47,11 +47,6 @@ export type UserPreferences = Message<"euler.v1.UserPreferences"> & {
    * @generated from field: euler.v1.Layout layout = 5;
    */
   layout?: Layout | undefined;
-
-  /**
-   * @generated from field: euler.v1.Capabilities capabilities = 6;
-   */
-  capabilities?: Capabilities | undefined;
 };
 
 /**
@@ -417,45 +412,6 @@ export const Layout_ArtifactStateSchema: GenMessage<Layout_ArtifactState> = /*@_
   messageDesc(file_euler_v1_preferences, 4, 0);
 
 /**
- * Built-in agent capabilities a user can turn off, e.g. in favor of an MCP server.
- *
- * @generated from message euler.v1.Capabilities
- */
-export type Capabilities = Message<"euler.v1.Capabilities"> & {
-  /**
-   * @generated from field: bool web = 1;
-   */
-  web: boolean;
-
-  /**
-   * @generated from field: bool image_generation = 2;
-   */
-  imageGeneration: boolean;
-
-  /**
-   * @generated from field: bool shell = 3;
-   */
-  shell: boolean;
-
-  /**
-   * @generated from field: bool files = 4;
-   */
-  files: boolean;
-
-  /**
-   * @generated from field: bool skills = 5;
-   */
-  skills: boolean;
-};
-
-/**
- * Describes the message euler.v1.Capabilities.
- * Use `create(CapabilitiesSchema)` to create a new message.
- */
-export const CapabilitiesSchema: GenMessage<Capabilities> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 5);
-
-/**
  * @generated from message euler.v1.GetPreferencesRequest
  */
 export type GetPreferencesRequest = Message<"euler.v1.GetPreferencesRequest"> & {
@@ -466,7 +422,7 @@ export type GetPreferencesRequest = Message<"euler.v1.GetPreferencesRequest"> & 
  * Use `create(GetPreferencesRequestSchema)` to create a new message.
  */
 export const GetPreferencesRequestSchema: GenMessage<GetPreferencesRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 6);
+  messageDesc(file_euler_v1_preferences, 5);
 
 /**
  * @generated from message euler.v1.GetPreferencesResponse
@@ -483,7 +439,7 @@ export type GetPreferencesResponse = Message<"euler.v1.GetPreferencesResponse"> 
  * Use `create(GetPreferencesResponseSchema)` to create a new message.
  */
 export const GetPreferencesResponseSchema: GenMessage<GetPreferencesResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 7);
+  messageDesc(file_euler_v1_preferences, 6);
 
 /**
  * @generated from message euler.v1.UpdatePreferencesRequest
@@ -508,11 +464,6 @@ export type UpdatePreferencesRequest = Message<"euler.v1.UpdatePreferencesReques
    * @generated from field: optional euler.v1.UpdatePreferencesRequest.LayoutPatch layout = 4;
    */
   layout?: UpdatePreferencesRequest_LayoutPatch | undefined;
-
-  /**
-   * @generated from field: optional euler.v1.UpdatePreferencesRequest.CapabilitiesPatch capabilities = 5;
-   */
-  capabilities?: UpdatePreferencesRequest_CapabilitiesPatch | undefined;
 };
 
 /**
@@ -520,7 +471,7 @@ export type UpdatePreferencesRequest = Message<"euler.v1.UpdatePreferencesReques
  * Use `create(UpdatePreferencesRequestSchema)` to create a new message.
  */
 export const UpdatePreferencesRequestSchema: GenMessage<UpdatePreferencesRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 8);
+  messageDesc(file_euler_v1_preferences, 7);
 
 /**
  * @generated from message euler.v1.UpdatePreferencesRequest.ImagePatch
@@ -552,7 +503,7 @@ export type UpdatePreferencesRequest_ImagePatch = Message<"euler.v1.UpdatePrefer
  * Use `create(UpdatePreferencesRequest_ImagePatchSchema)` to create a new message.
  */
 export const UpdatePreferencesRequest_ImagePatchSchema: GenMessage<UpdatePreferencesRequest_ImagePatch> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 8, 0);
+  messageDesc(file_euler_v1_preferences, 7, 0);
 
 /**
  * @generated from message euler.v1.UpdatePreferencesRequest.SettingsPatch
@@ -601,7 +552,7 @@ export type UpdatePreferencesRequest_SettingsPatch = Message<"euler.v1.UpdatePre
  * Use `create(UpdatePreferencesRequest_SettingsPatchSchema)` to create a new message.
  */
 export const UpdatePreferencesRequest_SettingsPatchSchema: GenMessage<UpdatePreferencesRequest_SettingsPatch> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 8, 1);
+  messageDesc(file_euler_v1_preferences, 7, 1);
 
 /**
  * @generated from message euler.v1.UpdatePreferencesRequest.AppearancePatch
@@ -648,7 +599,7 @@ export type UpdatePreferencesRequest_AppearancePatch = Message<"euler.v1.UpdateP
  * Use `create(UpdatePreferencesRequest_AppearancePatchSchema)` to create a new message.
  */
 export const UpdatePreferencesRequest_AppearancePatchSchema: GenMessage<UpdatePreferencesRequest_AppearancePatch> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 8, 2);
+  messageDesc(file_euler_v1_preferences, 7, 2);
 
 /**
  * @generated from message euler.v1.UpdatePreferencesRequest.LayoutPatch
@@ -677,44 +628,7 @@ export type UpdatePreferencesRequest_LayoutPatch = Message<"euler.v1.UpdatePrefe
  * Use `create(UpdatePreferencesRequest_LayoutPatchSchema)` to create a new message.
  */
 export const UpdatePreferencesRequest_LayoutPatchSchema: GenMessage<UpdatePreferencesRequest_LayoutPatch> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 8, 3);
-
-/**
- * @generated from message euler.v1.UpdatePreferencesRequest.CapabilitiesPatch
- */
-export type UpdatePreferencesRequest_CapabilitiesPatch = Message<"euler.v1.UpdatePreferencesRequest.CapabilitiesPatch"> & {
-  /**
-   * @generated from field: optional bool web = 1;
-   */
-  web?: boolean | undefined;
-
-  /**
-   * @generated from field: optional bool image_generation = 2;
-   */
-  imageGeneration?: boolean | undefined;
-
-  /**
-   * @generated from field: optional bool shell = 3;
-   */
-  shell?: boolean | undefined;
-
-  /**
-   * @generated from field: optional bool files = 4;
-   */
-  files?: boolean | undefined;
-
-  /**
-   * @generated from field: optional bool skills = 5;
-   */
-  skills?: boolean | undefined;
-};
-
-/**
- * Describes the message euler.v1.UpdatePreferencesRequest.CapabilitiesPatch.
- * Use `create(UpdatePreferencesRequest_CapabilitiesPatchSchema)` to create a new message.
- */
-export const UpdatePreferencesRequest_CapabilitiesPatchSchema: GenMessage<UpdatePreferencesRequest_CapabilitiesPatch> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 8, 4);
+  messageDesc(file_euler_v1_preferences, 7, 3);
 
 /**
  * @generated from message euler.v1.UpdatePreferencesResponse
@@ -731,7 +645,7 @@ export type UpdatePreferencesResponse = Message<"euler.v1.UpdatePreferencesRespo
  * Use `create(UpdatePreferencesResponseSchema)` to create a new message.
  */
 export const UpdatePreferencesResponseSchema: GenMessage<UpdatePreferencesResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 9);
+  messageDesc(file_euler_v1_preferences, 8);
 
 /**
  * @generated from message euler.v1.PutPermissionRuleRequest
@@ -748,7 +662,7 @@ export type PutPermissionRuleRequest = Message<"euler.v1.PutPermissionRuleReques
  * Use `create(PutPermissionRuleRequestSchema)` to create a new message.
  */
 export const PutPermissionRuleRequestSchema: GenMessage<PutPermissionRuleRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 10);
+  messageDesc(file_euler_v1_preferences, 9);
 
 /**
  * @generated from message euler.v1.PutPermissionRuleResponse
@@ -765,7 +679,7 @@ export type PutPermissionRuleResponse = Message<"euler.v1.PutPermissionRuleRespo
  * Use `create(PutPermissionRuleResponseSchema)` to create a new message.
  */
 export const PutPermissionRuleResponseSchema: GenMessage<PutPermissionRuleResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 11);
+  messageDesc(file_euler_v1_preferences, 10);
 
 /**
  * @generated from message euler.v1.DeletePermissionRuleRequest
@@ -782,7 +696,7 @@ export type DeletePermissionRuleRequest = Message<"euler.v1.DeletePermissionRule
  * Use `create(DeletePermissionRuleRequestSchema)` to create a new message.
  */
 export const DeletePermissionRuleRequestSchema: GenMessage<DeletePermissionRuleRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 12);
+  messageDesc(file_euler_v1_preferences, 11);
 
 /**
  * @generated from message euler.v1.DeletePermissionRuleResponse
@@ -799,7 +713,7 @@ export type DeletePermissionRuleResponse = Message<"euler.v1.DeletePermissionRul
  * Use `create(DeletePermissionRuleResponseSchema)` to create a new message.
  */
 export const DeletePermissionRuleResponseSchema: GenMessage<DeletePermissionRuleResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 13);
+  messageDesc(file_euler_v1_preferences, 12);
 
 /**
  * An argument a rule can match.
@@ -835,7 +749,7 @@ export type PermissionField = Message<"euler.v1.PermissionField"> & {
  * Use `create(PermissionFieldSchema)` to create a new message.
  */
 export const PermissionFieldSchema: GenMessage<PermissionField> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 14);
+  messageDesc(file_euler_v1_preferences, 13);
 
 /**
  * @generated from enum euler.v1.PermissionField.Type
@@ -866,7 +780,7 @@ export enum PermissionField_Type {
  * Describes the enum euler.v1.PermissionField.Type.
  */
 export const PermissionField_TypeSchema: GenEnum<PermissionField_Type> = /*@__PURE__*/
-  enumDesc(file_euler_v1_preferences, 14, 0);
+  enumDesc(file_euler_v1_preferences, 13, 0);
 
 /**
  * @generated from message euler.v1.PermissionTool
@@ -898,7 +812,7 @@ export type PermissionTool = Message<"euler.v1.PermissionTool"> & {
  * Use `create(PermissionToolSchema)` to create a new message.
  */
 export const PermissionToolSchema: GenMessage<PermissionTool> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 15);
+  messageDesc(file_euler_v1_preferences, 14);
 
 /**
  * @generated from message euler.v1.ListPermissionToolsRequest
@@ -911,7 +825,7 @@ export type ListPermissionToolsRequest = Message<"euler.v1.ListPermissionToolsRe
  * Use `create(ListPermissionToolsRequestSchema)` to create a new message.
  */
 export const ListPermissionToolsRequestSchema: GenMessage<ListPermissionToolsRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 16);
+  messageDesc(file_euler_v1_preferences, 15);
 
 /**
  * @generated from message euler.v1.ListPermissionToolsResponse
@@ -928,7 +842,7 @@ export type ListPermissionToolsResponse = Message<"euler.v1.ListPermissionToolsR
  * Use `create(ListPermissionToolsResponseSchema)` to create a new message.
  */
 export const ListPermissionToolsResponseSchema: GenMessage<ListPermissionToolsResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 17);
+  messageDesc(file_euler_v1_preferences, 16);
 
 /**
  * @generated from message euler.v1.GetEnvironmentRequest
@@ -941,7 +855,7 @@ export type GetEnvironmentRequest = Message<"euler.v1.GetEnvironmentRequest"> & 
  * Use `create(GetEnvironmentRequestSchema)` to create a new message.
  */
 export const GetEnvironmentRequestSchema: GenMessage<GetEnvironmentRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 18);
+  messageDesc(file_euler_v1_preferences, 17);
 
 /**
  * @generated from message euler.v1.GetEnvironmentResponse
@@ -963,7 +877,7 @@ export type GetEnvironmentResponse = Message<"euler.v1.GetEnvironmentResponse"> 
  * Use `create(GetEnvironmentResponseSchema)` to create a new message.
  */
 export const GetEnvironmentResponseSchema: GenMessage<GetEnvironmentResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_preferences, 19);
+  messageDesc(file_euler_v1_preferences, 18);
 
 /**
  * The user's settings and customization, shared by every client.

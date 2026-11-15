@@ -6,6 +6,11 @@ import {
   type GetRuntimeResponseSchema,
 } from "../../src/gen/euler/v1/agent_pb";
 import {
+  FeatureId,
+  type FeatureSchema,
+  FeatureService,
+} from "../../src/gen/euler/v1/features_pb";
+import {
   InputCapability,
   ModelProvider,
   type ModelSchema,
@@ -38,6 +43,34 @@ export type RuntimeInit = Init<typeof GetRuntimeResponseSchema>;
 
 export const at = timestampFromMs;
 export const sandbox = { kind: { case: "sandbox" as const, value: {} } };
+
+const workspaceCommands = [
+  {
+    name: "directory",
+    description: "Allow this chat to work in a folder on the server",
+  },
+  { name: "link", description: "Work in another chat's workspace" },
+  { name: "sandbox", description: "Return this chat to its private workspace" },
+];
+/** The features that add to a chat's sidebar and composer, all running. */
+export const chatFeatures: Init<typeof FeatureSchema>[] = [
+  {
+    id: FeatureId.FILES,
+    label: "Files",
+    sidebarTab: "Files",
+    commands: [
+      ...workspaceCommands,
+      { name: "workspace", description: "Show files in this chat's workspace" },
+    ],
+  },
+  {
+    id: FeatureId.SANDBOX,
+    label: "Sandbox",
+    sidebarTab: "Jobs",
+    commands: workspaceCommands,
+  },
+  { id: FeatureId.SUBAGENTS, label: "Subagents", sidebarTab: "Agents" },
+].map((feature) => ({ ...feature, toggleable: true, enabled: true }));
 
 /** A transcript message from a role name and text. */
 export function message(
@@ -124,6 +157,9 @@ export async function mockApp(page: Page, fixture: AppFixture = {}) {
       })),
       on(ProviderService.method.getOllamaHealth, () => ({ connected: true })),
       on(ProviderService.method.getComfyUiHealth, () => ({ connected: true })),
+      on(FeatureService.method.listFeatures, () => ({
+        features: chatFeatures,
+      })),
       on(PreferenceService.method.getEnvironment, () => ({
         ollamaHost: false,
         comfyuiHost: false,
