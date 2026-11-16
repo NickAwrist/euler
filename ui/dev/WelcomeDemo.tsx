@@ -31,6 +31,8 @@ export default function WelcomeDemo() {
         sessions={[]}
         home={params.get("home") !== "false"}
         ephemeral={params.get("ephemeral") === "true"}
+        commands
+        skills
         composerHeight={composerHeight}
         onNewEphemeralRun={noop}
         onOpenSession={noop}

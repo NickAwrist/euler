@@ -15,6 +15,10 @@ type WelcomeHomeProps = {
   /** Home, unlike an empty chat, also offers ephemeral and recent chats. */
   home: boolean;
   ephemeral: boolean;
+  /** Whether "/" offers commands or MCP tools. */
+  commands: boolean;
+  /** Whether "$" offers skills. */
+  skills: boolean;
   /** Height of the centered composer this screen is laid out around. */
   composerHeight: number;
   onNewEphemeralRun: () => void;
@@ -26,6 +30,8 @@ export function WelcomeHome({
   name,
   home,
   ephemeral,
+  commands,
+  skills,
   composerHeight,
   onNewEphemeralRun,
   onOpenSession,
@@ -68,7 +74,7 @@ export function WelcomeHome({
         >
           {ephemeral
             ? "This chat, its messages, and its files are deleted when it expires."
-            : "Type / for commands or $ to use a skill."}
+            : composerHint(commands, skills)}
         </p>
       </div>
       {home && (
@@ -115,4 +121,12 @@ export function WelcomeHome({
       )}
     </div>
   );
+}
+
+/** Names only what the composer offers, so nothing it mentions does nothing. */
+function composerHint(commands: boolean, skills: boolean): string | undefined {
+  if (commands && skills) return "Type / for commands or $ to use a skill.";
+  if (commands) return "Type / for commands.";
+  if (skills) return "Type $ to use a skill.";
+  return undefined;
 }

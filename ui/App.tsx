@@ -118,7 +118,7 @@ function ChatView({
   } = app;
   const localPath = localWorkspace(app.workspace)?.path;
   const workspaceKey = `${app.activeSessionId}:${localPath ?? linkedWorkspace(app.workspace)?.workspaceId ?? "sandbox"}`;
-  const { sidebarTabs, commands, skills } = useChatFeatures();
+  const { sidebarTabs, commands, skills, mcp } = useChatFeatures();
   const [artifactView, setArtifactView] = useState<SidebarView>("files");
   const sidebarView = sidebarTabs.some((tab) => tab.value === artifactView)
     ? artifactView
@@ -519,6 +519,8 @@ function ChatView({
                     sessions={app.sessions}
                     home={!app.activeSessionId}
                     ephemeral={app.activeExpiresAt !== null}
+                    commands={commands.length > 0 || mcp}
+                    skills={skills}
                     composerHeight={runFooterInset}
                     onNewEphemeralRun={app.createEphemeralSession}
                     onOpenSession={app.switchToSession}

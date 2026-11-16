@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
-import { mockRpc } from "./rpcMock";
+import { FeatureId, FeatureService } from "../../src/gen/euler/v1/features_pb";
+import { chatFeatures, mockApp } from "./appFixture";
+import { mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 test.beforeEach(async ({ page }) => {
@@ -81,3 +83,45 @@ for (const device of ["desktop", "mobile"]) {
     );
   });
 }
+
+test("welcome desktop hint names only what the running features offer", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    localStorage.setItem(
+      "euler:userUuid",
+      "12345678-1234-4234-9234-123456789abc",
+    );
+  });
+  await mockApp(page);
+  await mockUserPreferences(page);
+  let features = chatFeatures;
+  await mockRpc(page, [
+    on(FeatureService.method.listFeatures, () => ({ features })),
+  ]);
+  const hint = page.getByText(/^Type [/$]/);
+
+  await page.goto("/");
+  await expect(hint).toHaveText("Type / for commands or $ to use a skill.");
+
+  features = chatFeatures.filter((feature) => feature.id === FeatureId.SKILLS);
+  await page.reload();
+  await expect(hint).toHaveText("Type $ to use a skill.");
+
+  // MCP tools are offered under "/" too.
+  features = [
+    {
+      id: FeatureId.MCP,
+      label: "MCP servers",
+      toggleable: false,
+      enabled: true,
+    },
+  ];
+  await page.reload();
+  await expect(hint).toHaveText("Type / for commands.");
+
+  features = [];
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 2 })).toBeVisible();
+  await expect(hint).toHaveCount(0);
+});

@@ -98,7 +98,7 @@ struct NewChatView: View {
                 .padding(.bottom, 14)
             // Both lines keep their space, so switching modes leaves the mark and greeting in place.
             ZStack(alignment: .top) {
-                subtitle("Type / for commands or $ to use a skill.", font: .caption, shown: !ephemeral)
+                subtitle(composerHint ?? "", font: .caption, shown: !ephemeral && composerHint != nil)
                 subtitle("This chat, its messages, and its files are deleted when it expires.", font: .subheadline, shown: ephemeral)
             }
             .foregroundStyle(palette.muted)
@@ -113,6 +113,18 @@ struct NewChatView: View {
             .font(font)
             .opacity(shown ? 1 : 0)
             .accessibilityHidden(!shown)
+    }
+
+    /// Names only what the composer offers, as on the web.
+    private var composerHint: String? {
+        let features = session.features.chat
+        let commands = !features.commands.isEmpty || features.mcp
+        switch (commands, features.skills) {
+        case (true, true): return "Type / for commands or $ to use a skill."
+        case (true, false): return "Type / for commands."
+        case (false, true): return "Type $ to use a skill."
+        case (false, false): return nil
+        }
     }
 
     private var greetingText: Text {

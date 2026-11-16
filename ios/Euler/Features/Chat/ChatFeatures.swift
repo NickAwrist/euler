@@ -29,6 +29,8 @@ struct ChatFeatures {
     let commands: [RunCommand]
     /// Whether `$` offers skills, which the Skills feature loads.
     let skills: Bool
+    /// Whether `/` also offers MCP tools, which the MCP feature runs.
+    let mcp: Bool
     /// Whether a reply's files can be opened.
     let files: Bool
 
@@ -45,6 +47,7 @@ struct ChatFeatures {
         }
         self.commands = commands
         skills = running.contains { $0.id == .skills }
+        mcp = running.contains { $0.id == .mcp }
         files = running.contains { $0.id == .files }
     }
 

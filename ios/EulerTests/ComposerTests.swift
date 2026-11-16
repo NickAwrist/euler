@@ -61,6 +61,7 @@ struct ChatFeaturesTests {
             feature(.sandbox, tab: "Jobs", commands: ["directory", "link", "unknown"]),
             feature(.subagents, tab: "Agents", unavailable: "unavailable"),
             feature(.skills),
+            feature(.mcp),
         ])
         #expect(chat.panels.map(\.label) == ["Jobs"])
         #expect(chat.commands == [
@@ -69,6 +70,7 @@ struct ChatFeaturesTests {
         ])
         #expect(chat.choosesWorkspace)
         #expect(chat.skills)
+        #expect(chat.mcp)
         #expect(!chat.files)
     }
 
@@ -78,6 +80,7 @@ struct ChatFeaturesTests {
         #expect(chat.commands.isEmpty)
         #expect(!chat.choosesWorkspace)
         #expect(!chat.skills)
+        #expect(!chat.mcp)
     }
 }
 
