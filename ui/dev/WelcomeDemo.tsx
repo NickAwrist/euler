@@ -68,6 +68,7 @@ export default function WelcomeDemo() {
         linkedLabel={null}
         workspace={sandboxWorkspace()}
         commands={[]}
+        offerSkills={false}
         onRunCommand={noop}
         onFooterHeightChange={setComposerHeight}
       />

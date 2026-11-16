@@ -38,10 +38,8 @@ async function fixture() {
   await fs.writeFile(join(parent, "file.txt"), "inside marker");
   await fs.writeFile(join(outside, "file.txt"), "outside secret");
   const ctx = new RunContext(
-    new BaseAgent("test", "test"),
+    new BaseAgent("test"),
     permissionService.resolve(workspace),
-    undefined,
-    undefined,
     undefined,
     undefined,
     undefined,

@@ -1,4 +1,3 @@
-import "../setup";
 import { expect, test } from "bun:test";
 import fs from "node:fs/promises";
 import { timestampMs } from "@bufbuild/protobuf/wkt";

@@ -94,6 +94,8 @@ struct ComposerSuggestions: View {
         let text = target.draft.text
         switch token.kind {
         case .skill:
+            // With Skills off a `$name` would reach the model as plain text.
+            guard session.features.chat.skills else { return [] }
             return session.completions.skills
                 .filter { $0.userInvocable && $0.name.hasPrefix(token.query) }
                 .prefix(8)
@@ -111,9 +113,9 @@ struct ComposerSuggestions: View {
         case .tool, .command:
             // A new chat works in its own sandbox already, so it has nothing to return to.
             let commands: [Suggestion] = ComposerToken.command(in: text) != nil && !(target.chat?.running ?? false)
-                ? ChatCommand.allCases.filter { $0.rawValue.hasPrefix(token.query) && ($0 != .sandbox || target.chat != nil) }.map { command in
-                    Suggestion(id: "command:\(command.rawValue)", label: "/\(command.rawValue)", detail: command.description, icon: "command") {
-                        run(command)
+                ? session.features.chat.commands.filter { $0.name.rawValue.hasPrefix(token.query) && ($0.name != .sandbox || target.chat != nil) }.map { command in
+                    Suggestion(id: "command:\(command.name.rawValue)", label: "/\(command.name.rawValue)", detail: command.description, icon: "command") {
+                        run(command.name)
                     }
                 }
                 : []

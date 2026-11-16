@@ -1,4 +1,3 @@
-import "../setup";
 import { describe, expect, test } from "bun:test";
 import { getDb } from "../../src/db/connection";
 import {

@@ -4,7 +4,6 @@ import {
   effectiveUserPreferences,
   updateUserPreferences,
 } from "../../src/db/userPreferences";
-import { permissionService } from "../../src/permissions/PermissionService";
 import { ToolApprovalCoordinator } from "../../src/permissions/ToolApprovalCoordinator";
 import { removeToolPermissionRule } from "../../src/permissions/preferences";
 import { workspaceService } from "../../src/workspaces/WorkspaceService";
@@ -60,18 +59,7 @@ test("allow matching saves narrow rules, duplicate/foreign responses cannot gran
   await expect(
     coordinator.respond(owner, id, approval.id, { decision: "allow_once" }),
   ).rejects.toThrow();
-  const prefs = effectiveUserPreferences(owner);
-  const policy = permissionService.resolve(
-    context.workspace,
-    undefined,
-    prefs.toolPermissions,
-  );
-  expect(
-    permissionService.callDecision(policy, "bash", args, {
-      sessionId: id,
-      workspacePath: context.workspace.hostPath,
-    }).action,
-  ).toBe("allow");
+  expect(coordinator.checkCall(context, "bash", args).action).toBe("allow");
   await coordinator.authorize(context, "bash", args);
   removeToolPermissionRule(owner, saved.rule!.id);
   expect(effectiveUserPreferences(owner).toolPermissions.rules).toEqual([
@@ -119,6 +107,13 @@ test("feature switches and workspace are rechecked while a user is considering a
   await expect(
     coordinator.respond(owner, id, approval.id, { decision: "allow_matching" }),
   ).rejects.toThrow("disabled");
+  // A new call is refused outright, but a server's tool has no feature to switch off.
+  await expect(coordinator.authorize(context, "bash", {})).rejects.toThrow(
+    "disabled",
+  );
+  expect(coordinator.checkCall(context, "mcp__custom__tool", {}).action).toBe(
+    "ask",
+  );
   expect(effectiveUserPreferences(owner).toolPermissions.rules).toEqual([
     allToolsRule(),
   ]);

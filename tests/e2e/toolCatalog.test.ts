@@ -1,4 +1,3 @@
-import "../setup";
 import { expect, spyOn, test } from "bun:test";
 import { getDb } from "../../src/db/connection";
 import { FeatureId } from "../../src/gen/euler/v1/features_pb";
@@ -11,7 +10,7 @@ import { Code, rpc, rpcCode } from "../helpers/rpc";
 test("the tool picker uses active features' tools, actual MCP names, and runtime tools without saving agents", async () => {
   // The picker lists shell tools only where the host can contain them.
   const capability = spyOn(sandboxRunner, "capability").mockResolvedValue({
-    available: true,
+    capable: true,
   });
   const icons = [{ src: "data:image/png;base64,AAAA" }];
   const mcp = startMcpTestServer(icons);

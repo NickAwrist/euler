@@ -101,16 +101,14 @@ export function Sidebar({
       </div>
 
       <div className="space-y-1 border-t border-border-subtle pt-2">
-        {onUsage && (
-          <button
-            type="button"
-            onClick={onUsage}
-            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[0.8125rem] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <ChartNoAxesCombined size={15} />
-            <span>Usage insights</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={onUsage}
+          className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-[0.8125rem] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <ChartNoAxesCombined size={15} />
+          <span>Usage insights</span>
+        </button>
         <button
           type="button"
           onClick={onCustomization}

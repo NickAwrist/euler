@@ -12,6 +12,12 @@ import {
   WorkspaceFeature,
 } from "./Feature";
 
+// Workspace paths are opened through procfs.
+const CAPABILITY: Capability =
+  process.platform === "linux"
+    ? CAPABLE
+    : { capable: false, reason: "Requires Linux" };
+
 export class FilesFeature extends WorkspaceFeature {
   readonly id = "files";
   readonly label = "Files";
@@ -31,11 +37,8 @@ export class FilesFeature extends WorkspaceFeature {
     { name: "workspace", description: "Show files in this chat's workspace" },
   ];
 
-  async capable(): Promise<Capability> {
-    // Workspace paths are opened through procfs.
-    return process.platform === "linux"
-      ? CAPABLE
-      : { capable: false, reason: "Requires Linux" };
+  override async capable(): Promise<Capability> {
+    return CAPABILITY;
   }
 
   override async tools(): Promise<FeatureTools> {

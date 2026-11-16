@@ -102,5 +102,3 @@ export function getEnvironmentSettings() {
     comfyuiHost: Boolean(envConfig.comfyuiHost),
   };
 }
-
-export type EnvironmentSettings = ReturnType<typeof getEnvironmentSettings>;

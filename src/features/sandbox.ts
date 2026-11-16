@@ -2,7 +2,6 @@ import { sandboxRunner } from "../sandbox/SandboxRunner";
 import { BashTool } from "../tools/bash";
 import { JobTool } from "../tools/jobs";
 import {
-  CAPABLE,
   type Capability,
   type FeatureRun,
   type FeatureTools,
@@ -16,11 +15,8 @@ export class SandboxFeature extends WorkspaceFeature {
   readonly toolNames = ["bash", "get_job", "cancel_job"];
   override readonly sidebarTab = "Jobs";
 
-  async capable(): Promise<Capability> {
-    const { available, diagnostic } = await sandboxRunner.capability();
-    return available
-      ? CAPABLE
-      : { capable: false, reason: diagnostic ?? "Bubblewrap is unavailable" };
+  override capable(): Promise<Capability> {
+    return sandboxRunner.capability();
   }
 
   // Jobs are background shell commands, so their tools come with the shell.

@@ -1,11 +1,10 @@
-import { permissionService } from "../../src/permissions/PermissionService";
-import "../setup";
-import { beforeEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { RunContext } from "../../src/RunContext";
 import { BaseAgent } from "../../src/agents/BaseAgent";
 import { setOpenRouterApiKey } from "../../src/db";
 import { streamOpenRouterChat } from "../../src/llm/openRouterProvider";
 import type { LlmStreamChunk } from "../../src/llm/types";
+import { permissionService } from "../../src/permissions/PermissionService";
 import {
   getOpenRouterRequests,
   resetOpenRouterScenario,
@@ -13,10 +12,6 @@ import {
 } from "../helpers/mockOpenRouter";
 
 const model = "openai/gpt-5.4-mini";
-
-beforeEach(() => {
-  resetOpenRouterScenario();
-});
 
 async function collect(): Promise<LlmStreamChunk[]> {
   const stream = await streamOpenRouterChat({
@@ -154,7 +149,6 @@ describe("OpenRouter provider", () => {
     const thinkingDuration = async () => {
       const agent = new BaseAgent(
         "test_agent",
-        "Test agent",
         [],
         `openrouter:${model}`,
         "Be concise.",
@@ -176,7 +170,6 @@ describe("OpenRouter provider", () => {
     setOpenRouterScenario("tool-loop");
     const agent = new BaseAgent(
       "test_agent",
-      "Test agent",
       [],
       `openrouter:${model}`,
       "Be concise.",

@@ -1,4 +1,3 @@
-import "../setup";
 import { describe, expect, test } from "bun:test";
 import {
   agentManager,
@@ -30,15 +29,16 @@ describe("agent runtime", () => {
     );
     const listed = `"name":"${MANAGE_SUBAGENTS_SKILL_NAME}"`;
     expect(
-      agentManager.createAgent({ ownerUuid: owner, features }).systemPrompt,
+      agentManager.createAgent("main", { ownerUuid: owner, features })
+        .systemPrompt,
     ).toContain(listed);
     expect(
-      agentManager.createGeneralAgent({ ownerUuid: owner, features })
+      agentManager.createAgent("general", { ownerUuid: owner, features })
         .systemPrompt,
     ).not.toContain(listed);
     // The skill explains tools the agent only has with subagents on.
     expect(
-      agentManager.createAgent({
+      agentManager.createAgent("main", {
         ownerUuid: owner,
         features: features.filter(({ id }) => id === "skills"),
       }).systemPrompt,
@@ -50,7 +50,7 @@ describe("agent runtime", () => {
   });
 
   test("uses the default prompt unless the user provides one", () => {
-    const standard = agentManager.createAgent({
+    const standard = agentManager.createAgent("main", {
       ownerUuid: RUNTIME_USER_ID,
       promptContext: buildServerRunPromptContext({
         metadata: { systemPrompt: "   " },
@@ -60,7 +60,7 @@ describe("agent runtime", () => {
       DEFAULT_SYSTEM_PROMPT.split("\n")[0]!,
     );
 
-    const custom = agentManager.createAgent({
+    const custom = agentManager.createAgent("main", {
       ownerUuid: RUNTIME_USER_ID,
       promptContext: buildServerRunPromptContext({
         metadata: {
@@ -77,48 +77,33 @@ describe("agent runtime", () => {
     expect(custom.systemPrompt).toContain("<tool_format>");
   });
 
-  test("builds subagents from the parent's prompt, model, and effort without nesting", () => {
-    ensureUserData(RUNTIME_USER_ID);
-    const promptContext = buildServerRunPromptContext({
-      metadata: { systemPrompt: "Custom instructions." },
-    });
-    const parent = agentManager.createAgent({
+  test("subagents get the parent's prompt and effort plus the subagent directives", () => {
+    const options = {
       ownerUuid: RUNTIME_USER_ID,
-      promptContext,
+      promptContext: buildServerRunPromptContext({
+        metadata: { systemPrompt: "Custom instructions." },
+      }),
       reasoningEffort: "high",
-    });
-    parent.model = "parent-model";
-
-    const subagent = agentManager.createGeneralAgent({
-      ownerUuid: RUNTIME_USER_ID,
-      promptContext,
-      reasoningEffort: "high",
-    });
-    subagent.model = parent.model;
+    };
+    const parent = agentManager.createAgent("main", options);
+    const subagent = agentManager.createAgent("general", options);
 
     expect(subagent.name).toBe(SUBAGENT_NAME);
-    expect(subagent.model).toBe("parent-model");
     expect(subagent.reasoningEffort).toBe("high");
     expect(subagent.systemPrompt).toStartWith("Custom instructions.");
     expect(subagent.systemPrompt).toContain(SUBAGENT_DIRECTIVES);
     expect(parent.systemPrompt).not.toContain(SUBAGENT_DIRECTIVES);
   });
 
-  test("buildServerRunPromptContext includes current date by default when metadata is omitted", () => {
-    const agent = agentManager.createAgent({
-      ownerUuid: RUNTIME_USER_ID,
-      promptContext: buildServerRunPromptContext({}),
-    });
-    expect(agent.systemPrompt).toContain("Current date:");
-  });
-
-  test("buildServerRunPromptContext respects includeCurrentDate: false", () => {
-    const agent = agentManager.createAgent({
-      ownerUuid: RUNTIME_USER_ID,
-      promptContext: buildServerRunPromptContext({
-        metadata: { includeCurrentDate: false },
-      }),
-    });
-    expect(agent.systemPrompt).not.toContain("Current date:");
+  test("names the messaging tools only while Subagents is active", () => {
+    const prompt = (features: typeof FEATURES) =>
+      agentManager.createAgent("main", { ownerUuid: RUNTIME_USER_ID, features })
+        .systemPrompt;
+    expect(prompt(FEATURES.filter(({ id }) => id === "subagents"))).toContain(
+      "Use send_message",
+    );
+    expect(prompt([])).not.toContain("send_message");
+    // Job reports still arrive in envelopes the agent must not trust.
+    expect(prompt([])).toContain("untrusted reports");
   });
 });

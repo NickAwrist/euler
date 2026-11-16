@@ -46,7 +46,6 @@ export function ExecutionTraceList({
           // Steps only append, and identical steps repeat, so the index disambiguates.
           key={`${index}:${traceStepKey(step)}`}
           step={step}
-          showIndex
           stepNumber={index + 1}
           streamingThinking={index === lastIdx ? streamingThinking : undefined}
           timeline={timeline[index]}

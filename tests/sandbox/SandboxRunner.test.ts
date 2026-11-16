@@ -22,11 +22,11 @@ afterEach(async () => {
 async function workspace(): Promise<Workspace> {
   const hostPath = await fs.mkdtemp(join(tmpdir(), "orbis-runner-test-"));
   directories.push(hostPath);
-  return { kind: "sandbox", hostPath, displayPath: "/workspace" };
+  return { kind: "sandbox", hostPath };
 }
 
 describe("bubblewrap sandbox runner", () => {
-  test.skipIf(!capability.available || process.getuid?.() !== 0)(
+  test.skipIf(!capability.capable || process.getuid?.() !== 0)(
     "skips a root-private toolchain when launching as the local directory owner",
     async () => {
       const root = await fs.mkdtemp(join(tmpdir(), "euler-root-toolchain-"));
@@ -53,7 +53,6 @@ describe("bubblewrap sandbox runner", () => {
         const workspace = {
           kind: "local" as const,
           hostPath,
-          displayPath: "/workspace",
         };
         const result = await new BubblewrapSandboxRunner()
           .spawn({
@@ -72,7 +71,7 @@ describe("bubblewrap sandbox runner", () => {
       }
     },
   );
-  test.skipIf(!capability.available || process.getuid?.() !== 0)(
+  test.skipIf(!capability.capable || process.getuid?.() !== 0)(
     "runs a local workspace as its owner beneath a private home directory",
     async () => {
       const parent = await fs.mkdtemp(join(tmpdir(), "orbis-private-home-"));
@@ -86,7 +85,7 @@ describe("bubblewrap sandbox runner", () => {
         .spawn({
           permissions: permissionService.resolve({ kind: "local" }),
           command: "touch created.txt; id -u",
-          workspace: { kind: "local", hostPath, displayPath: "/workspace" },
+          workspace: { kind: "local", hostPath },
         })
         .then(({ completion }) => completion);
 
@@ -96,7 +95,7 @@ describe("bubblewrap sandbox runner", () => {
     },
   );
 
-  test.skipIf(capability.available)(
+  test.skipIf(capability.capable)(
     "fails closed when containment is unavailable",
     async () => {
       const runner = new BubblewrapSandboxRunner();
@@ -113,7 +112,7 @@ describe("bubblewrap sandbox runner", () => {
     },
   );
 
-  test.skipIf(!capability.available)(
+  test.skipIf(!capability.capable)(
     "allows workspace writes but rejects host-system writes",
     async () => {
       const runner = new BubblewrapSandboxRunner();
@@ -138,7 +137,7 @@ describe("bubblewrap sandbox runner", () => {
     },
   );
 
-  test.skipIf(!capability.available)(
+  test.skipIf(!capability.capable)(
     "has no network namespace access",
     async () => {
       const runner = new BubblewrapSandboxRunner();
@@ -156,7 +155,7 @@ describe("bubblewrap sandbox runner", () => {
   );
 });
 
-test.skipIf(!capability.available || !existsSync("/etc/alternatives/awk"))(
+test.skipIf(!capability.capable || !existsSync("/etc/alternatives/awk"))(
   "runs alternatives-backed executables inside the sandbox",
   async () => {
     const result = await new BubblewrapSandboxRunner()

@@ -1,6 +1,5 @@
-import { waitForActivation } from "../helpers/activation";
-import "../setup";
 import { describe, expect, test } from "bun:test";
+import { waitForActivation } from "../helpers/activation";
 import { Code, rpc, rpcCode } from "../helpers/rpc";
 
 const OTHER_USER = "22222222-2222-4222-8222-222222222222";

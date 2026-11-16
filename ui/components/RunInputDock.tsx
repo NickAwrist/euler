@@ -73,6 +73,7 @@ export function RunInputDock({
   workspace,
   linkedLabel,
   commands,
+  offerSkills,
   onRunCommand,
   onFooterHeightChange,
 }: {
@@ -106,6 +107,8 @@ export function RunInputDock({
   linkedLabel: string | null;
   /** The "/" commands the running features add. */
   commands: readonly RunCommand[];
+  /** Whether "$" offers skills, which the Skills feature loads. */
+  offerSkills: boolean;
   onRunCommand: (command: RunCommandName) => void | Promise<void>;
   onFooterHeightChange: (heightPx: number) => void;
 }) {
@@ -162,6 +165,7 @@ export function RunInputDock({
     busy: isBusy,
     workspace,
     commands,
+    offerSkills,
     runCommand,
     complete: (completed) => {
       setIntegrationPickerDismissed(true);
@@ -501,7 +505,6 @@ export function RunInputDock({
                   reasoning={currentModelOption.reasoning}
                   value={thinkingEffort}
                   onChange={onThinkingEffortChange}
-                  disabled={false}
                 />
               </>
             )}

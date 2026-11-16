@@ -321,10 +321,6 @@
   gap: 7px;
   padding-top: 4px;
 }
-.usage-tooltip .usage-dot {
-  width: 5px;
-  height: 5px;
-}
 .usage-tooltip-name {
   overflow: hidden;
   white-space: nowrap;

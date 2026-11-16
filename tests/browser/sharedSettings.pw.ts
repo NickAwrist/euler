@@ -35,18 +35,6 @@ async function mockSettings(
       on(ProviderService.method.getOpenRouterCatalog, () => ({
         catalog: { freshness: { status: CatalogFreshness_Status.FRESH } },
       })),
-      on(ProviderService.method.getComfyUiConfig, () => ({
-        config: {
-          host: "http://saved.comfy.test",
-          effectiveHost: "http://saved.comfy.test",
-        },
-        image: {
-          defaultModel: "saved.safetensors",
-          defaultWidth: 1024,
-          defaultHeight: 768,
-          negativePrompt: "Keep this",
-        },
-      })),
       on(ProviderService.method.getOllamaConfig, () => ({
         config: {
           host: "http://saved.ollama.test",

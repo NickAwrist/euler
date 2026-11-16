@@ -35,7 +35,7 @@ export type Feature = Message<"euler.v1.Feature"> & {
   description: string;
 
   /**
-   * False for a feature that is on whenever it is set up, such as skills.
+   * False for a feature that is on whenever it is set up, such as MCP servers.
    *
    * @generated from field: bool toggleable = 4;
    */

@@ -16,7 +16,7 @@ export class ImageGenerationFeature extends ToggleFeature {
   readonly description = "Generate images with ComfyUI.";
   readonly toolNames = ["generate_image"];
 
-  async capable(): Promise<Capability> {
+  override async capable(): Promise<Capability> {
     const health = await getComfyUIClient().healthCheck(HEALTH_TIMEOUT_MS);
     return health.ok
       ? CAPABLE

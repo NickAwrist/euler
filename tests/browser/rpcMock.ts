@@ -14,7 +14,6 @@ import { AgentService } from "../../src/gen/euler/v1/agent_pb";
 import { AttachmentService } from "../../src/gen/euler/v1/attachments_pb";
 import { ErrorCode, ErrorDetailSchema } from "../../src/gen/euler/v1/common_pb";
 import { DebugService } from "../../src/gen/euler/v1/debug_pb";
-import { DeviceService } from "../../src/gen/euler/v1/devices_pb";
 import { DirectoryService } from "../../src/gen/euler/v1/directories_pb";
 import { EventService } from "../../src/gen/euler/v1/events_pb";
 import { FeatureService } from "../../src/gen/euler/v1/features_pb";
@@ -36,7 +35,6 @@ const SERVICES = [
   AgentService,
   AttachmentService,
   DebugService,
-  DeviceService,
   DirectoryService,
   EventService,
   FeatureService,
@@ -86,17 +84,6 @@ type Handler<I extends DescMessage, R> = (
 export function on<I extends DescMessage, O extends DescMessage>(
   method: { input: I; output: O; methodKind: "unary" },
   handle: Handler<I, MessageInitShape<O>>,
-): RpcMock {
-  return {
-    method: method as unknown as DescMethod,
-    handle: handle as RpcMock["handle"],
-  };
-}
-
-/** Mocks a server stream with the messages to send before it ends. */
-export function onStream<I extends DescMessage, O extends DescMessage>(
-  method: { input: I; output: O; methodKind: "server_streaming" },
-  handle: Handler<I, MessageInitShape<O>[]>,
 ): RpcMock {
   return {
     method: method as unknown as DescMethod,
@@ -154,12 +141,7 @@ function failureJson(failure: RpcFailure) {
 }
 
 function decodeRequest(method: DescMethod, request: Request) {
-  if (method.methodKind === "unary")
-    return fromJson(method.input, request.postDataJSON() ?? {});
-  // A streaming request is one enveloped JSON message.
-  const body = request.postDataBuffer() ?? Buffer.alloc(0);
-  const json = body.length > 5 ? JSON.parse(body.subarray(5).toString()) : {};
-  return fromJson(method.input, json);
+  return fromJson(method.input, request.postDataJSON() ?? {});
 }
 
 /**
@@ -196,17 +178,11 @@ export async function mockRpc(
           : []
         : undefined;
     if (result === undefined) return route.fallback();
-    if (result instanceof RpcFailure) {
-      if (method.methodKind === "unary")
-        return route.fulfill({
-          status: HTTP_STATUS[result.code] ?? 500,
-          json: failureJson(result),
-        });
+    if (result instanceof RpcFailure)
       return route.fulfill({
-        headers: { "Content-Type": "application/connect+json" },
-        body: frame({ error: failureJson(result) }, 2),
+        status: HTTP_STATUS[result.code] ?? 500,
+        json: failureJson(result),
       });
-    }
     if (method.methodKind === "unary")
       return route.fulfill({
         json: toJson(method.output, create(method.output, result as never)),

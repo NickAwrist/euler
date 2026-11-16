@@ -23,7 +23,7 @@ export const FEATURES: readonly Feature[] = [
   new McpFeature(),
 ];
 
-export type FeatureStatus = {
+type FeatureStatus = {
   feature: Feature;
   enabled: boolean;
   capability: Capability;
@@ -51,11 +51,6 @@ export async function activeFeatures(ownerUuid: string): Promise<Feature[]> {
 
 export function featureIds(features: readonly Feature[]): Set<FeatureId> {
   return new Set(features.map((feature) => feature.id));
-}
-
-/** Without the capability checks, for a decision that cannot wait on them. */
-export function enabledFeatureIds(ownerUuid: string): Set<FeatureId> {
-  return featureIds(FEATURES.filter((feature) => feature.enabled(ownerUuid)));
 }
 
 export function featureOwning(toolName: string): Feature | undefined {

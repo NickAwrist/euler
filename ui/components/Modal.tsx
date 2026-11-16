@@ -30,7 +30,6 @@ export interface ModalProps {
   maxWidthClass?: string;
   surfaceClassName?: string;
   layout?: "grid" | "flex";
-  className?: string;
   ariaLabel?: string;
   ariaLabelledBy?: string;
   initialFocusRef?: RefObject<HTMLElement | null>;
@@ -52,7 +51,6 @@ export function Modal({
   maxWidthClass = "max-w-[400px]",
   surfaceClassName,
   layout = "grid",
-  className,
   ariaLabel,
   ariaLabelledBy,
   initialFocusRef,
@@ -129,7 +127,7 @@ export function Modal({
   return (
     <dialog
       ref={dialogRef}
-      className={cx(modalShell, className)}
+      className={modalShell}
       aria-label={ariaLabel}
       aria-labelledby={ariaLabel ? undefined : effectiveTitleId}
       onClick={handleDialogClick}

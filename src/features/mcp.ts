@@ -1,12 +1,6 @@
 import { listMcpServers } from "../db/mcpServers";
 import { openUserMcpTools } from "../mcp/userTools";
-import {
-  CAPABLE,
-  type Capability,
-  Feature,
-  type FeatureRun,
-  type FeatureTools,
-} from "./Feature";
+import { Feature, type FeatureRun, type FeatureTools } from "./Feature";
 
 /** On whenever the user has an enabled server; there is no switch. */
 export class McpFeature extends Feature {
@@ -15,10 +9,6 @@ export class McpFeature extends Feature {
   readonly description = "Tools from the remote MCP servers you add.";
   // Servers name their own tools, so none can be listed here.
   readonly toolNames = [];
-
-  async capable(): Promise<Capability> {
-    return CAPABLE;
-  }
 
   enabled(ownerUuid: string): boolean {
     return listMcpServers(ownerUuid).some((server) => server.enabled);

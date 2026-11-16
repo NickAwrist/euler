@@ -35,6 +35,7 @@ struct ReplyAttachments: View {
                             .overlay(Capsule().stroke(palette.borderSubtle))
                     }
                     .buttonStyle(.plain)
+                    .disabled(!session.features.chat.files)
                     .accessibilityLabel("Preview \(file.name)")
                 }
                 if !sources.isEmpty {

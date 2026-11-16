@@ -1,4 +1,3 @@
-import "../setup";
 import { expect, test } from "bun:test";
 import { MANAGE_SUBAGENTS_SKILL_NAME } from "../../src/skills/defaults";
 import { Code, rpc, rpcCode, rpcError } from "../helpers/rpc";

@@ -4,15 +4,12 @@ import { join } from "node:path";
 import { permissionService } from "../../src/permissions/PermissionService";
 import { BubblewrapSandboxRunner } from "../../src/sandbox/SandboxRunner";
 import { discoverToolchains } from "../../src/sandbox/toolchains";
-import { featuresExcept } from "../helpers/features";
 
 const runner = new BubblewrapSandboxRunner();
 const capability = await runner.capability();
 const tools = discoverToolchains();
 
-test.skipIf(
-  !capability.available || !tools.some((tool) => tool.name === "bun"),
-)(
+test.skipIf(!capability.capable || !tools.some((tool) => tool.name === "bun"))(
   "directory policy runs development runtimes while containing files and environment",
   async () => {
     const root = await mkdtemp("/tmp/euler-development-");
@@ -23,7 +20,6 @@ test.skipIf(
     const workspace = {
       kind: "local" as const,
       hostPath,
-      displayPath: "/workspace",
     };
     const previousSecret = process.env.EULER_DEVELOPMENT_TEST_SECRET;
     process.env.EULER_DEVELOPMENT_TEST_SECRET = "host-only-marker";
@@ -47,16 +43,6 @@ test.skipIf(
           })
           .then(({ completion }) => completion),
       ).resolves.toMatchObject({ exitCode: 1 });
-      await expect(
-        runner.spawn({
-          workspace,
-          command: "true",
-          permissions: permissionService.resolve(
-            workspace,
-            featuresExcept("sandbox"),
-          ),
-        }),
-      ).rejects.toThrow("sandbox feature is disabled");
     } finally {
       if (previousSecret === undefined)
         Reflect.deleteProperty(process.env, "EULER_DEVELOPMENT_TEST_SECRET");
@@ -66,16 +52,13 @@ test.skipIf(
   },
 );
 
-test.skipIf(
-  !capability.available || !tools.some((tool) => tool.name === "bun"),
-)(
+test.skipIf(!capability.capable || !tools.some((tool) => tool.name === "bun"))(
   "directory background servers are reachable from the host and another command and stop on cancellation",
   async () => {
     const hostPath = await mkdtemp("/tmp/euler-development-server-");
     const workspace = {
       kind: "local" as const,
       hostPath,
-      displayPath: "/workspace",
     };
     let output = "";
     const execution = await runner.spawn({

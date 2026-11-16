@@ -118,7 +118,7 @@ function ChatView({
   } = app;
   const localPath = localWorkspace(app.workspace)?.path;
   const workspaceKey = `${app.activeSessionId}:${localPath ?? linkedWorkspace(app.workspace)?.workspaceId ?? "sandbox"}`;
-  const { sidebarTabs, commands } = useChatFeatures();
+  const { sidebarTabs, commands, skills } = useChatFeatures();
   const [artifactView, setArtifactView] = useState<SidebarView>("files");
   const sidebarView = sidebarTabs.some((tab) => tab.value === artifactView)
     ? artifactView
@@ -223,7 +223,8 @@ function ChatView({
     sidebarTabs.length > 0 &&
     artifactsOpen &&
     (hasFiles === true ||
-      subagents.length > 0 ||
+      (subagents.length > 0 &&
+        sidebarTabs.some((tab) => tab.value === "agents")) ||
       openedSessionId === app.activeSessionId);
   // Settings unmounts this view, so the saved appearance is current on mount.
   const [appearance] = useState(loadAppearance);
@@ -249,6 +250,7 @@ function ChatView({
   const openFile = useCallback(
     (path: string) => {
       setSelectedFile(path);
+      setArtifactView("files");
       setArtifactsOpen(true);
       setOpenedSessionId(app.activeSessionId);
     },
@@ -349,7 +351,8 @@ function ChatView({
         value={{ jobs: app.jobs, open: setSelectedJobId, stop: stopJob }}
       >
         <ArtifactContext.Provider
-          value={app.activeSessionId ? artifactContext : null}
+          // Without the Files tab there is nowhere to preview a file.
+          value={app.activeSessionId && showsFiles ? artifactContext : null}
         >
           <div className="relative flex h-full w-full overflow-hidden">
             <SidebarToggle
@@ -578,6 +581,7 @@ function ChatView({
                 workspace={app.workspace}
                 linkedLabel={app.linkedLabel}
                 commands={commands}
+                offerSkills={skills}
                 onRunCommand={runCommand}
                 onFooterHeightChange={setRunFooterInset}
               />

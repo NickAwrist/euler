@@ -90,7 +90,7 @@ public nonisolated struct Euler_V1_Feature: Sendable {
 
   public var description_p: String = String()
 
-  /// False for a feature that is on whenever it is set up, such as skills.
+  /// False for a feature that is on whenever it is set up, such as MCP servers.
   public var toggleable: Bool = false
 
   public var enabled: Bool = false

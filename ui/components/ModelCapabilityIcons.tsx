@@ -1,6 +1,5 @@
 import { Brain, Eye, type LucideIcon, Wrench } from "lucide-react";
 import { InputCapability } from "../../src/gen/euler/v1/models_pb";
-import { cx } from "../styles";
 import type { ModelOption } from "../types";
 
 type CapabilityModel = Pick<
@@ -33,15 +32,13 @@ export function formatContextLength(tokens: number): string {
 
 export function ModelCapabilityIcons({
   model,
-  className,
 }: {
   model: CapabilityModel;
-  className?: string;
 }) {
   const capabilities = modelCapabilities(model);
   if (capabilities.length === 0) return null;
   return (
-    <span className={cx("inline-flex items-center gap-1.5", className)}>
+    <span className="inline-flex items-center gap-1.5">
       {capabilities.map((capability) => {
         const Icon = CAPABILITY_ICONS[capability];
         return (

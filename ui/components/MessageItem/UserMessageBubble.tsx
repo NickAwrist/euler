@@ -1,7 +1,6 @@
 import { Check, Copy, Pencil } from "lucide-react";
 import { useEffect, useRef } from "react";
 import type { RefObject } from "react";
-import type { CSSProperties } from "react";
 import { attachmentsOfKind } from "../../lib/attachments";
 import { cx } from "../../styles";
 import type { Message } from "../../types";
@@ -15,7 +14,6 @@ type Props = {
   message: Message;
   messageIndex: number;
   animateEntry: boolean;
-  enterStyle: CSSProperties | undefined;
   bubbleRef: RefObject<HTMLDivElement | null>;
   isEditingUser: boolean;
   draft: string;
@@ -32,7 +30,6 @@ export function UserMessageBubble({
   message,
   messageIndex,
   animateEntry,
-  enterStyle,
   bubbleRef,
   isEditingUser,
   draft,
@@ -54,7 +51,6 @@ export function UserMessageBubble({
   return (
     <div
       className={cx(animateEntry && "ui-animate-slide-up", "flex justify-end")}
-      style={enterStyle}
     >
       <div className="group/msg flex w-full min-w-0 flex-col items-end">
         <div

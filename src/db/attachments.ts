@@ -81,19 +81,6 @@ export function getAttachment(
   return row ? fromDb(row) : null;
 }
 
-export function getSessionAttachments(
-  ownerUuid: string,
-  sessionId: string,
-  ids: string[],
-): AttachmentRow[] {
-  const rows: AttachmentRow[] = [];
-  for (const id of ids) {
-    const row = getAttachment(ownerUuid, id);
-    if (row?.sessionId === sessionId) rows.push(row);
-  }
-  return rows;
-}
-
 export function deleteAttachment(ownerUuid: string, id: string): boolean {
   const result = getDb()
     .prepare("DELETE FROM attachments WHERE owner_uuid = ? AND id = ?")

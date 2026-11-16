@@ -23,12 +23,7 @@ test("validation and repeated tool decisions reuse one compiled pattern", () => 
         },
       ],
     };
-    const permissions = permissionService.resolve(
-      undefined,
-      undefined,
-      ToolPermissionsSchema.parse(policy),
-    );
-    ToolPermissionsSchema.parse(policy);
+    const permissions = ToolPermissionsSchema.parse(policy);
     for (let repeat = 0; repeat < 10; repeat++)
       expect(
         permissionService.callDecision(permissions, "bash", {

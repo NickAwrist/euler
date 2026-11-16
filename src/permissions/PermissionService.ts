@@ -1,16 +1,8 @@
-import type { FeatureId } from "../features/Feature";
-import { FEATURES, featureIds, featureOwning } from "../features/index";
-import {
-  type ToolPermissions,
-  ToolPermissionsSchema,
-} from "../schemas/toolPermissions";
+import type { ToolPermissions } from "../schemas/toolPermissions";
 import type { Workspace } from "../workspaces/WorkspaceService";
 import { type PermissionScope, matchesRule, ruleSpecificity } from "./rules";
 
 export type RunPermissions = {
-  readonly toolPermissions: ToolPermissions;
-  /** The features whose tools the run may call. */
-  readonly features: ReadonlySet<FeatureId>;
   readonly shell: {
     readonly network: "isolated" | "host";
     readonly hostToolchains: boolean;
@@ -21,24 +13,14 @@ export type RunPermissions = {
   };
 };
 
-export type PermissionDecision =
-  | { allowed: true }
-  | { allowed: false; reason: string };
-
 export type ToolCallDecision =
   | { action: "allow" }
   | { action: "deny" | "ask"; reason: string };
 
 export class PermissionService {
-  resolve(
-    workspace?: Pick<Workspace, "kind">,
-    features: Iterable<FeatureId> = featureIds(FEATURES),
-    toolPermissions: ToolPermissions = ToolPermissionsSchema.parse({}),
-  ): RunPermissions {
+  resolve(workspace?: Pick<Workspace, "kind">): RunPermissions {
     const development = workspace?.kind === "local";
     return {
-      features: new Set(features),
-      toolPermissions: structuredClone(toolPermissions),
       shell: {
         network: development ? "host" : "isolated",
         hostToolchains: development,
@@ -50,35 +32,13 @@ export class PermissionService {
     };
   }
 
-  toolDecision(
-    permissions: RunPermissions,
-    toolName: string,
-  ): PermissionDecision {
-    // MCP tools have no owning feature here; their servers have their own switch.
-    const feature = featureOwning(toolName);
-    if (feature && !permissions.features.has(feature.id)) {
-      return {
-        allowed: false,
-        reason: `The ${feature.id} feature is disabled for this run`,
-      };
-    }
-    return { allowed: true };
-  }
-
-  assertTool(permissions: RunPermissions, toolName: string): void {
-    const decision = this.toolDecision(permissions, toolName);
-    if (!decision.allowed) throw new Error(decision.reason);
-  }
-
   callDecision(
-    permissions: RunPermissions,
+    toolPermissions: ToolPermissions,
     tool: string,
     args: Record<string, unknown>,
     scope: PermissionScope = {},
   ): ToolCallDecision {
-    const feature = this.toolDecision(permissions, tool);
-    if (!feature.allowed) return { action: "deny", reason: feature.reason };
-    const matches = permissions.toolPermissions.rules.filter((rule) =>
+    const matches = toolPermissions.rules.filter((rule) =>
       matchesRule(rule, tool, args, scope),
     );
     if (matches.some((rule) => rule.action === "deny"))

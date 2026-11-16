@@ -10,6 +10,6 @@ export type SidebarProps = {
   onRenameSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
   onCustomization: () => void;
-  onUsage?: () => void;
+  onUsage: () => void;
   onSettings: () => void;
 };

@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Message_Role } from "../../../src/gen/euler/v1/sessions_pb";
 import { copyTextToClipboard } from "../../lib/copyTextToClipboard";
 import type { Message } from "../../types";
@@ -11,7 +11,6 @@ export function MessageItem({
   messageIndex,
   animateEntry = true,
   onViewSteps,
-  animDelayMs = 0,
   isBusy,
   editingUserIndex,
   onStartEditUser,
@@ -50,9 +49,6 @@ export function MessageItem({
     if (isEditingUser) setDraft(message.content);
   }, [isEditingUser, message.content]);
 
-  const enterStyle: CSSProperties | undefined =
-    animDelayMs > 0 ? { animationDelay: `${animDelayMs}ms` } : undefined;
-
   const copyContent = async () => {
     const ok = await copyTextToClipboard(shown.content);
     if (ok) {
@@ -84,7 +80,6 @@ export function MessageItem({
         message={message}
         messageIndex={messageIndex}
         animateEntry={animateEntry}
-        enterStyle={enterStyle}
         bubbleRef={bubbleRef}
         isEditingUser={isEditingUser}
         draft={draft}
@@ -103,7 +98,6 @@ export function MessageItem({
     <AssistantMessageBubble
       message={shown}
       animateEntry={animateEntry}
-      enterStyle={enterStyle}
       copied={copied}
       copyContent={copyContent}
       onViewSteps={onViewSteps}

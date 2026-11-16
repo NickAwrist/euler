@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import type { EnvironmentSettings } from "../../../src/env";
-import { loadEnvironmentSettings } from "../../persist/services";
+import {
+  type EnvironmentSettings,
+  loadEnvironmentSettings,
+} from "../../persist/services";
 
 export function useEnvironmentSettings() {
   const [settings, setSettings] = useState<EnvironmentSettings | null>(null);

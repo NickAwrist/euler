@@ -1,6 +1,6 @@
 import { getSessionById } from "../db/sessions";
 import { effectiveUserPreferences } from "../db/userPreferences";
-import { enabledFeatureIds } from "../features/index";
+import { featureOwning } from "../features/index";
 import { OperationError } from "../observability/errors";
 import type { DisplayIcon } from "../schemas/icons";
 import {
@@ -10,6 +10,7 @@ import {
   type ToolPermissionRule,
 } from "../schemas/toolPermissions";
 import {
+  WORKSPACE_PATH,
   type Workspace,
   workspaceService,
 } from "../workspaces/WorkspaceService";
@@ -61,16 +62,22 @@ export class ToolApprovalCoordinator {
     tool: string,
     args: Record<string, unknown>,
   ) {
-    // The switches are read again so one turned off mid-run still wins.
-    const permissions = permissionService.resolve(
-      context.workspace,
-      enabledFeatureIds(context.owner),
+    // A feature switched off mid-run stops its tools, whatever the rules say.
+    const feature = featureOwning(tool);
+    if (feature && !feature.enabled(context.owner))
+      return {
+        action: "deny" as const,
+        reason: `The ${feature.id} feature is disabled`,
+      };
+    return permissionService.callDecision(
       effectiveUserPreferences(context.owner).toolPermissions,
+      tool,
+      args,
+      {
+        sessionId: context.sessionId,
+        workspacePath: context.workspace?.hostPath,
+      },
     );
-    return permissionService.callDecision(permissions, tool, args, {
-      sessionId: context.sessionId,
-      workspacePath: context.workspace?.hostPath,
-    });
   }
 
   async authorize(
@@ -94,7 +101,9 @@ export class ToolApprovalCoordinator {
       workspacePath:
         context.workspace?.kind === "local"
           ? context.workspace.hostPath
-          : (context.workspace?.displayPath ?? ""),
+          : context.workspace
+            ? WORKSPACE_PATH
+            : "",
       reason: decision.reason,
       matchingScope: "Identical arguments in this chat and workspace",
     };

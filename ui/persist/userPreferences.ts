@@ -10,8 +10,6 @@ import { fromProtoField } from "../../src/permissions/wire";
 import type { ToolPermissionField } from "../../src/schemas/toolPermissions";
 import { preferenceClient, withErrorMessage } from "../lib/rpc";
 
-export type { UserPreferences };
-
 /** A tool for the rule editor, with its fields as plain values. */
 export type ToolPermissionTool = {
   name: string;

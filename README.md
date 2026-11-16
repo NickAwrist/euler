@@ -27,7 +27,7 @@ feature's own requirement is met:
 | Web search | A Brave Search API key |
 | Image generation | ComfyUI |
 | Subagents | Nothing |
-| Skills | A skill |
+| Skills | Nothing |
 | MCP servers | An enabled server |
 
 ## Quick start

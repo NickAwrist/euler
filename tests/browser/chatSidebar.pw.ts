@@ -8,6 +8,7 @@ import {
   type UpdatePreferencesRequest_AppearancePatchSchema,
 } from "../../src/gen/euler/v1/preferences_pb";
 import { SessionService } from "../../src/gen/euler/v1/sessions_pb";
+import { SkillService } from "../../src/gen/euler/v1/skills_pb";
 import {
   ArtifactEntry_Kind,
   WorkspaceService,
@@ -669,6 +670,20 @@ test("chat sidebar desktop draws tabs and commands from running features and hid
       listings++;
       return { entries: [] };
     }),
+    on(SkillService.method.listSkills, () => ({
+      skills: [
+        {
+          id: "review",
+          name: "review",
+          description: "Review code",
+          instructions: "Review code",
+          userInvocable: true,
+          disableModelInvocation: false,
+          createdAt: at(1),
+          updatedAt: at(1),
+        },
+      ],
+    })),
   ]);
   await page.goto("/run/sidebar-test");
   const toggle = page.getByRole("button", { name: "Toggle artifacts" });
@@ -686,6 +701,9 @@ test("chat sidebar desktop draws tabs and commands from running features and hid
     /\/directory/,
     /\/link/,
   ]);
+  const skills = page.locator("#skill-picker");
+  await composer.fill("$");
+  await expect(skills.getByRole("button")).toHaveText([/\$review/]);
 
   features = [];
   await page.reload();
@@ -694,6 +712,9 @@ test("chat sidebar desktop draws tabs and commands from running features and hid
   await expect(page.locator("#artifact-sidebar")).toHaveCount(0);
   await composer.fill("/");
   await expect(picker.getByRole("button")).toHaveCount(0);
+  // With Skills off a "$name" would reach the model as plain text.
+  await composer.fill("$");
+  await expect(skills).toHaveCount(0);
 });
 
 test("chat sidebar desktop jumps to the latest message after scrolling up", async ({

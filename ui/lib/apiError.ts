@@ -7,50 +7,21 @@ import {
 import {
   type Diagnostic,
   type ErrorDetails,
-  decodeErrorDetails,
   isErrorCode,
 } from "../../src/schemas/observability";
 
 /** A failed API request. `message` stays short; codes and IDs stay in `diagnostic`. */
 export class ApiError extends Error {
-  readonly status: number;
   readonly diagnostic?: ErrorDetails;
   /** The Connect code for a failed RPC. */
   readonly code?: Code;
 
-  constructor(
-    message: string,
-    status: number,
-    diagnostic?: ErrorDetails,
-    code?: Code,
-  ) {
+  constructor(message: string, diagnostic?: ErrorDetails, code?: Code) {
     super(message);
     this.name = "ApiError";
-    this.status = status;
     this.diagnostic = diagnostic;
     this.code = code;
   }
-}
-
-export async function createApiError(
-  response: Response,
-  fallbackMessage?: string,
-): Promise<ApiError> {
-  const body: unknown = await response.json().catch(() => undefined);
-  const diagnostic = decodeErrorDetails(
-    body && typeof body === "object" && "error" in body
-      ? body.error
-      : undefined,
-  );
-  const requestId = response.headers.get("X-Request-Id");
-  if (diagnostic && requestId) diagnostic.requestId = requestId;
-  return new ApiError(
-    diagnostic?.message ??
-      fallbackMessage ??
-      (response.statusText || `HTTP ${response.status}`),
-    response.status,
-    diagnostic,
-  );
 }
 
 /** A diagnostic the server sent, such as a failed job's, ready to display. */
@@ -74,7 +45,6 @@ export function apiErrorFromConnect(error: ConnectError): ApiError {
   const diagnostic = detail && diagnosticFromDetail(detail);
   return new ApiError(
     diagnostic?.message ?? (error.rawMessage || Code[error.code]),
-    0,
     diagnostic,
     error.code,
   );

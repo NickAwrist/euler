@@ -9,7 +9,6 @@ import {
 } from "../llm/index";
 import { priceLlmUsage } from "../llm/usageCost";
 import { logEvent } from "../observability/logger";
-import { permissionService } from "../permissions/PermissionService";
 import { CORE_DIRECTIVES } from "../prompts/render";
 import {
   type BaseTool,
@@ -25,7 +24,6 @@ export class BaseAgent {
   reasoningEffort?: string;
   systemPrompt?: string;
   name: string;
-  description: string;
   tools: BaseTool[];
   history: LlmMessage[];
 
@@ -37,13 +35,11 @@ export class BaseAgent {
 
   constructor(
     name: string,
-    description: string,
     tools?: BaseTool[],
     model?: string,
     systemPrompt?: string,
   ) {
     this.name = name;
-    this.description = description;
 
     this.tools = tools || [];
     this.model = model ?? DEFAULT_RUN_MODEL;
@@ -87,7 +83,6 @@ export class BaseAgent {
     try {
       const tool = this.TOOL_MAP[toolName];
       if (!tool) throw new Error(`tool ${toolName} not found`);
-      permissionService.assertTool(ctx.permissions, toolName);
       const { background = false, ...operationArgs } = args;
       if (typeof background !== "boolean")
         throw new Error("background must be a boolean");
@@ -95,22 +90,9 @@ export class BaseAgent {
         throw new Error("This tool does not support background execution");
       if (background && !ctx.jobs)
         throw new Error("Background execution is unavailable");
-      if (ctx.authorizeToolCall)
-        await ctx.authorizeToolCall(toolName, args, tool.icons);
-      else {
-        const decision = permissionService.callDecision(
-          ctx.permissions,
-          toolName,
-          args,
-          { workspacePath: ctx.workspace?.hostPath },
-        );
-        if (decision.action !== "allow")
-          throw new Error(
-            decision.action === "deny"
-              ? decision.reason
-              : "Tool approval is unavailable in this run",
-          );
-      }
+      if (!ctx.authorizeToolCall)
+        throw new Error("Tool approval is unavailable in this run");
+      await ctx.authorizeToolCall(toolName, args, tool.icons);
       if (ctx.signal?.aborted) throw new Error("Tool call cancelled");
       if (background && isBackgroundCapable(tool) && ctx.jobs) {
         result = await ctx.jobs.start(tool, operationArgs, ctx, parentStep);
@@ -121,7 +103,7 @@ export class BaseAgent {
     } catch (e) {
       failure = e;
       result = textToolResult(
-        `Error: ${toolErrorToString(e, ctx?.sessionDir)}`,
+        `Error: ${toolErrorToString(e, ctx.workspace?.hostPath)}`,
       );
       return result;
     } finally {
@@ -216,13 +198,7 @@ export class BaseAgent {
         ownerUuid: ctx.ownerUuid,
         model: this.model,
         messages,
-        tools: this.tools
-          .filter(
-            (tool) =>
-              permissionService.toolDecision(ctx.permissions, tool.name)
-                .allowed,
-          )
-          .map(toolDefinition),
+        tools: this.tools.map(toolDefinition),
         ...(this.reasoningEffort
           ? { reasoningEffort: this.reasoningEffort }
           : {}),

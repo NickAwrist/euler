@@ -13,12 +13,14 @@ const SIDEBAR_VIEWS: Partial<Record<FeatureId, SidebarView>> = {
 
 /**
  * What the running features add to a chat: a sidebar tab for each that draws
- * one, and their composer commands. Both are empty until the features load.
+ * one, their composer commands, and "$" skills. All are off until the features
+ * load.
  * A hook, so React Compiler treats the lists as read-only.
  */
 export function useChatFeatures(): {
   sidebarTabs: { value: SidebarView; label: string }[];
   commands: RunCommand[];
+  skills: boolean;
 } {
   const { features } = useFeatures();
   const running = (features ?? []).filter(
@@ -32,5 +34,6 @@ export function useChatFeatures(): {
         : [];
     }),
     commands: featureRunCommands(running),
+    skills: running.some((feature) => feature.id === FeatureId.SKILLS),
   };
 }

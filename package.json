@@ -1,6 +1,5 @@
 {
   "name": "euler",
-  "module": "index.ts",
   "type": "module",
   "private": true,
   "scripts": {
@@ -63,7 +62,6 @@
     "react-dom": "^19.2.5",
     "react-markdown": "^10.1.0",
     "rehype-katex": "^7.0.1",
-    "rehype-pretty-code": "^0.14.3",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",

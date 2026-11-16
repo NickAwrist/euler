@@ -316,9 +316,9 @@ test("tools desktop: features save, and one the server cannot run stays off", as
       unavailableReason: "bubblewrap is not installed",
     },
     {
-      id: FeatureId.SKILLS,
-      label: "Skills",
-      description: "Instructions the agent loads for specialized tasks.",
+      id: FeatureId.MCP,
+      label: "MCP servers",
+      description: "Tools from the remote MCP servers you add.",
       toggleable: false,
       enabled: true,
     },
@@ -348,7 +348,9 @@ test("tools desktop: features save, and one the server cannot run stays off", as
   await expect(sandbox).toBeDisabled();
   await expect(sandbox).toHaveAttribute("aria-checked", "false");
   await expect(page.getByText("bubblewrap is not installed")).toBeVisible();
-  await expect(page.getByRole("switch", { name: "Skills" })).toHaveCount(0);
+  await expect(page.getByRole("switch", { name: "MCP servers" })).toHaveCount(
+    0,
+  );
 
   await page.reload();
   await page.getByRole("button", { name: "Tools" }).click();

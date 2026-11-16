@@ -13,5 +13,3 @@ export const ComfyUIViewQuerySchema = z.object({
     return x === undefined || x === "" ? "output" : x;
   }, z.string()),
 });
-
-export type ComfyUIViewQuery = z.infer<typeof ComfyUIViewQuerySchema>;

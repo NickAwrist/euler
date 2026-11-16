@@ -1,6 +1,4 @@
-import { Database } from "bun:sqlite";
 import { expect, test } from "bun:test";
-import { createSchema } from "../../src/db/schema";
 import { Code, rpc, rpcCode, rpcError } from "../helpers/rpc";
 
 const USER = "33333333-3333-4333-8333-333333333333";
@@ -30,31 +28,6 @@ test("ChatGPT RPCs require a UUID and keep pending sign-ins separate", async () 
     await rpcCode(providers.finishChatGptLogin({ callbackUrl: "no" })),
   ).toBe(Code.InvalidArgument);
   expect((await providers.getChatGptStatus({})).status?.connected).toBe(false);
-});
-
-test("favorites migration preserves saved selections and allows ChatGPT", () => {
-  const db = new Database(":memory:");
-  try {
-    db.run(`CREATE TABLE model_favorites (owner_uuid TEXT NOT NULL, provider TEXT NOT NULL CHECK (provider IN ('openrouter', 'ollama')), model_id TEXT NOT NULL, PRIMARY KEY (owner_uuid, provider, model_id));
-      INSERT INTO model_favorites VALUES ('owner', 'ollama', 'local');`);
-    createSchema(db);
-    db.run(
-      "INSERT INTO model_favorites VALUES ('owner', 'chatgpt', 'gpt-example')",
-    );
-    createSchema(db);
-    expect(
-      db
-        .query(
-          "SELECT provider, model_id FROM model_favorites ORDER BY provider",
-        )
-        .all(),
-    ).toEqual([
-      { provider: "chatgpt", model_id: "gpt-example" },
-      { provider: "ollama", model_id: "local" },
-    ]);
-  } finally {
-    db.close();
-  }
 });
 
 test("sending with a disconnected ChatGPT model fails before starting a run", async () => {

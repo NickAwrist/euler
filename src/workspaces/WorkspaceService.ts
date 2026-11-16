@@ -22,8 +22,10 @@ export type WorkspaceKind = "sandbox" | "local";
 export type Workspace = {
   kind: WorkspaceKind;
   hostPath: string;
-  displayPath: string;
 };
+
+/** Where every workspace appears to the agent, whatever its host path. */
+export const WORKSPACE_PATH = "/workspace";
 
 const TRASH_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const SAFE_SEGMENT = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
@@ -59,11 +61,6 @@ export class WorkspaceService {
     await this.cleanupExpired();
   }
 
-  dispose(): void {
-    clearInterval(this.cleanupTimer);
-    this.cleanupTimer = undefined;
-  }
-
   async cleanupExpired(): Promise<void> {
     await this.purgeExpiredDirectories(this.trashRoot, TRASH_RETENTION_MS);
   }
@@ -90,9 +87,10 @@ export class WorkspaceService {
     const requestedPath = this.retainedPath(ownerUuid, sessionId);
     await fs.mkdir(requestedPath, { recursive: true });
     const hostPath = await fs.realpath(requestedPath);
-    return { kind: "sandbox", hostPath, displayPath: "/workspace" };
+    return { kind: "sandbox", hostPath };
   }
 
+  /** The chat's workspace. Its sandbox is created if it does not exist yet. */
   async resolveSession(row: SessionRow): Promise<Workspace> {
     if (row.workspace_kind === "local") {
       if (!row.session_directory?.trim()) {
@@ -101,12 +99,24 @@ export class WorkspaceService {
         );
       }
       const hostPath = await this.canonicalDirectory(row.session_directory);
-      return { kind: "local", hostPath, displayPath: "/workspace" };
+      return { kind: "local", hostPath };
     }
     return this.provisionRetained(
       row.owner_uuid,
       row.linked_workspace_id ?? row.id,
     );
+  }
+
+  /** The chat's workspace for reading: undefined until its sandbox is created. */
+  async existingSession(row: SessionRow): Promise<Workspace | undefined> {
+    if (
+      row.workspace_kind !== "local" &&
+      !existsSync(
+        this.retainedPath(row.owner_uuid, row.linked_workspace_id ?? row.id),
+      )
+    )
+      return undefined;
+    return this.resolveSession(row);
   }
 
   /** `linkedSessionId` is another chat using the linked sandbox, if any. */
@@ -293,8 +303,6 @@ export class WorkspaceService {
     path: string,
     flags: number,
   ): Promise<fs.FileHandle> {
-    if (process.platform !== "linux")
-      throw new WorkspaceError("Secure workspace file access requires Linux");
     const target = this.resolveLexical(workspace, path);
     const parts = relative(workspace.hostPath, target)
       .split("/")

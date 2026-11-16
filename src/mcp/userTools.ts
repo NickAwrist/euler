@@ -4,7 +4,7 @@ import { logEvent } from "../observability/logger";
 import { McpTool } from "../tools/mcp";
 import { connectMcpServer } from "./client";
 
-export type McpToolSet = { tools: McpTool[]; close(): Promise<void> };
+type McpToolSet = { tools: McpTool[]; close(): Promise<void> };
 
 /**
  * Connects to the user's enabled MCP servers for one activation. A server that

@@ -14,21 +14,23 @@ struct ToolsSettingsView: View {
             PermissionRulesSection()
         }
         .navigationTitle("Tools")
+        // What a feature needs, such as an API key, can change between visits.
+        .task { await session.features.load() }
     }
 }
 
 private struct FeaturesSection: View {
     @Environment(AppSession.self) private var session
-    @State private var features: [Euler_V1_Feature]?
 
     var body: some View {
+        let store = session.features
         Section("Features") {
-            if let features {
-                ForEach(features.filter(\.toggleable), id: \.id) { feature in
+            if store.loaded {
+                ForEach(store.features.filter(\.toggleable), id: \.id) { feature in
                     // A feature the server cannot run says why and stays off.
                     Toggle(isOn: Binding(
                         get: { feature.enabled && !feature.hasUnavailableReason },
-                        set: { enabled in Task { await setEnabled(feature.id, enabled) } }
+                        set: { enabled in Task { await session.notices.attempt { try await store.setEnabled(feature.id, enabled) } } }
                     )) {
                         Text(feature.label)
                         if feature.hasUnavailableReason {
@@ -38,20 +40,9 @@ private struct FeaturesSection: View {
                     .disabled(feature.hasUnavailableReason)
                 }
             } else {
-                ProgressView().task { await load() }
+                ProgressView()
             }
         }
-    }
-
-    private func load() async {
-        features = (try? await session.backend.features.listFeatures(request: .init(), headers: [:]).value().features) ?? features ?? []
-    }
-
-    private func setEnabled(_ id: Euler_V1_FeatureId, _ enabled: Bool) async {
-        var request = Euler_V1_SetFeatureEnabledRequest()
-        request.id = id
-        request.enabled = enabled
-        features = (try? await session.backend.features.setFeatureEnabled(request: request, headers: [:]).value().features) ?? features
     }
 }
 
@@ -355,8 +346,6 @@ private struct PermissionRulesSection: View {
                 }
         } header: {
             Text("Tool permissions")
-        } footer: {
-            Text("The first matching rule decides; tool calls without a match ask.")
         }
     }
 

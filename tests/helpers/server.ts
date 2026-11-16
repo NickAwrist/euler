@@ -3,13 +3,6 @@ import { app } from "../../src/app";
 
 export const TEST_USER_ID = "11111111-1111-4111-8111-111111111111";
 
-export function userHeaders(
-  ownerUuid = TEST_USER_ID,
-  extra: Record<string, string> = {},
-): Record<string, string> {
-  return { "X-Euler-User-ID": ownerUuid, ...extra };
-}
-
 export interface TestServer {
   url: string;
   close: () => Promise<void>;

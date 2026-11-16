@@ -1,4 +1,3 @@
-import "../setup";
 import { expect, test } from "bun:test";
 import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
 import { setOpenRouterApiKey } from "../../src/db";

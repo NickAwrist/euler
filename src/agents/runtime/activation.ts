@@ -6,7 +6,6 @@ import type {
 import type { AgentRecord, AgentStore } from "../../db/agents";
 import { getAttachment } from "../../db/attachments";
 import { getSessionById } from "../../db/sessions";
-import { effectiveUserPreferences } from "../../db/userPreferences";
 
 import type { Activation, AgentEvent } from "../../events/types";
 import type { FeatureTools, RunHost } from "../../features/Feature";
@@ -22,13 +21,12 @@ import { isFinalAgent } from "../../schemas/agents";
 import type { DisplayIcon } from "../../schemas/icons";
 import type { WireMessageInput } from "../../schemas/run";
 import type { Workspace } from "../../workspaces/WorkspaceService";
-import { workspaceService } from "../../workspaces/WorkspaceService";
-import { agentManager, buildServerRunPromptContext } from "../agentManager";
 import {
-  INBOX_DIRECTIVES,
-  inboxModelContent,
-  pendingSummary,
-} from "./agentContext";
+  WORKSPACE_PATH,
+  workspaceService,
+} from "../../workspaces/WorkspaceService";
+import { agentManager, buildServerRunPromptContext } from "../agentManager";
+import { inboxModelContent, pendingSummary } from "./agentContext";
 import { changedWorkspaceFiles } from "./workspaceOutputs";
 
 export interface ActivationHost {
@@ -155,10 +153,9 @@ export async function runActivation(
     const options = {
       ownerUuid: agent.ownerUuid,
       features,
-      toolSessionDir: workspace?.hostPath,
       promptContext: buildServerRunPromptContext({
         metadata: agent.config.metadata,
-        toolSessionDir: workspace?.displayPath,
+        sessionDirectory: workspace && WORKSPACE_PATH,
       }),
       reasoningEffort: agent.config.reasoningEffort,
       userPrompt: host.store
@@ -167,13 +164,9 @@ export async function runActivation(
         .map((m) => m.content)
         .join("\n"),
     };
-    const model =
-      agent.kind === "main"
-        ? agentManager.createAgent(options)
-        : agentManager.createGeneralAgent(options);
+    const model = agentManager.createAgent(agent.kind, options);
     model.model = agent.model;
     model.history = historyWithImages(agent);
-    model.systemPrompt += `\n\n${INBOX_DIRECTIVES}`;
     let waiting = false;
     let paused = false;
     featureTools = await openFeatureTools(features, {
@@ -193,11 +186,7 @@ export async function runActivation(
     model.addTools(featureTools.tools);
     ctx = new RunContext(
       model,
-      permissionService.resolve(
-        workspace,
-        active,
-        effectiveUserPreferences(agent.ownerUuid).toolPermissions,
-      ),
+      permissionService.resolve(workspace),
       (context, step) => {
         const position = context.steps.indexOf(step) - segmentStart;
         if (position < 0) return;
@@ -236,8 +225,6 @@ export async function runActivation(
         });
       },
       signal,
-      workspace?.hostPath,
-      options.promptContext,
       agent.ownerUuid,
       workspace,
     );

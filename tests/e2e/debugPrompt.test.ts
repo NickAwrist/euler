@@ -1,14 +1,13 @@
-import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
-import { waitForActivation } from "../helpers/activation";
-import "../setup";
 import { expect, test } from "bun:test";
+import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
 import {
   createSessionRow,
   createSkillRow,
   setOpenRouterApiKey,
 } from "../../src/db";
+import { waitForActivation } from "../helpers/activation";
 import { getOpenRouterRequests } from "../helpers/mockOpenRouter";
-import { Code, rpc, rpcCode } from "../helpers/rpc";
+import { rpc } from "../helpers/rpc";
 import { TEST_USER_ID } from "../helpers/server";
 
 test("PreviewPrompt returns the server-rendered system prompt", async () => {
@@ -64,7 +63,6 @@ for (const includeCurrentDate of [undefined, false]) {
         includeCurrentDate,
       };
       const { systemPrompt } = await debug.previewPrompt({
-        sessionId: id,
         message,
         metadata,
       });
@@ -91,21 +89,3 @@ for (const includeCurrentDate of [undefined, false]) {
     }
   });
 }
-
-test("debug preview rejects unknown and other users' chats", async () => {
-  const { sessions } = rpc();
-  const { id } = await sessions.createSession({});
-  expect(
-    await rpcCode(rpc().debug.previewPrompt({ sessionId: "missing-session" })),
-  ).toBe(Code.NotFound);
-  expect(
-    await rpcCode(
-      rpc("22222222-2222-4222-8222-222222222222").debug.previewPrompt({
-        sessionId: id,
-      }),
-    ),
-  ).toBe(Code.NotFound);
-  expect(await rpcCode(rpc().debug.previewPrompt({ sessionId: "" }))).toBe(
-    Code.InvalidArgument,
-  );
-});

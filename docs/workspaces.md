@@ -62,8 +62,8 @@ link can't lead them outside the workspace.
 Run `/link` in a chat to work in another chat's sandbox. Linking to a chat that
 is itself linked joins the same sandbox, so links never chain.
 
-A sandbox is kept while the chat that created it or any chat linked to it
-still uses it. After the last one is deleted or switches away, the sandbox
+A chat's sandbox is created on its first turn with Files or Sandbox on. It is
+kept while the chat that created it or any chat linked to it still uses it. After the last one is deleted or switches away, the sandbox
 moves to the workspace trash for 7 days.
 
 ## Ephemeral chats

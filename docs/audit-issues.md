@@ -381,24 +381,20 @@ for the provider API keys that `.env.example` already documents.
 
 **Where:**
 - `src/agents/BaseAgent.ts`: the `prompt` and `images` parameters of `run`
-  (only ever called as `run("", ctx)`), the `userMessage`/`userImages` path, and
-  the unused `name`/`description` fields if nothing reads them after
-  `RunContext.agentName` (check before removing)
+  (production only calls `run("", ctx)`) and the `userMessage`/`userImages` path
 - `src/http/asyncRoute.ts`, used by the three routes in `src/routes/`:
   Express 5 already forwards rejected promises
 
 ### LEG-11. Unused imports remain in two tests (Low, S)
 
-**Where:** `BaseAgent` in `tests/agents/agentManager.test.ts` and
-`modalSurface` in `tests/ui/modal.test.ts`.
+**Where:** The two imports are gone. What remains is the check itself.
 
-**Problem:** These were identified by running TypeScript with
+**Problem:** They were found by running TypeScript with
 `--noUnusedLocals --noUnusedParameters`, ignoring `src/gen/`. The same check
 reports the intentionally unused `args` parameter in the base tool method.
 
-**Fix:** Delete the unused imports and rename the base parameter `_args`.
-Enable unused-symbol checks outside `src/gen/` to prevent recurrence. No new
-behavior tests are needed for import removal.
+**Fix:** Rename the base parameter `_args` and enable unused-symbol checks
+outside `src/gen/` to prevent recurrence.
 
 ---
 
@@ -895,32 +891,32 @@ stop smoke. Make unknown external mock requests fail explicitly.
 **Done when:** The tests run without paid services and detect persistence or
 browser/backend contract failures that intercepted fixtures cannot.
 
-### TEST-7. The unavailable-sandbox path only runs on hosts without Bubblewrap (Low, S)
+### TEST-7. The runner's own fail-closed check only runs on hosts without Bubblewrap (Low, S)
 
 **Where:** `tests/sandbox/SandboxRunner.test.ts` ("fails closed when containment
 is unavailable"), `src/sandbox/SandboxRunner.ts` (`spawn`).
 
-**Problem:** The test uses `skipIf(capability.available)`, so the fail-closed
-branch never runs where Bubblewrap works, including the audit host. Its
-"Shell tools are disabled" assertion matches the current probe diagnostics.
+**Problem:** The test uses `skipIf(capability.capable)`, so the runner's
+fail-closed branch never runs where Bubblewrap works, including the audit host.
+The feature-level path, where the shell is not offered at all, is tested on any
+host in `tests/features/features.test.ts`.
 
-**Fix:** Exercise unavailable capability deterministically and assert the current
-fail-closed contract. Keep this test rather than deleting it as obsolete.
+**Fix:** Exercise the runner's unavailable capability deterministically and
+assert the fail-closed contract. Keep this test rather than deleting it as
+obsolete.
 
-**Done when:** Both available and unavailable containment paths are tested
-without depending on which capabilities the developer machine has.
+**Done when:** `spawn` is tested against both available and unavailable
+containment without depending on the developer machine.
 
-### TEST-8. Three browser tests stub the API in the old REST shape (Low, S)
+### TEST-8. One browser test stubs the API in the old REST shape (Low, S)
 
-**Where:** `tests/browser/welcome.pw.ts`, `agents.pw.ts`, and
-`settingsSave.pw.ts` answer `**/api/**` with hand-written JSON such as
-`{ skills: [] }` or a REST error body.
+**Where:** `tests/browser/agents.pw.ts` answers `**/api/**` with a REST error
+body.
 
-**Problem:** Connect ignores fields a message does not define, so every RPC
-"succeeds" with an empty reply and the tests pass without the stub matching
-any contract.
+**Problem:** The test only depends on the HTTP 503, so the body matches no
+contract.
 
-**Fix:** Replace each stub with `mockApp` or `mockRpc` from
+**Fix:** Replace the stub with `mockRpc` and an `RpcFailure` from
 `tests/browser/rpcMock.ts`, which type the replies.
 
 ---
@@ -954,13 +950,6 @@ error.
 **Fix:** Fall back to the user's `defaultModel` preference, and otherwise reject
 the request with a clear "choose a model" error.
 
-### DX-5. Unused dependency and dead manifest field (Low, S)
-
-**Where:** `package.json`. `rehype-pretty-code` has no imports, and
-`"module": "index.ts"` points to a file that does not exist.
-
-**Fix:** Remove both and run `bun install` to update `bun.lock`.
-
 ### DX-6. Invalid environment values silently fall back or partially parse (Low, S)
 
 **Where:** `src/env.ts` and `vite.config.ts` (`getPort`), `src/env.ts`
@@ -984,7 +973,7 @@ invalid configured values cannot silently select a different port or limit.
 
 1. **Security day:** `SEC-1`, `SEC-3`, then `SEC-2`.
 2. **Agent quality:** `TOOL-1`, `TOOL-2`, `LLM-1`, `LLM-2`, `OBS-2`.
-3. **Cleanup:** `LEG-6`, `LEG-7`, `LEG-9`, `LEG-11`, `TEST-8`, `DX-5`.
+3. **Cleanup:** `LEG-6`, `LEG-7`, `LEG-9`, `LEG-11`, `TEST-8`.
 4. **Safety net:** `TEST-1`, `TEST-2`.
 5. **Contracts:** `TYPE-1`, `TYPE-2`.
 6. **Structural:** `ARCH-2` with `FE-1`.

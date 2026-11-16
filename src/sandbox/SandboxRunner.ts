@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { existsSync, statSync } from "node:fs";
+import type { Capability } from "../features/Feature";
 import {
   type RunPermissions,
   permissionService,
@@ -33,32 +34,33 @@ export interface SandboxExecution {
 
 const DEFAULT_MAX_OUTPUT_BYTES = 2 * 1024 * 1024;
 
-export class BubblewrapSandboxRunner {
-  private capabilityPromise?: Promise<{
-    available: boolean;
-    diagnostic?: string;
-  }>;
+/** Set once: the operating system cannot change while the server runs. */
+const UNSUPPORTED_SYSTEM: Capability | undefined =
+  process.platform === "linux"
+    ? undefined
+    : {
+        capable: false,
+        reason:
+          "Shell tools are disabled because this operating system has no supported containment runner",
+      };
 
-  async capability(): Promise<{ available: boolean; diagnostic?: string }> {
+export class BubblewrapSandboxRunner {
+  private capabilityPromise?: Promise<Capability>;
+
+  async capability(): Promise<Capability> {
+    if (UNSUPPORTED_SYSTEM) return UNSUPPORTED_SYSTEM;
     this.capabilityPromise ??= this.probe();
     const probe = this.capabilityPromise;
     const capability = await probe;
     // Bubblewrap can be installed while the server runs, so a failure is rechecked.
-    if (!capability.available && this.capabilityPromise === probe)
+    if (!capability.capable && this.capabilityPromise === probe)
       this.capabilityPromise = undefined;
     return capability;
   }
 
   async spawn(options: SandboxRunOptions): Promise<SandboxExecution> {
-    const permissions = options.permissions;
-    permissionService.assertTool(permissions, "bash");
     const capability = await this.capability();
-    if (!capability.available) {
-      throw new Error(
-        capability.diagnostic ||
-          "Shell containment is unavailable on this host",
-      );
-    }
+    if (!capability.capable) throw new Error(capability.reason);
     // A user namespace cannot use root's DAC override for a private directory.
     // Resolve the execution identity once for discovery and the actual launch.
     const owner =
@@ -73,11 +75,11 @@ export class BubblewrapSandboxRunner {
       this.argumentsFor(
         options.workspace,
         options.command,
-        permissions,
+        options.permissions,
         options.background,
         owner,
       ),
-      { ...options, permissions, signal: controller.signal },
+      { ...options, signal: controller.signal },
       owner,
     ).finally(() => options.signal?.removeEventListener("abort", abort));
     // The caller receives the handle asynchronously. Observe immediate failures.
@@ -198,26 +200,14 @@ export class BubblewrapSandboxRunner {
     });
   }
 
-  private async probe(): Promise<{ available: boolean; diagnostic?: string }> {
-    if (process.platform !== "linux") {
-      return {
-        available: false,
-        diagnostic:
-          "Shell tools are disabled because this operating system has no supported containment runner",
-      };
-    }
+  private async probe(): Promise<Capability> {
     if (!this.executable()) {
       return {
-        available: false,
-        diagnostic:
-          "Shell tools are disabled because bubblewrap is not installed",
+        capable: false,
+        reason: "Shell tools are disabled because bubblewrap is not installed",
       };
     }
-    const probeWorkspace: Workspace = {
-      kind: "sandbox",
-      hostPath: "/tmp",
-      displayPath: "/workspace",
-    };
+    const probeWorkspace: Workspace = { kind: "sandbox", hostPath: "/tmp" };
     const permissions = permissionService.resolve(probeWorkspace);
     try {
       const result = await this.spawnSandbox(
@@ -235,11 +225,11 @@ export class BubblewrapSandboxRunner {
           result.stderr.trim() || `exited with status ${result.exitCode}`,
         );
       }
-      return { available: true };
+      return { capable: true };
     } catch (error) {
       return {
-        available: false,
-        diagnostic: `Shell tools are disabled because bubblewrap cannot create a sandbox: ${errorMessage(error)}`,
+        capable: false,
+        reason: `Shell tools are disabled because bubblewrap cannot create a sandbox: ${errorMessage(error)}`,
       };
     }
   }

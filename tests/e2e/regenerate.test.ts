@@ -1,7 +1,6 @@
-import { waitForActivation } from "../helpers/activation";
-import "../setup";
 import { expect, test } from "bun:test";
 import { setOpenRouterApiKey } from "../../src/db";
+import { waitForActivation } from "../helpers/activation";
 import { getOpenRouterRequests } from "../helpers/mockOpenRouter";
 import { rpc } from "../helpers/rpc";
 

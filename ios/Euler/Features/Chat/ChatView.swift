@@ -55,7 +55,11 @@ struct ChatView: View {
             if let summary = session.sessions.summary(chat.id), summary.hasExpiresAt {
                 ToolbarItem(placement: .principal) { EphemeralExpiry(summary: summary) }
             }
-            ToolbarItem(placement: .topBarTrailing) { ChatMenu(chat: chat, sheet: $sheet) }
+            // With nothing to open there is no menu, as the web hides its sidebar.
+            let features = session.features.chat
+            if !features.panels.isEmpty || features.choosesWorkspace {
+                ToolbarItem(placement: .topBarTrailing) { ChatMenu(chat: chat, features: features, sheet: $sheet) }
+            }
         }
         .sheet(item: $sheet) { sheet in
             ChatSheetView(sheet: sheet, chat: chat)
@@ -95,6 +99,7 @@ private struct EphemeralExpiry: View {
 /// The sheets a chat opens.
 enum ChatSheet: Identifiable, Hashable {
     case agents
+    case jobs
     case agent(String)
     case job(String)
     case trace([Euler_V1_Step])
@@ -107,6 +112,7 @@ enum ChatSheet: Identifiable, Hashable {
     var id: String {
         switch self {
         case .agents: "agents"
+        case .jobs: "jobs"
         case .agent(let id): "agent:\(id)"
         case .job(let id): "job:\(id)"
         case .trace(let steps): "trace:\(steps.count):\(steps.first?.startedAt.seconds ?? 0)"
@@ -126,6 +132,7 @@ private struct ChatSheetView: View {
     var body: some View {
         switch sheet {
         case .agents: AgentsSheet(chat: chat)
+        case .jobs: JobsSheet(chat: chat)
         case .agent(let id): page { AgentDetailView(chat: chat, agentID: id) }
         case .job(let id): page { JobDetailView(chat: chat, jobID: id) }
         case .trace(let steps): page { TraceView(steps: steps) }
@@ -144,15 +151,20 @@ private struct ChatSheetView: View {
     }
 }
 
+/// What the running features open for a chat: a panel each, and where the chat works.
 private struct ChatMenu: View {
     let chat: ChatStore
+    let features: ChatFeatures
     @Binding var sheet: ChatSheet?
 
     var body: some View {
         Menu {
-            Button("Agents and jobs", systemImage: "person.2", action: Haptics.selecting { sheet = .agents })
-            Button("Workspace", systemImage: "folder", action: Haptics.selecting { sheet = .workspace })
-            Button("Files", systemImage: "doc.on.doc", action: Haptics.selecting { sheet = .artifacts(path: nil) })
+            ForEach(features.panels) { panel in
+                Button(panel.label, systemImage: panel.kind.icon, action: Haptics.selecting { sheet = panel.kind.sheet })
+            }
+            if features.choosesWorkspace {
+                Button("Workspace", systemImage: "folder", action: Haptics.selecting { sheet = .workspace })
+            }
         } label: {
             Label("Chat options", systemImage: "ellipsis")
                 .overlay(alignment: .topTrailing) {
@@ -160,6 +172,24 @@ private struct ChatMenu: View {
                         Circle().fill(.green).frame(width: 7, height: 7).offset(x: 3, y: -2)
                     }
                 }
+        }
+    }
+}
+
+private extension ChatPanel.Kind {
+    var icon: String {
+        switch self {
+        case .files: "doc.on.doc"
+        case .jobs: "terminal"
+        case .agents: "person.2"
+        }
+    }
+
+    var sheet: ChatSheet {
+        switch self {
+        case .files: .artifacts(path: nil)
+        case .jobs: .jobs
+        case .agents: .agents
         }
     }
 }

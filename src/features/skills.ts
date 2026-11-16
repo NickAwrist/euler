@@ -4,28 +4,18 @@ import { modelInvocableSkills, renderSkillsPrompt } from "../skills/runtime";
 import { LoadSkillTool } from "../tools/load_skill";
 import { ManageSkillsTool } from "../tools/manage_skills";
 import {
-  CAPABLE,
-  type Capability,
-  Feature,
   type FeatureRun,
   type FeatureScope,
   type FeatureTools,
+  ToggleFeature,
 } from "./Feature";
 
-/** On whenever the user has a skill; there is no switch. */
-export class SkillsFeature extends Feature {
+/** On with no skills too, so the agent can write the first one. */
+export class SkillsFeature extends ToggleFeature {
   readonly id = "skills";
   readonly label = "Skills";
   readonly description = "Instructions the agent loads for specialized tasks.";
   readonly toolNames = ["load_skill", "manage_skills"];
-
-  async capable(): Promise<Capability> {
-    return CAPABLE;
-  }
-
-  enabled(ownerUuid: string): boolean {
-    return listSkills(ownerUuid).length > 0;
-  }
 
   override prompt(scope: FeatureScope, userPrompt: string): string {
     return renderSkillsPrompt(this.skills(scope), userPrompt);

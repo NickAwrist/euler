@@ -1,9 +1,8 @@
-import { waitForActivation } from "../helpers/activation";
-import "../setup";
 import { expect, test } from "bun:test";
 import { setOpenRouterApiKey } from "../../src/db";
 import { createMcpServers } from "../../src/db/mcpServers";
 import { Step_Kind } from "../../src/gen/euler/v1/steps_pb";
+import { waitForActivation } from "../helpers/activation";
 import { MCP_TEST_TOKEN, startMcpTestServer } from "../helpers/mcpServer";
 import { setOpenRouterScenario } from "../helpers/mockOpenRouter";
 import { rpc } from "../helpers/rpc";

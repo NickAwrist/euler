@@ -98,7 +98,7 @@ export async function withErrorMessage<T>(
     return await call;
   } catch (error) {
     if (error instanceof ApiError && !error.diagnostic)
-      throw new ApiError(message, error.status, undefined, error.code);
+      throw new ApiError(message, undefined, error.code);
     throw error;
   }
 }

@@ -18,6 +18,7 @@ export function useComposerSuggestions({
   busy,
   workspace,
   commands,
+  offerSkills,
   complete,
   runCommand,
 }: {
@@ -27,6 +28,7 @@ export function useComposerSuggestions({
   busy: boolean;
   workspace: SessionWorkspace;
   commands: readonly RunCommand[];
+  offerSkills: boolean;
   complete: (completion: { value: string; caret: number }) => void;
   runCommand: (command: RunCommandName) => void;
 }) {
@@ -35,7 +37,8 @@ export function useComposerSuggestions({
   const [toolStatus, setToolStatus] = useState<"loading" | "ready" | "error">(
     "loading",
   );
-  const skillToken = dismissed ? null : findActiveSkillToken(input, caret);
+  const skillToken =
+    dismissed || !offerSkills ? null : findActiveSkillToken(input, caret);
   const toolToken = dismissed ? null : findActiveToolToken(input, caret);
   const discoverTools = toolToken !== null;
 

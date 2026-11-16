@@ -1,4 +1,5 @@
 import os from "node:os";
+import type { AgentRecord } from "../db/agents";
 import type { Feature } from "../features/Feature";
 import { featureIds } from "../features/index";
 import {
@@ -12,11 +13,10 @@ import {
 } from "../prompts/systemPrompt";
 import { BaseAgent } from "./BaseAgent";
 import { MAIN_AGENT_NAME, SUBAGENT_NAME } from "./agentNames";
+import { INBOX_DIRECTIVES } from "./runtime/agentContext";
 
-export type CreateAgentOptions = {
+type CreateAgentOptions = {
   ownerUuid: string;
-  /** Resolved absolute directory tools use; also drives `{{SESSION_DIRECTORY}}`. */
-  toolSessionDir?: string;
   /** System prompt template and values to fill its `{{PLACEHOLDERS}}`. */
   promptContext?: PromptContext;
   /** Current user task, used to activate explicit `$skill-name` references. */
@@ -26,19 +26,9 @@ export type CreateAgentOptions = {
   reasoningEffort?: string;
 };
 
-function serverPromptContext(
-  base: PromptContext | undefined,
-  toolSessionDir: string | undefined,
-): PromptContext {
-  return {
-    systemPrompt: base?.systemPrompt,
-    personalization: base?.personalization ?? {},
-    sessionDirectory: base?.sessionDirectory ?? toolSessionDir,
-    os: base?.os ?? `${os.platform()} ${os.arch()} (${os.release()})`,
-  };
-}
-
 /** Prompt context for run turns, with server OS and session directory values. */
+const HOST_OS = `${os.platform()} ${os.arch()} (${os.release()})`;
+
 export function buildServerRunPromptContext(opts: {
   metadata?: {
     systemPrompt?: string | undefined;
@@ -47,7 +37,8 @@ export function buildServerRunPromptContext(opts: {
     preferredFormats?: string | undefined;
     includeCurrentDate?: boolean | undefined;
   };
-  toolSessionDir?: string;
+  /** Where the agent sees its workspace; absent when the run has none. */
+  sessionDirectory?: string;
 }): PromptContext {
   const personalization: PersonalizationFields = {};
   if (opts.metadata !== undefined) {
@@ -61,59 +52,46 @@ export function buildServerRunPromptContext(opts: {
       personalization.includeCurrentDate = opts.metadata.includeCurrentDate;
     }
   }
-  return serverPromptContext(
-    {
-      systemPrompt: opts.metadata?.systemPrompt?.trim() || undefined,
-      personalization,
-    },
-    opts.toolSessionDir,
-  );
-}
-
-function buildAgent(
-  name: typeof MAIN_AGENT_NAME | typeof SUBAGENT_NAME,
-  opts: CreateAgentOptions,
-): BaseAgent {
-  const promptContext = serverPromptContext(
-    opts.promptContext,
-    opts.toolSessionDir,
-  );
-  const isSubagent = name === SUBAGENT_NAME;
-  const features = opts.features ?? [];
-  const scope = {
-    ownerUuid: opts.ownerUuid,
-    agentKind: isSubagent ? ("general" as const) : ("main" as const),
-    active: featureIds(features),
+  return {
+    systemPrompt: opts.metadata?.systemPrompt?.trim() || undefined,
+    personalization,
+    sessionDirectory: opts.sessionDirectory,
+    os: HOST_OS,
   };
-  const finalPrompt = [
-    renderSystemPrompt(
-      promptContext.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT,
-      promptContext,
-    ),
-    isSubagent ? SUBAGENT_DIRECTIVES : "",
-    ...features.map((feature) => feature.prompt(scope, opts.userPrompt ?? "")),
-  ]
-    .filter((part) => part.length > 0)
-    .join("\n\n");
-
-  const agent = new BaseAgent(
-    name,
-    isSubagent ? "Subagent" : "Main agent",
-    undefined,
-    undefined,
-    finalPrompt,
-  );
-  if (opts.reasoningEffort) {
-    agent.reasoningEffort = opts.reasoningEffort;
-  }
-  return agent;
 }
 
 export const agentManager = {
-  createGeneralAgent(opts: CreateAgentOptions): BaseAgent {
-    return buildAgent(SUBAGENT_NAME, opts);
-  },
-  createAgent(opts: CreateAgentOptions): BaseAgent {
-    return buildAgent(MAIN_AGENT_NAME, opts);
+  /** An agent with its system prompt rendered. The caller adds the tools. */
+  createAgent(kind: AgentRecord["kind"], opts: CreateAgentOptions): BaseAgent {
+    const promptContext = opts.promptContext ?? buildServerRunPromptContext({});
+    const isSubagent = kind !== "main";
+    const features = opts.features ?? [];
+    const scope = {
+      ownerUuid: opts.ownerUuid,
+      agentKind: kind,
+      active: featureIds(features),
+    };
+    const prompt = [
+      renderSystemPrompt(
+        promptContext.systemPrompt?.trim() || DEFAULT_SYSTEM_PROMPT,
+        promptContext,
+      ),
+      isSubagent ? SUBAGENT_DIRECTIVES : "",
+      ...features.map((feature) =>
+        feature.prompt(scope, opts.userPrompt ?? ""),
+      ),
+    ]
+      .filter((part) => part.length > 0)
+      .join("\n\n");
+
+    const agent = new BaseAgent(
+      isSubagent ? SUBAGENT_NAME : MAIN_AGENT_NAME,
+      undefined,
+      undefined,
+      prompt,
+    );
+    agent.systemPrompt += `\n\n${INBOX_DIRECTIVES}`;
+    if (opts.reasoningEffort) agent.reasoningEffort = opts.reasoningEffort;
+    return agent;
   },
 };

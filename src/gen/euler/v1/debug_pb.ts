@@ -4,7 +4,6 @@
 
 import type { GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
-import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
 import type { RunMetadata } from "./agent_pb";
 import { file_euler_v1_agent } from "./agent_pb";
 import type { Message } from "@bufbuild/protobuf";
@@ -13,19 +12,12 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file euler/v1/debug.proto.
  */
 export const file_euler_v1_debug: GenFile = /*@__PURE__*/
-  fileDesc("ChRldWxlci92MS9kZWJ1Zy5wcm90bxIIZXVsZXIudjEipAEKFFByZXZpZXdQcm9tcHRSZXF1ZXN0EiAKCnNlc3Npb25faWQYASABKAlCB7pIBHICEAFIAIgBARIsCghtZXRhZGF0YRgCIAEoCzIVLmV1bGVyLnYxLlJ1bk1ldGFkYXRhSAGIAQESFAoHbWVzc2FnZRgDIAEoCUgCiAEBQg0KC19zZXNzaW9uX2lkQgsKCV9tZXRhZGF0YUIKCghfbWVzc2FnZSIuChVQcmV2aWV3UHJvbXB0UmVzcG9uc2USFQoNc3lzdGVtX3Byb21wdBgBIAEoCTJlCgxEZWJ1Z1NlcnZpY2USVQoNUHJldmlld1Byb21wdBIeLmV1bGVyLnYxLlByZXZpZXdQcm9tcHRSZXF1ZXN0Gh8uZXVsZXIudjEuUHJldmlld1Byb21wdFJlc3BvbnNlIgOQAgFiBnByb3RvMw", [file_buf_validate_validate, file_euler_v1_agent]);
+  fileDesc("ChRldWxlci92MS9kZWJ1Zy5wcm90bxIIZXVsZXIudjEicwoUUHJldmlld1Byb21wdFJlcXVlc3QSLAoIbWV0YWRhdGEYAiABKAsyFS5ldWxlci52MS5SdW5NZXRhZGF0YUgAiAEBEhQKB21lc3NhZ2UYAyABKAlIAYgBAUILCglfbWV0YWRhdGFCCgoIX21lc3NhZ2UiLgoVUHJldmlld1Byb21wdFJlc3BvbnNlEhUKDXN5c3RlbV9wcm9tcHQYASABKAkyZQoMRGVidWdTZXJ2aWNlElUKDVByZXZpZXdQcm9tcHQSHi5ldWxlci52MS5QcmV2aWV3UHJvbXB0UmVxdWVzdBofLmV1bGVyLnYxLlByZXZpZXdQcm9tcHRSZXNwb25zZSIDkAIBYgZwcm90bzM", [file_euler_v1_agent]);
 
 /**
  * @generated from message euler.v1.PreviewPromptRequest
  */
 export type PreviewPromptRequest = Message<"euler.v1.PreviewPromptRequest"> & {
-  /**
-   * The chat whose workspace the prompt describes; absent for a new chat.
-   *
-   * @generated from field: optional string session_id = 1;
-   */
-  sessionId?: string | undefined;
-
   /**
    * @generated from field: optional euler.v1.RunMetadata metadata = 2;
    */

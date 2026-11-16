@@ -1,7 +1,7 @@
 import EulerAPI
 import SwiftUI
 
-/// The chat's subagents and background jobs, with their status and Cancel.
+/// The chat's subagents, with their status.
 struct AgentsSheet: View {
     let chat: ChatStore
     @Environment(\.dismiss) private var dismiss
@@ -10,7 +10,7 @@ struct AgentsSheet: View {
     var body: some View {
         NavigationStack {
             ThemedList {
-                Section("Agents") {
+                Section {
                     if chat.subagents.isEmpty {
                         Text("No background agents in this chat.").foregroundStyle(palette.muted)
                     }
@@ -32,7 +32,25 @@ struct AgentsSheet: View {
                         }
                     }
                 }
-                Section("Jobs") {
+            }
+            .navigationTitle("Agents")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { CloseToolbarItem { dismiss() } }
+            .refreshable { await chat.refresh() }
+        }
+    }
+}
+
+/// The chat's background jobs, with their status.
+struct JobsSheet: View {
+    let chat: ChatStore
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.palette) private var palette
+
+    var body: some View {
+        NavigationStack {
+            ThemedList {
+                Section {
                     if chat.jobs.isEmpty {
                         Text("No background jobs in this chat.").foregroundStyle(palette.muted)
                     }
@@ -49,13 +67,10 @@ struct AgentsSheet: View {
                     }
                 }
             }
-            .navigationTitle("Agents and jobs")
+            .navigationTitle("Jobs")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { CloseToolbarItem { dismiss() } }
-            .refreshable {
-                await chat.refresh()
-                await chat.reloadJobs()
-            }
+            .refreshable { await chat.reloadJobs() }
         }
         .task { await chat.reloadJobs() }
     }
@@ -132,7 +147,6 @@ struct JobDetailView: View {
     let chat: ChatStore
     let jobID: String
     @Environment(AppSession.self) private var session
-    @Environment(\.palette) private var palette
     @State private var job: Euler_V1_Job?
 
     var body: some View {

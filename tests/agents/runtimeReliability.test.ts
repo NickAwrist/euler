@@ -1,8 +1,11 @@
-import "../setup";
 import { expect, spyOn, test } from "bun:test";
 import { AgentRuntime } from "../../src/agents/runtime/AgentRuntime";
 import type { OutputAttachment } from "../../src/attachments/types";
-import { setBraveSearchApiKey, setOpenRouterApiKey } from "../../src/db";
+import {
+  setBraveSearchApiKey,
+  setComfyUIHost,
+  setOpenRouterApiKey,
+} from "../../src/db";
 import { AgentStore } from "../../src/db/agents";
 import { createSessionRow, getSessionById } from "../../src/db/sessions";
 import { eventHub } from "../../src/events/eventHub";
@@ -25,7 +28,6 @@ async function until(check: () => boolean) {
 async function session(runtime: AgentRuntime) {
   const id = crypto.randomUUID();
   createSessionRow(owner, id, Date.now(), model);
-  await workspaceService.provisionRetained(owner, id);
   setOpenRouterApiKey("test");
   const main = runtime.main(owner, id);
   main.model = model;
@@ -158,6 +160,8 @@ test("child outputs survive waiting and result delivery without depending on rep
   };
   runtime.store.save(child);
   setBraveSearchApiKey("brave-child-outputs-test");
+  // The image feature needs a reachable ComfyUI; this host answers from the fetch mock.
+  setComfyUIHost("http://comfyui.test");
   setOpenRouterScenario("child-outputs");
   const image = {
     kind: "generated_image",

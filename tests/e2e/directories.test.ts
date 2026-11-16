@@ -1,4 +1,3 @@
-import "../setup";
 import { expect, test } from "bun:test";
 import fs from "node:fs/promises";
 import { homedir, tmpdir } from "node:os";

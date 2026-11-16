@@ -1,4 +1,3 @@
-import "../setup";
 import { expect, test } from "bun:test";
 import { setOllamaHost } from "../../src/db";
 import { getUsageDashboard, recordUsage } from "../../src/db/usage";

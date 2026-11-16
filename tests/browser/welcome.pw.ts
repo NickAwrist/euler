@@ -1,10 +1,9 @@
 import { expect, test } from "@playwright/test";
+import { mockRpc } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 test.beforeEach(async ({ page }) => {
-  await page.route("**/api/**", (route) =>
-    route.fulfill({ json: { skills: [] } }),
-  );
+  await mockRpc(page, [], { empty: true });
 });
 
 for (const device of ["desktop", "mobile"]) {
@@ -64,7 +63,6 @@ for (const device of ["desktop", "mobile"]) {
       path: testInfo.outputPath("name-italic.png"),
       animations: "disabled",
     });
-    await mockUserPreferences(page);
     await page.goto("/dev/welcome?ephemeral=true&home=false");
     await expect(page.getByRole("heading", { level: 2 })).toHaveText(
       "What's on your mind, Nick?",
@@ -77,7 +75,6 @@ for (const device of ["desktop", "mobile"]) {
     await expect(
       page.getByRole("button", { name: "Start an ephemeral chat" }),
     ).toHaveCount(0);
-    await mockUserPreferences(page);
     await page.goto("/dev/welcome?name=");
     await expect(page.getByRole("heading", { level: 2 })).toHaveText(
       "What's on your mind?",

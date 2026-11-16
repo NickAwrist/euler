@@ -9,7 +9,7 @@ import type { BaseTool } from "../tools/BaseTool";
 import type { AgentMessageRequest } from "../tools/send_message";
 import type { SpawnRequest, SpawnResult } from "../tools/spawn_agent";
 
-export type FeatureId = keyof FeatureToggles | "skills" | "mcp";
+export type FeatureId = keyof FeatureToggles | "mcp";
 
 export type Capability = { capable: true } | { capable: false; reason: string };
 
@@ -35,7 +35,7 @@ export type FeatureScope = {
 export type FeatureRun = FeatureScope & { signal: AbortSignal; host: RunHost };
 
 /** A "/" command the composer offers. The client runs it by name. */
-export type FeatureCommand = { name: string; description: string };
+type FeatureCommand = { name: string; description: string };
 
 export type FeatureTools = { tools: BaseTool[]; close?(): Promise<void> };
 
@@ -55,8 +55,10 @@ export abstract class Feature {
   readonly sidebarTab?: string;
   readonly commands: readonly FeatureCommand[] = [];
 
-  /** Checks the requirements the user's choice cannot change. */
-  abstract capable(): Promise<Capability>;
+  /** Checks the requirements the user's choice cannot change. None by default. */
+  async capable(): Promise<Capability> {
+    return CAPABLE;
+  }
   abstract enabled(ownerUuid: string): boolean;
 
   async tools(_run: FeatureRun): Promise<FeatureTools> {

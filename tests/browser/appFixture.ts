@@ -16,10 +16,6 @@ import {
   type ModelSchema,
   ModelService,
 } from "../../src/gen/euler/v1/models_pb";
-import {
-  type GetEnvironmentResponseSchema,
-  PreferenceService,
-} from "../../src/gen/euler/v1/preferences_pb";
 import { ProviderService } from "../../src/gen/euler/v1/providers_pb";
 import {
   type MessageSchema,
@@ -69,6 +65,7 @@ export const chatFeatures: Init<typeof FeatureSchema>[] = [
     sidebarTab: "Jobs",
     commands: workspaceCommands,
   },
+  { id: FeatureId.SKILLS, label: "Skills" },
   { id: FeatureId.SUBAGENTS, label: "Subagents", sidebarTab: "Agents" },
 ].map((feature) => ({ ...feature, toggleable: true, enabled: true }));
 
@@ -78,7 +75,7 @@ export function message(
   content: string,
   fields: Pick<
     MessageInitShape<typeof MessageSchema>,
-    "attachments" | "steps" | "versions" | "id" | "activationId"
+    "attachments" | "steps"
   > = {},
 ): MessageInit {
   const roles = {
@@ -125,7 +122,6 @@ export type AppFixture = {
   /** Stored chats by ID; GetSession reports others as missing. */
   chats?: Record<string, SessionInit>;
   models?: ModelInit[];
-  environment?: MessageInitShape<typeof GetEnvironmentResponseSchema>;
 };
 
 /**
@@ -153,17 +149,11 @@ export async function mockApp(page: Page, fixture: AppFixture = {}) {
         models: fixture.models ?? [
           ollamaModel("test", { name: "Test", lab: "Test" }),
         ],
-        providers: { ollama: { connected: true } },
       })),
       on(ProviderService.method.getOllamaHealth, () => ({ connected: true })),
       on(ProviderService.method.getComfyUiHealth, () => ({ connected: true })),
       on(FeatureService.method.listFeatures, () => ({
         features: chatFeatures,
-      })),
-      on(PreferenceService.method.getEnvironment, () => ({
-        ollamaHost: false,
-        comfyuiHost: false,
-        ...fixture.environment,
       })),
     ],
     { empty: true },

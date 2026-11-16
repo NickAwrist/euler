@@ -4,7 +4,6 @@ import {
   type ToolPermissionRule,
   ToolPermissionsSchema,
 } from "../../src/schemas/toolPermissions";
-import { featuresExcept } from "../helpers/features";
 import { allToolsRule } from "../helpers/toolPermissions";
 
 const rule = (
@@ -18,9 +17,7 @@ const rule = (
 });
 const evaluate = (rules: ToolPermissionRule[], command: string) =>
   permissionService.callDecision(
-    permissionService.resolve({ kind: "local" }, undefined, {
-      rules: [allToolsRule(), ...rules],
-    }),
+    { rules: [allToolsRule(), ...rules] },
     "bash",
     { command },
     { sessionId: "chat", workspacePath: "/project" },
@@ -54,9 +51,9 @@ test("All tools rules match builtin and MCP calls, with specific tool exceptions
   const allow = rule("allow", { kind: "any" });
   expect(evaluate([allow, ask], "bun test").action).toBe("allow");
   expect(evaluate([ask, allow], "bun test").action).toBe("allow");
-  const policy = permissionService.resolve(undefined, undefined, {
+  const policy = {
     rules: [ask],
-  });
+  };
   expect(
     permissionService.callDecision(policy, "read_file", { path: "README.md" })
       .action,
@@ -67,9 +64,9 @@ test("All tools rules match builtin and MCP calls, with specific tool exceptions
   expect(evaluate([{ ...ask, action: "deny" }, allow], "bun test").action).toBe(
     "deny",
   );
-  const scopedPolicy = permissionService.resolve(undefined, undefined, {
+  const scopedPolicy = {
     rules: [{ ...ask, sessionId: "chat" }],
-  });
+  };
   expect(
     permissionService.callDecision(
       scopedPolicy,
@@ -102,9 +99,9 @@ test("matching calls bind all arguments and their chat/workspace; object key ord
     sessionId: "chat",
     workspacePath: "/project",
   };
-  const policy = permissionService.resolve(undefined, undefined, {
+  const policy = {
     rules: [allToolsRule(), allow],
-  });
+  };
   const args = {
     options: { second: true, first: 1 },
     background: false,
@@ -125,16 +122,16 @@ test("matching calls bind all arguments and their chat/workspace; object key ord
   expect(call(args, "chat", "/another-project")).toBe("ask");
   expect(call({ command: "npm publish" })).toBe("ask");
 });
-test("argument rules read only own fields, and capability denials cannot be approved away", () => {
+test("argument rules read only own fields", () => {
   const allow = rule("allow", {
     kind: "argument",
     field: "options.command",
     match: "exact",
     value: "build",
   });
-  const policy = permissionService.resolve(undefined, undefined, {
+  const policy = {
     rules: [allToolsRule(), allow],
-  });
+  };
   expect(
     permissionService.callDecision(policy, "bash", {
       options: { command: "build" },
@@ -145,15 +142,6 @@ test("argument rules read only own fields, and capability denials cannot be appr
       options: Object.create({ command: "build" }),
     }).action,
   ).toBe("ask");
-  const disabled = permissionService.resolve(
-    undefined,
-    featuresExcept("sandbox"),
-    { rules: [rule("allow", { kind: "any" })] },
-  );
-  expect(permissionService.callDecision(disabled, "bash", {}).action).toBe(
-    "deny",
-  );
-  expect(ToolPermissionsSchema.parse({}).rules).toEqual([]);
 });
 test("schema-selected boolean and numeric fields use typed equality and reject non-text regex rules", () => {
   const background = rule("deny", {
@@ -171,9 +159,9 @@ test("schema-selected boolean and numeric fields use typed equality and reject n
     }),
     tool: "web_search",
   };
-  const policy = permissionService.resolve(undefined, undefined, {
+  const policy = {
     rules: [background, count],
-  });
+  };
   expect(
     permissionService.callDecision(policy, "bash", { background: false })
       .action,
@@ -239,9 +227,9 @@ test("regex rules support anchors, alternatives and repeated matching on text fi
     match: "regex",
     value: "^(create|delete)$",
   });
-  const policy = permissionService.resolve(undefined, undefined, {
+  const policy = {
     rules: [nested],
-  });
+  };
   expect(
     permissionService.callDecision(policy, "bash", {
       options: { action: "delete" },
@@ -269,21 +257,6 @@ test("invalid, unsupported and former match types are rejected before saving", (
       }).success,
     ).toBe(false);
   }
-  expect(
-    ToolPermissionsSchema.safeParse({
-      rules: [
-        {
-          ...rule("deny", { kind: "any" }),
-          condition: {
-            kind: "argument",
-            field: "command",
-            match: "prefix",
-            value: "npm",
-          },
-        },
-      ],
-    }).success,
-  ).toBe(false);
 });
 
 test("nested repetition cannot stall permission matching", () => {

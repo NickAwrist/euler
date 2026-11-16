@@ -14,7 +14,7 @@ export class WebFeature extends ToggleFeature {
   readonly description = "Search the web and read web pages.";
   readonly toolNames = ["web_search", "fetch_web_page"];
 
-  async capable(): Promise<Capability> {
+  override async capable(): Promise<Capability> {
     return getBraveSearchApiKey()
       ? CAPABLE
       : { capable: false, reason: "Needs a Brave Search API key" };

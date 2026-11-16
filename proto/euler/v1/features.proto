@@ -34,7 +34,7 @@ message Feature {
   FeatureId id = 1;
   string label = 2;
   string description = 3;
-  // False for a feature that is on whenever it is set up, such as skills.
+  // False for a feature that is on whenever it is set up, such as MCP servers.
   bool toggleable = 4;
   bool enabled = 5;
   // Why the feature cannot run on this server. Absent when it can.

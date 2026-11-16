@@ -1,5 +1,3 @@
-import { waitForActivation } from "../helpers/activation";
-import "../setup";
 import { describe, expect, spyOn, test } from "bun:test";
 import type WebSocket from "ws";
 import { ComfyUIClient } from "../../src/comfyui/client";
@@ -9,6 +7,7 @@ import {
   setOpenRouterApiKey,
 } from "../../src/db";
 import { Message_Role } from "../../src/gen/euler/v1/sessions_pb";
+import { waitForActivation } from "../helpers/activation";
 import { setOpenRouterScenario } from "../helpers/mockOpenRouter";
 import { rpc } from "../helpers/rpc";
 

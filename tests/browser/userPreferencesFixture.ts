@@ -28,12 +28,10 @@ function merge(
     appearance: { ...current.appearance, ...patch.appearance },
     layout: { ...current.layout, ...patch.layout },
     image: { ...current.image, ...patch.image },
-    features: { ...current.features, ...patch.features },
     toolPermissions: { ...current.toolPermissions, ...patch.toolPermissions },
   });
 }
 
-const attached = new WeakSet<Page>();
 /**
  * Serves PreferenceService and the ComfyUI config like the server: users
  * without saved preferences get `initial`, and each update saves into `store`.
@@ -43,8 +41,6 @@ export async function mockUserPreferences(
   store = new Map<string, UserPreferences>(),
   initial: MessageInitShape<typeof UpdatePreferencesRequestSchema> = {},
 ) {
-  if (attached.has(page)) return;
-  attached.add(page);
   const defaults = merge(
     userPreferencesSchema.parse({}),
     preferencesPatch(create(UpdatePreferencesRequestSchema, initial)),

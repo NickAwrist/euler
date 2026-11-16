@@ -94,7 +94,10 @@ struct HomeView: View {
         }
         .background(palette.background)
         .environment(\.openSettings) { page in session.settingsPage = page }
-        .sheet(item: Binding(get: { session.settingsPage }, set: { session.settingsPage = $0 })) { page in
+        // Settings can change what a feature needs, such as an API key or an MCP server.
+        .sheet(item: Binding(get: { session.settingsPage }, set: { session.settingsPage = $0 }), onDismiss: {
+            Task { await session.features.load() }
+        }) { page in
             SettingsView(page: page)
         }
         .onChange(of: session.route, initial: true) { _, route in

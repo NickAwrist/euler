@@ -1,11 +1,12 @@
-import "../setup";
 import { afterEach, expect, spyOn, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
 import { ComfyUIClient } from "../../src/comfyui/client";
 import {
   createSkillRow,
+  deleteSkillRow,
   ensureUserData,
+  listSkills,
   setBraveSearchApiKey,
   setOpenRouterApiKey,
 } from "../../src/db";
@@ -33,7 +34,6 @@ const OTHER_USER_ID = "66666666-6666-4666-8666-666666666666";
 const spies: { mockRestore(): void }[] = [];
 afterEach(() => {
   for (const spy of spies.splice(0)) spy.mockRestore();
-  setBraveSearchApiKey("");
 });
 
 /** Makes the host-dependent requirements pass or fail the same on any machine. */
@@ -41,8 +41,8 @@ function hostCan(available: boolean) {
   spies.push(
     spyOn(sandboxRunner, "capability").mockResolvedValue(
       available
-        ? { available }
-        : { available, diagnostic: "bubblewrap is not installed" },
+        ? { capable: true }
+        : { capable: false, reason: "bubblewrap is not installed" },
     ),
     spyOn(ComfyUIClient.prototype, "healthCheck").mockResolvedValue({
       ok: available,
@@ -97,7 +97,6 @@ test("a feature is active only while its requirements are met and it is enabled"
   });
   expect((await activeIds(TEST_USER_ID)).has("web")).toBe(false);
   expect((await activeIds(OTHER_USER_ID)).has("web")).toBe(true);
-  await features.setFeatureEnabled({ id: WireFeatureId.WEB, enabled: true });
 });
 
 test("features report why they cannot run and only switchable ones can be set", async () => {
@@ -136,12 +135,12 @@ test("features report why they cannot run and only switchable ones can be set", 
   expect(
     listed.find(({ id }) => id === WireFeatureId.SANDBOX)?.unavailableReason,
   ).toBeUndefined();
-  expect(listed.find(({ id }) => id === WireFeatureId.SKILLS)?.toggleable).toBe(
+  expect(listed.find(({ id }) => id === WireFeatureId.MCP)?.toggleable).toBe(
     false,
   );
   expect(
     await rpcCode(
-      features.setFeatureEnabled({ id: WireFeatureId.SKILLS, enabled: false }),
+      features.setFeatureEnabled({ id: WireFeatureId.MCP, enabled: false }),
     ),
   ).toBe(Code.InvalidArgument);
 });
@@ -209,6 +208,25 @@ test("skills reach only their owner's agents", async () => {
   );
 });
 
+test("skills stay on with none saved, so the agent can write the first", async () => {
+  const owner = "77777777-7777-4777-8777-777777777777";
+  ensureUserData(owner);
+  for (const skill of listSkills(owner)) deleteSkillRow(owner, skill.id);
+  expect((await activeIds(owner)).has("skills")).toBe(true);
+  const skills = feature("skills");
+  const scope = run(owner, "main");
+  expect((await skills.tools(scope)).tools.map((tool) => tool.name)).toEqual([
+    "manage_skills",
+  ]);
+  expect(skills.prompt(scope, "Hello")).toBe("");
+
+  await rpc(owner).features.setFeatureEnabled({
+    id: WireFeatureId.SKILLS,
+    enabled: false,
+  });
+  expect((await activeIds(owner)).has("skills")).toBe(false);
+});
+
 test("a chat runs with only a model provider", async () => {
   hostCan(false);
   setOpenRouterApiKey("sk-or-features-test");
@@ -243,10 +261,6 @@ test("a chat runs with only a model provider", async () => {
       false,
     );
   } finally {
-    await features.setFeatureEnabled({
-      id: WireFeatureId.FILES,
-      enabled: true,
-    });
     await agentRuntime.deleteSession(TEST_USER_ID, id);
   }
 });

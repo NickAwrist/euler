@@ -9,7 +9,6 @@ test("background cancellation tears down descendants and output overflow does no
   const workspace = {
     kind: "sandbox" as const,
     hostPath: root,
-    displayPath: "/workspace",
   };
   try {
     let output = "";

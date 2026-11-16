@@ -7,8 +7,14 @@ import {
   requestObservability,
   sendError,
 } from "../../src/observability/http";
-import { ERROR_MESSAGES } from "../../src/schemas/observability";
-import { createApiError } from "../../ui/lib/apiError";
+import {
+  ERROR_MESSAGES,
+  decodeErrorDetails,
+} from "../../src/schemas/observability";
+
+/** The diagnostic in a failed response's JSON body. */
+const diagnostic = async (response: Response) =>
+  decodeErrorDetails(((await response.json()) as { error?: unknown }).error);
 
 let server: Server | undefined;
 afterEach(() => server?.close());
@@ -48,36 +54,30 @@ describe("HTTP diagnostics", () => {
     expect(requestId).toBeTruthy();
     expect(requestId).not.toBe("untrusted");
     expect(response.status).toBe(500);
-    expect(await response.clone().json()).toEqual({
+    expect(await response.json()).toEqual({
       error: {
         code: "INTERNAL_ERROR",
         message: ERROR_MESSAGES.INTERNAL_ERROR,
         requestId,
       },
     });
-    const error = await createApiError(response);
-    expect(error.status).toBe(500);
-    expect(error.message).toBe(ERROR_MESSAGES.INTERNAL_ERROR);
-    expect(error.diagnostic?.requestId).toBe(requestId ?? undefined);
   });
 
   test("keeps a known server failure's shared message", async () => {
     const url = await start();
     const response = await fetch(`${url}/unreachable`);
     expect(response.status).toBe(502);
-    const error = await createApiError(response);
-    expect(error.diagnostic?.code).toBe("COMFY_UNREACHABLE");
-    expect(error.message).toBe(ERROR_MESSAGES.COMFY_UNREACHABLE);
+    expect(await diagnostic(response)).toMatchObject({
+      code: "COMFY_UNREACHABLE",
+      message: ERROR_MESSAGES.COMFY_UNREACHABLE,
+    });
   });
 
   test("preserves a specific validation message", async () => {
     const url = await start();
-    const error = await createApiError(
-      await fetch(`${url}/validate`, { method: "POST" }),
-    );
-    expect(error.status).toBe(400);
-    expect(error.message).toBe("Choose a model");
-    expect(error.diagnostic).toMatchObject({
+    const response = await fetch(`${url}/validate`, { method: "POST" });
+    expect(response.status).toBe(400);
+    expect(await diagnostic(response)).toMatchObject({
       code: "INVALID_REQUEST",
       message: "Choose a model",
       requestId: expect.any(String),
@@ -92,13 +92,9 @@ describe("HTTP diagnostics", () => {
         headers: { "Content-Type": "application/json" },
         body,
       });
-    expect((await createApiError(await post("{"))).diagnostic?.code).toBe(
-      "INVALID_REQUEST",
-    );
+    expect((await diagnostic(await post("{")))?.code).toBe("INVALID_REQUEST");
     const tooLarge = await post(JSON.stringify({ text: "x".repeat(2048) }));
     expect(tooLarge.status).toBe(413);
-    expect((await createApiError(tooLarge)).diagnostic?.code).toBe(
-      "BODY_TOO_LARGE",
-    );
+    expect((await diagnostic(tooLarge))?.code).toBe("BODY_TOO_LARGE");
   });
 });

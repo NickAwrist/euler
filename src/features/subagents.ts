@@ -2,13 +2,7 @@ import { AskParentTool } from "../tools/ask_parent";
 import { CancelAgentTool } from "../tools/cancel_agent";
 import { SendMessageTool } from "../tools/send_message";
 import { SpawnAgentTool } from "../tools/spawn_agent";
-import {
-  CAPABLE,
-  type Capability,
-  type FeatureRun,
-  type FeatureTools,
-  ToggleFeature,
-} from "./Feature";
+import { type FeatureRun, type FeatureTools, ToggleFeature } from "./Feature";
 
 export class SubagentsFeature extends ToggleFeature {
   readonly id = "subagents";
@@ -22,8 +16,8 @@ export class SubagentsFeature extends ToggleFeature {
   ];
   override readonly sidebarTab = "Agents";
 
-  async capable(): Promise<Capability> {
-    return CAPABLE;
+  override prompt(): string {
+    return "Use send_message to answer a subagent. Use progress sparingly for meaningful milestones. Use ask_parent when you must wait for an answer.";
   }
 
   override async tools({ agentKind, host }: FeatureRun): Promise<FeatureTools> {

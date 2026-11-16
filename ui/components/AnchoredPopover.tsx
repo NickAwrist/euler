@@ -11,18 +11,18 @@ import {
 } from "react";
 import { cx } from "../styles";
 
+/** Pixels between the trigger button and the popover. */
+const GAP = 6;
+
 export interface AnchoredPopoverTriggerProps {
   ref: RefObject<HTMLButtonElement | null>;
   popoverTarget: string;
   isOpen: boolean;
   open: () => void;
-  close: (restoreFocus?: boolean) => void;
 }
 
 export interface AnchoredPopoverPanelHelpers {
   close: (restoreFocus?: boolean) => void;
-  open: () => void;
-  isOpen: boolean;
 }
 
 export interface AnchoredPopoverProps {
@@ -38,8 +38,6 @@ export interface AnchoredPopoverProps {
   panelClassName?: string;
   /** Maximum panel height in pixels. Defaults to 280. */
   maxHeight?: number;
-  /** Gap in pixels between the trigger button and the popover. Defaults to 6. */
-  gap?: number;
   /** Callback fired whenever the popover opens or closes. */
   onOpenChange?: (open: boolean) => void;
   /** Callback fired when the popover opens, with a reference to the panel element. */
@@ -73,7 +71,6 @@ export function AnchoredPopover({
   containerClassName,
   panelClassName,
   maxHeight = 280,
-  gap = 6,
   onOpenChange,
   onOpen,
   onPanelKeyDown,
@@ -129,17 +126,17 @@ export function AnchoredPopover({
       const spaceAbove = rect.top - top;
       const spaceBelow = bottom - rect.bottom;
       const openUpwards =
-        spaceAbove >= panel.offsetHeight + gap || spaceAbove >= spaceBelow;
+        spaceAbove >= panel.offsetHeight + GAP || spaceAbove >= spaceBelow;
 
       const availableHeight = openUpwards
-        ? Math.max(0, spaceAbove - gap)
-        : Math.max(0, spaceBelow - gap);
+        ? Math.max(0, spaceAbove - GAP)
+        : Math.max(0, spaceBelow - GAP);
 
       panel.style.maxHeight = `${Math.min(maxHeight, availableHeight)}px`;
       panel.style.left = `${Math.max(left, Math.min(rect.left, right - panel.offsetWidth))}px`;
       panel.style.top = openUpwards
-        ? `${Math.max(top, rect.top - panel.offsetHeight - gap)}px`
-        : `${Math.min(bottom - panel.offsetHeight, rect.bottom + gap)}px`;
+        ? `${Math.max(top, rect.top - panel.offsetHeight - GAP)}px`
+        : `${Math.min(bottom - panel.offsetHeight, rect.bottom + GAP)}px`;
     };
 
     position();
@@ -168,13 +165,9 @@ export function AnchoredPopover({
       window.visualViewport?.removeEventListener("resize", position);
       window.visualViewport?.removeEventListener("scroll", position);
     };
-  }, [open, gap, maxHeight]);
+  }, [open, maxHeight]);
 
-  const panelHelpers: AnchoredPopoverPanelHelpers = {
-    close,
-    open: openPanel,
-    isOpen: open,
-  };
+  const panelHelpers: AnchoredPopoverPanelHelpers = { close };
 
   return (
     <div className={cx("relative shrink-0", containerClassName)}>
@@ -183,7 +176,6 @@ export function AnchoredPopover({
         popoverTarget: menuId,
         isOpen: open,
         open: openPanel,
-        close,
       })}
       {/*
         Using <dialog popover="auto"> preserves the established accessible role="dialog"

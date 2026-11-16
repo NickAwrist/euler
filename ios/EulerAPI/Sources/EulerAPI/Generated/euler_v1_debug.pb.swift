@@ -25,16 +25,6 @@ public nonisolated struct Euler_V1_PreviewPromptRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// The chat whose workspace the prompt describes; absent for a new chat.
-  public var sessionID: String {
-    get {_sessionID ?? String()}
-    set {_sessionID = newValue}
-  }
-  /// Returns true if `sessionID` has been explicitly set.
-  public var hasSessionID: Bool {self._sessionID != nil}
-  /// Clears the value of `sessionID`. Subsequent reads from it will return its default value.
-  public mutating func clearSessionID() {self._sessionID = nil}
-
   public var metadata: Euler_V1_RunMetadata {
     get {_metadata ?? Euler_V1_RunMetadata()}
     set {_metadata = newValue}
@@ -58,7 +48,6 @@ public nonisolated struct Euler_V1_PreviewPromptRequest: Sendable {
 
   public init() {}
 
-  fileprivate var _sessionID: String? = nil
   fileprivate var _metadata: Euler_V1_RunMetadata? = nil
   fileprivate var _message: String? = nil
 }
@@ -81,7 +70,7 @@ fileprivate nonisolated let _protobuf_package = "euler.v1"
 
 nonisolated extension Euler_V1_PreviewPromptRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".PreviewPromptRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_id\0\u{1}metadata\0\u{1}message\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\u{2}metadata\0\u{1}message\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -89,7 +78,6 @@ nonisolated extension Euler_V1_PreviewPromptRequest: SwiftProtobuf.Message, Swif
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._sessionID) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._metadata) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self._message) }()
       default: break
@@ -102,9 +90,6 @@ nonisolated extension Euler_V1_PreviewPromptRequest: SwiftProtobuf.Message, Swif
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._sessionID {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
     try { if let v = self._metadata {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
@@ -115,7 +100,6 @@ nonisolated extension Euler_V1_PreviewPromptRequest: SwiftProtobuf.Message, Swif
   }
 
   public static func ==(lhs: Euler_V1_PreviewPromptRequest, rhs: Euler_V1_PreviewPromptRequest) -> Bool {
-    if lhs._sessionID != rhs._sessionID {return false}
     if lhs._metadata != rhs._metadata {return false}
     if lhs._message != rhs._message {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
