@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package euler.v1;
+
+import "buf/validate/validate.proto";
+
+// The parts of Euler an agent can use, and whether each can run here.
+service FeatureService {
+  rpc ListFeatures(ListFeaturesRequest) returns (ListFeaturesResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+  // Switches one feature and returns every feature's new state.
+  rpc SetFeatureEnabled(SetFeatureEnabledRequest) returns (SetFeatureEnabledResponse);
+}
+
+enum FeatureId {
+  FEATURE_ID_UNSPECIFIED = 0;
+  FEATURE_ID_FILES = 1;
+  FEATURE_ID_SANDBOX = 2;
+  FEATURE_ID_WEB = 3;
+  FEATURE_ID_IMAGE_GENERATION = 4;
+  FEATURE_ID_SKILLS = 5;
+  FEATURE_ID_SUBAGENTS = 6;
+  FEATURE_ID_MCP = 7;
+}
+
+// An agent gets a feature while it is enabled and nothing makes it unavailable.
+message Feature {
+  // A "/" command the feature adds to the composer. Clients run it by name.
+  message Command {
+    string name = 1;
+    string description = 2;
+  }
+  FeatureId id = 1;
+  string label = 2;
+  string description = 3;
+  // False for a feature that is on whenever it is set up, such as MCP servers.
+  bool toggleable = 4;
+  bool enabled = 5;
+  // Why the feature cannot run on this server. Absent when it can.
+  optional string unavailable_reason = 6;
+  // The label of the feature's tab in a chat's sidebar. Absent when it has none.
+  optional string sidebar_tab = 7;
+  repeated Command commands = 8;
+}
+
+message ListFeaturesRequest {}
+
+message ListFeaturesResponse {
+  repeated Feature features = 1;
+}
+
+message SetFeatureEnabledRequest {
+  // Must be a toggleable feature.
+  FeatureId id = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  bool enabled = 2;
+}
+
+message SetFeatureEnabledResponse {
+  repeated Feature features = 1;
+}

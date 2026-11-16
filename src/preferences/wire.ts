@@ -92,7 +92,6 @@ export function preferences(value: DomainPreferences): UserPreferences {
         path: layout.artifactState.path ?? undefined,
       },
     },
-    capabilities: value.capabilities,
   });
 }
 
@@ -118,7 +117,7 @@ export function imagePatch(
 export function preferencesPatch(
   request: UpdatePreferencesRequest,
 ): UserPreferencesPatch {
-  const { settings, appearance, layout, capabilities } = request;
+  const { settings, appearance, layout } = request;
   return {
     image: imagePatch(request.image),
     settings: settings
@@ -158,15 +157,6 @@ export function preferencesPatch(
             workspace: layout.artifactState.workspace,
             path: layout.artifactState.path ?? null,
           },
-        })
-      : undefined,
-    capabilities: capabilities
-      ? defined({
-          web: capabilities.web,
-          imageGeneration: capabilities.imageGeneration,
-          shell: capabilities.shell,
-          files: capabilities.files,
-          skills: capabilities.skills,
         })
       : undefined,
   };

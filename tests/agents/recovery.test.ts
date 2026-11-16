@@ -1,4 +1,3 @@
-import "../setup";
 import { expect, spyOn, test } from "bun:test";
 import { AgentRuntime } from "../../src/agents/runtime/AgentRuntime";
 import { setOpenRouterApiKey } from "../../src/db";
@@ -6,7 +5,6 @@ import { AgentStore } from "../../src/db/agents";
 import { getDb } from "../../src/db/connection";
 import { createSchema } from "../../src/db/schema";
 import { createSessionRow, getMessagesForSession } from "../../src/db/sessions";
-import { workspaceService } from "../../src/workspaces/WorkspaceService";
 import {
   getOpenRouterRequests,
   setOpenRouterScenario,
@@ -24,7 +22,6 @@ test("restart preserves an interrupted main reply without retrying and repairs c
   setOpenRouterApiKey("test");
   const id = crypto.randomUUID();
   createSessionRow(owner, id, Date.now(), model);
-  await workspaceService.provisionRetained(owner, id);
   const first = new AgentRuntime();
   const main = first.main(owner, id);
   main.status = "running";
@@ -112,7 +109,6 @@ test("the automatic-turn budget holds updates and a user message resets it", asy
   setOpenRouterApiKey("test");
   const id = crypto.randomUUID();
   createSessionRow(owner, id, Date.now(), model);
-  await workspaceService.provisionRetained(owner, id);
   const runtime = new AgentRuntime();
   const main = runtime.main(owner, id);
   main.automaticTurns = 10;
@@ -142,7 +138,6 @@ test("the scheduler queues work beyond the configured limit and frees slots as w
   try {
     for (const id of ids) {
       createSessionRow(owner, id, Date.now(), model);
-      await workspaceService.provisionRetained(owner, id);
     }
     for (const id of ids)
       runtime.enqueue(runtime.main(owner, id), "user", "user", "Run");
@@ -169,7 +164,6 @@ test("the scheduler queues work beyond the configured limit and frees slots as w
 test("restart retains queued and waiting agents and their input without starting work", async () => {
   const id = crypto.randomUUID();
   createSessionRow(owner, id, Date.now(), model);
-  await workspaceService.provisionRetained(owner, id);
   const first = new AgentRuntime();
   const main = first.main(owner, id);
   const children = (["queued", "waiting", "idle"] as const).map((status) => {

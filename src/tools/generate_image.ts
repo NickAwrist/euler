@@ -50,13 +50,6 @@ export class GenerateImageTool extends BaseTool {
     const client = getComfyUIClient();
 
     return client.runSerialized(async (): Promise<ToolResult> => {
-      const health = await client.healthCheck();
-      if (!health.ok) {
-        return textToolResult(
-          `Error: ComfyUI is not reachable - ${health.error ?? "unknown error"}`,
-        );
-      }
-
       const image =
         (ctx?.ownerUuid
           ? effectiveUserPreferences(ctx.ownerUuid).image

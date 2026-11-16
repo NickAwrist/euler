@@ -1,4 +1,3 @@
-import "../setup";
 import { expect, spyOn, test } from "bun:test";
 import fs from "node:fs/promises";
 import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";

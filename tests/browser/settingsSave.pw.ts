@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockRpc } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
 
 for (const device of ["desktop", "mobile"] as const) {
@@ -12,11 +13,7 @@ for (const device of ["desktop", "mobile"] as const) {
           ? { width: 1280, height: 800 }
           : { width: 390, height: 844 },
     });
-    await page.route("**/api/**", (route) =>
-      route.fulfill({
-        json: { ollamaHost: false, comfyuiHost: false },
-      }),
-    );
+    await mockRpc(page, [], { empty: true });
     try {
       await mockUserPreferences(page);
       await page.goto("/dev/settings");

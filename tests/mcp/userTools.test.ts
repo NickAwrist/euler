@@ -1,4 +1,3 @@
-import "../setup";
 import { expect, test } from "bun:test";
 import { createMcpServers, setMcpServerEnabled } from "../../src/db/mcpServers";
 import { openUserMcpTools } from "../../src/mcp/userTools";

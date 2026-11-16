@@ -7,13 +7,6 @@ import Foundation
 /// followed by a digit, and both are on one line. So "$5 and $10" stays text.
 /// Escaped `\$` is a literal dollar. Code is never touched.
 enum MathDelimiters {
-    /// One math span in reply text.
-    struct Span: Equatable {
-        var tex: String
-        /// Fenced on its own lines (`$$` above and below), shown as a block.
-        var display: Bool
-    }
-
     // Swift regex has no lookbehind, so the character before a single `$` is
     // matched as group 1 and put back.
     nonisolated(unsafe) private static let delimiters = /\$\$([\s\S]*?)\$\$|\\\(([\s\S]*?)\\\)|\\\[([\s\S]*?)\\\]|(^|[^\\$])\$(?![\s$])((?:\\.|[^$\\\n])*?[^\s\\$])\$(?![\d$])/

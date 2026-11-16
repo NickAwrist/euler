@@ -3,7 +3,11 @@ import type { DisplayIcon } from "../../src/gen/euler/v1/common_pb";
 import type { McpTool } from "../persist/mcpServers";
 import type { Skill } from "../persist/skills";
 import type { SessionWorkspace } from "../types";
-import { type RunCommandName, matchingRunCommands } from "./runCommands";
+import {
+  type RunCommand,
+  type RunCommandName,
+  matchingRunCommands,
+} from "./runCommands";
 import { type ActiveSkillToken, completeSkillToken } from "./skillPicker";
 
 /** Sources own matching and selection; the picker only renders and navigates. */
@@ -20,6 +24,7 @@ export interface ComposerSuggestionContext {
   input: string;
   workspace: SessionWorkspace;
   busy: boolean;
+  commands: readonly RunCommand[];
   skills: readonly Skill[];
   tools: readonly McpTool[];
   skillToken: ActiveSkillToken | null;
@@ -36,10 +41,10 @@ export interface ComposerSuggestionSource {
 
 export const composerSuggestionSources: readonly ComposerSuggestionSource[] = [
   {
-    getSuggestions: ({ input, workspace, busy, runCommand }) =>
+    getSuggestions: ({ input, workspace, busy, commands, runCommand }) =>
       busy
         ? []
-        : matchingRunCommands(input, workspace).map((command) => ({
+        : matchingRunCommands(commands, input, workspace).map((command) => ({
             id: `command:${command.name}`,
             label: `/${command.name}`,
             description: command.description,

@@ -62,8 +62,8 @@ link can't lead them outside the workspace.
 Run `/link` in a chat to work in another chat's sandbox. Linking to a chat that
 is itself linked joins the same sandbox, so links never chain.
 
-A sandbox is kept while the chat that created it or any chat linked to it
-still uses it. After the last one is deleted or switches away, the sandbox
+A chat's sandbox is created on its first turn with Files or Sandbox on. It is
+kept while the chat that created it or any chat linked to it still uses it. After the last one is deleted or switches away, the sandbox
 moves to the workspace trash for 7 days.
 
 ## Ephemeral chats
@@ -86,7 +86,7 @@ disable scripts and external resources.
 ## Bubblewrap on Ubuntu 24.04
 
 Shell tools need Bubblewrap at `/usr/bin/bwrap` or `/bin/bwrap`. Without a
-working one, Euler turns them off.
+working one, Euler turns the Sandbox feature off.
 
 Ubuntu can block the capabilities Bubblewrap needs, including its isolated
 loopback interface. The symptom is
@@ -103,8 +103,7 @@ sudo apparmor_parser -r /etc/apparmor.d/euler-bwrap
 The profile lets Bubblewrap create user namespaces, following
 [Ubuntu's guidance](https://ubuntu.com/blog/ubuntu-23-10-restricted-unprivileged-user-namespaces).
 The runner's filesystem restrictions and the workspace's network policy still
-apply. Restart the backend afterwards, because it caches the sandbox capability
-check.
+apply. Euler checks again on the next turn, so the backend needs no restart.
 
 To confirm the sandbox works, run the
 [sandbox tests](development.md#sandbox-tests).

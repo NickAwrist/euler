@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Modal } from "../../ui/components/Modal";
-import { modalShell, modalSurface } from "../../ui/styles";
+import { modalShell } from "../../ui/styles";
 
 describe("Modal primitive component", () => {
   test("renders closed dialog by default with hidden-when-closed class and title wiring", () => {

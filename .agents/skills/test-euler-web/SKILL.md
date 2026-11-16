@@ -46,7 +46,7 @@ the protos. Run `bun run proto` and commit what it writes.
 ## Linux and the Mac
 
 Workspace file tools and shell tools need Linux. On macOS, about 40 tests in
-`bun test` fail, most with "Secure workspace file access requires Linux",
+`bun test` fail, most because macOS has no `/proc/self/fd`,
 `tests/browser/jobs.pw.ts` fails, and `bun run perf:check` stops at the file
 suggestions. `main` fails the same way there, so compare against it before
 blaming a change. CI runs on Linux.
@@ -121,8 +121,7 @@ Three rules that are easy to miss:
   stored chats, the model catalog and healthy providers. Add the RPCs a test
   exercises with `mockRpc(page, [on(Service.method.name, handler)])` from
   `rpcMock.ts`, after `mockApp`, because the route registered last answers
-  first. Return `new RpcFailure("not_found", "…")` for an error and use
-  `onStream` for a server stream. Don't stub `**/api/**` with hand-written
+  first. Return `new RpcFailure("not_found", "…")` for an error. Don't stub `**/api/**` with hand-written
   JSON. Connect ignores fields it does not know, so a stub in the wrong shape
   passes without testing anything.
 

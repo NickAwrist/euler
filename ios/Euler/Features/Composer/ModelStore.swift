@@ -7,7 +7,6 @@ import Observation
 @Observable
 final class ModelStore {
     private(set) var models: [Euler_V1_Model] = []
-    private(set) var providers = Euler_V1_ProviderStates()
     private(set) var loaded = false
     private(set) var error: String?
     private(set) var thinking: [String: String]
@@ -25,7 +24,6 @@ final class ModelStore {
         do {
             let response = try await client.listModels(request: .init(), headers: [:]).value()
             models = response.models
-            providers = response.providers
             error = nil
         } catch {
             self.error = error.displayMessage

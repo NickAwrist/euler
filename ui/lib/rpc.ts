@@ -12,6 +12,7 @@ import { AttachmentService } from "../../src/gen/euler/v1/attachments_pb";
 import { DebugService } from "../../src/gen/euler/v1/debug_pb";
 import { DirectoryService } from "../../src/gen/euler/v1/directories_pb";
 import { EventService } from "../../src/gen/euler/v1/events_pb";
+import { FeatureService } from "../../src/gen/euler/v1/features_pb";
 import { JobService } from "../../src/gen/euler/v1/jobs_pb";
 import { McpServerService } from "../../src/gen/euler/v1/mcp_pb";
 import { ModelService } from "../../src/gen/euler/v1/models_pb";
@@ -72,6 +73,7 @@ export const attachmentClient = rpcClient(AttachmentService);
 export const modelClient = rpcClient(ModelService);
 export const workspaceClient = rpcClient(WorkspaceService);
 export const preferenceClient = rpcClient(PreferenceService);
+export const featureClient = rpcClient(FeatureService);
 export const skillClient = rpcClient(SkillService);
 export const mcpServerClient = rpcClient(McpServerService);
 export const providerClient = rpcClient(ProviderService);
@@ -96,7 +98,7 @@ export async function withErrorMessage<T>(
     return await call;
   } catch (error) {
     if (error instanceof ApiError && !error.diagnostic)
-      throw new ApiError(message, error.status, undefined, error.code);
+      throw new ApiError(message, undefined, error.code);
     throw error;
   }
 }

@@ -1,12 +1,17 @@
-import "../setup";
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 import { getDb } from "../../src/db/connection";
+import { FeatureId } from "../../src/gen/euler/v1/features_pb";
 import { PermissionField_Type } from "../../src/gen/euler/v1/preferences_pb";
 import { fromProtoField } from "../../src/permissions/wire";
+import { sandboxRunner } from "../../src/sandbox/SandboxRunner";
 import { MCP_TEST_TOKEN, startMcpTestServer } from "../helpers/mcpServer";
 import { Code, rpc, rpcCode } from "../helpers/rpc";
 
-test("the tool picker uses enabled user tools, actual MCP names, and runtime tools without saving agents", async () => {
+test("the tool picker uses active features' tools, actual MCP names, and runtime tools without saving agents", async () => {
+  // The picker lists shell tools only where the host can contain them.
+  const capability = spyOn(sandboxRunner, "capability").mockResolvedValue({
+    capable: true,
+  });
   const icons = [{ src: "data:image/png;base64,AAAA" }];
   const mcp = startMcpTestServer(icons);
   const api = rpc();
@@ -51,10 +56,12 @@ test("the tool picker uses enabled user tools, actual MCP names, and runtime too
     expect(getDb().query("SELECT COUNT(*) AS count FROM agents").get()).toEqual(
       before,
     );
-    await api.preferences.updatePreferences({
-      capabilities: { shell: false },
+    await api.features.setFeatureEnabled({
+      id: FeatureId.SANDBOX,
+      enabled: false,
     });
     expect(await names()).not.toContain("bash");
+    expect(await names()).not.toContain("get_job");
     expect(await names(other)).toContain("bash");
     const { servers } = await api.mcp.createServers({
       config: JSON.stringify({
@@ -83,6 +90,7 @@ test("the tool picker uses enabled user tools, actual MCP names, and runtime too
       Code.InvalidArgument,
     );
   } finally {
+    capability.mockRestore();
     mcp.close();
   }
 });

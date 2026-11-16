@@ -7,7 +7,7 @@ import {
   RefreshCw,
   Waypoints,
 } from "lucide-react";
-import { type CSSProperties, type ComponentProps, useMemo } from "react";
+import { type ComponentProps, useMemo } from "react";
 import type { WorkspaceFileAttachment } from "../../../src/gen/euler/v1/attachments_pb";
 import { attachmentsOfKind } from "../../lib/attachments";
 import { fileWorkspaceKind } from "../../lib/workspace";
@@ -36,7 +36,6 @@ import { replyThinking } from "./replyThinking";
 type Props = {
   message: Message;
   animateEntry: boolean;
-  enterStyle: CSSProperties | undefined;
   copied: boolean;
   copyContent: () => void;
   onViewSteps?: () => void;
@@ -51,7 +50,6 @@ type Props = {
 export function AssistantMessageBubble({
   message,
   animateEntry,
-  enterStyle,
   copied,
   copyContent,
   onViewSteps,
@@ -89,7 +87,6 @@ export function AssistantMessageBubble({
         "group/msg flex w-full min-w-0 flex-col",
         animateEntry && "ui-animate-slide-up",
       )}
-      style={enterStyle}
     >
       <div
         className="flex w-full justify-start pt-4 max-[640px]:pt-3.5"

@@ -1,4 +1,3 @@
-import "../setup";
 import { expect, test } from "bun:test";
 import { recordUsage } from "../../src/db/usage";
 import { UsageGrouping } from "../../src/gen/euler/v1/usage_pb";

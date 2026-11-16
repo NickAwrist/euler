@@ -16,15 +16,6 @@ export const safeStorage = {
     }
   },
 
-  removeItem(key: string): boolean {
-    try {
-      localStorage.removeItem(key);
-      return true;
-    } catch {
-      return false;
-    }
-  },
-
   getJSON<T>(key: string, fallback: T): T {
     try {
       const raw = localStorage.getItem(key);

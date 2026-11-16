@@ -67,7 +67,7 @@ export function ToolPermissionsSection() {
 
   const toolsRequest = useRef(0);
 
-  // Capabilities and MCP servers change the catalogue, so Add rule reloads it.
+  // Features and MCP servers change the catalogue, so Add rule reloads it.
   // Only the latest request applies, so a slow older response cannot win.
   const loadTools = useCallback(() => {
     const request = ++toolsRequest.current;

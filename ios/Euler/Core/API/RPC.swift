@@ -48,13 +48,6 @@ extension ServerOnlyAsyncStreamInterface {
     }
 }
 
-extension ConnectError {
-    /// The diagnostic the server attached, with its Euler code.
-    var eulerDetail: Euler_V1_ErrorDetail? {
-        unpackedDetails().first
-    }
-}
-
 extension Error {
     /// The message to show a person: the server's public message when it sent one.
     var displayMessage: String {

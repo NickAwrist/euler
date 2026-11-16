@@ -1,7 +1,6 @@
+import { expect, test } from "bun:test";
 import fs from "node:fs/promises";
 import { join } from "node:path";
-import "../setup";
-import { expect, test } from "bun:test";
 import { getSessionById, patchSessionRow } from "../../src/db";
 import { ArtifactEntry_Kind } from "../../src/gen/euler/v1/workspace_pb";
 import { workspaceService } from "../../src/workspaces/WorkspaceService";

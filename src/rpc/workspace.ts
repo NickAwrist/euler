@@ -15,7 +15,11 @@ import { isLoopbackRequest } from "../http/isLoopbackRequest";
 import { revealFileNative } from "../nativeFolderPicker";
 import { OperationError } from "../observability/errors";
 import { releaseWorkspace } from "../sessions/lifecycle";
-import { workspaceService as workspaces } from "../workspaces/WorkspaceService";
+import {
+  type Workspace,
+  WorkspaceError,
+  workspaceService as workspaces,
+} from "../workspaces/WorkspaceService";
 import {
   listArtifactDirectory,
   readArtifactPreview,
@@ -26,12 +30,22 @@ import { millis } from "./wire";
 
 const CHUNK_BYTES = 64 * 1024;
 
+/** The workspace to read `path` from. A sandbox no run has created holds nothing. */
+async function workspaceHolding(
+  context: HandlerContext,
+  sessionId: string,
+  path: string,
+): Promise<Workspace> {
+  const workspace = await workspaces.existingSession(
+    ownedSession(context, sessionId),
+  );
+  if (!workspace) throw new WorkspaceError(`Path does not exist: ${path}`);
+  return workspace;
+}
+
 /** The chat's current row when it still exists and is idle. */
 function idleSession(context: HandlerContext, sessionId: string): SessionRow {
-  const loaded = ownedSession(context, sessionId);
-  const row = getSessionById(loaded.owner_uuid, loaded.id);
-  if (!row)
-    throw new OperationError("NOT_FOUND", { message: "Session not found" });
+  const row = ownedSession(context, sessionId);
   if (agentRuntime.busy(row.owner_uuid, row.id))
     throw new OperationError("CONFLICT", {
       message: "Wait for the current turn to finish before changing workspaces",
@@ -67,7 +81,6 @@ export const workspaceService: ServiceImpl<typeof WorkspaceService> = {
   },
   async useSandbox(request, context) {
     const row = idleSession(context, request.sessionId);
-    await workspaces.provisionRetained(row.owner_uuid, row.id);
     const current = getSessionById(row.owner_uuid, row.id);
     if (current?.workspace_kind === "local" || current?.linked_workspace_id) {
       patchSessionRow(row.owner_uuid, row.id, {
@@ -126,10 +139,10 @@ export const workspaceService: ServiceImpl<typeof WorkspaceService> = {
     return { workspace: sessionWorkspace({ ...row, ...patch }) };
   },
   async listFiles(request, context) {
-    const workspace = await workspaces.resolveSession(
+    const workspace = await workspaces.existingSession(
       ownedSession(context, request.sessionId),
     );
-    const files = await workspaces.listFiles(workspace);
+    const files = workspace ? await workspaces.listFiles(workspace) : [];
     const query = request.query?.toLowerCase() ?? "";
     return {
       files: (query
@@ -146,8 +159,10 @@ export const workspaceService: ServiceImpl<typeof WorkspaceService> = {
     };
   },
   async *downloadFile(request, context) {
-    const workspace = await workspaces.resolveSession(
-      ownedSession(context, request.sessionId),
+    const workspace = await workspaceHolding(
+      context,
+      request.sessionId,
+      request.path,
     );
     const file = await workspaces.openFile(workspace, request.path);
     try {
@@ -199,14 +214,16 @@ export const workspaceService: ServiceImpl<typeof WorkspaceService> = {
     return {};
   },
   async listArtifacts(request, context) {
-    const workspace = await workspaces.resolveSession(
-      ownedSession(context, request.sessionId),
-    );
-    const entries = await listArtifactDirectory(
-      workspaces,
-      workspace,
-      request.path || ".",
-    );
+    const path = request.path || ".";
+    const workspace =
+      path === "."
+        ? await workspaces.existingSession(
+            ownedSession(context, request.sessionId),
+          )
+        : await workspaceHolding(context, request.sessionId, path);
+    const entries = workspace
+      ? await listArtifactDirectory(workspaces, workspace, path)
+      : [];
     return {
       entries: entries.map((entry) => ({
         name: entry.name,
@@ -219,8 +236,10 @@ export const workspaceService: ServiceImpl<typeof WorkspaceService> = {
     };
   },
   async previewArtifact(request, context) {
-    const workspace = await workspaces.resolveSession(
-      ownedSession(context, request.sessionId),
+    const workspace = await workspaceHolding(
+      context,
+      request.sessionId,
+      request.path,
     );
     const preview = await readArtifactPreview(
       workspaces,

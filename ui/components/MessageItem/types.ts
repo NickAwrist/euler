@@ -10,7 +10,6 @@ export type MessageItemProps = {
   messageIndex: number;
   animateEntry?: boolean;
   onViewSteps?: () => void;
-  animDelayMs?: number;
   isBusy: boolean;
   editingUserIndex: number | null;
   onStartEditUser: (index: number) => void;

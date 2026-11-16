@@ -69,15 +69,13 @@ function fixture() {
     },
   });
   const ctx = new RunContext(
-    new BaseAgent("test", "test"),
+    new BaseAgent("test"),
     permissionService.resolve({ kind: "sandbox" }),
     undefined,
     undefined,
     undefined,
-    undefined,
-    undefined,
     "owner",
-    { kind: "sandbox", hostPath: "/tmp", displayPath: "/workspace" },
+    { kind: "sandbox", hostPath: "/tmp" },
   );
   return { manager, ctx, notifications: () => notifications };
 }

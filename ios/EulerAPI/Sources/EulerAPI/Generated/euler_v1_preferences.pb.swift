@@ -66,15 +66,6 @@ public nonisolated struct Euler_V1_UserPreferences: @unchecked Sendable {
   /// Clears the value of `layout`. Subsequent reads from it will return its default value.
   public mutating func clearLayout() {_uniqueStorage()._layout = nil}
 
-  public var capabilities: Euler_V1_Capabilities {
-    get {_storage._capabilities ?? Euler_V1_Capabilities()}
-    set {_uniqueStorage()._capabilities = newValue}
-  }
-  /// Returns true if `capabilities` has been explicitly set.
-  public var hasCapabilities: Bool {_storage._capabilities != nil}
-  /// Clears the value of `capabilities`. Subsequent reads from it will return its default value.
-  public mutating func clearCapabilities() {_uniqueStorage()._capabilities = nil}
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -422,27 +413,6 @@ public nonisolated struct Euler_V1_Layout: Sendable {
   fileprivate var _artifactState: Euler_V1_Layout.ArtifactState? = nil
 }
 
-/// Built-in agent capabilities a user can turn off, e.g. in favor of an MCP server.
-public nonisolated struct Euler_V1_Capabilities: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var web: Bool = false
-
-  public var imageGeneration: Bool = false
-
-  public var shell: Bool = false
-
-  public var files: Bool = false
-
-  public var skills: Bool = false
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
 public nonisolated struct Euler_V1_GetPreferencesRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -514,15 +484,6 @@ public nonisolated struct Euler_V1_UpdatePreferencesRequest: @unchecked Sendable
   public var hasLayout: Bool {_storage._layout != nil}
   /// Clears the value of `layout`. Subsequent reads from it will return its default value.
   public mutating func clearLayout() {_uniqueStorage()._layout = nil}
-
-  public var capabilities: Euler_V1_UpdatePreferencesRequest.CapabilitiesPatch {
-    get {_storage._capabilities ?? Euler_V1_UpdatePreferencesRequest.CapabilitiesPatch()}
-    set {_uniqueStorage()._capabilities = newValue}
-  }
-  /// Returns true if `capabilities` has been explicitly set.
-  public var hasCapabilities: Bool {_storage._capabilities != nil}
-  /// Clears the value of `capabilities`. Subsequent reads from it will return its default value.
-  public mutating func clearCapabilities() {_uniqueStorage()._capabilities = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -782,67 +743,6 @@ public nonisolated struct Euler_V1_UpdatePreferencesRequest: @unchecked Sendable
     fileprivate var _artifactState: Euler_V1_Layout.ArtifactState? = nil
   }
 
-  public nonisolated struct CapabilitiesPatch: Sendable {
-    // SwiftProtobuf.Message conformance is added in an extension below. See the
-    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-    // methods supported on all messages.
-
-    public var web: Bool {
-      get {_web ?? false}
-      set {_web = newValue}
-    }
-    /// Returns true if `web` has been explicitly set.
-    public var hasWeb: Bool {self._web != nil}
-    /// Clears the value of `web`. Subsequent reads from it will return its default value.
-    public mutating func clearWeb() {self._web = nil}
-
-    public var imageGeneration: Bool {
-      get {_imageGeneration ?? false}
-      set {_imageGeneration = newValue}
-    }
-    /// Returns true if `imageGeneration` has been explicitly set.
-    public var hasImageGeneration: Bool {self._imageGeneration != nil}
-    /// Clears the value of `imageGeneration`. Subsequent reads from it will return its default value.
-    public mutating func clearImageGeneration() {self._imageGeneration = nil}
-
-    public var shell: Bool {
-      get {_shell ?? false}
-      set {_shell = newValue}
-    }
-    /// Returns true if `shell` has been explicitly set.
-    public var hasShell: Bool {self._shell != nil}
-    /// Clears the value of `shell`. Subsequent reads from it will return its default value.
-    public mutating func clearShell() {self._shell = nil}
-
-    public var files: Bool {
-      get {_files ?? false}
-      set {_files = newValue}
-    }
-    /// Returns true if `files` has been explicitly set.
-    public var hasFiles: Bool {self._files != nil}
-    /// Clears the value of `files`. Subsequent reads from it will return its default value.
-    public mutating func clearFiles() {self._files = nil}
-
-    public var skills: Bool {
-      get {_skills ?? false}
-      set {_skills = newValue}
-    }
-    /// Returns true if `skills` has been explicitly set.
-    public var hasSkills: Bool {self._skills != nil}
-    /// Clears the value of `skills`. Subsequent reads from it will return its default value.
-    public mutating func clearSkills() {self._skills = nil}
-
-    public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-    public init() {}
-
-    fileprivate var _web: Bool? = nil
-    fileprivate var _imageGeneration: Bool? = nil
-    fileprivate var _shell: Bool? = nil
-    fileprivate var _files: Bool? = nil
-    fileprivate var _skills: Bool? = nil
-  }
-
   public init() {}
 
   fileprivate var _storage = _StorageClass.defaultInstance
@@ -1085,7 +985,7 @@ fileprivate nonisolated let _protobuf_package = "euler.v1"
 
 nonisolated extension Euler_V1_UserPreferences: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UserPreferences"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tool_permission_rules\0\u{1}image\0\u{1}settings\0\u{1}appearance\0\u{1}layout\0\u{1}capabilities\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tool_permission_rules\0\u{1}image\0\u{1}settings\0\u{1}appearance\0\u{1}layout\0")
 
   fileprivate class _StorageClass {
     var _toolPermissionRules: [Euler_V1_ToolPermissionRule] = []
@@ -1093,7 +993,6 @@ nonisolated extension Euler_V1_UserPreferences: SwiftProtobuf.Message, SwiftProt
     var _settings: Euler_V1_UserSettings? = nil
     var _appearance: Euler_V1_Appearance? = nil
     var _layout: Euler_V1_Layout? = nil
-    var _capabilities: Euler_V1_Capabilities? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1109,7 +1008,6 @@ nonisolated extension Euler_V1_UserPreferences: SwiftProtobuf.Message, SwiftProt
       _settings = source._settings
       _appearance = source._appearance
       _layout = source._layout
-      _capabilities = source._capabilities
     }
   }
 
@@ -1133,7 +1031,6 @@ nonisolated extension Euler_V1_UserPreferences: SwiftProtobuf.Message, SwiftProt
         case 3: try { try decoder.decodeSingularMessageField(value: &_storage._settings) }()
         case 4: try { try decoder.decodeSingularMessageField(value: &_storage._appearance) }()
         case 5: try { try decoder.decodeSingularMessageField(value: &_storage._layout) }()
-        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._capabilities) }()
         default: break
         }
       }
@@ -1161,9 +1058,6 @@ nonisolated extension Euler_V1_UserPreferences: SwiftProtobuf.Message, SwiftProt
       try { if let v = _storage._layout {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
       } }()
-      try { if let v = _storage._capabilities {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1178,7 +1072,6 @@ nonisolated extension Euler_V1_UserPreferences: SwiftProtobuf.Message, SwiftProt
         if _storage._settings != rhs_storage._settings {return false}
         if _storage._appearance != rhs_storage._appearance {return false}
         if _storage._layout != rhs_storage._layout {return false}
-        if _storage._capabilities != rhs_storage._capabilities {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1461,56 +1354,6 @@ nonisolated extension Euler_V1_Layout.ArtifactState: SwiftProtobuf.Message, Swif
   }
 }
 
-nonisolated extension Euler_V1_Capabilities: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".Capabilities"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}web\0\u{3}image_generation\0\u{1}shell\0\u{1}files\0\u{1}skills\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBoolField(value: &self.web) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.imageGeneration) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self.shell) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.files) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self.skills) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.web != false {
-      try visitor.visitSingularBoolField(value: self.web, fieldNumber: 1)
-    }
-    if self.imageGeneration != false {
-      try visitor.visitSingularBoolField(value: self.imageGeneration, fieldNumber: 2)
-    }
-    if self.shell != false {
-      try visitor.visitSingularBoolField(value: self.shell, fieldNumber: 3)
-    }
-    if self.files != false {
-      try visitor.visitSingularBoolField(value: self.files, fieldNumber: 4)
-    }
-    if self.skills != false {
-      try visitor.visitSingularBoolField(value: self.skills, fieldNumber: 5)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Euler_V1_Capabilities, rhs: Euler_V1_Capabilities) -> Bool {
-    if lhs.web != rhs.web {return false}
-    if lhs.imageGeneration != rhs.imageGeneration {return false}
-    if lhs.shell != rhs.shell {return false}
-    if lhs.files != rhs.files {return false}
-    if lhs.skills != rhs.skills {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 nonisolated extension Euler_V1_GetPreferencesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetPreferencesRequest"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
@@ -1566,14 +1409,13 @@ nonisolated extension Euler_V1_GetPreferencesResponse: SwiftProtobuf.Message, Sw
 
 nonisolated extension Euler_V1_UpdatePreferencesRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UpdatePreferencesRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}image\0\u{1}settings\0\u{1}appearance\0\u{1}layout\0\u{1}capabilities\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}image\0\u{1}settings\0\u{1}appearance\0\u{1}layout\0")
 
   fileprivate class _StorageClass {
     var _image: Euler_V1_UpdatePreferencesRequest.ImagePatch? = nil
     var _settings: Euler_V1_UpdatePreferencesRequest.SettingsPatch? = nil
     var _appearance: Euler_V1_UpdatePreferencesRequest.AppearancePatch? = nil
     var _layout: Euler_V1_UpdatePreferencesRequest.LayoutPatch? = nil
-    var _capabilities: Euler_V1_UpdatePreferencesRequest.CapabilitiesPatch? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -1588,7 +1430,6 @@ nonisolated extension Euler_V1_UpdatePreferencesRequest: SwiftProtobuf.Message, 
       _settings = source._settings
       _appearance = source._appearance
       _layout = source._layout
-      _capabilities = source._capabilities
     }
   }
 
@@ -1611,7 +1452,6 @@ nonisolated extension Euler_V1_UpdatePreferencesRequest: SwiftProtobuf.Message, 
         case 2: try { try decoder.decodeSingularMessageField(value: &_storage._settings) }()
         case 3: try { try decoder.decodeSingularMessageField(value: &_storage._appearance) }()
         case 4: try { try decoder.decodeSingularMessageField(value: &_storage._layout) }()
-        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._capabilities) }()
         default: break
         }
       }
@@ -1636,9 +1476,6 @@ nonisolated extension Euler_V1_UpdatePreferencesRequest: SwiftProtobuf.Message, 
       try { if let v = _storage._layout {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
       } }()
-      try { if let v = _storage._capabilities {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
-      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -1652,7 +1489,6 @@ nonisolated extension Euler_V1_UpdatePreferencesRequest: SwiftProtobuf.Message, 
         if _storage._settings != rhs_storage._settings {return false}
         if _storage._appearance != rhs_storage._appearance {return false}
         if _storage._layout != rhs_storage._layout {return false}
-        if _storage._capabilities != rhs_storage._capabilities {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -1878,60 +1714,6 @@ nonisolated extension Euler_V1_UpdatePreferencesRequest.LayoutPatch: SwiftProtob
     if lhs._sidebarCollapsed != rhs._sidebarCollapsed {return false}
     if lhs._artifactWidth != rhs._artifactWidth {return false}
     if lhs._artifactState != rhs._artifactState {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension Euler_V1_UpdatePreferencesRequest.CapabilitiesPatch: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = Euler_V1_UpdatePreferencesRequest.protoMessageName + ".CapabilitiesPatch"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}web\0\u{3}image_generation\0\u{1}shell\0\u{1}files\0\u{1}skills\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBoolField(value: &self._web) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self._imageGeneration) }()
-      case 3: try { try decoder.decodeSingularBoolField(value: &self._shell) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self._files) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self._skills) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._web {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._imageGeneration {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._shell {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._files {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 4)
-    } }()
-    try { if let v = self._skills {
-      try visitor.visitSingularBoolField(value: v, fieldNumber: 5)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Euler_V1_UpdatePreferencesRequest.CapabilitiesPatch, rhs: Euler_V1_UpdatePreferencesRequest.CapabilitiesPatch) -> Bool {
-    if lhs._web != rhs._web {return false}
-    if lhs._imageGeneration != rhs._imageGeneration {return false}
-    if lhs._shell != rhs._shell {return false}
-    if lhs._files != rhs._files {return false}
-    if lhs._skills != rhs._skills {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

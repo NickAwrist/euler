@@ -6,15 +6,16 @@ import {
   type GetRuntimeResponseSchema,
 } from "../../src/gen/euler/v1/agent_pb";
 import {
+  FeatureId,
+  type FeatureSchema,
+  FeatureService,
+} from "../../src/gen/euler/v1/features_pb";
+import {
   InputCapability,
   ModelProvider,
   type ModelSchema,
   ModelService,
 } from "../../src/gen/euler/v1/models_pb";
-import {
-  type GetEnvironmentResponseSchema,
-  PreferenceService,
-} from "../../src/gen/euler/v1/preferences_pb";
 import { ProviderService } from "../../src/gen/euler/v1/providers_pb";
 import {
   type MessageSchema,
@@ -39,13 +40,42 @@ export type RuntimeInit = Init<typeof GetRuntimeResponseSchema>;
 export const at = timestampFromMs;
 export const sandbox = { kind: { case: "sandbox" as const, value: {} } };
 
+const workspaceCommands = [
+  {
+    name: "directory",
+    description: "Allow this chat to work in a folder on the server",
+  },
+  { name: "link", description: "Work in another chat's workspace" },
+  { name: "sandbox", description: "Return this chat to its private workspace" },
+];
+/** The features that add to a chat's sidebar and composer, all running. */
+export const chatFeatures: Init<typeof FeatureSchema>[] = [
+  {
+    id: FeatureId.FILES,
+    label: "Files",
+    sidebarTab: "Files",
+    commands: [
+      ...workspaceCommands,
+      { name: "workspace", description: "Show files in this chat's workspace" },
+    ],
+  },
+  {
+    id: FeatureId.SANDBOX,
+    label: "Sandbox",
+    sidebarTab: "Jobs",
+    commands: workspaceCommands,
+  },
+  { id: FeatureId.SKILLS, label: "Skills" },
+  { id: FeatureId.SUBAGENTS, label: "Subagents", sidebarTab: "Agents" },
+].map((feature) => ({ ...feature, toggleable: true, enabled: true }));
+
 /** A transcript message from a role name and text. */
 export function message(
   role: "user" | "assistant" | "event",
   content: string,
   fields: Pick<
     MessageInitShape<typeof MessageSchema>,
-    "attachments" | "steps" | "versions" | "id" | "activationId"
+    "attachments" | "steps"
   > = {},
 ): MessageInit {
   const roles = {
@@ -92,7 +122,6 @@ export type AppFixture = {
   /** Stored chats by ID; GetSession reports others as missing. */
   chats?: Record<string, SessionInit>;
   models?: ModelInit[];
-  environment?: MessageInitShape<typeof GetEnvironmentResponseSchema>;
 };
 
 /**
@@ -120,14 +149,11 @@ export async function mockApp(page: Page, fixture: AppFixture = {}) {
         models: fixture.models ?? [
           ollamaModel("test", { name: "Test", lab: "Test" }),
         ],
-        providers: { ollama: { connected: true } },
       })),
       on(ProviderService.method.getOllamaHealth, () => ({ connected: true })),
       on(ProviderService.method.getComfyUiHealth, () => ({ connected: true })),
-      on(PreferenceService.method.getEnvironment, () => ({
-        ollamaHost: false,
-        comfyuiHost: false,
-        ...fixture.environment,
+      on(FeatureService.method.listFeatures, () => ({
+        features: chatFeatures,
       })),
     ],
     { empty: true },

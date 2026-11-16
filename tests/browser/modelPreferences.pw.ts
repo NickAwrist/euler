@@ -125,9 +125,6 @@ for (const device of ["desktop", "mobile"] as const) {
           tracked = true;
         }),
       ),
-      on(ProviderService.method.removeOpenRouterPublisher, () =>
-        saved(() => {}),
-      ),
       on(ProviderService.method.getApiKey, () => ({
         state: { hasKey: true, environmentManaged: false },
       })),

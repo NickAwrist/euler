@@ -31,6 +31,8 @@ export default function WelcomeDemo() {
         sessions={[]}
         home={params.get("home") !== "false"}
         ephemeral={params.get("ephemeral") === "true"}
+        commands
+        skills
         composerHeight={composerHeight}
         onNewEphemeralRun={noop}
         onOpenSession={noop}
@@ -67,6 +69,8 @@ export default function WelcomeDemo() {
         attachmentsSendReady
         linkedLabel={null}
         workspace={sandboxWorkspace()}
+        commands={[]}
+        offerSkills={false}
         onRunCommand={noop}
         onFooterHeightChange={setComposerHeight}
       />

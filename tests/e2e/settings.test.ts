@@ -1,4 +1,3 @@
-import "../setup";
 import { beforeEach, describe, expect, test } from "bun:test";
 import { toBinary } from "@bufbuild/protobuf";
 import { getOpenRouterApiKey } from "../../src/db";

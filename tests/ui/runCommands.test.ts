@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { create } from "@bufbuild/protobuf";
+import { FeatureSchema } from "../../src/gen/euler/v1/features_pb";
 import { SessionWorkspaceSchema } from "../../src/gen/euler/v1/sessions_pb";
 import {
-  exactRunCommand,
-  matchingRunCommands,
+  exactRunCommand as exact,
+  featureRunCommands,
+  matchingRunCommands as matching,
 } from "../../ui/components/runCommands";
 import type { SessionWorkspace } from "../../ui/types";
 
@@ -19,10 +21,39 @@ const linked = create(SessionWorkspaceSchema, {
     value: { linked: { workspaceId: "chat-a", sessionId: "chat-a" } },
   },
 });
+const workspaceCommands = ["directory", "link", "sandbox"].map((name) => ({
+  name,
+  description: name,
+}));
+// Two features share the workspace commands, as Files and Sandbox do.
+const commands = featureRunCommands([
+  create(FeatureSchema, {
+    commands: [
+      ...workspaceCommands,
+      { name: "workspace", description: "Show files" },
+    ],
+  }),
+  create(FeatureSchema, {
+    commands: [...workspaceCommands, { name: "unknown", description: "" }],
+  }),
+]);
+const exactRunCommand = (input: string) => exact(commands, input);
+const matchingRunCommands = (input: string, workspace: SessionWorkspace) =>
+  matching(commands, input, workspace);
 const names = (workspace: SessionWorkspace) =>
   matchingRunCommands("/", workspace).map((command) => command.name);
 
 describe("run commands", () => {
+  test("come from features, each once, without the ones this app cannot run", () => {
+    expect(commands).toEqual([
+      { name: "directory", description: "directory" },
+      { name: "link", description: "link" },
+      { name: "sandbox", description: "sandbox" },
+      { name: "workspace", description: "Show files" },
+    ]);
+    expect(featureRunCommands([])).toEqual([]);
+  });
+
   test("recognizes exact workspace commands for local UI handling", () => {
     expect(exactRunCommand("/directory")).toBe("directory");
     expect(exactRunCommand(" /sandbox ")).toBe("sandbox");

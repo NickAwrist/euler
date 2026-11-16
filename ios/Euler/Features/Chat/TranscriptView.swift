@@ -6,7 +6,6 @@ import SwiftUI
 struct TranscriptView: View {
     let chat: ChatStore
     @Binding var sheet: ChatSheet?
-    @Environment(\.palette) private var palette
     @State private var position = ScrollPosition(edge: .bottom)
     @State private var atBottom = true
     @State private var editing: Int?
@@ -132,7 +131,6 @@ extension EnvironmentValues {
 private struct LiveReplyView: View {
     let chat: ChatStore
     @Binding var sheet: ChatSheet?
-    @Environment(\.palette) private var palette
 
     var body: some View {
         let activation = chat.live.activation

@@ -1,4 +1,3 @@
-import "../setup";
 import { describe, expect, test } from "bun:test";
 import { createSkillRow, getSkillByName } from "../../src/db";
 import { ManageSkillsTool } from "../../src/tools/manage_skills";

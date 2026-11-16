@@ -72,17 +72,13 @@ export function getTierSvgChildren(tier: ThinkingTier): ReactNode[] {
 export function BrainTierIcon({
   effort,
   level,
-  tier,
-  className,
   size = 16,
 }: {
   effort?: string | null;
   level?: number;
-  tier?: ThinkingTier;
-  className?: string;
   size?: number;
 }) {
-  const resolvedTier = tier ?? normalizeThinkingTier(effort, level);
+  const resolvedTier = normalizeThinkingTier(effort, level);
   const colorClass = TIER_COLOR_CLASSES[resolvedTier];
 
   return (
@@ -95,7 +91,7 @@ export function BrainTierIcon({
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className={cx("shrink-0", colorClass, className)}
+      className={cx("shrink-0", colorClass)}
       aria-hidden="true"
     >
       {getTierSvgChildren(resolvedTier)}
@@ -107,12 +103,10 @@ export function ThinkingLevelBar({
   reasoning,
   value,
   onChange,
-  disabled,
 }: {
   reasoning: ModelReasoning;
   value: string | null | undefined;
   onChange: (effort: string) => void;
-  disabled: boolean;
 }) {
   const options = useMemo(() => buildThinkingOptions(reasoning), [reasoning]);
   const effectiveValue = resolveEffectiveOptionFromList(
@@ -132,7 +126,6 @@ export function ThinkingLevelBar({
 
   return (
     <AnchoredPopover
-      disabled={disabled}
       ariaLabel="Thinking level"
       panelClassName="thinking-level-picker"
       maxHeight={280}
@@ -183,7 +176,6 @@ export function ThinkingLevelBar({
           aria-haspopup="menu"
           aria-expanded={isOpen}
           aria-controls={popoverTarget}
-          disabled={disabled}
           title={`Thinking level: ${currentOption?.label ?? "Default"}`}
           className="flex items-center gap-1.5 rounded-lg px-2 py-1 text-[0.8125rem] text-muted-foreground outline-none focus:outline-none focus-visible:outline-2 focus-visible:outline-accent-ring transition-[background-color,color] duration-150 hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45"
           onKeyDown={(event) => {

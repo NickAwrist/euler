@@ -4,7 +4,7 @@ import {
   composerSuggestionSources,
   findActiveToolToken,
 } from "../components/composerSuggestions";
-import type { RunCommandName } from "../components/runCommands";
+import type { RunCommand, RunCommandName } from "../components/runCommands";
 import { findActiveSkillToken } from "../components/skillPicker";
 import type { McpTool } from "../persist/mcpServers";
 import { fetchMcpTools } from "../persist/mcpServers";
@@ -17,6 +17,8 @@ export function useComposerSuggestions({
   dismissed,
   busy,
   workspace,
+  commands,
+  offerSkills,
   complete,
   runCommand,
 }: {
@@ -25,6 +27,8 @@ export function useComposerSuggestions({
   dismissed: boolean;
   busy: boolean;
   workspace: SessionWorkspace;
+  commands: readonly RunCommand[];
+  offerSkills: boolean;
   complete: (completion: { value: string; caret: number }) => void;
   runCommand: (command: RunCommandName) => void;
 }) {
@@ -33,7 +37,8 @@ export function useComposerSuggestions({
   const [toolStatus, setToolStatus] = useState<"loading" | "ready" | "error">(
     "loading",
   );
-  const skillToken = dismissed ? null : findActiveSkillToken(input, caret);
+  const skillToken =
+    dismissed || !offerSkills ? null : findActiveSkillToken(input, caret);
   const toolToken = dismissed ? null : findActiveToolToken(input, caret);
   const discoverTools = toolToken !== null;
 
@@ -76,6 +81,7 @@ export function useComposerSuggestions({
         input,
         workspace,
         busy,
+        commands,
         skills,
         tools,
         skillToken,

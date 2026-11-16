@@ -12,6 +12,7 @@ import { DebugService } from "../../src/gen/euler/v1/debug_pb";
 import { DeviceService } from "../../src/gen/euler/v1/devices_pb";
 import { DirectoryService } from "../../src/gen/euler/v1/directories_pb";
 import { EventService } from "../../src/gen/euler/v1/events_pb";
+import { FeatureService } from "../../src/gen/euler/v1/features_pb";
 import { JobService } from "../../src/gen/euler/v1/jobs_pb";
 import { McpServerService } from "../../src/gen/euler/v1/mcp_pb";
 import { ModelService } from "../../src/gen/euler/v1/models_pb";
@@ -54,6 +55,7 @@ export function rpc(owner: string | null = TEST_USER_ID) {
     devices: client(DeviceService),
     workspace: client(WorkspaceService),
     preferences: client(PreferenceService),
+    features: client(FeatureService),
     skills: client(SkillService),
     mcp: client(McpServerService),
     providers: client(ProviderService),

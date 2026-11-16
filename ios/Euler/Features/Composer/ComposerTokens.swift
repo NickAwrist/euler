@@ -84,19 +84,11 @@ struct ComposerToken: Equatable {
     }
 }
 
-/// The web's chat commands, offered when the whole message is a `/word`.
-enum ChatCommand: String, CaseIterable {
+/// The chat commands this app can run. Running features offer them, when the
+/// whole message is a `/word`.
+enum ChatCommand: String {
     case directory
     case link
     case sandbox
     case workspace
-
-    var description: String {
-        switch self {
-        case .directory: "Allow this chat to work in a folder on the server"
-        case .link: "Work in another chat's workspace"
-        case .sandbox: "Return this chat to its private workspace"
-        case .workspace: "Show files in this chat's workspace"
-        }
-    }
 }

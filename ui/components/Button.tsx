@@ -16,7 +16,6 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ButtonSize;
   loading?: boolean;
   icon?: ComponentType<{ size?: number; className?: string }>;
-  iconPosition?: "left" | "right";
   children?: ReactNode;
 }
 
@@ -43,7 +42,6 @@ export const Button = forwardRef(function Button(
     loading = false,
     disabled = false,
     icon: Icon,
-    iconPosition = "left",
     type = "button",
     className,
     children,
@@ -78,9 +76,8 @@ export const Button = forwardRef(function Button(
       )}
       {...rest}
     >
-      {iconPosition === "left" && iconElement}
+      {iconElement}
       {children}
-      {iconPosition === "right" && iconElement}
     </button>
   );
 });

@@ -49,7 +49,6 @@ describe("workspace service", () => {
     expect(
       new Set([first.hostPath, second.hostPath, third.hostPath]).size,
     ).toBe(3);
-    expect(first.displayPath).toBe("/workspace");
   });
 
   test("rejects traversal and symlinks that leave the workspace", async () => {
@@ -77,7 +76,6 @@ describe("workspace service", () => {
     roots.push(local);
     for (const directory of [null, local]) {
       const workspace = await workspaces.resolveSession(sessionRow(directory));
-      expect(workspace.displayPath).toBe("/workspace");
       const target = join(workspace.hostPath, "output.txt");
       await workspaces.writeFile(workspace, "/workspace/output.txt", "output");
       expect(

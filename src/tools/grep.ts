@@ -63,19 +63,16 @@ export class GrepTool extends BaseTool {
       typeof args.path === "string" && args.path.length > 0 ? args.path : ".";
     try {
       const workspace = requireWorkspace(ctx);
-      const path = rawPath;
       const regex = new RegExp(patternStr);
 
-      const results = await this.searchRecursive(workspace, path, regex);
+      const results = await this.searchRecursive(workspace, rawPath, regex);
 
       if (results.length === 0) {
         return textToolResult("No matches found.");
       }
 
       return textToolResult(
-        results
-          .join("\n")
-          .replaceAll(requireWorkspace(ctx).hostPath, "/workspace"),
+        results.join("\n").replaceAll(workspace.hostPath, "/workspace"),
       );
     } catch (e) {
       return textToolResult(workspaceError(e));

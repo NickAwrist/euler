@@ -1,5 +1,6 @@
 import { getSessionById } from "../db/sessions";
 import { effectiveUserPreferences } from "../db/userPreferences";
+import { featureOwning } from "../features/index";
 import { OperationError } from "../observability/errors";
 import type { DisplayIcon } from "../schemas/icons";
 import {
@@ -9,6 +10,7 @@ import {
   type ToolPermissionRule,
 } from "../schemas/toolPermissions";
 import {
+  WORKSPACE_PATH,
   type Workspace,
   workspaceService,
 } from "../workspaces/WorkspaceService";
@@ -21,7 +23,8 @@ export type ApprovalContext = {
   agentId: string;
   agentTitle: string;
   icons?: readonly DisplayIcon[];
-  workspace: Workspace;
+  /** Absent when no active feature works in the chat's workspace. */
+  workspace?: Workspace;
   signal: AbortSignal;
   waiting(): void;
 };
@@ -59,16 +62,22 @@ export class ToolApprovalCoordinator {
     tool: string,
     args: Record<string, unknown>,
   ) {
-    const preferences = effectiveUserPreferences(context.owner);
-    const permissions = permissionService.resolve(
-      context.workspace,
-      preferences.capabilities,
-      preferences.toolPermissions,
+    // A feature switched off mid-run stops its tools, whatever the rules say.
+    const feature = featureOwning(tool);
+    if (feature && !feature.enabled(context.owner))
+      return {
+        action: "deny" as const,
+        reason: `The ${feature.id} feature is disabled`,
+      };
+    return permissionService.callDecision(
+      effectiveUserPreferences(context.owner).toolPermissions,
+      tool,
+      args,
+      {
+        sessionId: context.sessionId,
+        workspacePath: context.workspace?.hostPath,
+      },
     );
-    return permissionService.callDecision(permissions, tool, args, {
-      sessionId: context.sessionId,
-      workspacePath: context.workspace.hostPath,
-    });
   }
 
   async authorize(
@@ -90,9 +99,11 @@ export class ToolApprovalCoordinator {
       ...(context.icons?.length ? { icons: [...context.icons] } : {}),
       arguments: args,
       workspacePath:
-        context.workspace.kind === "local"
+        context.workspace?.kind === "local"
           ? context.workspace.hostPath
-          : context.workspace.displayPath,
+          : context.workspace
+            ? WORKSPACE_PATH
+            : "",
       reason: decision.reason,
       matchingScope: "Identical arguments in this chat and workspace",
     };
@@ -118,7 +129,7 @@ export class ToolApprovalCoordinator {
       );
       if (context.signal.aborted) throw new Error("Tool call cancelled");
       if (answer === "deny") throw new Error("Tool call denied by the user");
-      // A changed deny rule or capability must still win after an approval.
+      // A changed deny rule or feature switch must still win after an approval.
       const current = this.checkCall(context, tool, args);
       if (current.action === "deny") throw new Error(current.reason);
     } finally {
@@ -150,10 +161,11 @@ export class ToolApprovalCoordinator {
       const session = getSessionById(owner, sessionId);
       if (!session)
         throw new OperationError("NOT_FOUND", { message: "Session not found" });
-      const workspace = await workspaceService.resolveSession(session);
+      const workspace =
+        context.workspace && (await workspaceService.resolveSession(session));
       if (
-        workspace.kind !== context.workspace.kind ||
-        workspace.hostPath !== context.workspace.hostPath
+        workspace?.kind !== context.workspace?.kind ||
+        workspace?.hostPath !== context.workspace?.hostPath
       ) {
         throw new OperationError("CONFLICT", {
           message:
@@ -181,7 +193,7 @@ export class ToolApprovalCoordinator {
             action: "allow",
             condition: { kind: "arguments", value: approval.arguments },
             sessionId,
-            workspacePath: context.workspace.hostPath,
+            workspacePath: context.workspace?.hostPath,
           }
         : undefined;
     if (rule) saveToolPermissionRule(owner, rule);

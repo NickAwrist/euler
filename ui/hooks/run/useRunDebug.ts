@@ -18,13 +18,11 @@ async function loadDebugData(
   const metadata = buildRunMetadata(settings);
 
   const [{ systemPrompt }, stored] = await Promise.all([
-    debugClient.previewPrompt({ sessionId, metadata, message }),
+    debugClient.previewPrompt({ metadata, message }),
     fetchSession(sessionId),
   ]);
   return {
     systemPrompt,
-    history: stored?.history ?? [],
-    customTitle: stored?.customTitle,
     modelMessages: stored?.modelMessages,
   };
 }
@@ -38,7 +36,6 @@ export function useRunDebug({ userSettingsRef, setDebugData }: Args) {
           console.error("Failed to load debug data", error);
           setDebugData({
             systemPrompt: "",
-            history: [],
             error:
               "Failed to load the debug preview. Close and reopen it to retry.",
           });

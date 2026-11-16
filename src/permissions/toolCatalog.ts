@@ -1,6 +1,10 @@
-import { agentManager } from "../agents/agentManager";
 import { agentRuntime } from "../agents/runtime/AgentRuntime";
-import { openUserMcpTools } from "../mcp/userTools";
+import type { FeatureTools } from "../features/Feature";
+import {
+  activeFeatures,
+  featureIds,
+  openFeatureTools,
+} from "../features/index";
 import type { DisplayIcon } from "../schemas/icons";
 import { toolDefinition } from "../tools/background";
 import { mergeToolFields } from "./toolFieldMetadata";
@@ -8,13 +12,20 @@ import { toolFields } from "./toolFields";
 
 /** Current definitions, including user-scoped MCP names exactly as agents invoke them. */
 export async function toolCatalog(ownerUuid: string, signal: AbortSignal) {
-  const options = { ownerUuid };
-  const builtins = [
-    ...agentManager.createAgent(options).tools,
-    ...agentManager.createGeneralAgent(options).tools,
-    ...agentRuntime.toolCatalog(ownerUuid),
-  ];
-  const mcp = await openUserMcpTools(ownerUuid, signal);
+  const features = await activeFeatures(ownerUuid);
+  const active = featureIds(features);
+  const open = (
+    agentKind: "main" | "general",
+    from = features,
+  ): Promise<FeatureTools> =>
+    openFeatureTools(from, {
+      ownerUuid,
+      agentKind,
+      active,
+      signal,
+      host: agentRuntime.catalogHost(ownerUuid, agentKind),
+    });
+  const main = await open("main");
   try {
     const tools = new Map<
       string,
@@ -25,7 +36,12 @@ export async function toolCatalog(ownerUuid: string, signal: AbortSignal) {
         icons?: readonly DisplayIcon[];
       }
     >();
-    for (const tool of [...builtins, ...mcp.tools]) {
+    // A server's tools are the same for a subagent; connect to it only once.
+    const general = await open(
+      "general",
+      features.filter((feature) => feature.id !== "mcp"),
+    );
+    for (const tool of [...main.tools, ...general.tools]) {
       const { description, parameters } = toolDefinition(tool).function;
       const { name } = tool;
       const fields = toolFields(parameters);
@@ -44,6 +60,6 @@ export async function toolCatalog(ownerUuid: string, signal: AbortSignal) {
     }
     return [...tools.values()].sort((a, b) => a.name.localeCompare(b.name));
   } finally {
-    await mcp.close();
+    await main.close?.();
   }
 }

@@ -134,8 +134,6 @@ export function useSessionPreferences({
 
   return {
     selectedModel,
-    setSelectedModel,
-    sessionModel,
     setSessionModel,
     thinkingEffort,
     workspace,

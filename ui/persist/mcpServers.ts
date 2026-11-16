@@ -8,7 +8,7 @@ import {
 import { mcpServerClient, withErrorMessage } from "../lib/rpc";
 
 export { McpServerOAuth_GrantType };
-export type { McpServer, McpTool, StartServerOAuthResponse };
+export type { McpServer, McpTool };
 export type McpServerCheck = {
   result: TestServerResponse["result"];
   authorizationRequired: boolean;

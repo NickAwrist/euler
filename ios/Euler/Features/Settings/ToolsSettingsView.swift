@@ -3,39 +3,46 @@ import EulerAPI
 import SwiftProtobuf
 import SwiftUI
 
-/// Customization › Tools: built-in capabilities, MCP servers and tool permission rules.
+/// Customization › Tools: features, MCP servers and tool permission rules.
 struct ToolsSettingsView: View {
     @Environment(AppSession.self) private var session
 
     var body: some View {
         ThemedForm {
-            CapabilitiesSection()
+            FeaturesSection()
             McpServersSection()
             PermissionRulesSection()
         }
         .navigationTitle("Tools")
+        // What a feature needs, such as an API key, can change between visits.
+        .task { await session.features.load() }
     }
 }
 
-private struct CapabilitiesSection: View {
+private struct FeaturesSection: View {
     @Environment(AppSession.self) private var session
 
     var body: some View {
-        let capabilities = session.preferences.preferences.capabilities
-        Section("Built-in") {
-            toggle("Web search", capabilities.web) { $0.web = $1 }
-            toggle("Image generation", capabilities.imageGeneration) { $0.imageGeneration = $1 }
-            toggle("Shell", capabilities.shell) { $0.shell = $1 }
-            toggle("Files", capabilities.files) { $0.files = $1 }
-            toggle("Skill management", capabilities.skills) { $0.skills = $1 }
+        let store = session.features
+        Section("Features") {
+            if store.loaded {
+                ForEach(store.features.filter(\.toggleable), id: \.id) { feature in
+                    // A feature the server cannot run says why and stays off.
+                    Toggle(isOn: Binding(
+                        get: { feature.enabled && !feature.hasUnavailableReason },
+                        set: { enabled in Task { await session.notices.attempt { try await store.setEnabled(feature.id, enabled) } } }
+                    )) {
+                        Text(feature.label)
+                        if feature.hasUnavailableReason {
+                            Text(feature.unavailableReason)
+                        }
+                    }
+                    .disabled(feature.hasUnavailableReason)
+                }
+            } else {
+                ProgressView()
+            }
         }
-    }
-
-    private func toggle(_ title: String, _ value: Bool, set: @escaping (inout Euler_V1_UpdatePreferencesRequest.CapabilitiesPatch, Bool) -> Void) -> some View {
-        Toggle(title, isOn: Binding(
-            get: { value },
-            set: { enabled in savePreferences(session) { set(&$0.capabilities, enabled) } }
-        ))
     }
 }
 
@@ -339,8 +346,6 @@ private struct PermissionRulesSection: View {
                 }
         } header: {
             Text("Tool permissions")
-        } footer: {
-            Text("The first matching rule decides; tool calls without a match ask.")
         }
     }
 

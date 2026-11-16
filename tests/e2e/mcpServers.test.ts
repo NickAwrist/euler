@@ -1,4 +1,3 @@
-import "../setup";
 import { expect, test } from "bun:test";
 import { toBinary } from "@bufbuild/protobuf";
 import {

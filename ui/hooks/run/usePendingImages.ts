@@ -11,7 +11,6 @@ import {
   MAX_IMAGE_BYTES,
 } from "../../../src/attachments/types";
 import type { ImageAttachment } from "../../../src/gen/euler/v1/attachments_pb";
-import { whileRunning } from "../../lib/whileRunning";
 import { uploadImageAttachment } from "../../persist/attachments";
 import { createBrowserUuid } from "../../persist/userIdentity";
 
@@ -32,7 +31,6 @@ export function usePendingImages({
 }: Args) {
   const [pendingImages, setPendingImages] = useState<PendingImage[]>([]);
   const [imageError, setImageError] = useState<string | null>(null);
-  const [uploadPending, setUploadPending] = useState(false);
   const pendingImagesRef = useRef<PendingImage[]>([]);
   useLayoutEffect(() => {
     pendingImagesRef.current = pendingImages;
@@ -110,21 +108,20 @@ export function usePendingImages({
   }, []);
 
   const uploadPendingImages = useCallback(
-    (sessionId: string): Promise<ImageAttachment[] | null> =>
-      whileRunning(setUploadPending, async () => {
-        try {
-          return await Promise.all(
-            pendingImages.map((image) =>
-              uploadImageAttachment(sessionId, image.file),
-            ),
-          );
-        } catch (error) {
-          setImageError(
-            error instanceof Error ? error.message : "Could not upload image.",
-          );
-          return null;
-        }
-      }),
+    async (sessionId: string): Promise<ImageAttachment[] | null> => {
+      try {
+        return await Promise.all(
+          pendingImages.map((image) =>
+            uploadImageAttachment(sessionId, image.file),
+          ),
+        );
+      } catch (error) {
+        setImageError(
+          error instanceof Error ? error.message : "Could not upload image.",
+        );
+        return null;
+      }
+    },
     [pendingImages],
   );
 
@@ -134,7 +131,6 @@ export function usePendingImages({
     pendingImages,
     imageError,
     setImageError,
-    uploadPending,
     addPendingImages,
     removePendingImage,
     clearPendingImages,

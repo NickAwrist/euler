@@ -22,10 +22,7 @@ const ROLES = {
 export function fixtureMessage(
   role: keyof typeof ROLES,
   content: string,
-  fields: Pick<
-    MessageInitShape<typeof MessageSchema>,
-    "steps" | "attachments" | "versions"
-  > = {},
+  fields: Pick<MessageInitShape<typeof MessageSchema>, "attachments"> = {},
 ): Message {
   return create(MessageSchema, { ...fields, role: ROLES[role], content });
 }

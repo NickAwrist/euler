@@ -26,12 +26,25 @@ description until it loads the skill.
 - Ask the agent to create, edit, or delete a skill, for example "update my
   storytelling skill to open with dialogue".
 
-## Built-in capabilities
+## Features
 
-On the **Tools** tab, **Built-in capabilities** turns **Web search**, **Image
-generation**, **Shell**, **Files**, or **Skill management** off for your
+On the **Tools** tab, **Features** turns **Files**, **Sandbox**, **Web
+search**, **Image generation**, **Skills**, or **Subagents** off for your
 agents. Turn one off to use an MCP server's version, such as its image
-generation.
+generation, or to keep it out of the agent's context.
+
+With **Skills** off, agents get no skills and `$skill-name` does nothing. The
+guidance for subagents is a skill, so it goes too.
+
+A feature the server cannot run stays off and says what it needs, such as a
+Brave Search API key or Bubblewrap. The README lists each requirement.
+
+A chat's sidebar has a tab for each running feature with something to show:
+**Files**, **Jobs** for Sandbox, and **Agents** for Subagents. With none of
+them running, the sidebar is hidden.
+
+MCP servers have no switch here. Agents get their tools once you enable a
+server.
 
 Rules for individual tool calls are in [Tool permissions](tool-permissions.md).
 

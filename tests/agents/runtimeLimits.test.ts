@@ -1,10 +1,8 @@
-import "../setup";
 import { expect, spyOn, test } from "bun:test";
 import { AgentRuntime } from "../../src/agents/runtime/AgentRuntime";
 import { setOpenRouterApiKey } from "../../src/db";
 import type { AgentRecord } from "../../src/db/agents";
 import { createSessionRow, getMessagesForSession } from "../../src/db/sessions";
-import { workspaceService } from "../../src/workspaces/WorkspaceService";
 import {
   getOpenRouterRequests,
   setOpenRouterScenario,
@@ -22,7 +20,6 @@ async function until(condition: () => boolean) {
 async function session(runtime: AgentRuntime) {
   const id = crypto.randomUUID();
   createSessionRow(owner, id, Date.now(), model);
-  await workspaceService.provisionRetained(owner, id);
   setOpenRouterApiKey("test");
   return runtime.main(owner, id);
 }

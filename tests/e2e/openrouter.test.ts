@@ -1,8 +1,5 @@
-import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
-import { waitForActivation } from "../helpers/activation";
-import { TEST_USER_ID } from "../helpers/server";
-import "../setup";
 import { describe, expect, spyOn, test } from "bun:test";
+import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
 import {
   createSessionRow,
   getOpenRouterApiKey,
@@ -27,8 +24,10 @@ import {
   normalizeCatalog,
   openRouterCatalog,
 } from "../../src/models/openRouterModels";
+import { waitForActivation } from "../helpers/activation";
 import { setOpenRouterScenario } from "../helpers/mockOpenRouter";
 import { Code, rpc, rpcCode } from "../helpers/rpc";
+import { TEST_USER_ID } from "../helpers/server";
 
 describe("OpenRouter API integration", () => {
   test("exposes a provider-aware model catalog even when one provider fails", async () => {

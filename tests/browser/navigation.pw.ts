@@ -157,12 +157,12 @@ test("view navigation desktop opens fresh view links without replacing them with
   await page.addInitScript(() =>
     sessionStorage.setItem("activeSessionId", "b"),
   );
+  await mockUserPreferences(page);
   for (const [path, heading] of [
     ["/settings/openrouter", "Settings"],
     ["/customization", "Customization"],
     ["/usage", "Usage insights"],
   ]) {
-    await mockUserPreferences(page);
     await page.goto(path!);
     await expect(page).toHaveURL(new RegExp(`${path}$`));
     await expect(

@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test";
-import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
+import {
+  AgentRuntime,
+  agentRuntime,
+} from "../../src/agents/runtime/AgentRuntime";
 import { setOpenRouterApiKey } from "../../src/db";
 import { getDb } from "../../src/db/connection";
 import { getMessagesForSession } from "../../src/db/sessions";
@@ -211,9 +214,6 @@ test("ephemeral chat jobs persist, survive reply completion, and stop cancels th
 });
 
 test("restart records one non-waking interruption notification without restarting work", async () => {
-  const { AgentRuntime } = await import(
-    "../../src/agents/runtime/AgentRuntime"
-  );
   const { id } = await rpc().sessions.createSession({ model });
   try {
     const main = agentRuntime.main(TEST_USER_ID, id);

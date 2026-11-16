@@ -57,14 +57,12 @@ function TraceSection({ label, text }: { label: string; text: string }) {
 
 export function TraceStepBody({
   step,
-  showIndex,
   stepNumber,
   streamingThinking,
   timeline,
 }: {
   step: Step;
-  showIndex: boolean;
-  stepNumber?: number;
+  stepNumber: number;
   streamingThinking?: string;
   timeline?: TimelineSpan;
 }) {
@@ -75,17 +73,11 @@ export function TraceStepBody({
   const durationMs = traceStepDurationMs(step);
 
   return (
-    <div
-      className={cx(
-        showIndex && "border-b border-border-subtle py-[14px] last:border-b-0",
-      )}
-    >
+    <div className="border-b border-border-subtle py-[14px] last:border-b-0">
       <div className="flex flex-wrap items-center gap-2">
-        {showIndex && stepNumber != null ? (
-          <span className="flex size-[26px] items-center justify-center rounded-md bg-muted text-[0.6875rem] font-semibold text-muted-foreground">
-            {stepNumber}
-          </span>
-        ) : null}
+        <span className="flex size-[26px] items-center justify-center rounded-md bg-muted text-[0.6875rem] font-semibold text-muted-foreground">
+          {stepNumber}
+        </span>
         <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-[3px] text-[0.6875rem] font-medium text-foreground">
           {step.kind === Step_Kind.TOOL_CALL && (
             <ToolIcon name={step.toolName} icons={step.toolIcons} size={12} />

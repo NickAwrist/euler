@@ -1,5 +1,4 @@
 import type { JsonObject } from "@bufbuild/protobuf";
-import type { Message } from "../../src/gen/euler/v1/sessions_pb";
 
 export type {
   Message,
@@ -17,8 +16,6 @@ export type TruncateConfirmState =
 export interface DebugData {
   error?: string;
   systemPrompt: string;
-  history: Message[];
-  customTitle?: string;
   /** Cumulative model `messages` (excludes system); next turn prepends system and appends the new user message. */
   modelMessages?: JsonObject[];
 }

@@ -98,14 +98,6 @@ test("markdown rendering preserves lists, lines, code, tables, and link navigati
   expect(await popup.evaluate(() => window.opener)).toBeNull();
   await expect(page).toHaveURL(/\/dev\/messages\?markdown$/);
   await popup.close();
-
-  await mockUserPreferences(page);
-  await page.goto("/dev/artifacts");
-  await page.getByRole("button", { name: "the notes", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Workspace notes" }),
-  ).toBeVisible();
-  await expect(page).toHaveURL(/\/dev\/artifacts$/);
 });
 
 test("markdown rendering shows tool output images once and opens sources in a new tab", async ({

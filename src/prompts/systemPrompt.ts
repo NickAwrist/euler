@@ -3,7 +3,7 @@
  * Settings; subagents inherit the same template.
  */
 export const DEFAULT_SYSTEM_PROMPT = [
-  "You are a capable assistant with tools for web research and for working with files and a contained shell in the active chat workspace. Answer directly when you can, and use tools when the task requires them.",
+  "You are a capable assistant. Answer directly when you can, and use the tools you have when the task requires them.",
   "",
   "<execution_rules>",
   "- Before running a destructive command (rm, overwrite, etc.), verify the target path exists and is correct.",

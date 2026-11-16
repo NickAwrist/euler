@@ -204,7 +204,6 @@ struct ApiKeySection: View {
     let title: String
     var onChange: () async -> Void = {}
     @Environment(AppSession.self) private var session
-    @Environment(\.palette) private var palette
     @State private var state: Euler_V1_ApiKeyState?
     @State private var editing = false
     @State private var key = ""

@@ -50,9 +50,6 @@ const ollama = Bun.serve({
       return Response.json({ capabilities: ["completion", "tools"] });
     if (pathname !== "/api/chat")
       return new Response("Not found", { status: 404 });
-    const body = (await request.json()) as { stream?: boolean };
-    if (body.stream === false)
-      return Response.json(chatLine("Fixture reply", true));
     const encoder = new TextEncoder();
     let controller: ReadableStreamDefaultController<Uint8Array> | undefined;
     const stream: OpenStream = {

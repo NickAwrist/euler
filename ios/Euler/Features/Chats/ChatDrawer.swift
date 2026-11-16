@@ -133,6 +133,7 @@ struct ChatDrawer: View {
             .refreshable {
                 await session.sessions.reload()
                 await session.models.load()
+                await session.features.load()
             }
         }
     }

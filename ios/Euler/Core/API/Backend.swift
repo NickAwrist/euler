@@ -14,6 +14,7 @@ nonisolated struct Backend: Sendable {
     let models: any Euler_V1_ModelServiceClientInterface
     let devices: any Euler_V1_DeviceServiceClientInterface
     let preferences: any Euler_V1_PreferenceServiceClientInterface
+    let features: any Euler_V1_FeatureServiceClientInterface
     let workspace: any Euler_V1_WorkspaceServiceClientInterface
     let skills: any Euler_V1_SkillServiceClientInterface
     let mcpServers: any Euler_V1_McpServerServiceClientInterface
@@ -44,6 +45,7 @@ nonisolated struct Backend: Sendable {
         models = Euler_V1_ModelServiceClient(client: client)
         devices = Euler_V1_DeviceServiceClient(client: client)
         preferences = Euler_V1_PreferenceServiceClient(client: client)
+        features = Euler_V1_FeatureServiceClient(client: client)
         workspace = Euler_V1_WorkspaceServiceClient(client: client)
         skills = Euler_V1_SkillServiceClient(client: client)
         mcpServers = Euler_V1_McpServerServiceClient(client: client)

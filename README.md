@@ -16,11 +16,19 @@ remote MCP servers, and set allow, ask, and deny rules for tool calls.
 
 - [Bun](https://bun.sh/)
 - A model provider: Ollama, an OpenRouter API key, or a ChatGPT plan
-- Linux with procfs for the file tools
-- [Bubblewrap](https://github.com/containers/bubblewrap) for the shell tools.
-  Ubuntu 24.04 needs an
-  [AppArmor profile](docs/workspaces.md#bubblewrap-on-ubuntu-2404) too.
-- Optional: ComfyUI for image generation, a Brave Search API key for web search
+
+Everything else is a feature. An agent gets a feature's tools once the
+feature's own requirement is met:
+
+| Feature | Needs |
+| --- | --- |
+| Files | Linux with procfs |
+| Sandbox | [Bubblewrap](https://github.com/containers/bubblewrap). Ubuntu 24.04 needs an [AppArmor profile](docs/workspaces.md#bubblewrap-on-ubuntu-2404) too. |
+| Web search | A Brave Search API key |
+| Image generation | ComfyUI |
+| Subagents | Nothing |
+| Skills | Nothing |
+| MCP servers | An enabled server |
 
 ## Quick start
 
@@ -38,8 +46,8 @@ model. For remote inference, set up **Settings > OpenRouter** or
 
 ### Using Euler
 
-- [Customization](docs/customization.md): the system prompt, skills, built-in
-  tools, and MCP servers
+- [Customization](docs/customization.md): the system prompt, skills, features,
+  and MCP servers
 - [Tool permissions](docs/tool-permissions.md): rules and approvals
 - [Workspaces](docs/workspaces.md): sandboxes, local directories, and artifacts
 

@@ -49,6 +49,10 @@ test("sources share a picker while keeping command and tool selection separate",
     input: "/",
     workspace: sandboxWorkspace(),
     busy: false,
+    commands: [
+      { name: "directory", description: "Work in a folder" },
+      { name: "workspace", description: "Show files" },
+    ],
     skills: [],
     tools: [
       create(McpToolSchema, {
@@ -67,7 +71,6 @@ test("sources share a picker while keeping command and tool selection separate",
   );
   expect(options.map(({ label }) => label)).toEqual([
     "/directory",
-    "/link",
     "/workspace",
     "/mcp__test__echo",
   ]);

@@ -1,4 +1,3 @@
-import "../env-setup";
 import { expect, test } from "bun:test";
 import { AgentRuntime } from "../../src/agents/runtime/AgentRuntime";
 import { AgentStore } from "../../src/db/agents";

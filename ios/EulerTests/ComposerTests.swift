@@ -33,6 +33,57 @@ struct ComposerTokenTests {
     }
 }
 
+struct ChatFeaturesTests {
+    private func feature(
+        _ id: Euler_V1_FeatureId,
+        tab: String? = nil,
+        commands: [String] = [],
+        enabled: Bool = true,
+        unavailable: String? = nil
+    ) -> Euler_V1_Feature {
+        var feature = Euler_V1_Feature()
+        feature.id = id
+        feature.enabled = enabled
+        if let tab { feature.sidebarTab = tab }
+        if let unavailable { feature.unavailableReason = unavailable }
+        feature.commands = commands.map { name in
+            var command = Euler_V1_Feature.Command()
+            command.name = name
+            command.description_p = "Runs \(name)"
+            return command
+        }
+        return feature
+    }
+
+    @Test func onlyRunningFeaturesAddPanelsAndCommands() {
+        let chat = ChatFeatures([
+            feature(.files, tab: "Files", commands: ["directory", "workspace"], enabled: false),
+            feature(.sandbox, tab: "Jobs", commands: ["directory", "link", "unknown"]),
+            feature(.subagents, tab: "Agents", unavailable: "unavailable"),
+            feature(.skills),
+            feature(.mcp),
+        ])
+        #expect(chat.panels.map(\.label) == ["Jobs"])
+        #expect(chat.commands == [
+            RunCommand(name: .directory, description: "Runs directory"),
+            RunCommand(name: .link, description: "Runs link"),
+        ])
+        #expect(chat.choosesWorkspace)
+        #expect(chat.skills)
+        #expect(chat.mcp)
+        #expect(!chat.files)
+    }
+
+    @Test func nothingIsOfferedBeforeTheFeaturesLoad() {
+        let chat = ChatFeatures([])
+        #expect(chat.panels.isEmpty)
+        #expect(chat.commands.isEmpty)
+        #expect(!chat.choosesWorkspace)
+        #expect(!chat.skills)
+        #expect(!chat.mcp)
+    }
+}
+
 /// A port of ui/lib/thinkingLevel.ts.
 struct ThinkingOptionTests {
     private func reasoning(efforts: [String] = [], mandatory: Bool = false, enabled: Bool = true, defaultEffort: String? = nil) -> Euler_V1_ModelReasoning {

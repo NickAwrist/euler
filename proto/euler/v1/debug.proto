@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package euler.v1;
 
-import "buf/validate/validate.proto";
 import "euler/v1/agent.proto";
 
 // What the model would see, for the debug view.
@@ -14,8 +13,6 @@ service DebugService {
 }
 
 message PreviewPromptRequest {
-  // The chat whose workspace the prompt describes; absent for a new chat.
-  optional string session_id = 1 [(buf.validate.field).string.min_len = 1];
   optional RunMetadata metadata = 2;
   // A draft message, for skills it would invoke.
   optional string message = 3;

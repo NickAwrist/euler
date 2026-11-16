@@ -1,9 +1,7 @@
-import "../setup";
 import { expect, test } from "bun:test";
 import { AgentRuntime } from "../../src/agents/runtime/AgentRuntime";
 import { setOpenRouterApiKey } from "../../src/db";
 import { createSessionRow } from "../../src/db/sessions";
-import { workspaceService } from "../../src/workspaces/WorkspaceService";
 import {
   getOpenRouterRequests,
   setOpenRouterScenario,
@@ -21,10 +19,8 @@ async function until(check: () => boolean) {
 for (const edit of [false, true]) {
   test(`${edit ? "edit" : "retry"} deletes running and ended agents from discarded messages`, async () => {
     const runtime = new AgentRuntime();
-    await workspaceService.initialize();
     const id = crypto.randomUUID();
     createSessionRow(owner, id, Date.now(), model);
-    await workspaceService.provisionRetained(owner, id);
     setOpenRouterApiKey("test");
     const main = runtime.main(owner, id);
     try {

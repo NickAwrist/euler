@@ -7,8 +7,6 @@ import type {
 import type { WorkspaceFile } from "../../src/gen/euler/v1/workspace_pb";
 import { isNotFound, sessionClient, workspaceClient } from "../lib/rpc";
 
-export type { Session, SessionSummary, SessionWorkspace };
-
 /** The user's chats, most recently updated first. */
 export async function fetchSessionSummaries(): Promise<SessionSummary[]> {
   return (await sessionClient.listSessions({})).sessions;

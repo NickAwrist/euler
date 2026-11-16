@@ -14,13 +14,10 @@ test("attaches only tool-reported paths without scanning or leaking outside the 
   const workspace = {
     kind: "local" as const,
     hostPath: root,
-    displayPath: "/workspace",
   };
   const ctx = new RunContext(
-    new BaseAgent("test", "test"),
+    new BaseAgent("test"),
     permissionService.resolve(workspace),
-    undefined,
-    undefined,
     undefined,
     undefined,
     undefined,

@@ -1,7 +1,6 @@
 import type { BaseAgent } from "./agents/BaseAgent";
 import type { ToolOutputAttachment } from "./attachments/types";
 import type { RunPermissions } from "./permissions/PermissionService";
-import type { PromptContext } from "./prompts/render";
 import type { DisplayIcon } from "./schemas/icons";
 import type { Workspace } from "./workspaces/WorkspaceService";
 
@@ -55,20 +54,15 @@ export type OnStreamDelta = (
 ) => void;
 
 export class RunContext {
-  /** Server runs use live rules and approvals; standalone runs use the supplied policy and fail closed on Ask. */
+  /** Checks a call against the user's live rules and approvals. A run without it can call no tool. */
   authorizeToolCall?: (
     tool: string,
     args: Record<string, unknown>,
     icons?: readonly DisplayIcon[],
   ) => Promise<void>;
   jobs?: import("./tools/background").JobExecutor;
-  agentInstance: BaseAgent;
   readonly agentName: string;
   readonly signal?: AbortSignal;
-  /** Resolved host path for the active workspace. */
-  readonly sessionDir?: string;
-  /** Values used to render `{{PLACEHOLDERS}}` in subagent templates. */
-  readonly promptContext?: PromptContext;
   readonly ownerUuid: string;
   readonly workspace?: Workspace;
   readonly permissions: RunPermissions;
@@ -86,18 +80,13 @@ export class RunContext {
     onChange?: OnStepChange,
     onStreamDelta?: OnStreamDelta,
     signal?: AbortSignal,
-    sessionDir?: string,
-    promptContext?: PromptContext,
     ownerUuid = "",
     workspace?: Workspace,
   ) {
-    this.agentInstance = agentInstance;
     this.agentName = agentInstance.name;
     this._onChange = onChange;
     this._onStreamDelta = onStreamDelta;
     this.signal = signal;
-    this.sessionDir = sessionDir;
-    this.promptContext = promptContext;
     this.ownerUuid = ownerUuid;
     this.workspace = workspace;
     this.permissions = permissions;

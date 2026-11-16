@@ -6,31 +6,33 @@ import type {
 import type { AgentRecord, AgentStore } from "../../db/agents";
 import { getAttachment } from "../../db/attachments";
 import { getSessionById } from "../../db/sessions";
-import { effectiveUserPreferences } from "../../db/userPreferences";
 
 import type { Activation, AgentEvent } from "../../events/types";
+import type { FeatureTools, RunHost } from "../../features/Feature";
+import {
+  activeFeatures,
+  featureIds,
+  openFeatureTools,
+} from "../../features/index";
 import type { LlmMessage } from "../../llm";
-import { type McpToolSet, openUserMcpTools } from "../../mcp/userTools";
 import { logEvent } from "../../observability/logger";
 import { permissionService } from "../../permissions/PermissionService";
 import { isFinalAgent } from "../../schemas/agents";
 import type { DisplayIcon } from "../../schemas/icons";
 import type { WireMessageInput } from "../../schemas/run";
-import type { BaseTool } from "../../tools/BaseTool";
 import type { Workspace } from "../../workspaces/WorkspaceService";
-import { workspaceService } from "../../workspaces/WorkspaceService";
-import { agentManager, buildServerRunPromptContext } from "../agentManager";
 import {
-  INBOX_DIRECTIVES,
-  inboxModelContent,
-  pendingSummary,
-} from "./agentContext";
+  WORKSPACE_PATH,
+  workspaceService,
+} from "../../workspaces/WorkspaceService";
+import { agentManager, buildServerRunPromptContext } from "../agentManager";
+import { inboxModelContent, pendingSummary } from "./agentContext";
 import { changedWorkspaceFiles } from "./workspaceOutputs";
 
 export interface ActivationHost {
   authorizeToolCall(
     agent: AgentRecord,
-    workspace: Workspace,
+    workspace: Workspace | undefined,
     signal: AbortSignal,
     tool: string,
     args: Record<string, unknown>,
@@ -45,12 +47,12 @@ export interface ActivationHost {
   isDeleting(sessionId: string): boolean;
   transcriptLength(sessionId: string): number;
   allowModelCall(agent: AgentRecord): boolean;
-  tools(
+  runHost(
     agent: AgentRecord,
     signal: AbortSignal,
     wait: () => void,
     model: () => string,
-  ): BaseTool[];
+  ): RunHost;
   enqueue(
     agent: AgentRecord,
     sender: string,
@@ -107,7 +109,7 @@ export async function runActivation(
   let segmentStart = 0;
   const summarySince = agent.lastSummaryAt;
   let ctx: RunContext | undefined;
-  let mcpTools: McpToolSet | undefined;
+  let featureTools: FeatureTools | undefined;
   let changedFiles: WorkspaceFileAttachment[] = [];
   let attachmentStart = 0;
   let savedReply = "";
@@ -143,13 +145,17 @@ export async function runActivation(
   try {
     const session = getSessionById(agent.ownerUuid, agent.sessionId);
     if (!session) throw new Error("Session not found");
-    const workspace = await workspaceService.resolveSession(session);
+    const features = await activeFeatures(agent.ownerUuid);
+    const active = featureIds(features);
+    const workspace = features.some((feature) => feature.usesWorkspace)
+      ? await workspaceService.resolveSession(session)
+      : undefined;
     const options = {
       ownerUuid: agent.ownerUuid,
-      toolSessionDir: workspace.hostPath,
+      features,
       promptContext: buildServerRunPromptContext({
         metadata: agent.config.metadata,
-        toolSessionDir: workspace.displayPath,
+        sessionDirectory: workspace && WORKSPACE_PATH,
       }),
       reasoningEffort: agent.config.reasoningEffort,
       userPrompt: host.store
@@ -158,17 +164,17 @@ export async function runActivation(
         .map((m) => m.content)
         .join("\n"),
     };
-    const model =
-      agent.kind === "main"
-        ? agentManager.createAgent(options)
-        : agentManager.createGeneralAgent(options);
+    const model = agentManager.createAgent(agent.kind, options);
     model.model = agent.model;
     model.history = historyWithImages(agent);
-    model.systemPrompt += `\n\n${INBOX_DIRECTIVES}`;
     let waiting = false;
     let paused = false;
-    model.addTools(
-      host.tools(
+    featureTools = await openFeatureTools(features, {
+      ownerUuid: agent.ownerUuid,
+      agentKind: agent.kind,
+      active,
+      signal,
+      host: host.runHost(
         agent,
         signal,
         () => {
@@ -176,16 +182,11 @@ export async function runActivation(
         },
         () => model.model,
       ),
-    );
-    mcpTools = await openUserMcpTools(agent.ownerUuid, signal);
-    model.addTools(mcpTools.tools);
+    });
+    model.addTools(featureTools.tools);
     ctx = new RunContext(
       model,
-      permissionService.resolve(
-        workspace,
-        effectiveUserPreferences(agent.ownerUuid).capabilities,
-        effectiveUserPreferences(agent.ownerUuid).toolPermissions,
-      ),
+      permissionService.resolve(workspace),
       (context, step) => {
         const position = context.steps.indexOf(step) - segmentStart;
         if (position < 0) return;
@@ -224,8 +225,6 @@ export async function runActivation(
         });
       },
       signal,
-      workspace.hostPath,
-      options.promptContext,
       agent.ownerUuid,
       workspace,
     );
@@ -333,11 +332,12 @@ export async function runActivation(
     };
     const result = await model.run("", ctx);
     host.store.saveHistory(agent, model.history);
-    changedFiles = await changedWorkspaceFiles(
-      workspace,
-      ctx.writtenFiles,
-      agent.sessionId,
-    );
+    if (workspace)
+      changedFiles = await changedWorkspaceFiles(
+        workspace,
+        ctx.writtenFiles,
+        agent.sessionId,
+      );
     host.atomically(agent.sessionId, closeSegment);
     if (signal.aborted) {
       outcome = "aborted";
@@ -415,6 +415,6 @@ export async function runActivation(
       activationId: partial.id,
       outcome,
     });
-    await mcpTools?.close();
+    await featureTools?.close?.();
   }
 }

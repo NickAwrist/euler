@@ -210,8 +210,7 @@ struct ComposerView: View {
 
     private var exactCommand: ChatCommand? {
         let text = draft.trimmedText
-        guard text.hasPrefix("/") else { return nil }
-        return ChatCommand(rawValue: String(text.dropFirst()))
+        return session.features.chat.commands.first { "/\($0.name.rawValue)" == text }?.name
     }
 
     /// Opens the command's sheet; in a new chat it creates the chat first and opens it there, as the web does.

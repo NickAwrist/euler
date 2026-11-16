@@ -1,4 +1,3 @@
-import "../setup";
 import { expect, test } from "bun:test";
 import fs from "node:fs/promises";
 import { timestampMs } from "@bufbuild/protobuf/wkt";
@@ -24,7 +23,11 @@ test("ephemeral chats are regular sessions with an expiry and are hard-deleted",
   const { session } = await sessions.getSession({ id: ephemeral.id });
   expect(session?.expiresAt && timestampMs(session.expiresAt)).toBe(expiresAt);
 
-  const workspace = workspaceService.retainedPath(TEST_USER_ID, ephemeral.id);
+  // A chat gets its directory the first time a run works in it.
+  const { hostPath: workspace } = await workspaceService.provisionRetained(
+    TEST_USER_ID,
+    ephemeral.id,
+  );
   await fs.writeFile(`${workspace}/output.txt`, "output");
   const trashed = await fs.readdir(workspaceService.trashRoot);
   await sessions.deleteSession({ id: ephemeral.id });

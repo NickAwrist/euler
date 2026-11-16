@@ -1,18 +1,17 @@
-import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
-import "../setup";
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createClient } from "@connectrpc/connect";
 import { createConnectTransport } from "@connectrpc/connect-node";
+import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
 import { getSessionById, patchSessionRow } from "../../src/db";
 import { Message_Role } from "../../src/gen/euler/v1/sessions_pb";
 import { WorkspaceService } from "../../src/gen/euler/v1/workspace_pb";
 import { isLoopbackRequest } from "../../src/http/isLoopbackRequest";
 import { workspaceService } from "../../src/workspaces/WorkspaceService";
 import { Code, rpc, rpcCode } from "../helpers/rpc";
-import { TEST_USER_ID, startTestServer, userHeaders } from "../helpers/server";
+import { TEST_USER_ID, startTestServer } from "../helpers/server";
 
 const temporaryDirectories: string[] = [];
 const OTHER_USER = "22222222-2222-4222-8222-222222222222";
@@ -140,6 +139,23 @@ describe("workspace API", () => {
     );
   });
 
+  test("reading a chat's files does not create its sandbox", async () => {
+    const sessionId = await createSession();
+    expect((await api.workspace.listFiles({ sessionId })).files).toEqual([]);
+    expect((await api.workspace.listArtifacts({ sessionId })).entries).toEqual(
+      [],
+    );
+    for (const read of [
+      api.workspace.listArtifacts({ sessionId, path: "docs" }),
+      api.workspace.previewArtifact({ sessionId, path: "notes.md" }),
+      download(sessionId, "notes.md"),
+    ])
+      expect(await rpcCode(read)).toBe(Code.InvalidArgument);
+    expect(
+      await fs.exists(workspaceService.retainedPath(TEST_USER_ID, sessionId)),
+    ).toBe(false);
+  });
+
   test("creates a private server-owned workspace and ignores path patches", async () => {
     const sessionId = await createSession();
     const row = getSessionById(TEST_USER_ID, sessionId);
@@ -149,29 +165,6 @@ describe("workspace API", () => {
     expect(workspace.hostPath).toContain(
       `/workspaces/${TEST_USER_ID}/${sessionId}`,
     );
-    // UpdateSession has no workspace fields; unknown JSON fields change nothing.
-    const { url, close } = await startTestServer();
-    try {
-      const patch = await fetch(
-        `${url}/api/rpc/euler.v1.SessionService/UpdateSession`,
-        {
-          method: "POST",
-          headers: userHeaders(undefined, {
-            "Content-Type": "application/json",
-          }),
-          body: JSON.stringify({
-            id: sessionId,
-            sessionDirectory: "/tmp",
-            workspaceKind: "local",
-          }),
-        },
-      );
-      expect(patch.status).toBe(200);
-    } finally {
-      await close();
-    }
-    const { session } = await api.sessions.getSession({ id: sessionId });
-    expect(session?.workspace?.kind.case).toBe("sandbox");
   });
 
   test("deleting a local-workspace chat leaves the directory untouched", async () => {

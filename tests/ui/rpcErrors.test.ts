@@ -5,7 +5,7 @@ import { withErrorMessage } from "../../ui/lib/rpc";
 
 test("unexplained RPC failures report the caller's message", async () => {
   const failure = withErrorMessage(
-    Promise.reject(new ApiError("HTTP 503", 0, undefined, Code.Unavailable)),
+    Promise.reject(new ApiError("HTTP 503", undefined, Code.Unavailable)),
     "Failed to load tools",
   );
   const error = await failure.catch((caught: unknown) => caught);
@@ -15,7 +15,7 @@ test("unexplained RPC failures report the caller's message", async () => {
 });
 
 test("server-explained RPC failures keep the server's message", async () => {
-  const explained = new ApiError("Skill name is taken", 0, {
+  const explained = new ApiError("Skill name is taken", {
     code: "CONFLICT",
     message: "Skill name is taken",
   });

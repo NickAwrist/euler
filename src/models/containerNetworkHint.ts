@@ -1,8 +1,7 @@
 import { existsSync } from "node:fs";
 
-export function isRunningInContainer(): boolean {
-  return existsSync("/.dockerenv") || process.env.CONTAINER === "true";
-}
+const IN_CONTAINER =
+  existsSync("/.dockerenv") || process.env.CONTAINER === "true";
 
 export function isLoopbackHttpUrl(value: string): boolean {
   try {
@@ -18,7 +17,7 @@ export function isLoopbackHttpUrl(value: string): boolean {
 }
 
 export function withContainerLoopbackHint(error: string, host: string): string {
-  if (!host || !isRunningInContainer() || !isLoopbackHttpUrl(host)) {
+  if (!host || !IN_CONTAINER || !isLoopbackHttpUrl(host)) {
     return error;
   }
 

@@ -22,15 +22,13 @@ async function fixture(content: string) {
   const path = join(root, "file.txt");
   await fs.writeFile(path, content, { mode: 0o755 });
   const ctx = new RunContext(
-    new BaseAgent("test", "test"),
+    new BaseAgent("test"),
     permissionService.resolve({ kind: "local" }),
     undefined,
     undefined,
     undefined,
-    undefined,
-    undefined,
     "owner",
-    { kind: "local", hostPath: root, displayPath: "/workspace" },
+    { kind: "local", hostPath: root },
   );
   const patch = (body: string, target = "file.txt") =>
     new ApplyPatchTool().execute(

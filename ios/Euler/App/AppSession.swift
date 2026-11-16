@@ -12,6 +12,7 @@ final class AppSession {
     let sessions: SessionStore
     let models: ModelStore
     let preferences: PreferenceStore
+    let features: FeatureStore
     let completions: CompletionSources
     let notices = Notices()
     /// The chat a tapped notification asks to show.
@@ -35,6 +36,7 @@ final class AppSession {
         sessions = SessionStore(client: backend.sessions)
         models = ModelStore(client: backend.models, userID: identity.userID)
         preferences = PreferenceStore(client: backend.preferences)
+        features = FeatureStore(client: backend.features)
         completions = CompletionSources(backend: backend)
         SharedSettings.setServerURL(identity.serverURL)
         events.onEvent = { [weak self] event in self?.apply(event) }

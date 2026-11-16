@@ -44,6 +44,10 @@ const FIXTURE_MODEL = {
   },
 };
 const { app } = await import("../../src/app");
+const { sandboxRunner } = await import("../../src/sandbox/SandboxRunner");
+// The scripted flows ask to run bash. Offer it on hosts that cannot contain it
+// too, such as the Mac the iOS UI tests run on.
+sandboxRunner.capability = async () => ({ capable: true });
 const { setOpenRouterApiKey } = await import("../../src/db");
 const { setOpenRouterModelEnabled } = await import("../../src/db/openrouter");
 setOpenRouterApiKey("fixture");

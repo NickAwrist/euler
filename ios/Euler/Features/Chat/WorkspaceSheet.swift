@@ -7,7 +7,6 @@ struct WorkspaceSheet: View {
     let chat: ChatStore
     @Environment(AppSession.self) private var session
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.palette) private var palette
 
     var body: some View {
         NavigationStack {

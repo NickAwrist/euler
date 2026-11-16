@@ -41,8 +41,9 @@ private struct SignedInView: View {
                 push.backend = session.backend
                 async let preferences: Void = session.preferences.load()
                 async let models: Void = session.models.load()
+                async let features: Void = session.features.load()
                 async let chats: Void = session.sessions.reload()
-                _ = await (preferences, models, chats)
+                _ = await (preferences, models, features, chats)
                 await push.requestAuthorization()
             }
             // Each identity registers this device for its own user.

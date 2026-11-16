@@ -66,24 +66,6 @@ const originalFetch = globalThis.fetch;
       });
     }
 
-    if (pathname.endsWith("/api/chat")) {
-      return new Response(
-        JSON.stringify({
-          model: "llama3:latest",
-          created_at: new Date().toISOString(),
-          message: {
-            role: "assistant",
-            content: "Mocked Ollama response content",
-          },
-          done: true,
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
     // 2. ComfyUI mocks
     if (pathname.endsWith("/system_stats")) {
       return new Response(
@@ -114,31 +96,6 @@ const originalFetch = globalThis.fetch;
         JSON.stringify({
           prompt_id: "mock-prompt-123",
           number: 1,
-        }),
-        {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    if (pathname.includes("/history/")) {
-      const promptId = pathname.split("/history/")[1] || "";
-      return new Response(
-        JSON.stringify({
-          [promptId]: {
-            outputs: {
-              "9": {
-                images: [
-                  {
-                    filename: "mock_image.png",
-                    subfolder: "",
-                    type: "output",
-                  },
-                ],
-              },
-            },
-          },
         }),
         {
           status: 200,

@@ -49,15 +49,16 @@ export const layoutSchema = z.object({
     })
     .default({ open: false, workspace: "", path: null }),
 });
-/** Built-in agent capabilities a user can turn off, e.g. in favor of an MCP server. */
-export const capabilitiesSchema = z.object({
+/** The switch of each feature a user can turn off, e.g. in favor of an MCP server. */
+const featureTogglesSchema = z.object({
+  files: z.boolean().default(true),
+  sandbox: z.boolean().default(true),
   web: z.boolean().default(true),
   imageGeneration: z.boolean().default(true),
-  shell: z.boolean().default(true),
-  files: z.boolean().default(true),
   skills: z.boolean().default(true),
+  subagents: z.boolean().default(true),
 });
-export type Capabilities = z.infer<typeof capabilitiesSchema>;
+export type FeatureToggles = z.infer<typeof featureTogglesSchema>;
 export const DEFAULT_COMFYUI_NEGATIVE_PROMPT =
   "low quality, worst quality, blurry, watermark, signature, text, bad anatomy, deformed, ugly, duplicate, extra fingers, poorly drawn hands, poorly drawn face, mutation, cropped";
 export const imagePreferencesSchema = z.object({
@@ -77,94 +78,10 @@ export const userPreferencesSchema = z.object({
   settings: userSettingsSchema.default(() => userSettingsSchema.parse({})),
   appearance: appearanceSchema.default(() => appearanceSchema.parse({})),
   layout: layoutSchema.default(() => layoutSchema.parse({})),
-  capabilities: capabilitiesSchema.default(() => capabilitiesSchema.parse({})),
+  features: featureTogglesSchema.default(() => featureTogglesSchema.parse({})),
 });
 export type UserPreferences = z.infer<typeof userPreferencesSchema>;
-const strictAppearanceSchema = z
-  .object({
-    theme: appearanceSchema.shape.theme.removeCatch(),
-    font: appearanceSchema.shape.font.removeCatch(),
-    chatWidth: appearanceSchema.shape.chatWidth.removeCatch(),
-    codeFont: appearanceSchema.shape.codeFont.removeCatch(),
-    shiftForChatList: appearanceSchema.shape.shiftForChatList.removeCatch(),
-    shiftForArtifacts: appearanceSchema.shape.shiftForArtifacts.removeCatch(),
-    sidebarAnimationMs: appearanceSchema.shape.sidebarAnimationMs.removeCatch(),
-  })
-  .strict();
-export const userPreferencesPatchSchema = z
-  .object({
-    toolPermissions: z
-      .object({
-        rules: ToolPermissionsSchema.shape.rules.removeDefault().optional(),
-      })
-      .strict()
-      .optional(),
-    image: z
-      .object({
-        defaultModel: imagePreferencesSchema.shape.defaultModel
-          .removeDefault()
-          .optional(),
-        defaultWidth: imagePreferencesSchema.shape.defaultWidth
-          .removeDefault()
-          .optional(),
-        defaultHeight: imagePreferencesSchema.shape.defaultHeight
-          .removeDefault()
-          .optional(),
-        negativePrompt: imagePreferencesSchema.shape.negativePrompt
-          .removeDefault()
-          .optional(),
-      })
-      .strict()
-      .optional(),
-    settings: z
-      .object({
-        systemPrompt: userSettingsSchema.shape.systemPrompt
-          .removeDefault()
-          .optional(),
-        name: userSettingsSchema.shape.name.removeDefault().optional(),
-        preferredFormats: userSettingsSchema.shape.preferredFormats
-          .removeDefault()
-          .optional(),
-        location: userSettingsSchema.shape.location.removeDefault().optional(),
-        defaultModel: userSettingsSchema.shape.defaultModel
-          .removeDefault()
-          .optional(),
-        includeCurrentDate: userSettingsSchema.shape.includeCurrentDate
-          .removeDefault()
-          .optional(),
-        showDebugButton: userSettingsSchema.shape.showDebugButton
-          .removeDefault()
-          .optional(),
-      })
-      .strict()
-      .optional(),
-    appearance: strictAppearanceSchema.partial().optional(),
-    layout: z
-      .object({
-        sidebarCollapsed: layoutSchema.shape.sidebarCollapsed
-          .removeDefault()
-          .optional(),
-        artifactWidth: layoutSchema.shape.artifactWidth
-          .removeDefault()
-          .optional(),
-        artifactState: layoutSchema.shape.artifactState
-          .removeDefault()
-          .optional(),
-      })
-      .strict()
-      .optional(),
-    capabilities: z
-      .object({
-        web: capabilitiesSchema.shape.web.removeDefault().optional(),
-        imageGeneration: capabilitiesSchema.shape.imageGeneration
-          .removeDefault()
-          .optional(),
-        shell: capabilitiesSchema.shape.shell.removeDefault().optional(),
-        files: capabilitiesSchema.shape.files.removeDefault().optional(),
-        skills: capabilitiesSchema.shape.skills.removeDefault().optional(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
-export type UserPreferencesPatch = z.infer<typeof userPreferencesPatchSchema>;
+/** The fields a write changes; a section left out keeps its saved values. */
+export type UserPreferencesPatch = {
+  [Section in keyof UserPreferences]?: Partial<UserPreferences[Section]>;
+};
