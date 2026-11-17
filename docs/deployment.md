@@ -35,17 +35,17 @@ deployctl restart euler
 ```
 
 Open Euler at that address in the browser and in the iPhone app.
-`EULER_PUBLIC_URL` lets an MCP sign-in started from a plain HTTP address
-return over HTTPS.
+`EULER_PUBLIC_URL` sets the HTTPS callback for MCP
+[OAuth](customization.md#oauth).
 
 - **Reveal file** stays limited to a browser on the server's own machine.
 - A browser keeps its user UUID per address, so the first visit at the new
   address starts as a new user. Copy the UUID from **Settings > General** at
   the old address and paste it into **Switch UUID** at the new one.
 
-Plain HTTP still works. Set `EULER_BACKEND_HOST=0.0.0.0` and open
-`http://<host>:<port>`. MCP sign-in is limited at such an address. See
-[OAuth](customization.md#oauth).
+Plain HTTP still works: set `EULER_BACKEND_HOST=0.0.0.0` and open
+`http://<host>:<port>` (see [OAuth](customization.md#oauth) for MCP sign-in
+limits over HTTP).
 
 ## Updating
 

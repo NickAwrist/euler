@@ -170,10 +170,8 @@ Two things render differently from the web:
   is taken as `https`.
 - **MCP sign-in.** Authorize opens the provider's page in a system sheet
   (`webAuthenticationSession`). The server finishes the sign-in on its own
-  callback and redirects to `euler://mcp-oauth`, which closes the sheet. The
-  phone has to reach that callback over HTTPS. Without an HTTPS address the app
-  says so and opens nothing. See
-  [OAuth](../docs/customization.md#oauth).
+  callback and redirects to `euler://mcp-oauth`, which closes the sheet.
+  Requires Euler on HTTPS; see [OAuth](../docs/customization.md#oauth).
 
 ## Tests
 

@@ -1,9 +1,8 @@
 # The Connect API
 
 The web app and the iPhone app call RPCs defined in `proto/euler/v1/` and
-served by [Connect](https://connectrpc.com/) at `/api/rpc`. Three plain GET
-routes remain. ComfyUI outputs and favicons serve `<img src>`, and the third is
-the MCP OAuth callback.
+served by [Connect](https://connectrpc.com/) at `/api/rpc`. Plain GET routes
+serve `<img src>` (ComfyUI outputs and favicons) and the MCP OAuth callback.
 
 ## Contract and generated code
 

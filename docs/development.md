@@ -68,12 +68,11 @@ bun run test:browser
 `bun test` loads a test setup with an in-memory database and mocked services.
 Dev instances use your real configuration.
 
-Several checks need Linux, because the file and shell tools do. On macOS about
-40 unit tests and one browser test fail.
+Euler requires Linux for workspace file tools and shell sandboxing, so failures
+are expected when running server and workspace tests on macOS.
 
 CI builds the app and runs the
-[performance check](../scripts/performance/README.md). It doesn't run the
-other checks yet.
+[performance check](../scripts/performance/README.md).
 
 ## Browser tests
 
@@ -85,9 +84,6 @@ bun run test:browser
 The tests run Vite on port 5199, run mobile and desktop interactions, and save
 screenshots in `.cache/browser-results/`. They need no display server. Test
 files end in `.pw.ts` so `bun test` doesn't pick them up.
-
-Outside CI the tests reuse a server already on port 5199, which may be another
-worktree's. Stop it first.
 
 The `/dev/...` routes are UI fixtures for these tests. Production builds
 exclude them. To try one by hand, run `bun run dev:ui` and open
@@ -102,6 +98,6 @@ bun test tests/sandbox
 ```
 
 Run it on a Linux host with working Bubblewrap namespaces to verify workspace
-writes and network isolation. Without Bubblewrap most of these tests report
-skips, and `tests/sandbox/background.test.ts` fails. On Ubuntu 24.04, see
+writes and network isolation; without Bubblewrap, sandbox tests skip or fail.
+On Ubuntu 24.04, see
 [Bubblewrap on Ubuntu 24.04](workspaces.md#bubblewrap-on-ubuntu-2404).

@@ -8,7 +8,7 @@ a temporary database and workspace. It then compares what it measured with
 ## Running locally
 
 ```bash
-bunx playwright install chromium
+bunx playwright install chromium --no-shell
 bun run build
 bun run perf:check
 ```
@@ -83,10 +83,10 @@ diagnose differences between hosts.
   is held during every window that doesn't measure it.
 - **One token at a time.** Streaming waits for each token to render before
   sending the next, so a slower machine can't batch tokens into fewer commits.
-- **Calls answered in turn.** Finishing a reply sends three chat list
-  refreshes at once, and opening a chat sends `GetSession` with `GetRuntime`.
-  If the answers raced, React would render two of them in one commit on some
-  runs and two on others. `answerInTurn` releases each answer only after the
+- **Calls answered in turn.** When an action sends concurrent RPCs (such as
+  `GetSession` and `GetRuntime` when opening a chat, or overlapping list
+  refreshes), racing answers can land in one React commit on some runs and
+  separate commits on others. `answerInTurn` releases each answer only after the
   page has rendered the one before.
 - **Scroll.** The count pass crosses the thread from bottom to top in 200
   settled steps. It covers small scroll steps, not remount work during large
@@ -117,9 +117,8 @@ a reviewed diff, so small increases can't pile up unnoticed.
 ## Coverage
 
 These scenarios cover chat interactions. They don't cover settings pages or
-searching a large workspace. The autocomplete endpoint still walks the whole
-workspace per query and returns up to 200 files, while suggestions use eight.
-See `PERF-3` in [the audit](../../docs/audit-issues.md).
+searching a large workspace (see `PERF-3` in
+[the audit](../../docs/audit-issues.md)).
 
 Virtualization mounts only nearby messages. Browser find and screen readers
 see only those, and Tab reaches the composer after the last mounted row

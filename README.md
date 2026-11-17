@@ -49,7 +49,8 @@ model. For remote inference, set up **Settings > OpenRouter** or
 - [Customization](docs/customization.md): the system prompt, skills, features,
   and MCP servers
 - [Tool permissions](docs/tool-permissions.md): rules and approvals
-- [Workspaces](docs/workspaces.md): sandboxes, local directories, and artifacts
+- [Workspaces](docs/workspaces.md): sandboxes, local directories, and file
+  previews
 
 ### Running Euler
 

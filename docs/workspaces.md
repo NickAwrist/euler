@@ -62,9 +62,10 @@ link can't lead them outside the workspace.
 Run `/link` in a chat to work in another chat's sandbox. Linking to a chat that
 is itself linked joins the same sandbox, so links never chain.
 
-A chat's sandbox is created on its first turn with Files or Sandbox on. It is
-kept while the chat that created it or any chat linked to it still uses it. After the last one is deleted or switches away, the sandbox
-moves to the workspace trash for 7 days.
+A chat's sandbox is created on its first turn with a workspace feature running.
+It is kept while the chat that created it or any chat linked to it still uses
+it. After the last one is deleted or switches away, the sandbox moves to the
+workspace trash for 7 days.
 
 ## Ephemeral chats
 
@@ -77,11 +78,12 @@ trash.
 A sandbox another chat still links to is kept, and goes to the trash once no
 chat uses it. Selected local directories are never removed.
 
-## Artifacts
+## File previews
 
-Run `/workspace` to browse the chat's files. The artifact sidebar previews
-them, including Markdown, images, and HTML with inline CSS. HTML previews
-disable scripts and external resources.
+Run `/workspace` to inspect a chat's workspace and file list. In the chat
+sidebar, the file feature's tab browses and previews workspace files, including
+Markdown, images, and HTML with inline CSS. HTML previews disable scripts and
+external resources.
 
 ## Bubblewrap on Ubuntu 24.04
 

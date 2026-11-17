@@ -28,23 +28,20 @@ description until it loads the skill.
 
 ## Features
 
-On the **Tools** tab, **Features** turns **Files**, **Sandbox**, **Web
-search**, **Image generation**, **Skills**, or **Subagents** off for your
-agents. Turn one off to use an MCP server's version, such as its image
-generation, or to keep it out of the agent's context.
+On the **Tools** tab, **Features** switches built-in features on or off for
+your agents. Turn one off to use an MCP server's equivalent instead, or to keep
+its tools out of the agent's context. MCP servers have no switch here; agents
+get their tools once you enable a server.
 
-With **Skills** off, agents get no skills and `$skill-name` does nothing. The
-guidance for subagents is a skill, so it goes too.
+A feature the server cannot run stays off and shows what it needs. See
+[Requirements](../README.md#requirements).
 
-A feature the server cannot run stays off and says what it needs, such as a
-Brave Search API key or Bubblewrap. The README lists each requirement.
+Running features also add their UI to a chat: the chat sidebar shows a tab for
+each running feature that defines one (and is hidden when none do), and the
+composer's `/` menu offers the commands of running features.
 
-A chat's sidebar has a tab for each running feature with something to show:
-**Files**, **Jobs** for Sandbox, and **Agents** for Subagents. With none of
-them running, the sidebar is hidden.
-
-MCP servers have no switch here. Agents get their tools once you enable a
-server.
+With **Skills** off, agents get no skills, `$skill-name` does nothing, and
+built-in skills such as subagent guidance are omitted too.
 
 Rules for individual tool calls are in [Tool permissions](tool-permissions.md).
 

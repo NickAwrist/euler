@@ -5,11 +5,8 @@ description: Test and verify changes to the Euler web app and server. Covers cho
 
 # Testing the web app and server
 
-The type checker and the unit tests do not load a stored chat through the API
-in a browser. The performance check does, and after the move to Connect it was
-the only check that failed: its seeded chats had a step status the server
-never writes, and `GetSession` answered 500 for every one of them. Run the
-change the way a user reaches it before calling it done.
+Type checking and unit tests do not load stored chats through the API in a
+browser. Run the change the way a user reaches it before calling it done.
 
 ## Pick the check
 
@@ -25,31 +22,15 @@ Use the cheapest one that would fail if the change were wrong.
 | Something only a real provider does | `bun run dev`, on the cheapest model that shows it |
 | The iPhone app | The `test-euler-ios` skill |
 
-`AGENTS.md` says which of these a change needs before handoff. For a broad
-change, run them all.
-
-```bash
-bun test                # about 11 seconds
-bunx tsc --noEmit
-bun run lint            # Biome, then the proto gate
-bun run build           # when the UI build could change
-bun run test:browser    # about a minute, for anything a user can reach
-```
-
-If modules fail to resolve in a new worktree, run
-`bun install --frozen-lockfile`. `bun run init:worktree` links the primary
-checkout's `node_modules`, but only when it ran.
-
-`bun run lint` fails when `src/gen/` or the generated Swift no longer match
-the protos. Run `bun run proto` and commit what it writes.
+`AGENTS.md` ("Refactoring and verification" and "Data and types") lists the
+required pre-handoff checks and proto generation rules. `docs/development.md`
+covers worktree setup and test suites.
 
 ## Linux and the Mac
 
-Workspace file tools and shell tools need Linux. On macOS, about 40 tests in
-`bun test` fail, most because macOS has no `/proc/self/fd`,
-`tests/browser/jobs.pw.ts` fails, and `bun run perf:check` stops at the file
-suggestions. `main` fails the same way there, so compare against it before
-blaming a change. CI runs on Linux.
+Euler requires Linux for workspace file tools (`procfs`) and shell sandboxing,
+so failures are expected when running server, workspace, and performance checks
+on macOS. CI runs on Linux.
 
 On Linux, run everything in the worktree. From a Mac, copy the working tree to
 a temporary directory on a Linux machine you reach over ssh, and run there.
@@ -76,12 +57,9 @@ worktree. Remove the directory when you finish.
 
 ## Unit and API tests
 
-`bunfig.toml` preloads `tests/setup.ts` for every `bun test`. It gives each
-test an in-memory database and answers Ollama and OpenRouter calls from
-scripts, so no test reaches a provider.
-
-API tests call the handlers through the same router options and interceptors
-as the HTTP mount, without a socket:
+`bunfig.toml` preloads `tests/setup.ts` for every `bun test` (in-memory
+database, scripted providers). API tests call the handlers through the same
+router options and interceptors as the HTTP mount, without a socket:
 
 ```ts
 import { Code, rpc, rpcCode } from "../helpers/rpc";
@@ -93,6 +71,12 @@ expect(await rpcCode(other.sessions.getSession({ id }))).toBe(Code.NotFound);
 
 `rpc(null)` sends no user header. `rpcError` returns the `ConnectError` when
 the test reads its message or details.
+
+`src/rpc/wire.ts` throws on an unknown stored kind or status (see
+`docs/connect-api.md`). Seed test data through the runtime's own shapes, and
+before shipping changes to those converters, read real stored chats through the
+new handlers on the iOS test server's database (ask the user before reading
+production's).
 
 ## Browser tests
 
@@ -106,29 +90,26 @@ bunx playwright test -g "usage desktop"
 
 A failure saves a screenshot under `.cache/browser-results/`. Read it first.
 
-Three rules that are easy to miss:
+Two rules that are easy to miss:
 
 - **A title picks the project.** `playwright.config.ts` runs a test only when
   its title matches the `grep` of the `mobile` or `desktop` project. A new
   test whose title matches neither never runs and never fails. Put a listed
   phrase in the title or add one to the `grep`, then confirm the test appears
   in `bunx playwright test --list`.
-- **Port 5199 is reused.** Outside CI, Playwright reuses whatever answers on
-  5199. If another worktree left Vite there, the tests run against its code.
-  Check with `lsof -i :5199` and stop a server that is not this worktree's.
 - **Mock RPCs with the typed helpers.** `mockApp(page, fixture)` in
   `tests/browser/appFixture.ts` serves a returning user's app: the chat list,
   stored chats, the model catalog and healthy providers. Add the RPCs a test
   exercises with `mockRpc(page, [on(Service.method.name, handler)])` from
   `rpcMock.ts`, after `mockApp`, because the route registered last answers
-  first. Return `new RpcFailure("not_found", "…")` for an error. Don't stub `**/api/**` with hand-written
-  JSON. Connect ignores fields it does not know, so a stub in the wrong shape
-  passes without testing anything.
+  first. Return `new RpcFailure("not_found", "…")` for an error. Never stub
+  `**/api/**` with hand-written JSON or legacy REST shapes: Connect ignores
+  unknown fields, so an untyped or wrong-shaped stub passes without testing the
+  contract.
 
-`mockUserPreferences(page)` keeps preferences in memory across saves. The
-`/dev/...` routes in `ui/main.tsx` render one part of the UI from fixtures and
-exist only in the Vite dev server. Use them in browser tests. Final screenshots
-come from the running app.
+`mockUserPreferences(page)` keeps preferences in memory across saves.
+`ui/main.tsx` defines the `/dev/...` fixture routes (`AGENTS.md` has the rules
+for fixtures vs. final screenshots).
 
 Tests that need the real server call `startAsyncBackend` in
 `tests/browser/asyncBackend.ts`. It starts `tests/helpers/asyncFixture.ts`,
@@ -142,31 +123,21 @@ sends the page's calls to it. `sessionLoading.pw.ts`, `jobs.pw.ts` and
 bun run build && bun run perf:check
 ```
 
-About 90 seconds, on Linux, and the only job CI runs. It serves the production
-bundle and the real API from `scripts/performance/fixture.ts`, with 100 seeded
-chats and a fake Ollama, on port 5305. Then it counts React renders for
-scrolling, typing, file suggestions, streaming, finishing a reply and opening
-a chat, and measures two response sizes and the bundle. It fails when a count
-leaves the band in `scripts/performance/baseline.json`. The timings at the end
-are for reading and never fail the check. The numbers of the last run are in
-`/tmp/euler-performance-check/check.json`.
+`perf:check` serves `dist/` without building it, so always run `bun run build`
+first. `scripts/performance/README.md` covers what it measures, how
+`answerInTurn` keeps concurrent RPC render counts deterministic, and when to
+run `bun run perf:check --update`.
 
-When it fails:
-
-- **A timeout waiting for text, or a 500 in the output.** The app did not
-  load a seeded chat. Read the `rpc.failed` lines above the error. The fixture
-  must store records as the runtime writes them. `RunContext.wireStep` is the
-  shape of a step.
-- **A render count went up.** Find the component that renders more. Accept a
-  new number with `bun run perf:check --update` only when the change is meant
-  to cost that, and say why in the PR.
-- **"improved".** The check passes. Lock a lower number in only after several
-  runs agree on it, including one on two cores with `taskset -c 0,1`.
+The last run's numbers are in `/tmp/euler-performance-check/check.json`. A
+timeout waiting for text or a 500 in the output means a seeded chat failed to
+load—read the `rpc.failed` lines above the error and ensure `fixture.ts` writes
+records in the runtime's shapes (`RunContext.wireStep`).
 
 ## Run the app without a provider
 
-The performance fixture is also the quickest whole app to look at. It needs no
-key and no model, and it deletes nothing of yours.
+The performance fixture is also the quickest whole app to look at. It serves
+`dist/` (`bun run build` first), needs no key and no model, and deletes nothing
+of yours.
 
 ```bash
 bun run build
@@ -189,7 +160,7 @@ curl "http://127.0.0.1:$CONTROL/streams"                                   # rep
 Hold a reply open to look at a state that lasts a moment, such as the Stop
 button or streaming text. Stop the fixture with
 `kill "$(cat "$SCRATCH/fixture.pid")"`, then delete the `workspace` directory
-it printed. On macOS it runs, but file suggestions and shell tools do not.
+it printed. On macOS it runs, though Linux-only workspace features stay off.
 
 The fake model says only what you push, so it never calls a tool or starts an
 agent, and the fixture has no image or search provider. For those use the
@@ -221,7 +192,7 @@ await page.getByRole("button", { name: "Send message" }).click();
 const stop = page.getByRole("button", { name: "Stop generation" });
 await stop.waitFor();
 await stop.waitFor({ state: "detached" });
-// Messages fade in. Wait for the animations before the screenshot.
+// Messages fade in. Wait for the animations before the screenshot, or text captures half-transparent.
 await page.waitForFunction(() =>
   document.getAnimations().every(
     (a) => a.playState !== "running" || a.effect?.getComputedTiming().endTime === Infinity,
@@ -236,14 +207,14 @@ Names that hold across the app:
 
 - The composer's box has the placeholder `Send a message...`. Its buttons are
   `Send message` and, while a reply runs, `Stop generation`.
-- `Toggle chats` opens and closes the sidebar. A chat there is a button named
-  by its title.
+- `Toggle chats` opens and closes the chat list sidebar. A chat there is a
+  button named by its title.
 - Typing `@` in the composer opens `#file-picker`, with one button per file.
 - Settings has `Save settings`, which shows only when something changed.
 
 For a phone, use
 `{ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }`.
-The composer, sidebar and sheets lay out differently there, so check both
+The composer, sidebars and sheets lay out differently there, so check both
 sizes for anything in them. Look at the screenshots yourself with the Read
 tool, and send the user the ones that show the change.
 
@@ -251,25 +222,17 @@ Collect `pageerror` every time. A flow that looks right can still throw.
 
 ## The real dev server
 
-`bun run init:worktree` once, then `bun run dev`. It starts the watched server
-and Vite on the ports in this worktree's `.env`, against this worktree's copy
-of the real database and the real providers. `AGENTS.md`, Running the app, has
-the rules for ports, the address to give the user and what to confirm before
-handing it over.
+`AGENTS.md` ("Running the app") covers worktree initialization, `.env` ports,
+and what to verify before handing the server to the user.
 
-A reply from OpenRouter or a ChatGPT plan spends the user's money or quota, so
-pick a local Ollama model when the change does not depend on the provider.
-Before reusing a server that is already up, confirm its working directory is
-this worktree. A port tells you nothing about who owns it.
-
-`http://<hostname>:<port>` is not a secure context, so `crypto.randomUUID`
-and `navigator.clipboard` can be missing there while they work on
-`127.0.0.1`. Check anything that uses them at the address the user will open.
-
-MCP OAuth sign-in cannot return to the app from `http://<hostname>:<port>`.
-The redirect goes to `127.0.0.1` on the browser's machine and the callback
-address has to be pasted under the server. It returns unaided from
-`http://127.0.0.1:<port>` and from an HTTPS address.
+- Replies from OpenRouter or a ChatGPT plan spend the user's money or quota;
+  pick a local Ollama model when the change does not depend on the provider.
+- Before using a dev server that is already running, confirm its working
+  directory is this worktree. A port tells you nothing about who owns it.
+- `http://<hostname>:<port>` is not a secure context, so `crypto.randomUUID`
+  and `navigator.clipboard` can be missing there while they work on
+  `127.0.0.1`. Check anything that uses them at the address the user will open
+  (and see `docs/customization.md` under OAuth for MCP sign-in over plain HTTP).
 
 ## Calling an RPC by hand
 
@@ -292,32 +255,6 @@ bun scripts/rpc-smoke.ts http://<hostname>:<port> <uuid>
 
 A failed call logs `rpc.failed` on the server with the stack. The fixtures run
 with `LOG_LEVEL=error`, so those lines are all they print.
-
-## What has gone wrong before
-
-- **A stored record the API refuses.** Stored steps, agents and jobs are JSON
-  the server reads back without checking. `src/rpc/wire.ts` throws on a kind
-  or status it does not know, and one bad row fails the whole `GetSession`.
-  Seed test data through the runtime's own shapes. Before a change to those
-  converters ships, read real stored chats through the new handlers. The iOS
-  test server's database started as a copy of production. Ask the user before
-  reading production's own.
-- **A stub in the old REST shape.** Three browser tests still answer
-  `**/api/**` with JSON from before Connect and pass, because unknown fields
-  are ignored. They prove less than they look like they do. Use `mockRpc`.
-- **A render count that depends on which answer arrives first.** Opening a
-  chat sends `GetSession` and `GetRuntime` together, and a finished reply
-  refreshes the chat list three times. React renders two answers in one
-  commit or two depending on their timing. Opening a chat counted about 648
-  renders when the answers shared a commit and about 724 when they did not,
-  and CI failed at 653. The check now answers calls one at a time in those
-  two windows (`answerInTurn`). Wrap a
-  new measurement the same way when its window has calls in flight together,
-  and prove it with `taskset -c 0,1 bun run perf:check` before trusting it.
-- **A screenshot of a fade.** Messages animate in. A capture taken as soon as
-  the text exists shows it half transparent.
-- **A stale bundle.** `perf:check` and the performance fixture serve `dist/`.
-  Neither builds it. Run `bun run build` first.
 
 ## Adding coverage
 

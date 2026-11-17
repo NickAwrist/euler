@@ -5,16 +5,14 @@ description: Test and verify changes to the Euler iPhone app. Covers choosing be
 
 # Testing the iPhone app
 
-The iPhone app in `ios/` is a client of the same Connect API as the web app.
-While a change is in progress, the simulator and the phone talk to a separate
-**iOS test server** that runs the branch, never to production. The phone has
-two apps side by side: **Euler - Dev** (scheme `EulerDev`,
-`<bundle prefix>.euler.dev`) for the test server, and **Euler** (scheme
-`Euler`, `<bundle prefix>.euler`) for production. Branches install only as
-Euler - Dev; Euler is installed from `main` when shipping. Read
-`ios/README.md` for the app's layout and `docs/connect-api.md` for the API,
-the event stream and push. The web app and
-the server have their own skill, `test-euler-web`.
+Read `ios/README.md` for project setup, schemes (`Euler` vs. `EulerDev`), and
+app architecture, and `docs/connect-api.md` for the RPC contract, event stream,
+and push. Server and web checks are in `test-euler-web`.
+
+While a change is in progress, simulators and devices talk to a separate **iOS
+test server** running the branch—never to production. Branches install on the
+phone only as **Euler - Dev** (`EulerDev`); **Euler** (`Euler`) is built only
+from `main` when shipping.
 
 ## Pick the check
 
@@ -28,9 +26,8 @@ the server have their own skill, `test-euler-web`.
 
 ## The usual loop
 
-1. Contract changes: edit `proto/euler/v1/`, run `bun run proto`, and commit
-   the TypeScript and Swift it writes. Update the handler, the web's callers
-   and the iOS stores and views in the same change.
+1. For contract changes, run `bun run proto` (see `AGENTS.md`) and update the
+   handler, web callers, and iOS stores/views together.
 2. Run the unit tests on a simulator, and the checks in `test-euler-web` for
    the server and the web app.
 3. Commit, then deploy the branch to the iOS test server.
@@ -122,11 +119,11 @@ Euler - Dev, from the branch under test:
 
 ```bash
 xcrun devicectl list devices            # the phone's identifier; "available (paired)"
-cd ios && bun run ios:project
-xcodebuild -project Euler.xcodeproj -scheme EulerDev -destination 'id=<device id>' \
-  -derivedDataPath build/DeviceData -allowProvisioningUpdates build
-xcrun devicectl device install app --device <device id> \
-  build/DeviceData/Build/Products/Dev-iphoneos/Euler.app
+bun run ios:project
+(cd ios && xcodebuild -project Euler.xcodeproj -scheme EulerDev -destination 'id=<device id>' \
+  -derivedDataPath build/DeviceData -allowProvisioningUpdates build && \
+  xcrun devicectl device install app --device <device id> \
+    build/DeviceData/Build/Products/Dev-iphoneos/Euler.app)
 xcrun devicectl device process launch --device <device id> <bundle prefix>.euler.dev
 ```
 
@@ -137,7 +134,6 @@ points at production. Never install a branch as Euler.
 
 - Signing runs outside the command sandbox; inside it, xcodebuild reports
   "No Accounts".
-
 - A launch that fails with "could not be unlocked" only means the phone is
   locked; ask the user to open the app.
 - "Developer Mode disabled" or "Manual pairing … in progress": the user must
@@ -174,17 +170,15 @@ EOF
 
 ## Simulator
 
-`Euler.xcodeproj` is generated and never committed. Run `bun run ios:project`
-first, and again after every pull.
-
-Other sessions keep simulators booted. Run tests on one that is shut down, and
-name it by ID so two with the same name cannot be confused:
+Run `bun run ios:project` first (see `ios/README.md`). Other sessions keep
+simulators booted; run tests on one that is shut down, and name it by ID so two
+with the same name cannot be confused:
 
 ```bash
 xcrun simctl list devices available | grep iPhone    # pick one marked (Shutdown)
-cd ios && xcodebuild test -project Euler.xcodeproj -scheme Euler \
+(cd ios && xcodebuild test -project Euler.xcodeproj -scheme Euler \
   -destination 'id=<simulator id>' -derivedDataPath <scratchpad>/ios-derived \
-  -only-testing:EulerTests
+  -only-testing:EulerTests)
 ```
 
 The first build compiles the Swift packages and takes several minutes. The
@@ -192,10 +186,8 @@ result is the line `Test run with <n> tests in <m> suites passed`. The
 XCTest summary above it reads "Executed 0 tests" because the suite is Swift
 Testing, which is not a failure.
 
-The UI tests (`-only-testing:EulerUITests`) need the scripted fixture backend
-on port 5195, which has no real model. `LiveServerTests` run against a real
-server when two environment variables name it. Both commands are in
-`ios/README.md` under Tests.
+UI test (`EulerUITests`) and `LiveServerTests` commands are in `ios/README.md`
+under Tests.
 
 Drive simulator UI through the T3 device tools (`device_list`, `device_open`,
 `device_screenshot`, and the `agent-device` command they return), not `simctl`
@@ -207,10 +199,8 @@ simulator at `http://127.0.0.1:<EULER_FRONTEND_PORT>`.
 
 ## MCP sign-in
 
-Authorize needs the server at an HTTPS address the simulator or phone can
-reach. Against a plain HTTP address such as `<test-http-url>` the app answers
-"Sign-in needs Euler at an HTTPS address." and opens nothing. The test server's HTTPS
-address works. To test a sign-in without deploying there:
+MCP OAuth on iOS requires Euler at an HTTPS address (see `docs/customization.md`
+under OAuth). `<test-url>` works; to test without deploying there:
 
 - Run the branch on a spare port on `<test-host>`, bound to loopback, with its
   own `EULER_DB_PATH` and `EULER_DATA_ROOT` and `EULER_PUBLIC_URL` set to the
@@ -228,11 +218,8 @@ address works. To test a sign-in without deploying there:
 
 ## Push notifications
 
-The server pushes when a main agent's turn finishes or fails, and when any
-agent asks to run a tool, to every device the user registered, unless a client
-holds the event stream open (the app does only in the foreground). Approval
-notifications carry Allow once and Deny actions. Code:
-`src/notifications/` and `ios/Euler/App/PushNotifications.swift`.
+See `docs/connect-api.md` ("Push") for when the server sends or skips pushes;
+client handling is in `ios/Euler/App/PushNotifications.swift`.
 
 ```bash
 # Did the server send, skip, or fail?
