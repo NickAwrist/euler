@@ -39,31 +39,34 @@ export const providerIcons: Record<string, string> = {
 export function groupModelProviders(models: ModelOption[]): ModelProvider[] {
   const groups = new Map<string, ModelProvider>();
   for (const model of models) {
+    const isVercel = model.provider === Provider.VERCEL_GATEWAY;
+    const isGateway = isVercel || model.provider === Provider.OPENROUTER;
+    const prefix = isVercel ? "vercel_gateway" : "openrouter";
+    const route =
+      model.route ?? model.id.replace(/^(openrouter|vercel_gateway):/, "");
     const name =
       model.provider === Provider.OLLAMA
         ? "Ollama"
         : model.provider === Provider.CHATGPT
           ? "ChatGPT"
-          : model.lab.trim() || "OpenRouter";
+          : model.lab.trim() || (isVercel ? "Vercel AI Gateway" : "OpenRouter");
     const id =
       model.provider === Provider.OLLAMA
         ? "ollama"
         : model.provider === Provider.CHATGPT
           ? "chatgpt"
-          : `openrouter:${model.publisherId ?? (model.route ?? model.id.replace(/^openrouter:/, "")).split("/")[0]}`;
+          : `${prefix}:${model.publisherId ?? route.split("/")[0]}`;
     let group = groups.get(id);
     if (!group) {
-      const route = model.route ?? model.id.replace(/^openrouter:/, "");
       const routeOrg =
         route.replace(/^~/, "").split("/")[0]?.toLowerCase() ?? "";
       const labKey = model.lab
         .trim()
         .toLowerCase()
         .replace(/[^a-z0-9-]/g, "");
-      const icon =
-        model.provider === Provider.OPENROUTER
-          ? (providerIcons[routeOrg] ?? providerIcons[labKey])
-          : undefined;
+      const icon = isGateway
+        ? (providerIcons[routeOrg] ?? providerIcons[labKey])
+        : undefined;
       group = {
         id,
         name,
@@ -79,18 +82,32 @@ export function groupModelProviders(models: ModelOption[]): ModelProvider[] {
     }
     group.models.push(model);
   }
-  for (const group of groups.values()) group.models.sort(compareModelOptions);
+  const nameCounts = new Map<string, number>();
+  for (const group of groups.values()) {
+    nameCounts.set(group.name, (nameCounts.get(group.name) ?? 0) + 1);
+  }
+  for (const group of groups.values()) {
+    if ((nameCounts.get(group.name) ?? 0) > 1) {
+      if (group.id.startsWith("vercel_gateway:")) {
+        group.name = `${group.name} (Vercel)`;
+      } else if (group.id.startsWith("openrouter:")) {
+        group.name = `${group.name} (OpenRouter)`;
+      }
+    }
+    group.models.sort(compareModelOptions);
+  }
   return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function modelProviderId(model: string) {
   if (model.startsWith("chatgpt:")) return "chatgpt";
-  return model.startsWith("openrouter:")
-    ? model.slice(11).split("/")[0]!
-    : "ollama";
+  if (model.startsWith("openrouter:")) return model.slice(11).split("/")[0]!;
+  if (model.startsWith("vercel_gateway:"))
+    return model.slice(15).split("/")[0]!;
+  return "ollama";
 }
 
 /** Model ID without its catalog prefix, for display. */
 export function modelRoute(model: string) {
-  return model.replace(/^(openrouter|chatgpt):/, "");
+  return model.replace(/^(openrouter|vercel_gateway|chatgpt):/, "");
 }

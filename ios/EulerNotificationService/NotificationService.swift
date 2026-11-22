@@ -44,7 +44,7 @@ final class NotificationService: UNNotificationServiceExtension {
 
     private func attach(_ location: URL?, response: URLResponse?) {
         guard let content, let contentHandler else { return }
-        // ComfyUI may return WebP, which attachments don't take, so images are re-encoded as JPEG.
+        // Images may arrive as WebP, which attachments don't take, so re-encode as JPEG.
         let file = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).jpg")
         if let location, (response as? HTTPURLResponse)?.statusCode == 200,
            let jpeg = UIImage(contentsOfFile: location.path)?.jpegData(compressionQuality: 0.9),

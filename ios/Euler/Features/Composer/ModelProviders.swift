@@ -42,6 +42,7 @@ struct ModelProviderGroup: Identifiable {
         switch model.provider {
         case .ollama: "ollama"
         case .chatgpt: "chatgpt"
+        case .vercelGateway: "vercel_gateway:\(model.hasPublisherID ? model.publisherID : model.routeOrganization)"
         default: "openrouter:\(model.hasPublisherID ? model.publisherID : model.routeOrganization)"
         }
     }
@@ -50,7 +51,10 @@ struct ModelProviderGroup: Identifiable {
         switch model.provider {
         case .ollama: "Ollama"
         case .chatgpt: "ChatGPT"
-        default: model.lab.trimmingCharacters(in: .whitespaces).isEmpty ? "OpenRouter" : model.lab.trimmingCharacters(in: .whitespaces)
+        case .vercelGateway:
+            model.lab.trimmingCharacters(in: .whitespaces).isEmpty ? "Vercel AI Gateway" : model.lab.trimmingCharacters(in: .whitespaces)
+        default:
+            model.lab.trimmingCharacters(in: .whitespaces).isEmpty ? "OpenRouter" : model.lab.trimmingCharacters(in: .whitespaces)
         }
     }
 }
@@ -80,8 +84,15 @@ enum ProviderIconAsset: String {
     /// The icon for a saved model ID, when the catalog no longer lists the model.
     static func forModelID(_ id: String) -> ProviderIconAsset? {
         if id.hasPrefix("chatgpt:") { return .codex }
-        guard id.hasPrefix("openrouter:") else { return .ollama }
-        let organization = id.dropFirst("openrouter:".count).split(separator: "/").first.map(String.init) ?? ""
+        let route: Substring
+        if id.hasPrefix("openrouter:") {
+            route = id.dropFirst("openrouter:".count)
+        } else if id.hasPrefix("vercel_gateway:") {
+            route = id.dropFirst("vercel_gateway:".count)
+        } else {
+            return .ollama
+        }
+        let organization = route.split(separator: "/").first.map(String.init) ?? ""
         return labs[organization.replacingOccurrences(of: "~", with: "").lowercased()]
     }
 }
@@ -116,12 +127,12 @@ struct ProviderIcon: View {
 extension Euler_V1_Model {
     /// A model ID without its catalog prefix, for display, as the web's modelRoute.
     static func displayRoute(_ id: String) -> String {
-        id.replacing(/^(openrouter|chatgpt):/, with: "")
+        id.replacing(/^(openrouter|vercel_gateway|chatgpt):/, with: "")
     }
 
-    /// The OpenRouter route's organization, such as "anthropic".
+    /// The gateway route's organization, such as "anthropic".
     var routeOrganization: String {
-        let route = hasRoute ? route : id.replacingOccurrences(of: "openrouter:", with: "")
+        let route = hasRoute ? route : Self.displayRoute(id)
         return route.replacingOccurrences(of: "~", with: "").split(separator: "/").first.map(String.init) ?? ""
     }
 
@@ -134,9 +145,9 @@ extension Euler_V1_Model {
         return a.name.localizedCompare(b.name) == .orderedAscending
     }
 
-    /// Only OpenRouter models need setup before they can be picked.
+    /// Gateway models need setup before they can be picked.
     var needsSetup: Bool {
-        provider == .openrouter && !configured
+        (provider == .openrouter || provider == .vercelGateway) && !configured
     }
 
     /// Vision, tools and thinking, as the web's capability icons show them.

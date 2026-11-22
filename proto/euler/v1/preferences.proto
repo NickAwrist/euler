@@ -35,11 +35,17 @@ message UserPreferences {
   Layout layout = 5;
 }
 
+enum ImageProvider {
+  IMAGE_PROVIDER_UNSPECIFIED = 0;
+  IMAGE_PROVIDER_OPENROUTER = 1;
+  IMAGE_PROVIDER_VERCEL_GATEWAY = 2;
+}
+
 message ImagePreferences {
-  string default_model = 1;
-  uint32 default_width = 2;
-  uint32 default_height = 3;
-  string negative_prompt = 4;
+  // Unspecified uses the first configured provider.
+  ImageProvider provider = 1;
+  // Empty uses the first model the provider offers.
+  string model = 2;
 }
 
 message UserSettings {
@@ -117,16 +123,8 @@ message GetPreferencesResponse {
 
 message UpdatePreferencesRequest {
   message ImagePatch {
-    optional string default_model = 1 [(buf.validate.field).string.max_len = 1000];
-    optional uint32 default_width = 2 [(buf.validate.field).uint32 = {
-      gte: 1
-      lte: 16384
-    }];
-    optional uint32 default_height = 3 [(buf.validate.field).uint32 = {
-      gte: 1
-      lte: 16384
-    }];
-    optional string negative_prompt = 4 [(buf.validate.field).string.max_len = 100000];
+    optional ImageProvider provider = 1 [(buf.validate.field).enum.defined_only = true];
+    optional string model = 2 [(buf.validate.field).string.max_len = 200];
   }
   message SettingsPatch {
     // Empty restores the default system prompt.
@@ -226,5 +224,4 @@ message GetEnvironmentRequest {}
 
 message GetEnvironmentResponse {
   bool ollama_host = 1;
-  bool comfyui_host = 2;
 }

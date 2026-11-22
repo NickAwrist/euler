@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
+import { ModelProvider } from "../../../src/gen/euler/v1/models_pb";
 import { ApiKeyProvider } from "../../../src/gen/euler/v1/providers_pb";
 import { NEW_MODEL_DAYS } from "../../../src/models/newModels";
 import { whileRunning } from "../../lib/whileRunning";
@@ -9,20 +10,51 @@ import { ProviderIcon } from "../ModelSelectBar";
 import { RefreshButton } from "../RefreshButton";
 import { providerIcons } from "../modelProviders";
 import { ApiKeySettingsCard } from "./ApiKeySettingsCard";
-import { OpenRouterBalanceCard } from "./OpenRouterBalanceCard";
+import { ProviderBalanceCard } from "./OpenRouterBalanceCard";
 import { CatalogStatus, PublisherDialog } from "./OpenRouterPublisherDialog";
 import { useApiKeySetting } from "./useApiKeySetting";
-import { useOpenRouterCatalog } from "./useOpenRouterCatalog";
+import { useGatewayCatalog } from "./useOpenRouterCatalog";
 
-export function OpenRouterSettingsTab({
+type GatewayTabConfig = {
+  label: string;
+  apiKeyProvider: ApiKeyProvider;
+  apiKeyTitle: string;
+  inputId: string;
+  placeholder: string;
+};
+
+const GATEWAY_CONFIG: Record<
+  ModelProvider.OPENROUTER | ModelProvider.VERCEL_GATEWAY,
+  GatewayTabConfig
+> = {
+  [ModelProvider.OPENROUTER]: {
+    label: "OpenRouter",
+    apiKeyProvider: ApiKeyProvider.OPENROUTER,
+    apiKeyTitle: "OpenRouter API key",
+    inputId: "openrouter-key",
+    placeholder: "sk-or-...",
+  },
+  [ModelProvider.VERCEL_GATEWAY]: {
+    label: "Vercel AI Gateway",
+    apiKeyProvider: ApiKeyProvider.VERCEL_GATEWAY,
+    apiKeyTitle: "Vercel AI Gateway API key",
+    inputId: "vercel-gateway-key",
+    placeholder: "vck_...",
+  },
+};
+
+export function GatewaySettingsTab({
+  provider,
   onModelsChanged,
   onKeyStatusChange,
 }: {
+  provider: ModelProvider.OPENROUTER | ModelProvider.VERCEL_GATEWAY;
   onModelsChanged: () => Promise<void>;
   /** Reports whether a key is saved once known and after each change. */
   onKeyStatusChange?: (hasKey: boolean) => void;
 }) {
-  const key = useApiKeySetting(ApiKeyProvider.OPENROUTER);
+  const config = GATEWAY_CONFIG[provider];
+  const key = useApiKeySetting(config.apiKeyProvider);
   const [keyRevision, setKeyRevision] = useState(0);
   const {
     data: overview,
@@ -30,7 +62,7 @@ export function OpenRouterSettingsTab({
     error: loadError,
     load,
     change,
-  } = useOpenRouterCatalog(onModelsChanged);
+  } = useGatewayCatalog(provider, onModelsChanged);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [dialog, setDialog] = useState<string | null>(null);
@@ -57,15 +89,17 @@ export function OpenRouterSettingsTab({
     <div className="space-y-6">
       <ApiKeySettingsCard
         setting={key}
-        title="OpenRouter API key"
-        inputId="openrouter-key"
-        placeholder="sk-or-..."
+        title={config.apiKeyTitle}
+        inputId={config.inputId}
+        placeholder={config.placeholder}
         onSaved={async () => {
           setKeyRevision((value) => value + 1);
           await onModelsChanged();
         }}
       />
-      {key.hasKey && <OpenRouterBalanceCard key={keyRevision} />}
+      {key.hasKey && (
+        <ProviderBalanceCard key={keyRevision} provider={provider} />
+      )}
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -92,7 +126,7 @@ export function OpenRouterSettingsTab({
           </div>
           <p className="text-sm text-muted-foreground">
             Choose which models appear in the composer. New marks models added
-            to OpenRouter in the last {NEW_MODEL_DAYS} days.
+            to {config.label} in the last {NEW_MODEL_DAYS} days.
           </p>
           {overview?.freshness && (
             <CatalogStatus catalog={overview.freshness} />
@@ -152,10 +186,18 @@ export function OpenRouterSettingsTab({
         <PublisherDialog
           publisher={selectedPublisher}
           data={overview}
+          providerLabel={config.label}
           onClose={() => setDialog(null)}
           onChange={change}
         />
       )}
     </div>
   );
+}
+
+export function OpenRouterSettingsTab(props: {
+  onModelsChanged: () => Promise<void>;
+  onKeyStatusChange?: (hasKey: boolean) => void;
+}) {
+  return <GatewaySettingsTab provider={ModelProvider.OPENROUTER} {...props} />;
 }

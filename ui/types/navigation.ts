@@ -3,6 +3,7 @@ export type SettingsTab =
   | "appearance"
   | "ollama"
   | "openrouter"
+  | "vercel-gateway"
   | "chatgpt"
   | "image-generation"
   | "web-search";

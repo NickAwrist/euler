@@ -1,7 +1,11 @@
 import { create } from "@bufbuild/protobuf";
 import { timestampFromDate } from "@bufbuild/protobuf/wkt";
 import type { ServiceImpl } from "@connectrpc/connect";
-import { getOpenRouterApiKey, listOpenRouterModels } from "../db/index";
+import {
+  getOpenRouterApiKey,
+  getVercelGatewayApiKey,
+  listOpenRouterModels,
+} from "../db/index";
 import {
   listModelFavorites,
   listOpenRouterPublishers,
@@ -14,7 +18,7 @@ import {
   ModelSchema,
   type ModelService,
 } from "../gen/euler/v1/models_pb";
-import { openRouterModelId } from "../llm/index";
+import { type CatalogProvider, gatewayModelId } from "../llm/index";
 import { ollamaReasoning } from "../llm/ollamaProvider";
 import { chatGptModels, chatGptStatus } from "../models/chatgpt";
 import { getOllamaClient } from "../models/ollamaClient";
@@ -37,7 +41,13 @@ const PROVIDERS = {
   [ModelProvider.OLLAMA]: "ollama",
   [ModelProvider.OPENROUTER]: "openrouter",
   [ModelProvider.CHATGPT]: "chatgpt",
+  [ModelProvider.VERCEL_GATEWAY]: "vercel_gateway",
 } as const;
+
+const WIRE_CATALOG_PROVIDER: Record<CatalogProvider, ModelProvider> = {
+  openrouter: ModelProvider.OPENROUTER,
+  vercel_gateway: ModelProvider.VERCEL_GATEWAY,
+};
 
 async function ollamaModels(owner: string): Promise<Model[]> {
   const favorites = listModelFavorites(owner);
@@ -77,29 +87,38 @@ async function ollamaModels(owner: string): Promise<Model[]> {
   });
 }
 
-async function openRouterModels(owner: string, cached: boolean) {
-  const hasSelections = listOpenRouterModels().some(
+async function gatewayModels(
+  provider: CatalogProvider,
+  owner: string,
+  cached: boolean,
+) {
+  const hasSelections = listOpenRouterModels(provider).some(
     (model) => model.enabled === 1,
   );
-  const hasSubscriptions = listOpenRouterPublishers().some(
+  const hasSubscriptions = listOpenRouterPublishers(provider).some(
     (publisher) => publisher.subscribed === 1,
   );
   if (!hasSelections && !hasSubscriptions) return [];
-  const catalog = await getCatalogPreferences(false, cached);
+  const catalog = await getCatalogPreferences(
+    false,
+    cached,
+    undefined,
+    provider,
+  );
   // Discovery may have enabled the first model for a subscribed publisher.
   const publishers = new Set(
-    listOpenRouterModels()
+    listOpenRouterModels(provider)
       .filter((model) => model.enabled === 1)
       .map((model) => model.publisher_id),
   );
   return [...publishers]
-    .flatMap((id) => publisherModels(catalog, id, owner))
+    .flatMap((id) => publisherModels(catalog, id, owner, provider))
     .filter((model) => model.enabled && model.availability !== "unavailable")
     .map((model) =>
       create(ModelSchema, {
-        id: openRouterModelId(model.route),
+        id: gatewayModelId(provider, model.route),
         name: model.name,
-        provider: ModelProvider.OPENROUTER,
+        provider: WIRE_CATALOG_PROVIDER[provider],
         lab: publisherName(model.publisherId),
         route: model.route,
         publisherId: model.publisherId,
@@ -148,9 +167,15 @@ export const modelService: ServiceImpl<typeof ModelService> = {
       ollamaError = errorMessage(error);
     }
     const openrouterConfigured = getOpenRouterApiKey().length > 0;
-    const openrouter = openrouterConfigured
-      ? await openRouterModels(owner, request.cachedCatalog)
-      : [];
+    const vercelGatewayConfigured = getVercelGatewayApiKey().length > 0;
+    const [openrouter, vercelGateway] = await Promise.all([
+      openrouterConfigured
+        ? gatewayModels("openrouter", owner, request.cachedCatalog)
+        : Promise.resolve([]),
+      vercelGatewayConfigured
+        ? gatewayModels("vercel_gateway", owner, request.cachedCatalog)
+        : Promise.resolve([]),
+    ]);
     const chatgptConfigured = chatGptStatus(owner).planEnabled;
     let chatgpt: Model[] = [];
     let chatgptError: string | undefined;
@@ -162,11 +187,12 @@ export const modelService: ServiceImpl<typeof ModelService> = {
       }
     }
     return {
-      models: [...ollama, ...openrouter, ...chatgpt],
+      models: [...ollama, ...openrouter, ...vercelGateway, ...chatgpt],
       providers: {
         chatgpt: { configured: chatgptConfigured, error: chatgptError },
         ollama: { connected: ollamaError === undefined, error: ollamaError },
         openrouter: { configured: openrouterConfigured },
+        vercelGateway: { configured: vercelGatewayConfigured },
       },
     };
   },
@@ -175,12 +201,12 @@ export const modelService: ServiceImpl<typeof ModelService> = {
     const provider = PROVIDERS[request.provider as keyof typeof PROVIDERS];
     const modelId = request.modelId.trim();
     if (
-      provider === "openrouter" &&
-      (modelId.startsWith("openrouter:") ||
+      (provider === "openrouter" || provider === "vercel_gateway") &&
+      (modelId.startsWith(`${provider}:`) ||
         !openRouterRouteSchema.safeParse(modelId).success)
     )
       throw new OperationError("INVALID_REQUEST", {
-        message: "Use a raw OpenRouter route",
+        message: "Use a raw model route",
       });
     setModelFavorite(owner, provider, modelId, request.favorite);
     return {};

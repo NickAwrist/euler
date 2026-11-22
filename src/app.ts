@@ -10,7 +10,6 @@ import {
   requestObservability,
   sendError,
 } from "./observability/http";
-import comfyuiRoutes from "./routes/comfyui";
 import faviconsRoutes from "./routes/favicons";
 import mcpOAuthRoutes from "./routes/mcpOAuth";
 import { rpcMiddleware } from "./rpc/routes";
@@ -48,7 +47,6 @@ app.use(
   }),
 );
 app.use(rpcMiddleware());
-app.use("/api/comfyui", comfyuiRoutes);
 app.use("/api/favicons", faviconsRoutes);
 app.use("/api/mcp/oauth", mcpOAuthRoutes);
 

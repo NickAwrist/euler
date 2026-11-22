@@ -43,7 +43,7 @@ first, then its `PATH`:
 
 Directory commands can download dependencies and reach services on the backend
 machine and its local network. That includes loopback-only services such as
-Euler, Ollama, and ComfyUI. Their requests count as local, so a loopback check
+Euler and Ollama. Their requests count as local, so a loopback check
 can't tell an agent command from a person at the machine.
 
 Background servers share host ports with other chats and applications. Run a

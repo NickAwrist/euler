@@ -4,6 +4,7 @@ import {
   Appearance_CodeFont,
   Appearance_Font,
   Appearance_Theme,
+  ImageProvider,
   type UpdatePreferencesRequest,
   type UserPreferences,
   UserPreferencesSchema,
@@ -12,6 +13,7 @@ import { toProtoRule } from "../permissions/wire";
 import type {
   Appearance,
   UserPreferences as DomainPreferences,
+  ImageProviderPreference,
   UserPreferencesPatch,
 } from "../schemas/userPreferences";
 
@@ -65,11 +67,20 @@ export const codeFonts = choices<Appearance["codeFont"], Appearance_CodeFont>({
   "source-code": Appearance_CodeFont.SOURCE_CODE,
 });
 
+export const imageProviders = choices<ImageProviderPreference, ImageProvider>({
+  "": ImageProvider.UNSPECIFIED,
+  openrouter: ImageProvider.OPENROUTER,
+  vercel_gateway: ImageProvider.VERCEL_GATEWAY,
+});
+
 export function preferences(value: DomainPreferences): UserPreferences {
-  const { appearance, layout } = value;
+  const { appearance, image, layout } = value;
   return create(UserPreferencesSchema, {
     toolPermissionRules: value.toolPermissions.rules.map(toProtoRule),
-    image: value.image,
+    image: {
+      provider: imageProviders.toProto(image.provider),
+      model: image.model,
+    },
     settings: {
       ...value.settings,
       systemPrompt: value.settings.systemPrompt ?? undefined,
@@ -101,25 +112,17 @@ const defined = <T extends object>(value: T) =>
     Object.entries(value).filter(([, entry]) => entry !== undefined),
   ) as { [K in keyof T]?: Exclude<T[K], undefined> };
 
-export function imagePatch(
-  value: UpdatePreferencesRequest["image"],
-): UserPreferencesPatch["image"] {
-  return value
-    ? defined({
-        defaultModel: value.defaultModel,
-        defaultWidth: value.defaultWidth,
-        defaultHeight: value.defaultHeight,
-        negativePrompt: value.negativePrompt,
-      })
-    : undefined;
-}
-
 export function preferencesPatch(
   request: UpdatePreferencesRequest,
 ): UserPreferencesPatch {
-  const { settings, appearance, layout } = request;
+  const { image, settings, appearance, layout } = request;
   return {
-    image: imagePatch(request.image),
+    image: image
+      ? defined({
+          provider: imageProviders.fromProto(image.provider),
+          model: image.model,
+        })
+      : undefined,
     settings: settings
       ? defined({
           systemPrompt:

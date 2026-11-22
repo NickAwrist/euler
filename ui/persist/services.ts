@@ -1,5 +1,11 @@
-import type { GetEnvironmentResponse } from "../../src/gen/euler/v1/preferences_pb";
-import type { OllamaContextWindow } from "../../src/gen/euler/v1/providers_pb";
+import type {
+  GetEnvironmentResponse,
+  ImageProvider,
+} from "../../src/gen/euler/v1/preferences_pb";
+import type {
+  ImageModel,
+  OllamaContextWindow,
+} from "../../src/gen/euler/v1/providers_pb";
 import { preferenceClient, providerClient, withErrorMessage } from "../lib/rpc";
 import type { MessageFields } from "../types";
 
@@ -32,19 +38,22 @@ export async function saveOllamaContextWindow(
   ).contextWindow;
 }
 
-export async function loadComfyUIModels(): Promise<string[]> {
-  return (await providerClient.listComfyUiModels({})).models;
-}
-
-/** Tests an unsaved server address; resolves with the reported version, if any. */
-export async function testServiceHost(
-  service: "ollama" | "comfyui",
+/** Tests an unsaved Ollama address; resolves with the reported version, if any. */
+export async function testOllamaHost(
   host: string,
 ): Promise<{ version?: string }> {
-  const { result } =
-    service === "ollama"
-      ? await providerClient.testOllamaHost({ host })
-      : await providerClient.testComfyUiHost({ host });
+  const { result } = await providerClient.testOllamaHost({ host });
   if (!result?.ok) throw new Error(result?.error || "Connection failed");
   return { version: result.version };
+}
+
+export async function loadImageModels(
+  provider?: ImageProvider,
+  refresh = false,
+): Promise<{ models: ImageModel[]; error?: string }> {
+  const response = await providerClient.listImageModels({
+    provider,
+    refresh,
+  });
+  return { models: response.models, error: response.error };
 }

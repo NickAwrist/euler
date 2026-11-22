@@ -1,5 +1,6 @@
 import { ArrowLeft } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { ModelProvider } from "../../src/gen/euler/v1/models_pb";
 import { ApiKeyProvider } from "../../src/gen/euler/v1/providers_pb";
 import { useSavedDraft } from "../hooks/useSavedDraft";
 import { changedFields } from "../lib/changedFields";
@@ -7,7 +8,7 @@ import { effectiveDefaultRunModel } from "../lib/defaultModel";
 import { whileRunning } from "../lib/whileRunning";
 import { completeOnboarding } from "../persist/onboarding";
 import type { UserSettings } from "../persist/userSettings";
-import type { ComfyUIConfigPayload, ModelOption } from "../types";
+import type { ModelOption } from "../types";
 import { Button } from "./Button";
 import { PersonalizationFields } from "./CustomizationPage/PersonalizationFields";
 import { type OnboardingSection, OnboardingShell } from "./OnboardingShell";
@@ -18,16 +19,14 @@ import {
 } from "./SettingsPage/AppearanceSettingsTab";
 import { ChatGptSettingsTab } from "./SettingsPage/ChatGptSettingsTab";
 import { DefaultModelSetting } from "./SettingsPage/DefaultModelSetting";
-import { ImageGenerationTab } from "./SettingsPage/ImageGenerationTab";
 import { OllamaSettingsTab } from "./SettingsPage/OllamaSettingsTab";
-import { OpenRouterSettingsTab } from "./SettingsPage/OpenRouterSettingsTab";
+import { GatewaySettingsTab } from "./SettingsPage/OpenRouterSettingsTab";
 import { useApiKeySetting } from "./SettingsPage/useApiKeySetting";
 import { useAppearanceDraft } from "./SettingsPage/useAppearanceDraft";
 import { useChatGptStatus } from "./SettingsPage/useChatGptStatus";
 import { useEnvironmentSettings } from "./SettingsPage/useEnvironmentSettings";
 import {
   type ServiceStatus,
-  useComfyUIDraft,
   useOllamaDraft,
 } from "./SettingsPage/useProviderDrafts";
 
@@ -58,10 +57,8 @@ type Props = {
   models: ModelOption[];
   catalogLoaded: boolean;
   ollama: { host: string; connected: boolean | null };
-  comfyui: Required<ComfyUIConfigPayload> & { connected: boolean | null };
   onSavePreferences: (updates: Partial<UserSettings>) => Promise<void>;
   onSaveOllamaHost: (host: string) => Promise<void>;
-  onSaveComfyUI: (config: ComfyUIConfigPayload) => Promise<void>;
   onModelsChanged: () => Promise<void>;
   chatgptCatalogError: string | null;
   onComplete: () => void;
@@ -71,10 +68,8 @@ export function Onboarding({
   models,
   catalogLoaded,
   ollama,
-  comfyui,
   onSavePreferences,
   onSaveOllamaHost,
-  onSaveComfyUI,
   onModelsChanged,
   chatgptCatalogError,
   onComplete,
@@ -87,10 +82,10 @@ export function Onboarding({
   const aboutYou = useSavedDraft(settings);
   const appearance = useAppearanceDraft();
   const [openRouterKey, setOpenRouterKey] = useState(false);
+  const [vercelGatewayKey, setVercelGatewayKey] = useState(false);
   const chatGptAccount = useChatGptStatus();
   const ollamaDraft = useOllamaDraft(ollama.host, ollama.connected);
   const defaultModel = useSavedDraft(settings.defaultModel);
-  const comfy = useComfyUIDraft(comfyui, comfyui.connected);
   const braveKey = useApiKeySetting(ApiKeyProvider.BRAVE);
   useEffect(() => {
     heading.current?.focus();
@@ -164,19 +159,39 @@ export function Onboarding({
       title: "Model providers",
       summary: servicesSummary([
         ["OpenRouter", openRouterKey ? "configured" : null],
+        ["Vercel AI Gateway", vercelGatewayKey ? "configured" : null],
         ["Ollama", ollamaDraft.status],
         ["ChatGPT", chatGptAccount.status?.planEnabled ? "connected" : null],
       ]),
       steps: [
         {
-          title: "Cloud models",
+          title: "OpenRouter",
           description:
             "Add an OpenRouter key, then choose which publishers' models appear in the composer.",
           sharedServices: true,
           content: (
-            <OpenRouterSettingsTab
+            <GatewaySettingsTab
+              key="openrouter"
+              provider={ModelProvider.OPENROUTER}
               onModelsChanged={onModelsChanged}
               onKeyStatusChange={setOpenRouterKey}
+            />
+          ),
+          // The key and model choices save as they change.
+          save: async () => true,
+          discard: () => {},
+        },
+        {
+          title: "Vercel AI Gateway",
+          description:
+            "Add a Vercel AI Gateway key, then choose which publishers' models appear in the composer.",
+          sharedServices: true,
+          content: (
+            <GatewaySettingsTab
+              key="vercel-gateway"
+              provider={ModelProvider.VERCEL_GATEWAY}
+              onModelsChanged={onModelsChanged}
+              onKeyStatusChange={setVercelGatewayKey}
             />
           ),
           // The key and model choices save as they change.
@@ -252,40 +267,9 @@ export function Onboarding({
     {
       title: "Tools",
       summary: servicesSummary([
-        ["ComfyUI", comfy.server.status],
         ["Brave Search", braveKey.hasKey ? "configured" : null],
       ]),
       steps: [
-        {
-          title: "Image generation",
-          description: "Connect ComfyUI to generate images in chat.",
-          sharedServices: true,
-          content: (
-            <ImageGenerationTab
-              compact
-              environmentManaged={environment.settings?.comfyuiHost}
-              comfyuiConnected={comfy.server.connected}
-              comfyUri={comfy.server.host}
-              onComfyUriInput={comfy.server.onHostInput}
-              comfyTestState={comfy.server.testState}
-              onTestComfyUI={comfy.server.test}
-              comfyModel={comfy.model}
-              setComfyModel={comfy.setModel}
-              comfyModels={comfy.models}
-              comfySize={comfy.size}
-              setComfySize={comfy.setSize}
-              comfyNegative={comfy.negative}
-              setComfyNegative={comfy.setNegative}
-            />
-          ),
-          save: async () => {
-            if (comfy.changes.length === 0) return true;
-            await onSaveComfyUI(comfy.patch);
-            comfy.accept();
-            return true;
-          },
-          discard: comfy.reset,
-        },
         {
           title: "Web search",
           description:

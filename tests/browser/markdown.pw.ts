@@ -1,5 +1,14 @@
 import { expect, test } from "@playwright/test";
+import { AttachmentService } from "../../src/gen/euler/v1/attachments_pb";
+import { mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
+
+const TINY_PNG = Uint8Array.from(
+  Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=",
+    "base64",
+  ),
+);
 
 test("markdown rendering previews image links including extensionless URLs", async ({
   page,
@@ -100,29 +109,24 @@ test("markdown rendering preserves lists, lines, code, tables, and link navigati
   await popup.close();
 });
 
-test("markdown rendering shows tool output images once and opens sources in a new tab", async ({
+test("markdown rendering opens sources in a new tab and displays attached images", async ({
   page,
 }) => {
-  await page.route("**/api/comfyui/view/**", (route) =>
-    route.fulfill({
-      contentType: "image/png",
-      body: Buffer.from(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=",
-        "base64",
-      ),
-    }),
-  );
+  await mockRpc(page, [
+    on(AttachmentService.method.getAttachmentData, () => ({
+      data: TINY_PNG,
+      mimeType: "image/png",
+      name: "lighthouse.png",
+    })),
+  ]);
   await mockUserPreferences(page);
   await page.goto("/dev/messages?markdown");
   const reply = page.getByRole("region", { name: "Message 2", exact: true });
-  await expect(reply.getByRole("img")).toHaveCount(2);
-  await expect(reply.getByAltText("Lighthouse", { exact: true })).toBeVisible();
+  await reply.scrollIntoViewIfNeeded();
+
   await expect(
-    reply.getByAltText("Generated image", { exact: true }),
-  ).toHaveAttribute("src", "/api/comfyui/view/omitted.png?type=output");
-  await expect(
-    reply.getByRole("link", { name: /^Open generated image \d in new tab$/ }),
-  ).toHaveCount(2);
+    reply.getByAltText("lighthouse.png", { exact: true }),
+  ).toBeVisible();
 
   const toggle = reply.getByRole("button", { name: "1 source" });
   const source = reply.getByRole("link", { name: /Lighthouse history/ });

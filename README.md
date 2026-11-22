@@ -6,7 +6,8 @@
 
 A local-first agent runtime with a chat UI in the browser and a native iPhone
 app. Run local models through [Ollama](https://ollama.com/), remote models
-through [OpenRouter](https://openrouter.ai/), or connect your ChatGPT plan.
+through [OpenRouter](https://openrouter.ai/) or
+[Vercel AI Gateway](https://vercel.com/ai-gateway), or connect your ChatGPT plan.
 
 Each chat runs one agent, which can hand work to subagents. Its shell and file
 tools run in a sandbox or in a local directory you pick. You can add skills and
@@ -15,7 +16,7 @@ remote MCP servers, and set allow, ask, and deny rules for tool calls.
 ## Requirements
 
 - [Bun](https://bun.sh/)
-- A model provider: Ollama, an OpenRouter API key, or a ChatGPT plan
+- A model provider: Ollama, an OpenRouter or Vercel AI Gateway API key, or a ChatGPT plan
 
 Everything else is a feature. An agent gets a feature's tools once the
 feature's own requirement is met:
@@ -25,7 +26,7 @@ feature's own requirement is met:
 | Files | Linux with procfs |
 | Sandbox | [Bubblewrap](https://github.com/containers/bubblewrap). Ubuntu 24.04 needs an [AppArmor profile](docs/workspaces.md#bubblewrap-on-ubuntu-2404) too. |
 | Web search | A Brave Search API key |
-| Image generation | ComfyUI |
+| Image generation | An OpenRouter or Vercel AI Gateway API key |
 | Subagents | Nothing |
 | Skills | Nothing |
 | MCP servers | An enabled server |
@@ -39,8 +40,8 @@ bun run dev
 ```
 
 Open `http://localhost:5174`. For local inference, run Ollama and install a
-model. For remote inference, set up **Settings > OpenRouter** or
-**Settings > ChatGPT**.
+model. For remote inference, set up **Settings > OpenRouter**,
+**Settings > Vercel AI Gateway**, or **Settings > ChatGPT**.
 
 ## Documentation
 

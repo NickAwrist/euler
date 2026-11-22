@@ -5,28 +5,32 @@ import {
   listOpenRouterPublishers,
   refreshRegistryMetadata,
 } from "../db/openrouter";
+import type { CatalogProvider } from "../llm/types";
 import { InputCapability } from "./modelCapabilities";
 import { comparePublisherModels } from "./modelSort";
 import { isNewModel } from "./newModels";
 import {
   type CatalogModel,
   type CatalogResult,
+  type GatewayCatalog,
+  catalogForProvider,
   catalogFreshness,
   isBatchRoute,
   isInteractiveModel,
-  openRouterCatalog,
 } from "./openRouterModels";
 import { publisherName } from "./openRouterPublishers";
 
 export async function getCatalogPreferences(
   force = false,
   cachedOnly = false,
-  service = openRouterCatalog,
+  service?: GatewayCatalog,
+  provider: CatalogProvider = "openrouter",
 ) {
-  const catalog = cachedOnly ? service.peek() : await service.get(force);
+  const target = service ?? catalogForProvider(provider);
+  const catalog = cachedOnly ? target.peek() : await target.get(force);
   if (!cachedOnly && catalog.status === "fresh" && catalog.models) {
-    refreshRegistryMetadata(catalog.models);
-    applyPublisherSubscriptions(catalog.models);
+    refreshRegistryMetadata(catalog.models, provider);
+    applyPublisherSubscriptions(catalog.models, provider);
   }
   return catalog;
 }
@@ -34,13 +38,14 @@ export function publisherModels(
   catalog: CatalogResult,
   publisherId: string,
   ownerUuid: string,
+  provider: CatalogProvider = "openrouter",
 ) {
-  const registered = listOpenRouterModels().filter(
+  const registered = listOpenRouterModels(provider).filter(
     (model) => model.publisher_id === publisherId,
   );
   const favorites = new Set(
     listModelFavorites(ownerUuid)
-      .filter((row) => row.provider === "openrouter")
+      .filter((row) => row.provider === provider)
       .map((row) => row.model_id),
   );
   const choices = new Map(registered.map((model) => [model.route, model]));
@@ -80,11 +85,14 @@ export function publisherModels(
   }
   return models.sort(comparePublisherModels);
 }
-export function publisherOverview(catalog: CatalogResult) {
-  const selections = listOpenRouterModels();
+export function publisherOverview(
+  catalog: CatalogResult,
+  provider: CatalogProvider = "openrouter",
+) {
+  const selections = listOpenRouterModels(provider);
   return {
     catalog: catalogFreshness(catalog),
-    publishers: listOpenRouterPublishers().map((publisher) => ({
+    publishers: listOpenRouterPublishers(provider).map((publisher) => ({
       id: publisher.id,
       name: publisher.name,
       subscribed: publisher.subscribed === 1,
@@ -115,8 +123,12 @@ export function savedModelMetadata(
   };
 }
 
-export function catalogSettings(catalog: CatalogResult, ownerUuid: string) {
-  const overview = publisherOverview(catalog);
+export function catalogSettings(
+  catalog: CatalogResult,
+  ownerUuid: string,
+  provider: CatalogProvider = "openrouter",
+) {
+  const overview = publisherOverview(catalog, provider);
   const tracked = new Set(overview.publishers.map((publisher) => publisher.id));
   const ids = new Set([
     ...tracked,
@@ -127,7 +139,10 @@ export function catalogSettings(catalog: CatalogResult, ownerUuid: string) {
   return {
     ...overview,
     modelsByPublisher: Object.fromEntries(
-      [...ids].map((id) => [id, publisherModels(catalog, id, ownerUuid)]),
+      [...ids].map((id) => [
+        id,
+        publisherModels(catalog, id, ownerUuid, provider),
+      ]),
     ),
     discoveredPublishers: discoveredPublishers(catalog, tracked),
   };

@@ -7,9 +7,9 @@ import "euler/v1/models.proto";
 import "euler/v1/preferences.proto";
 import "google/protobuf/timestamp.proto";
 
-// Model and tool providers: Ollama, ComfyUI, OpenRouter, ChatGPT and Brave
-// Search. Addresses, keys and the Ollama context window are server-wide;
-// ComfyUI image defaults and the ChatGPT connection belong to the user.
+// Model and tool providers: Ollama, OpenRouter, Vercel AI Gateway, ChatGPT and
+// Brave Search. Addresses, keys and the Ollama context window are server-wide;
+// the ChatGPT connection belongs to the user.
 service ProviderService {
   rpc GetOllamaConfig(GetOllamaConfigRequest) returns (GetOllamaConfigResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -22,38 +22,31 @@ service ProviderService {
   // Tests an unsaved address.
   rpc TestOllamaHost(TestOllamaHostRequest) returns (TestOllamaHostResponse);
 
-  rpc GetComfyUiConfig(GetComfyUiConfigRequest) returns (GetComfyUiConfigResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc UpdateComfyUiConfig(UpdateComfyUiConfigRequest) returns (UpdateComfyUiConfigResponse);
-  rpc GetComfyUiHealth(GetComfyUiHealthRequest) returns (GetComfyUiHealthResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-  rpc TestComfyUiHost(TestComfyUiHostRequest) returns (TestComfyUiHostResponse);
-  rpc ListComfyUiModels(ListComfyUiModelsRequest) returns (ListComfyUiModelsResponse) {
-    option idempotency_level = NO_SIDE_EFFECTS;
-  }
-
   rpc GetApiKey(GetApiKeyRequest) returns (GetApiKeyResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   // Saves a key; an empty key removes it.
   rpc SetApiKey(SetApiKeyRequest) returns (SetApiKeyResponse);
 
-  rpc GetOpenRouterBalance(GetOpenRouterBalanceRequest) returns (GetOpenRouterBalanceResponse) {
+  rpc GetProviderBalance(GetProviderBalanceRequest) returns (GetProviderBalanceResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   // Publishers, their models, and the user's choices among them.
-  rpc GetOpenRouterCatalog(GetOpenRouterCatalogRequest) returns (GetOpenRouterCatalogResponse) {
+  rpc GetModelCatalog(GetModelCatalogRequest) returns (GetModelCatalogResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
   }
   // Fetches the catalog again instead of using the cached copy.
-  rpc RefreshOpenRouterCatalog(RefreshOpenRouterCatalogRequest) returns (RefreshOpenRouterCatalogResponse);
-  rpc SetOpenRouterModelEnabled(SetOpenRouterModelEnabledRequest) returns (SetOpenRouterModelEnabledResponse);
-  rpc TrackOpenRouterPublisher(TrackOpenRouterPublisherRequest) returns (TrackOpenRouterPublisherResponse);
-  rpc RemoveOpenRouterPublisher(RemoveOpenRouterPublisherRequest) returns (RemoveOpenRouterPublisherResponse);
+  rpc RefreshModelCatalog(RefreshModelCatalogRequest) returns (RefreshModelCatalogResponse);
+  rpc SetCatalogModelEnabled(SetCatalogModelEnabledRequest) returns (SetCatalogModelEnabledResponse);
+  rpc TrackCatalogPublisher(TrackCatalogPublisherRequest) returns (TrackCatalogPublisherResponse);
+  rpc RemoveCatalogPublisher(RemoveCatalogPublisherRequest) returns (RemoveCatalogPublisherResponse);
   // A subscribed publisher's new models are enabled as they appear.
-  rpc SetOpenRouterSubscription(SetOpenRouterSubscriptionRequest) returns (SetOpenRouterSubscriptionResponse);
+  rpc SetCatalogSubscription(SetCatalogSubscriptionRequest) returns (SetCatalogSubscriptionResponse);
+
+  // Image generation models from OpenRouter and Vercel AI Gateway.
+  rpc ListImageModels(ListImageModelsRequest) returns (ListImageModelsResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
 
   rpc GetChatGptStatus(GetChatGptStatusRequest) returns (GetChatGptStatusResponse) {
     option idempotency_level = NO_SIDE_EFFECTS;
@@ -129,52 +122,11 @@ message TestOllamaHostResponse {
   HostTest result = 1;
 }
 
-message GetComfyUiConfigRequest {}
-
-message GetComfyUiConfigResponse {
-  HostConfig config = 1;
-  ImagePreferences image = 2;
-}
-
-message UpdateComfyUiConfigRequest {
-  // Set to change the server-wide address; empty uses the default.
-  optional string host = 1 [(buf.validate.field).string.max_len = 2048];
-  UpdatePreferencesRequest.ImagePatch image = 2;
-}
-
-message UpdateComfyUiConfigResponse {
-  HostConfig config = 1;
-  ImagePreferences image = 2;
-}
-
-message GetComfyUiHealthRequest {}
-
-message GetComfyUiHealthResponse {
-  bool connected = 1;
-  optional string error = 2;
-}
-
-message TestComfyUiHostRequest {
-  // Empty tests the saved address.
-  string host = 1 [(buf.validate.field).string.max_len = 2048];
-}
-
-message TestComfyUiHostResponse {
-  HostTest result = 1;
-}
-
-message ListComfyUiModelsRequest {}
-
-message ListComfyUiModelsResponse {
-  repeated string models = 1;
-  // Why the list is empty when ComfyUI could not be reached.
-  optional string error = 2;
-}
-
 enum ApiKeyProvider {
   API_KEY_PROVIDER_UNSPECIFIED = 0;
   API_KEY_PROVIDER_OPENROUTER = 1;
   API_KEY_PROVIDER_BRAVE = 2;
+  API_KEY_PROVIDER_VERCEL_GATEWAY = 3;
 }
 
 // Whether a key exists, never the key itself.
@@ -207,9 +159,17 @@ message SetApiKeyResponse {
   ApiKeyState state = 1;
 }
 
-message GetOpenRouterBalanceRequest {}
+message GetProviderBalanceRequest {
+  ModelProvider provider = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    in: [
+      2,
+      4
+    ]
+  }];
+}
 
-message GetOpenRouterBalanceResponse {
+message GetProviderBalanceResponse {
   // Credits minus usage, when the key may read them.
   optional double account_balance = 1;
   optional double key_limit = 2;
@@ -230,7 +190,7 @@ message CatalogFreshness {
   optional string error = 3;
 }
 
-message OpenRouterPublisher {
+message CatalogPublisher {
   string id = 1;
   string name = 2;
   bool subscribed = 3;
@@ -247,7 +207,7 @@ message DiscoveredPublisher {
 }
 
 // A catalog model with the user's choices.
-message OpenRouterModel {
+message CatalogModel {
   string route = 1;
   string publisher_id = 2;
   string name = 3;
@@ -267,71 +227,133 @@ message OpenRouterModel {
 }
 
 message PublisherModels {
-  repeated OpenRouterModel models = 1;
+  repeated CatalogModel models = 1;
 }
 
 // Publishers, their models, and the user's choices among them.
-message OpenRouterCatalog {
+message ModelCatalog {
   CatalogFreshness freshness = 1;
-  repeated OpenRouterPublisher publishers = 2;
+  repeated CatalogPublisher publishers = 2;
   map<string, PublisherModels> models_by_publisher = 3;
   // Every publisher with an interactive model; absent without a catalog.
   optional DiscoveredPublishers discovered_publishers = 4;
 }
 
-message GetOpenRouterCatalogRequest {}
-
-message GetOpenRouterCatalogResponse {
-  OpenRouterCatalog catalog = 1;
+message GetModelCatalogRequest {
+  ModelProvider provider = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    in: [
+      2,
+      4
+    ]
+  }];
 }
 
-message RefreshOpenRouterCatalogRequest {}
+message GetModelCatalogResponse {
+  ModelCatalog catalog = 1;
+}
 
-message RefreshOpenRouterCatalogResponse {
-  OpenRouterCatalog catalog = 1;
+message RefreshModelCatalogRequest {
+  ModelProvider provider = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    in: [
+      2,
+      4
+    ]
+  }];
+}
+
+message RefreshModelCatalogResponse {
+  ModelCatalog catalog = 1;
 }
 
 message DiscoveredPublishers {
   repeated DiscoveredPublisher publishers = 1;
 }
 
-message SetOpenRouterModelEnabledRequest {
+message SetCatalogModelEnabledRequest {
   string route = 1 [(buf.validate.field).string = {
     min_len: 1
     max_len: 200
   }];
   bool enabled = 2;
+  ModelProvider provider = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    in: [
+      2,
+      4
+    ]
+  }];
 }
 
-message SetOpenRouterModelEnabledResponse {}
+message SetCatalogModelEnabledResponse {}
 
-message TrackOpenRouterPublisherRequest {
+message TrackCatalogPublisherRequest {
   string publisher_id = 1 [(buf.validate.field).string = {
     min_len: 1
     max_len: 200
   }];
+  ModelProvider provider = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    in: [
+      2,
+      4
+    ]
+  }];
 }
 
-message TrackOpenRouterPublisherResponse {}
+message TrackCatalogPublisherResponse {}
 
-message RemoveOpenRouterPublisherRequest {
+message RemoveCatalogPublisherRequest {
   string publisher_id = 1 [(buf.validate.field).string = {
     min_len: 1
     max_len: 200
   }];
+  ModelProvider provider = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    in: [
+      2,
+      4
+    ]
+  }];
 }
 
-message RemoveOpenRouterPublisherResponse {}
+message RemoveCatalogPublisherResponse {}
 
-message SetOpenRouterSubscriptionRequest {
+message SetCatalogSubscriptionRequest {
   string publisher_id = 1 [(buf.validate.field).string = {
     min_len: 1
     max_len: 200
   }];
   bool subscribed = 2;
+  ModelProvider provider = 3 [(buf.validate.field).enum = {
+    defined_only: true
+    in: [
+      2,
+      4
+    ]
+  }];
 }
 
-message SetOpenRouterSubscriptionResponse {}
+message SetCatalogSubscriptionResponse {}
+
+message ImageModel {
+  string id = 1;
+  string name = 2;
+  ImageProvider provider = 3;
+  repeated string aspect_ratios = 4;
+}
+
+message ListImageModelsRequest {
+  // Unspecified returns models from all providers.
+  ImageProvider provider = 1 [(buf.validate.field).enum.defined_only = true];
+  bool refresh = 2;
+}
+
+message ListImageModelsResponse {
+  repeated ImageModel models = 1;
+  optional string error = 2;
+}
 
 message ChatGptStatus {
   bool connected = 1;

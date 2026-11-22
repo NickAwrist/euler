@@ -26,6 +26,7 @@ public nonisolated enum Euler_V1_ModelProvider: SwiftProtobuf.Enum, Swift.CaseIt
   case ollama // = 1
   case openrouter // = 2
   case chatgpt // = 3
+  case vercelGateway // = 4
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -38,6 +39,7 @@ public nonisolated enum Euler_V1_ModelProvider: SwiftProtobuf.Enum, Swift.CaseIt
     case 1: self = .ollama
     case 2: self = .openrouter
     case 3: self = .chatgpt
+    case 4: self = .vercelGateway
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -48,6 +50,7 @@ public nonisolated enum Euler_V1_ModelProvider: SwiftProtobuf.Enum, Swift.CaseIt
     case .ollama: return 1
     case .openrouter: return 2
     case .chatgpt: return 3
+    case .vercelGateway: return 4
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -58,6 +61,7 @@ public nonisolated enum Euler_V1_ModelProvider: SwiftProtobuf.Enum, Swift.CaseIt
     .ollama,
     .openrouter,
     .chatgpt,
+    .vercelGateway,
   ]
 
 }
@@ -373,6 +377,15 @@ public nonisolated struct Euler_V1_ProviderStates: Sendable {
   /// Clears the value of `openrouter`. Subsequent reads from it will return its default value.
   public mutating func clearOpenrouter() {self._openrouter = nil}
 
+  public var vercelGateway: Euler_V1_ProviderStates.VercelGateway {
+    get {_vercelGateway ?? Euler_V1_ProviderStates.VercelGateway()}
+    set {_vercelGateway = newValue}
+  }
+  /// Returns true if `vercelGateway` has been explicitly set.
+  public var hasVercelGateway: Bool {self._vercelGateway != nil}
+  /// Clears the value of `vercelGateway`. Subsequent reads from it will return its default value.
+  public mutating func clearVercelGateway() {self._vercelGateway = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated struct ChatGpt: Sendable {
@@ -433,11 +446,24 @@ public nonisolated struct Euler_V1_ProviderStates: Sendable {
     public init() {}
   }
 
+  public nonisolated struct VercelGateway: Sendable {
+    // SwiftProtobuf.Message conformance is added in an extension below. See the
+    // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+    // methods supported on all messages.
+
+    public var configured: Bool = false
+
+    public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+    public init() {}
+  }
+
   public init() {}
 
   fileprivate var _chatgpt: Euler_V1_ProviderStates.ChatGpt? = nil
   fileprivate var _ollama: Euler_V1_ProviderStates.Ollama? = nil
   fileprivate var _openrouter: Euler_V1_ProviderStates.OpenRouter? = nil
+  fileprivate var _vercelGateway: Euler_V1_ProviderStates.VercelGateway? = nil
 }
 
 public nonisolated struct Euler_V1_ListModelsRequest: Sendable {
@@ -445,7 +471,7 @@ public nonisolated struct Euler_V1_ListModelsRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Use the cached OpenRouter catalog instead of refreshing it.
+  /// Use the cached gateway catalogs instead of refreshing them.
   public var cachedCatalog: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -508,7 +534,7 @@ public nonisolated struct Euler_V1_SetFavoriteResponse: Sendable {
 fileprivate nonisolated let _protobuf_package = "euler.v1"
 
 nonisolated extension Euler_V1_ModelProvider: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_PROVIDER_UNSPECIFIED\0\u{1}MODEL_PROVIDER_OLLAMA\0\u{1}MODEL_PROVIDER_OPENROUTER\0\u{1}MODEL_PROVIDER_CHATGPT\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_PROVIDER_UNSPECIFIED\0\u{1}MODEL_PROVIDER_OLLAMA\0\u{1}MODEL_PROVIDER_OPENROUTER\0\u{1}MODEL_PROVIDER_CHATGPT\0\u{1}MODEL_PROVIDER_VERCEL_GATEWAY\0")
 }
 
 nonisolated extension Euler_V1_InputCapability: SwiftProtobuf._ProtoNameProviding {
@@ -773,7 +799,7 @@ nonisolated extension Euler_V1_Model.Availability: SwiftProtobuf._ProtoNameProvi
 
 nonisolated extension Euler_V1_ProviderStates: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ProviderStates"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}chatgpt\0\u{1}ollama\0\u{1}openrouter\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}chatgpt\0\u{1}ollama\0\u{1}openrouter\0\u{3}vercel_gateway\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -784,6 +810,7 @@ nonisolated extension Euler_V1_ProviderStates: SwiftProtobuf.Message, SwiftProto
       case 1: try { try decoder.decodeSingularMessageField(value: &self._chatgpt) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._ollama) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._openrouter) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._vercelGateway) }()
       default: break
       }
     }
@@ -803,6 +830,9 @@ nonisolated extension Euler_V1_ProviderStates: SwiftProtobuf.Message, SwiftProto
     try { if let v = self._openrouter {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
+    try { if let v = self._vercelGateway {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -810,6 +840,7 @@ nonisolated extension Euler_V1_ProviderStates: SwiftProtobuf.Message, SwiftProto
     if lhs._chatgpt != rhs._chatgpt {return false}
     if lhs._ollama != rhs._ollama {return false}
     if lhs._openrouter != rhs._openrouter {return false}
+    if lhs._vercelGateway != rhs._vercelGateway {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -917,6 +948,36 @@ nonisolated extension Euler_V1_ProviderStates.OpenRouter: SwiftProtobuf.Message,
   }
 
   public static func ==(lhs: Euler_V1_ProviderStates.OpenRouter, rhs: Euler_V1_ProviderStates.OpenRouter) -> Bool {
+    if lhs.configured != rhs.configured {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Euler_V1_ProviderStates.VercelGateway: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = Euler_V1_ProviderStates.protoMessageName + ".VercelGateway"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}configured\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.configured) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.configured != false {
+      try visitor.visitSingularBoolField(value: self.configured, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Euler_V1_ProviderStates.VercelGateway, rhs: Euler_V1_ProviderStates.VercelGateway) -> Bool {
     if lhs.configured != rhs.configured {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

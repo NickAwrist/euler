@@ -55,7 +55,6 @@ test("preferences require identity, isolate users, preserve unrelated fields, an
   expect(getUserPreferences(TEST_USER_ID)?.settings.systemPrompt).toBeNull();
   for (const patch of [
     { appearance: { theme: 99 as Appearance_Theme } },
-    { image: { defaultWidth: 0 } },
     { layout: { artifactWidth: 100 } },
     { appearance: { sidebarAnimationMs: 601 } },
     { settings: { name: "n".repeat(1001) } },
@@ -79,26 +78,8 @@ test("startup schema creation preserves saved preferences", () => {
   );
 });
 
-test("image defaults and model favorites are scoped to the requesting user", async () => {
+test("model favorites are scoped to the requesting user", async () => {
   setOllamaHost("http://ollama.test");
-  for (const [owner, model] of [
-    [TEST_USER_ID, "image-a"],
-    [other, "image-b"],
-  ] as const) {
-    const saved = await rpc(owner).providers.updateComfyUiConfig({
-      image: { defaultModel: model, defaultWidth: 512, defaultHeight: 768 },
-    });
-    expect(saved.image?.defaultModel).toBe(model);
-  }
-  const partial = await rpc().providers.updateComfyUiConfig({
-    image: { negativePrompt: "blurry" },
-  });
-  expect(partial.image).toMatchObject({
-    defaultModel: "image-a",
-    defaultWidth: 512,
-    defaultHeight: 768,
-    negativePrompt: "blurry",
-  });
   await rpc().models.setFavorite({
     provider: ModelProvider.OLLAMA,
     modelId: "llama3:latest",

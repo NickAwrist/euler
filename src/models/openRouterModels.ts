@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { CatalogProvider } from "../llm/types";
 import {
   InputCapability,
   type InputCapability as InputCapabilityValue,
@@ -48,6 +49,38 @@ const RemoteModel = z.object({
     .nullish(),
 });
 const RemoteCatalog = z.object({ data: z.array(RemoteModel) });
+
+const VercelReasoningOption = z.object({
+  type: z.string(),
+  values: z.array(z.string()).optional(),
+});
+
+const VercelRemoteModel = z.object({
+  id: z.string().regex(ROUTE_PATTERN),
+  name: z.string().trim().min(1).optional(),
+  description: z.string().nullish(),
+  created: z.number().int().nonnegative().optional(),
+  released: z.number().int().nonnegative().optional(),
+  context_window: z.number().int().nonnegative().nullish(),
+  type: z.string().optional(),
+  tags: z.array(z.string()).nullish(),
+  pricing: z
+    .object({
+      input: z.unknown(),
+      output: z.unknown(),
+      input_cache_read: z.unknown(),
+    })
+    .nullish(),
+  modalities: z
+    .object({
+      input: z.array(z.string()).optional(),
+      output: z.array(z.string()).optional(),
+    })
+    .nullish(),
+  supported_parameters: z.array(z.string()).nullish(),
+  reasoning_options: z.array(VercelReasoningOption).nullish(),
+});
+const VercelRemoteCatalog = z.object({ data: z.array(VercelRemoteModel) });
 
 export type { ModelReasoning };
 
@@ -135,7 +168,76 @@ export function catalogFreshness(result: CatalogResult): CatalogFreshness {
   };
 }
 
-export class OpenRouterCatalog {
+function parseVercelReasoning(
+  options: readonly z.infer<typeof VercelReasoningOption>[] | null | undefined,
+  tags: readonly string[] | null | undefined,
+): ModelReasoning | null {
+  const effortOption = options?.find(
+    (entry) => entry.type === "effort" && entry.values?.length,
+  );
+  const hasToggle = options?.some((entry) => entry.type === "toggle") ?? false;
+  const hasBudget =
+    options?.some((entry) => entry.type === "budget_tokens") ?? false;
+  const supportedEfforts = effortOption?.values ?? [];
+  if (
+    !hasToggle &&
+    !hasBudget &&
+    supportedEfforts.length === 0 &&
+    !tags?.includes("reasoning")
+  ) {
+    return null;
+  }
+  const hasOff = supportedEfforts.some(
+    (value) => value.toLowerCase() === "none" || value.toLowerCase() === "off",
+  );
+  return parseModelReasoning({
+    mandatory: !hasToggle && !hasOff && supportedEfforts.length > 0,
+    defaultEnabled: true,
+    supportedEfforts,
+  });
+}
+
+export function normalizeVercelGatewayCatalog(
+  payload: unknown,
+): CatalogModel[] {
+  const { data } = VercelRemoteCatalog.parse(payload);
+  const languageModels = data.filter((model) => model.type === "language");
+  if (
+    new Set(languageModels.map((model) => model.id)).size !==
+    languageModels.length
+  ) {
+    throw new Error("Duplicate catalog routes");
+  }
+  return languageModels.map((model) => {
+    const rawInputs = [
+      ...(model.modalities?.input ?? ["text"]),
+      ...(model.tags?.includes("vision") ? ["image"] : []),
+    ].map((cap) => (cap.toLowerCase() === "pdf" ? "file" : cap));
+    return {
+      route: model.id,
+      publisherId: model.id.split("/")[0]!,
+      name: model.name || model.id,
+      description: model.description ?? "",
+      created: model.released ?? model.created ?? 0,
+      contextLength:
+        model.context_window && model.context_window > 0
+          ? model.context_window
+          : null,
+      promptPricePerMillion: price(model.pricing?.input),
+      completionPricePerMillion: price(model.pricing?.output),
+      cacheReadPricePerMillion: price(model.pricing?.input_cache_read),
+      inputCapabilities: parseInputCapabilities(rawInputs),
+      outputCapabilities: model.modalities?.output ?? ["text"],
+      supportsTools:
+        (model.supported_parameters?.includes("tools") ||
+          model.tags?.includes("tool-use")) ??
+        false,
+      reasoning: parseVercelReasoning(model.reasoning_options, model.tags),
+    };
+  });
+}
+
+export class GatewayCatalog {
   private snapshot: {
     models: readonly CatalogModel[];
     fetchedAt: number;
@@ -143,6 +245,9 @@ export class OpenRouterCatalog {
   private lastError: string | null = null;
   private inFlight: Promise<CatalogResult> | null = null;
   constructor(
+    private readonly url: string,
+    private readonly label: string,
+    private readonly normalize: (payload: unknown) => CatalogModel[],
     private readonly request: (
       url: string,
       init: RequestInit,
@@ -161,6 +266,12 @@ export class OpenRouterCatalog {
       lastSuccessfulFetchAt: this.snapshot?.fetchedAt ?? null,
       error: this.lastError,
     };
+  }
+
+  reset(): void {
+    this.snapshot = null;
+    this.lastError = null;
+    this.inFlight = null;
   }
 
   async get(force = false): Promise<CatalogResult> {
@@ -186,15 +297,14 @@ export class OpenRouterCatalog {
   }
   private async refresh(): Promise<CatalogResult> {
     try {
-      const response = await this.request(
-        "https://openrouter.ai/api/v1/models",
-        { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
-      );
+      const response = await this.request(this.url, {
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      });
       if (!response.ok)
         throw new Error(
-          `OpenRouter catalog request failed (${response.status})`,
+          `${this.label} catalog request failed (${response.status})`,
         );
-      const models = normalizeCatalog(await response.json());
+      const models = this.normalize(await response.json());
       this.snapshot = { models, fetchedAt: this.now() };
       this.lastError = null;
       return {
@@ -204,7 +314,7 @@ export class OpenRouterCatalog {
         error: null,
       };
     } catch {
-      this.lastError = "Could not refresh the OpenRouter catalog. Try again.";
+      this.lastError = `Could not refresh the ${this.label} catalog. Try again.`;
       return {
         models: this.snapshot?.models ?? null,
         status: this.snapshot ? "stale" : "unavailable",
@@ -214,4 +324,42 @@ export class OpenRouterCatalog {
     }
   }
 }
+
+export class OpenRouterCatalog extends GatewayCatalog {
+  constructor(
+    request?: (url: string, init: RequestInit) => Promise<Response>,
+    now?: () => number,
+  ) {
+    super(
+      "https://openrouter.ai/api/v1/models",
+      "OpenRouter",
+      normalizeCatalog,
+      request,
+      now,
+    );
+  }
+}
+
+export class VercelGatewayCatalog extends GatewayCatalog {
+  constructor(
+    request?: (url: string, init: RequestInit) => Promise<Response>,
+    now?: () => number,
+  ) {
+    super(
+      "https://ai-gateway.vercel.sh/v1/models",
+      "Vercel AI Gateway",
+      normalizeVercelGatewayCatalog,
+      request,
+      now,
+    );
+  }
+}
+
 export const openRouterCatalog = new OpenRouterCatalog();
+export const vercelGatewayCatalog = new VercelGatewayCatalog();
+
+export function catalogForProvider(provider: CatalogProvider): GatewayCatalog {
+  return provider === "vercel_gateway"
+    ? vercelGatewayCatalog
+    : openRouterCatalog;
+}

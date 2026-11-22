@@ -6,7 +6,8 @@ import type { UserSettings } from "../../persist/userSettings";
 import type { SettingsTab } from "../../types";
 import type { SettingChange, SettingsPageProps } from "./types";
 import { useAppearanceDraft } from "./useAppearanceDraft";
-import { useComfyUIDraft, useOllamaDraft } from "./useProviderDrafts";
+import { useImageGenDraft } from "./useImageGenDraft";
+import { useOllamaDraft } from "./useProviderDrafts";
 
 type Args = Pick<
   SettingsPageProps,
@@ -14,12 +15,6 @@ type Args = Pick<
   | "ollamaHost"
   | "ollamaContextWindow"
   | "ollamaConnected"
-  | "comfyuiHost"
-  | "comfyuiConnected"
-  | "comfyuiDefaultModel"
-  | "comfyuiDefaultWidth"
-  | "comfyuiDefaultHeight"
-  | "comfyuiNegativePrompt"
   | "onSave"
 >;
 
@@ -28,29 +23,14 @@ export function useSettingsPageState({
   ollamaHost,
   ollamaContextWindow,
   ollamaConnected,
-  comfyuiHost,
-  comfyuiConnected,
-  comfyuiDefaultModel,
-  comfyuiDefaultWidth,
-  comfyuiDefaultHeight,
-  comfyuiNegativePrompt,
   onSave,
 }: Args) {
   const appearance = useAppearanceDraft();
+  const imageGen = useImageGenDraft();
   const settings = useSavedDraft(currentSettings);
   const ollama = useOllamaDraft(ollamaHost, ollamaConnected);
   const contextWindow = useSavedDraft(ollamaContextWindow);
   const contextWindowDirty = contextWindow.value !== ollamaContextWindow;
-  const comfy = useComfyUIDraft(
-    {
-      host: comfyuiHost,
-      defaultModel: comfyuiDefaultModel,
-      defaultWidth: comfyuiDefaultWidth,
-      defaultHeight: comfyuiDefaultHeight,
-      negativePrompt: comfyuiNegativePrompt,
-    },
-    comfyuiConnected,
-  );
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,39 +57,38 @@ export function useSettingsPageState({
       ...(ollama.dirty ? ["Ollama server URL"] : []),
       ...(contextWindowDirty ? ["Ollama context window"] : []),
     ]),
-    ...tabChanges("image-generation", comfy.changes),
+    ...tabChanges("image-generation", imageGen.changes),
   ];
   const isDirty = changes.length > 0;
 
   const discardChanges = () => {
     appearance.reset();
+    imageGen.reset();
     settings.reset();
     ollama.reset();
     contextWindow.reset();
-    comfy.reset();
     setError(null);
   };
 
   const handleSubmit = async (): Promise<boolean> => {
     if (!isDirty) return true;
     const save = async () => {
-      if (changes.some((change) => change.tab !== "appearance")) {
-        await onSave(
-          changedFields(settings.value, currentSettings),
-          {
-            ...(ollama.dirty ? { host: ollama.host } : {}),
-            ...(contextWindowDirty
-              ? { contextWindow: contextWindow.value }
-              : {}),
-          },
-          comfy.changes.length > 0 ? comfy.patch : undefined,
-        );
+      if (
+        changes.some(
+          (change) =>
+            change.tab !== "appearance" && change.tab !== "image-generation",
+        )
+      ) {
+        await onSave(changedFields(settings.value, currentSettings), {
+          ...(ollama.dirty ? { host: ollama.host } : {}),
+          ...(contextWindowDirty ? { contextWindow: contextWindow.value } : {}),
+        });
         settings.accept();
         ollama.accept();
         contextWindow.accept();
-        comfy.accept();
       }
       if (appearance.changes.length > 0) await appearance.save();
+      if (imageGen.changes.length > 0) await imageGen.save();
     };
     setError(null);
     return whileRunning(setIsSaving, () =>
@@ -127,12 +106,12 @@ export function useSettingsPageState({
 
   return {
     appearance,
+    imageGen,
     settings: settings.value,
     handleChange,
     ollama,
     contextWindow: contextWindow.value,
     setContextWindow: contextWindow.setValue,
-    comfy,
     isSaving,
     changes,
     isDirty,

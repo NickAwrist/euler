@@ -32,7 +32,7 @@ async function mockSettings(
   await mockRpc(
     page,
     [
-      on(ProviderService.method.getOpenRouterCatalog, () => ({
+      on(ProviderService.method.getModelCatalog, () => ({
         catalog: { freshness: { status: CatalogFreshness_Status.FRESH } },
       })),
       on(ProviderService.method.getOllamaConfig, () => ({
@@ -81,7 +81,7 @@ for (const screen of ["Settings", "Onboarding"] as const) {
     if (screen === "Settings") {
       await page.getByRole("button", { name: "Ollama", exact: true }).click();
     } else {
-      for (let step = 0; step < 3; step++)
+      for (let step = 0; step < 4; step++)
         await page.getByRole("button", { name: "Skip", exact: true }).click();
     }
     const address = page.locator("#ollamaUri");

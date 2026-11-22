@@ -25,7 +25,12 @@ for (const device of ["desktop", "mobile"] as const) {
         const general = await page
           .getByRole("button", { name: "General", exact: true })
           .boundingBox();
-        for (const name of ["Image Generation", "Web Search"]) {
+        for (const name of [
+          "Vercel AI Gateway",
+          "ChatGPT",
+          "Image Generation",
+          "Web Search",
+        ]) {
           const tab = page.getByRole("button", { name, exact: true });
           await expect(tab).toBeInViewport({ ratio: 1 });
           expect((await tab.boundingBox())!.height).toBe(general!.height);
@@ -37,13 +42,9 @@ for (const device of ["desktop", "mobile"] as const) {
       await expect(save).toBeInViewport();
       await expect(footer).toContainText("Unsaved changes in General");
 
-      await page
-        .getByRole("button", { name: "Image Generation", exact: true })
-        .click();
-      await page.getByLabel("Negative Prompt").fill("blurry");
-      await expect(footer).toContainText(
-        "Unsaved changes in General, Image Generation",
-      );
+      await page.getByRole("button", { name: "Ollama", exact: true }).click();
+      await page.getByLabel("Context window").selectOption("high");
+      await expect(footer).toContainText("Unsaved changes in General, Ollama");
       await page.screenshot({
         path: testInfo.outputPath(`${device}-settings-dirty.png`),
       });
@@ -53,7 +54,7 @@ for (const device of ["desktop", "mobile"] as const) {
       const changes = dialog.getByRole("list", { name: "Changed settings" });
       await expect(changes.getByRole("listitem")).toHaveText([
         "Display debug buttonGeneral",
-        "Negative promptImage Generation",
+        "Ollama context windowOllama",
       ]);
       await expect(
         dialog.getByRole("button", { name: "Save & leave" }),
@@ -69,13 +70,13 @@ for (const device of ["desktop", "mobile"] as const) {
         path: testInfo.outputPath(`${device}-settings-discard.png`),
       });
       await dialog.getByRole("button", { name: "Keep editing" }).last().click();
-      await expect(page.getByLabel("Negative Prompt")).toHaveValue("blurry");
+      await expect(page.getByLabel("Context window")).toHaveValue("high");
 
       await footer.getByRole("button", { name: "Discard" }).click();
       await dialog.getByRole("button", { name: "Discard changes" }).click();
       await expect(dialog).toBeHidden();
       await expect(save).toBeHidden();
-      await expect(page.getByLabel("Negative Prompt")).toHaveValue("");
+      await expect(page.getByLabel("Context window")).toHaveValue("low");
       await page.getByRole("button", { name: "General", exact: true }).click();
       await page.getByText("Developer tools", { exact: true }).click();
       await expect(

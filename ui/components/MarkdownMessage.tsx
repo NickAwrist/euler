@@ -20,7 +20,6 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
-import { COMFYUI_VIEW_PREFIX } from "../../src/attachments/types";
 import { copyTextToClipboard } from "../lib/copyTextToClipboard";
 import { cx } from "../styles";
 import { artifactPath, useArtifacts } from "./Artifacts/ArtifactContext";
@@ -152,21 +151,6 @@ function MarkdownPre({
   );
 }
 
-// The prefix has no regex metacharacters, so the patterns embed it directly.
-const VIEW_URL = COMFYUI_VIEW_PREFIX;
-const JSON_WRAPPED_VIEW_URL = new RegExp(
-  String.raw`\{\s*"[^"]*"\s*:\s*"(${VIEW_URL}[^"]+)"\s*\}`,
-  "g",
-);
-const QUOTED_VIEW_URL = new RegExp(
-  String.raw`(?<!\]\()"(${VIEW_URL}[^"]+)"`,
-  "g",
-);
-// Trailing sentence punctuation is not part of a bare URL.
-const BARE_VIEW_URL = new RegExp(
-  String.raw`(?<!\]\()(?<!\()(${VIEW_URL}[^\s"')>\]]*[^\s"')>\].,;:!?])`,
-  "g",
-);
 const markdownParser = unified().use(remarkParse).use(remarkGfm);
 
 /**
@@ -209,105 +193,43 @@ export function normalizeMathDelimiters(markdown: string): string {
   return result + toDollarMath(markdown.slice(cursor));
 }
 
-function isComfyUIImage(src: string | undefined): boolean {
-  return typeof src === "string" && src.startsWith(COMFYUI_VIEW_PREFIX);
-}
-
-/** ComfyUI image URLs rendered as images (not code) after {@link convertComfyUIUrls}, in order (deduped). */
-export function extractComfyUIImageUrls(markdown: string): string[] {
-  const source = convertComfyUIUrls(normalizeFlattenedPipeTables(markdown));
-  const tree = markdownParser.parse(source);
-  const definitions = new Map<string, string>();
-  const images: Extract<RootContent, { type: "image" | "imageReference" }>[] =
-    [];
-  function collect(node: Root | RootContent): void {
-    if (node.type === "definition" && !definitions.has(node.identifier)) {
-      definitions.set(node.identifier, node.url);
-    } else if (node.type === "image" || node.type === "imageReference") {
-      images.push(node);
-    }
-    if ("children" in node) node.children.forEach(collect);
-  }
-  collect(tree);
-  const urls = images.flatMap((node) => {
-    const url =
-      node.type === "image" ? node.url : definitions.get(node.identifier);
-    return url && isComfyUIImage(url) ? [url] : [];
-  });
-  return [...new Set(urls)];
-}
-
-/** Identifies the image a view URL loads; the view route defaults `type` to "output". */
-export function comfyUIImageKey(url: string): string {
-  const { pathname, searchParams } = new URL(url, "http://localhost");
-  return [
-    pathname,
-    searchParams.get("type") || "output",
-    searchParams.get("subfolder") ?? "",
-  ].join("\n");
-}
-
-export function MarkdownImageCard({
-  src,
-  alt,
-  linkPreview = false,
-}: { src: string; alt?: string; linkPreview?: boolean }) {
+function ImageLinkPreviewCard({ src, alt }: { src: string; alt: string }) {
   const [loaded, setLoaded] = useState(false);
   const [errored, setErrored] = useState(false);
-  const [errorDetails, setErrorDetails] = useState<string>("");
 
-  const handleError = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    if (!linkPreview) console.error("Image failed to load:", src, e);
-    setErrored(true);
-    setErrorDetails(`URL: ${src}`);
-  };
-
-  if (linkPreview && errored) return null;
-  const Container = linkPreview ? "a" : "div";
+  if (errored) return null;
 
   return (
-    <Container
-      href={linkPreview ? src : undefined}
-      target={linkPreview ? "_blank" : undefined}
-      rel={linkPreview ? "noopener noreferrer" : undefined}
-      aria-label={linkPreview ? "Open image in new tab" : undefined}
-      className={cx(
-        "my-3 inline-block max-w-full",
-        linkPreview && (!loaded || errored) && "hidden",
-      )}
+    <a
+      href={src}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Open image in new tab"
+      className={cx("my-3 inline-block max-w-full", !loaded && "hidden")}
     >
       <div className="overflow-hidden rounded-lg border border-border-subtle bg-background shadow-sm">
-        {errored ? (
-          <div className="flex h-48 w-80 max-w-full flex-col items-center justify-center p-4 text-center text-[0.8125rem] text-muted-foreground">
-            <div className="mb-2">Failed to load image</div>
-            <div className="break-all text-[0.7rem] opacity-70">
-              {errorDetails}
+        <div className="relative block h-48 w-80 max-w-full">
+          {!loaded && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="h-5 w-5 animate-spin rounded-full border-2 border-border-subtle border-t-foreground" />
             </div>
-          </div>
-        ) : (
-          <div className="relative block h-48 w-80 max-w-full">
-            {!loaded && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-border-subtle border-t-foreground" />
-              </div>
+          )}
+          <img
+            src={src}
+            loading="eager"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            alt={alt}
+            onLoad={() => setLoaded(true)}
+            onError={() => setErrored(true)}
+            className={cx(
+              "block h-full w-full object-contain",
+              loaded ? "opacity-100" : "opacity-0",
             )}
-            <img
-              src={src}
-              loading={linkPreview ? "eager" : "lazy"}
-              decoding="async"
-              referrerPolicy="no-referrer"
-              alt={alt || "Generated image"}
-              onLoad={() => setLoaded(true)}
-              onError={handleError}
-              className={cx(
-                "block h-full w-full object-contain",
-                loaded ? "opacity-100" : "opacity-0",
-              )}
-            />
-          </div>
-        )}
+          />
+        </div>
       </div>
-    </Container>
+    </a>
   );
 }
 
@@ -316,44 +238,9 @@ function MarkdownImg({
   alt,
   ...rest
 }: ComponentPropsWithoutRef<"img"> & ExtraProps) {
-  if (isComfyUIImage(src)) {
-    return <MarkdownImageCard src={src!} alt={alt} />;
-  }
   return (
     <img {...rest} src={src} alt={alt ?? ""} loading="lazy" decoding="async" />
   );
-}
-
-/**
- * Detect ComfyUI image URLs in various formats the LLM might produce and
- * convert them into clean markdown image syntax.
- *
- * Handles:
- *  - JSON wrapper:  { "image_url": "/api/comfyui/view/..." }
- *  - Quoted URL:    "/api/comfyui/view/..."
- *  - Bare URL:      /api/comfyui/view/...
- *  - Already valid: ![alt](/api/comfyui/view/...) - left untouched
- */
-function convertComfyUIUrls(markdown: string): string {
-  // 1. Replace full JSON object wrappers like { "image_url": "..." }
-  let result = markdown.replace(
-    JSON_WRAPPED_VIEW_URL,
-    (_match, url) => `![Generated Image](${url})`,
-  );
-
-  // 2. Replace quoted URLs not already inside markdown image syntax
-  result = result.replace(
-    QUOTED_VIEW_URL,
-    (_match, url) => `![Generated Image](${url})`,
-  );
-
-  // 3. Replace remaining bare URLs (exclude quotes, parens, brackets, whitespace)
-  result = result.replace(BARE_VIEW_URL, (match) => {
-    if (result.includes(`](${match})`)) return match;
-    return `![Generated Image](${match})`;
-  });
-
-  return result;
 }
 
 function MarkdownLink({
@@ -444,12 +331,7 @@ function ImageLinkPreviews({ urls }: { urls: string[] }) {
     <div ref={ref} className="flex flex-wrap gap-x-3">
       {visible &&
         urls.map((src) => (
-          <MarkdownImageCard
-            key={src}
-            src={src}
-            alt="Linked image"
-            linkPreview
-          />
+          <ImageLinkPreviewCard key={src} src={src} alt="Linked image" />
         ))}
     </div>
   );
@@ -463,7 +345,7 @@ export const MarkdownMessage = memo(function MarkdownMessage({
   className,
 }: { children: string; className?: string }) {
   const source = normalizeMathDelimiters(
-    convertComfyUIUrls(normalizeFlattenedPipeTables(children)),
+    normalizeFlattenedPipeTables(children),
   );
   const imageLinks = useMemo(() => extractImagePreviewLinks(source), [source]);
 

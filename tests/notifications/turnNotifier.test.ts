@@ -137,21 +137,6 @@ test("failed turns push, stopped and subagent turns do not", async () => {
   ]);
 });
 
-test("a reply's generated image rides along for the notification extension", async () => {
-  const { sent, publish } = setup();
-  await publish(
-    agent("main", "main"),
-    reply("main", "", [
-      { kind: "generated_image", url: "/api/comfyui/view/out.png" },
-    ]),
-    ended("main", "done"),
-  );
-  expect(sent[0]?.payload).toMatchObject({
-    aps: { alert: { body: "Generated an image." } },
-    image: "/api/comfyui/view/out.png",
-  });
-});
-
 test("approvals from any agent push with actions", async () => {
   const { sent, publish } = setup();
   await publish({
@@ -209,4 +194,24 @@ test("summaries drop Markdown and stay short", () => {
   const long = plainSummary("word ".repeat(200));
   expect(long.length).toBeLessThanOrEqual(240);
   expect(long.endsWith("…")).toBe(true);
+});
+
+test("an image-only reply pushes a short image summary", async () => {
+  const { sent, publish } = setup();
+  await publish(
+    agent("main", "main"),
+    reply("main", "", [
+      {
+        kind: "image",
+        id: "img-1",
+        name: "lighthouse.png",
+        mimeType: "image/png",
+        size: 128,
+      },
+    ]),
+    ended("main", "done"),
+  );
+  expect(sent[0]?.payload.aps).toMatchObject({
+    alert: { title: "Release notes", body: "Generated an image." },
+  });
 });

@@ -72,7 +72,6 @@ export const preferenceService: ServiceImpl<typeof PreferenceService> = {
     const environment = getEnvironmentSettings();
     return {
       ollamaHost: environment.ollamaHost,
-      comfyuiHost: environment.comfyuiHost,
     };
   },
 };

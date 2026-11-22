@@ -1,26 +1,23 @@
 import EulerAPI
 import SwiftUI
 
-/// What tools attached to a reply: generated images the text doesn't show,
-/// workspace files to preview, and the web sources it read.
+/// What tools attached to a reply: generated images, workspace files to preview,
+/// and the web sources it read.
 struct ReplyAttachments: View {
     let attachments: [Euler_V1_MessageAttachment]
-    let content: String
     @Binding var sheet: ChatSheet?
     @Environment(AppSession.self) private var session
     @Environment(\.palette) private var palette
 
     var body: some View {
-        let images = generatedImages
+        let images = attachments.compactMap { if case .image(let image) = $0.kind { image } else { nil } }
         let files = attachments.compactMap { if case .file(let file) = $0.kind { file } else { nil } }
         let sources = attachments.compactMap { if case .webSource(let source) = $0.kind { source } else { nil } }
         if !images.isEmpty || !files.isEmpty || !sources.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(images, id: \.self) { path in
-                    if let url = session.backend.url(forPath: path) {
-                        RemoteImage(url: url, alt: "Generated image")
-                            .frame(maxWidth: 320, maxHeight: 320, alignment: .leading)
-                    }
+                ForEach(images, id: \.id) { image in
+                    RemoteImage(attachment: image.id, alt: image.name)
+                        .frame(maxWidth: 320, maxHeight: 320, alignment: .leading)
                 }
                 ForEach(files, id: \.id) { file in
                     Button {
@@ -42,14 +39,6 @@ struct ReplyAttachments: View {
                     SourcesChip(sources: sources) { sheet = .sources(sources) }
                 }
             }
-        }
-    }
-
-    /// Generated images, leaving out those the reply's Markdown already shows.
-    private var generatedImages: [String] {
-        attachments.compactMap { attachment in
-            guard case .generatedImage(let image) = attachment.kind, !content.contains(image.url) else { return nil }
-            return image.url
         }
     }
 }

@@ -71,13 +71,6 @@ struct MarkdownDocumentTests {
         }
         #expect(table.rows.count == 1)
     }
-
-    @Test func comfyUIURLsBecomeImages() {
-        let blocks = MarkdownDocument(#"Here: {"image_url": "/api/comfyui/view/out.png"}"#).blocks
-        #expect(blocks.contains(.image(url: "/api/comfyui/view/out.png", alt: "Generated Image")))
-        let bare = MarkdownDocument("Saved to /api/comfyui/view/a.png.").blocks
-        #expect(bare.contains(.image(url: "/api/comfyui/view/a.png", alt: "Generated Image")))
-    }
 }
 
 @MainActor

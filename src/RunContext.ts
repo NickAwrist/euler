@@ -64,6 +64,7 @@ export class RunContext {
   readonly agentName: string;
   readonly signal?: AbortSignal;
   readonly ownerUuid: string;
+  readonly sessionId: string;
   readonly workspace?: Workspace;
   readonly permissions: RunPermissions;
   private _steps: Step[] = [];
@@ -82,12 +83,14 @@ export class RunContext {
     signal?: AbortSignal,
     ownerUuid = "",
     workspace?: Workspace,
+    sessionId = "",
   ) {
     this.agentName = agentInstance.name;
     this._onChange = onChange;
     this._onStreamDelta = onStreamDelta;
     this.signal = signal;
     this.ownerUuid = ownerUuid;
+    this.sessionId = sessionId;
     this.workspace = workspace;
     this.permissions = permissions;
   }
@@ -158,10 +161,15 @@ export class RunContext {
     }
   }
 
-  /** Record tool outputs for the reply, skipping URLs already recorded. */
+  /** Record tool outputs for the reply, skipping duplicates already recorded. */
   addOutputAttachments(attachments: readonly ToolOutputAttachment[]): void {
+    const key = (attachment: ToolOutputAttachment) =>
+      attachment.kind === "image"
+        ? `image:${attachment.id}`
+        : `web:${attachment.url}`;
     for (const attachment of attachments) {
-      if (!this._outputAttachments.some((a) => a.url === attachment.url)) {
+      const nextKey = key(attachment);
+      if (!this._outputAttachments.some((a) => key(a) === nextKey)) {
         this._outputAttachments.push(attachment);
       }
     }

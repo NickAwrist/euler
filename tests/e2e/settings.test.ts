@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { toBinary } from "@bufbuild/protobuf";
 import { getOpenRouterApiKey } from "../../src/db";
 import { getDb } from "../../src/db/connection";
+import { ModelProvider } from "../../src/gen/euler/v1/models_pb";
 import {
   ApiKeyProvider,
   GetApiKeyResponseSchema,
@@ -16,9 +17,20 @@ describe("Settings E2E Tests", () => {
   });
 
   test("balance requires a configured key", async () => {
-    expect(await rpcCode(rpc().providers.getOpenRouterBalance({}))).toBe(
-      Code.InvalidArgument,
-    );
+    expect(
+      await rpcCode(
+        rpc().providers.getProviderBalance({
+          provider: ModelProvider.OPENROUTER,
+        }),
+      ),
+    ).toBe(Code.InvalidArgument);
+    expect(
+      await rpcCode(
+        rpc().providers.getProviderBalance({
+          provider: ModelProvider.VERCEL_GATEWAY,
+        }),
+      ),
+    ).toBe(Code.InvalidArgument);
   });
 
   test("save, retrieve presence/absence, overwrite, clear, whitespace trim, SQL injection, and database locks", async () => {

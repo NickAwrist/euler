@@ -37,11 +37,6 @@ message WorkspaceFileAttachment {
   WorkspaceKind workspace_kind = 6;
 }
 
-// An image ComfyUI generated, served under /api/comfyui/view/.
-message GeneratedImageAttachment {
-  string url = 1;
-}
-
 // A web page a search or fetch tool cited.
 message WebSourceAttachment {
   string title = 1;
@@ -52,7 +47,6 @@ message MessageAttachment {
   oneof kind {
     ImageAttachment image = 1;
     WorkspaceFileAttachment file = 2;
-    GeneratedImageAttachment generated_image = 3;
     WebSourceAttachment web_source = 4;
   }
 }
@@ -61,8 +55,8 @@ message MessageAttachment {
 message OutputAttachment {
   oneof kind {
     WorkspaceFileAttachment file = 1;
-    GeneratedImageAttachment generated_image = 2;
     WebSourceAttachment web_source = 3;
+    ImageAttachment image = 4;
   }
 }
 

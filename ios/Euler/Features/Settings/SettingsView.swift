@@ -3,7 +3,7 @@ import SwiftUI
 
 /// The pages Settings can open on.
 enum SettingsPage: Hashable, Identifiable {
-    case root, general, appearance, ollama, openRouter, chatGpt, imageGeneration, webSearch
+    case root, general, appearance, ollama, openRouter, vercelGateway, chatGpt, imageGeneration, webSearch
     case customization, personalization, skills, tools, usage
 
     var id: Self { self }
@@ -49,6 +49,7 @@ struct SettingsView: View {
             Section {
                 row(.ollama, "Ollama", .provider(.ollama))
                 row(.openRouter, "OpenRouter", .provider(.openrouter))
+                row(.vercelGateway, "Vercel AI Gateway", .system("triangle.fill", Color(hex: 0x18181B)))
                 row(.chatGpt, "ChatGPT", .provider(.codex))
                 row(.imageGeneration, "Image Generation", .system("photo.fill", Color(hex: 0xFF375F)))
                 row(.webSearch, "Web Search", .system("globe", Color(hex: 0x0A84FF)))
@@ -107,7 +108,8 @@ struct SettingsView: View {
         case .general: GeneralSettingsView()
         case .appearance: AppearanceSettingsView()
         case .ollama: OllamaSettingsView()
-        case .openRouter: OpenRouterSettingsView()
+        case .openRouter: OpenRouterSettingsView(provider: .openrouter)
+        case .vercelGateway: OpenRouterSettingsView(provider: .vercelGateway)
         case .chatGpt: ChatGptSettingsView()
         case .imageGeneration: ImageGenerationSettingsView()
         case .webSearch: WebSearchSettingsView()

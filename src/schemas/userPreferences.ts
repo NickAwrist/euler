@@ -59,17 +59,13 @@ const featureTogglesSchema = z.object({
   subagents: z.boolean().default(true),
 });
 export type FeatureToggles = z.infer<typeof featureTogglesSchema>;
-export const DEFAULT_COMFYUI_NEGATIVE_PROMPT =
-  "low quality, worst quality, blurry, watermark, signature, text, bad anatomy, deformed, ugly, duplicate, extra fingers, poorly drawn hands, poorly drawn face, mutation, cropped";
+export const imageProviderSchema = z.enum(["", "openrouter", "vercel_gateway"]);
+export type ImageProviderPreference = z.infer<typeof imageProviderSchema>;
 export const imagePreferencesSchema = z.object({
-  defaultModel: z.string().max(1000).default(""),
-  defaultWidth: z.number().int().min(1).max(16384).default(1440),
-  defaultHeight: z.number().int().min(1).max(16384).default(1440),
-  negativePrompt: z
-    .string()
-    .max(100000)
-    .default(DEFAULT_COMFYUI_NEGATIVE_PROMPT),
+  provider: imageProviderSchema.catch(""),
+  model: z.string().max(200).catch(""),
 });
+export type ImagePreferences = z.infer<typeof imagePreferencesSchema>;
 export const userPreferencesSchema = z.object({
   toolPermissions: ToolPermissionsSchema.default(() =>
     ToolPermissionsSchema.parse({}),

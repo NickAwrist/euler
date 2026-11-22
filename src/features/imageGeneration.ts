@@ -1,4 +1,4 @@
-import { getComfyUIClient } from "../comfyui/client";
+import { configuredImageProviders } from "../imageGen/index";
 import { GenerateImageTool } from "../tools/generate_image";
 import {
   CAPABLE,
@@ -7,20 +7,20 @@ import {
   ToggleFeature,
 } from "./Feature";
 
-/** Runs before every turn, so an unreachable host must not hold the turn up. */
-const HEALTH_TIMEOUT_MS = 2000;
-
 export class ImageGenerationFeature extends ToggleFeature {
   readonly id = "imageGeneration";
   readonly label = "Image generation";
-  readonly description = "Generate images with ComfyUI.";
+  readonly description =
+    "Generate images with OpenRouter or Vercel AI Gateway.";
   readonly toolNames = ["generate_image"];
 
   override async capable(): Promise<Capability> {
-    const health = await getComfyUIClient().healthCheck(HEALTH_TIMEOUT_MS);
-    return health.ok
+    return configuredImageProviders().length > 0
       ? CAPABLE
-      : { capable: false, reason: "ComfyUI is not reachable" };
+      : {
+          capable: false,
+          reason: "Needs an OpenRouter or Vercel AI Gateway API key",
+        };
   }
 
   override async tools(): Promise<FeatureTools> {

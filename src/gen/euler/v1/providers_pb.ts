@@ -5,9 +5,9 @@
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
 import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
-import type { InputCapability, Model_Availability, ModelReasoning } from "./models_pb";
+import type { InputCapability, Model_Availability, ModelProvider, ModelReasoning } from "./models_pb";
 import { file_euler_v1_models } from "./models_pb";
-import type { ImagePreferences, UpdatePreferencesRequest_ImagePatch } from "./preferences_pb";
+import type { ImageProvider } from "./preferences_pb";
 import { file_euler_v1_preferences } from "./preferences_pb";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
@@ -17,7 +17,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file euler/v1/providers.proto.
  */
 export const file_euler_v1_providers: GenFile = /*@__PURE__*/
-  fileDesc("ChhldWxlci92MS9wcm92aWRlcnMucHJvdG8SCGV1bGVyLnYxIjIKCkhvc3RDb25maWcSDAoEaG9zdBgBIAEoCRIWCg5lZmZlY3RpdmVfaG9zdBgCIAEoCSJWCghIb3N0VGVzdBIKCgJvaxgBIAEoCBIUCgd2ZXJzaW9uGAIgASgJSACIAQESEgoFZXJyb3IYAyABKAlIAYgBAUIKCghfdmVyc2lvbkIICgZfZXJyb3IiGAoWR2V0T2xsYW1hQ29uZmlnUmVxdWVzdCJ2ChdHZXRPbGxhbWFDb25maWdSZXNwb25zZRIkCgZjb25maWcYASABKAsyFC5ldWxlci52MS5Ib3N0Q29uZmlnEjUKDmNvbnRleHRfd2luZG93GAIgASgOMh0uZXVsZXIudjEuT2xsYW1hQ29udGV4dFdpbmRvdyIzChlVcGRhdGVPbGxhbWFDb25maWdSZXF1ZXN0EhYKBGhvc3QYASABKAlCCLpIBXIDGIAQIkIKGlVwZGF0ZU9sbGFtYUNvbmZpZ1Jlc3BvbnNlEiQKBmNvbmZpZxgBIAEoCzIULmV1bGVyLnYxLkhvc3RDb25maWciYgodU2V0T2xsYW1hQ29udGV4dFdpbmRvd1JlcXVlc3QSQQoOY29udGV4dF93aW5kb3cYASABKA4yHS5ldWxlci52MS5PbGxhbWFDb250ZXh0V2luZG93Qgq6SAeCAQQQASAAIlcKHlNldE9sbGFtYUNvbnRleHRXaW5kb3dSZXNwb25zZRI1Cg5jb250ZXh0X3dpbmRvdxgBIAEoDjIdLmV1bGVyLnYxLk9sbGFtYUNvbnRleHRXaW5kb3ciGAoWR2V0T2xsYW1hSGVhbHRoUmVxdWVzdCJKChdHZXRPbGxhbWFIZWFsdGhSZXNwb25zZRIRCgljb25uZWN0ZWQYASABKAgSEgoFZXJyb3IYAiABKAlIAIgBAUIICgZfZXJyb3IiLwoVVGVzdE9sbGFtYUhvc3RSZXF1ZXN0EhYKBGhvc3QYASABKAlCCLpIBXIDGIAQIjwKFlRlc3RPbGxhbWFIb3N0UmVzcG9uc2USIgoGcmVzdWx0GAEgASgLMhIuZXVsZXIudjEuSG9zdFRlc3QiGQoXR2V0Q29tZnlVaUNvbmZpZ1JlcXVlc3QiawoYR2V0Q29tZnlVaUNvbmZpZ1Jlc3BvbnNlEiQKBmNvbmZpZxgBIAEoCzIULmV1bGVyLnYxLkhvc3RDb25maWcSKQoFaW1hZ2UYAiABKAsyGi5ldWxlci52MS5JbWFnZVByZWZlcmVuY2VzIoABChpVcGRhdGVDb21meVVpQ29uZmlnUmVxdWVzdBIbCgRob3N0GAEgASgJQgi6SAVyAxiAEEgAiAEBEjwKBWltYWdlGAIgASgLMi0uZXVsZXIudjEuVXBkYXRlUHJlZmVyZW5jZXNSZXF1ZXN0LkltYWdlUGF0Y2hCBwoFX2hvc3QibgobVXBkYXRlQ29tZnlVaUNvbmZpZ1Jlc3BvbnNlEiQKBmNvbmZpZxgBIAEoCzIULmV1bGVyLnYxLkhvc3RDb25maWcSKQoFaW1hZ2UYAiABKAsyGi5ldWxlci52MS5JbWFnZVByZWZlcmVuY2VzIhkKF0dldENvbWZ5VWlIZWFsdGhSZXF1ZXN0IksKGEdldENvbWZ5VWlIZWFsdGhSZXNwb25zZRIRCgljb25uZWN0ZWQYASABKAgSEgoFZXJyb3IYAiABKAlIAIgBAUIICgZfZXJyb3IiMAoWVGVzdENvbWZ5VWlIb3N0UmVxdWVzdBIWCgRob3N0GAEgASgJQgi6SAVyAxiAECI9ChdUZXN0Q29tZnlVaUhvc3RSZXNwb25zZRIiCgZyZXN1bHQYASABKAsyEi5ldWxlci52MS5Ib3N0VGVzdCIaChhMaXN0Q29tZnlVaU1vZGVsc1JlcXVlc3QiSQoZTGlzdENvbWZ5VWlNb2RlbHNSZXNwb25zZRIOCgZtb2RlbHMYASADKAkSEgoFZXJyb3IYAiABKAlIAIgBAUIICgZfZXJyb3IiOwoLQXBpS2V5U3RhdGUSDwoHaGFzX2tleRgBIAEoCBIbChNlbnZpcm9ubWVudF9tYW5hZ2VkGAIgASgIIkoKEEdldEFwaUtleVJlcXVlc3QSNgoIcHJvdmlkZXIYASABKA4yGC5ldWxlci52MS5BcGlLZXlQcm92aWRlckIKukgHggEEEAEgACI5ChFHZXRBcGlLZXlSZXNwb25zZRIkCgVzdGF0ZRgBIAEoCzIVLmV1bGVyLnYxLkFwaUtleVN0YXRlImUKEFNldEFwaUtleVJlcXVlc3QSNgoIcHJvdmlkZXIYASABKA4yGC5ldWxlci52MS5BcGlLZXlQcm92aWRlckIKukgHggEEEAEgABIZCgdhcGlfa2V5GAIgASgJQgi6SAVyAxiABCI5ChFTZXRBcGlLZXlSZXNwb25zZRIkCgVzdGF0ZRgBIAEoCzIVLmV1bGVyLnYxLkFwaUtleVN0YXRlIh0KG0dldE9wZW5Sb3V0ZXJCYWxhbmNlUmVxdWVzdCLpAQocR2V0T3BlblJvdXRlckJhbGFuY2VSZXNwb25zZRIcCg9hY2NvdW50X2JhbGFuY2UYASABKAFIAIgBARIWCglrZXlfbGltaXQYAiABKAFIAYgBARIaCg1rZXlfcmVtYWluaW5nGAMgASgBSAKIAQESHAoPa2V5X2xpbWl0X3Jlc2V0GAQgASgJSAOIAQESEQoJa2V5X3VzYWdlGAUgASgBQhIKEF9hY2NvdW50X2JhbGFuY2VCDAoKX2tleV9saW1pdEIQCg5fa2V5X3JlbWFpbmluZ0ISChBfa2V5X2xpbWl0X3Jlc2V0IqECChBDYXRhbG9nRnJlc2huZXNzEjEKBnN0YXR1cxgBIAEoDjIhLmV1bGVyLnYxLkNhdGFsb2dGcmVzaG5lc3MuU3RhdHVzEkEKGGxhc3Rfc3VjY2Vzc2Z1bF9mZXRjaF9hdBgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAIgBARISCgVlcnJvchgDIAEoCUgBiAEBIlwKBlN0YXR1cxIWChJTVEFUVVNfVU5TUEVDSUZJRUQQABIQCgxTVEFUVVNfRlJFU0gQARIQCgxTVEFUVVNfU1RBTEUQAhIWChJTVEFUVVNfVU5BVkFJTEFCTEUQA0IbChlfbGFzdF9zdWNjZXNzZnVsX2ZldGNoX2F0QggKBl9lcnJvciLQAQoTT3BlblJvdXRlclB1Ymxpc2hlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEhIKCnN1YnNjcmliZWQYAyABKAgSNgoNc3Vic2NyaWJlZF9hdBgEIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXBIAIgBARIVCg1lbmFibGVkX2NvdW50GAUgASgNEhkKDHJlY2VudF9jb3VudBgGIAEoDUgBiAEBQhAKDl9zdWJzY3JpYmVkX2F0Qg8KDV9yZWNlbnRfY291bnQiQAoTRGlzY292ZXJlZFB1Ymxpc2hlchIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEg8KB3RyYWNrZWQYAyABKAgi2QQKD09wZW5Sb3V0ZXJNb2RlbBINCgVyb3V0ZRgBIAEoCRIUCgxwdWJsaXNoZXJfaWQYAiABKAkSDAoEbmFtZRgDIAEoCRITCgtkZXNjcmlwdGlvbhgEIAEoCRIrCgdjcmVhdGVkGAUgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIbCg5jb250ZXh0X2xlbmd0aBgGIAEoDUgAiAEBEiUKGHByb21wdF9wcmljZV9wZXJfbWlsbGlvbhgHIAEoAUgBiAEBEikKHGNvbXBsZXRpb25fcHJpY2VfcGVyX21pbGxpb24YCCABKAFIAogBARI1ChJpbnB1dF9jYXBhYmlsaXRpZXMYCSADKA4yGS5ldWxlci52MS5JbnB1dENhcGFiaWxpdHkSFgoOc3VwcG9ydHNfdG9vbHMYCiABKAgSGwoTb3V0cHV0X2NhcGFiaWxpdGllcxgLIAMoCRIwCglyZWFzb25pbmcYDCABKAsyGC5ldWxlci52MS5Nb2RlbFJlYXNvbmluZ0gDiAEBEg8KB2VuYWJsZWQYDSABKAgSEAoIZmF2b3JpdGUYDiABKAgSMgoMYXZhaWxhYmlsaXR5GA8gASgOMhwuZXVsZXIudjEuTW9kZWwuQXZhaWxhYmlsaXR5Eg4KBmlzX25ldxgQIAEoCEIRCg9fY29udGV4dF9sZW5ndGhCGwoZX3Byb21wdF9wcmljZV9wZXJfbWlsbGlvbkIfCh1fY29tcGxldGlvbl9wcmljZV9wZXJfbWlsbGlvbkIMCgpfcmVhc29uaW5nIjwKD1B1Ymxpc2hlck1vZGVscxIpCgZtb2RlbHMYASADKAsyGS5ldWxlci52MS5PcGVuUm91dGVyTW9kZWwi+QIKEU9wZW5Sb3V0ZXJDYXRhbG9nEi0KCWZyZXNobmVzcxgBIAEoCzIaLmV1bGVyLnYxLkNhdGFsb2dGcmVzaG5lc3MSMQoKcHVibGlzaGVycxgCIAMoCzIdLmV1bGVyLnYxLk9wZW5Sb3V0ZXJQdWJsaXNoZXISTwoTbW9kZWxzX2J5X3B1Ymxpc2hlchgDIAMoCzIyLmV1bGVyLnYxLk9wZW5Sb3V0ZXJDYXRhbG9nLk1vZGVsc0J5UHVibGlzaGVyRW50cnkSQgoVZGlzY292ZXJlZF9wdWJsaXNoZXJzGAQgASgLMh4uZXVsZXIudjEuRGlzY292ZXJlZFB1Ymxpc2hlcnNIAIgBARpTChZNb2RlbHNCeVB1Ymxpc2hlckVudHJ5EgsKA2tleRgBIAEoCRIoCgV2YWx1ZRgCIAEoCzIZLmV1bGVyLnYxLlB1Ymxpc2hlck1vZGVsczoCOAFCGAoWX2Rpc2NvdmVyZWRfcHVibGlzaGVycyIdChtHZXRPcGVuUm91dGVyQ2F0YWxvZ1JlcXVlc3QiTAocR2V0T3BlblJvdXRlckNhdGFsb2dSZXNwb25zZRIsCgdjYXRhbG9nGAEgASgLMhsuZXVsZXIudjEuT3BlblJvdXRlckNhdGFsb2ciIQofUmVmcmVzaE9wZW5Sb3V0ZXJDYXRhbG9nUmVxdWVzdCJQCiBSZWZyZXNoT3BlblJvdXRlckNhdGFsb2dSZXNwb25zZRIsCgdjYXRhbG9nGAEgASgLMhsuZXVsZXIudjEuT3BlblJvdXRlckNhdGFsb2ciSQoURGlzY292ZXJlZFB1Ymxpc2hlcnMSMQoKcHVibGlzaGVycxgBIAMoCzIdLmV1bGVyLnYxLkRpc2NvdmVyZWRQdWJsaXNoZXIiTgogU2V0T3BlblJvdXRlck1vZGVsRW5hYmxlZFJlcXVlc3QSGQoFcm91dGUYASABKAlCCrpIB3IFEAEYyAESDwoHZW5hYmxlZBgCIAEoCCIjCiFTZXRPcGVuUm91dGVyTW9kZWxFbmFibGVkUmVzcG9uc2UiQwofVHJhY2tPcGVuUm91dGVyUHVibGlzaGVyUmVxdWVzdBIgCgxwdWJsaXNoZXJfaWQYASABKAlCCrpIB3IFEAEYyAEiIgogVHJhY2tPcGVuUm91dGVyUHVibGlzaGVyUmVzcG9uc2UiRAogUmVtb3ZlT3BlblJvdXRlclB1Ymxpc2hlclJlcXVlc3QSIAoMcHVibGlzaGVyX2lkGAEgASgJQgq6SAdyBRABGMgBIiMKIVJlbW92ZU9wZW5Sb3V0ZXJQdWJsaXNoZXJSZXNwb25zZSJYCiBTZXRPcGVuUm91dGVyU3Vic2NyaXB0aW9uUmVxdWVzdBIgCgxwdWJsaXNoZXJfaWQYASABKAlCCrpIB3IFEAEYyAESEgoKc3Vic2NyaWJlZBgCIAEoCCIjCiFTZXRPcGVuUm91dGVyU3Vic2NyaXB0aW9uUmVzcG9uc2UilAEKDUNoYXRHcHRTdGF0dXMSEQoJY29ubmVjdGVkGAEgASgIEhIKBWVtYWlsGAIgASgJSACIAQESFAoMcGxhbl9lbmFibGVkGAMgASgIEhEKBG5hbWUYBCABKAlIAYgBARIUCgdwaWN0dXJlGAUgASgJSAKIAQFCCAoGX2VtYWlsQgcKBV9uYW1lQgoKCF9waWN0dXJlIhkKF0dldENoYXRHcHRTdGF0dXNSZXF1ZXN0IkMKGEdldENoYXRHcHRTdGF0dXNSZXNwb25zZRInCgZzdGF0dXMYASABKAsyFy5ldWxlci52MS5DaGF0R3B0U3RhdHVzIi8KGFN0YXJ0Q2hhdEdwdExvZ2luUmVxdWVzdBITCgtuZXdfYWNjb3VudBgBIAEoCCI2ChlTdGFydENoYXRHcHRMb2dpblJlc3BvbnNlEhkKEWF1dGhvcml6YXRpb25fdXJsGAEgASgJIj8KGUZpbmlzaENoYXRHcHRMb2dpblJlcXVlc3QSIgoMY2FsbGJhY2tfdXJsGAEgASgJQgy6SAlyBxiAgAGIAQEiRQoaRmluaXNoQ2hhdEdwdExvZ2luUmVzcG9uc2USJwoGc3RhdHVzGAEgASgLMhcuZXVsZXIudjEuQ2hhdEdwdFN0YXR1cyIaChhEaXNjb25uZWN0Q2hhdEdwdFJlcXVlc3QiLAoZRGlzY29ubmVjdENoYXRHcHRSZXNwb25zZRIPCgdyZXZva2VkGAEgASgIKp0BChNPbGxhbWFDb250ZXh0V2luZG93EiUKIU9MTEFNQV9DT05URVhUX1dJTkRPV19VTlNQRUNJRklFRBAAEh0KGU9MTEFNQV9DT05URVhUX1dJTkRPV19MT1cQARIgChxPTExBTUFfQ09OVEVYVF9XSU5ET1dfTUVESVVNEAISHgoaT0xMQU1BX0NPTlRFWFRfV0lORE9XX0hJR0gQAypvCg5BcGlLZXlQcm92aWRlchIgChxBUElfS0VZX1BST1ZJREVSX1VOU1BFQ0lGSUVEEAASHwobQVBJX0tFWV9QUk9WSURFUl9PUEVOUk9VVEVSEAESGgoWQVBJX0tFWV9QUk9WSURFUl9CUkFWRRACMvsRCg9Qcm92aWRlclNlcnZpY2USWwoPR2V0T2xsYW1hQ29uZmlnEiAuZXVsZXIudjEuR2V0T2xsYW1hQ29uZmlnUmVxdWVzdBohLmV1bGVyLnYxLkdldE9sbGFtYUNvbmZpZ1Jlc3BvbnNlIgOQAgESXwoSVXBkYXRlT2xsYW1hQ29uZmlnEiMuZXVsZXIudjEuVXBkYXRlT2xsYW1hQ29uZmlnUmVxdWVzdBokLmV1bGVyLnYxLlVwZGF0ZU9sbGFtYUNvbmZpZ1Jlc3BvbnNlEmsKFlNldE9sbGFtYUNvbnRleHRXaW5kb3cSJy5ldWxlci52MS5TZXRPbGxhbWFDb250ZXh0V2luZG93UmVxdWVzdBooLmV1bGVyLnYxLlNldE9sbGFtYUNvbnRleHRXaW5kb3dSZXNwb25zZRJbCg9HZXRPbGxhbWFIZWFsdGgSIC5ldWxlci52MS5HZXRPbGxhbWFIZWFsdGhSZXF1ZXN0GiEuZXVsZXIudjEuR2V0T2xsYW1hSGVhbHRoUmVzcG9uc2UiA5ACARJTCg5UZXN0T2xsYW1hSG9zdBIfLmV1bGVyLnYxLlRlc3RPbGxhbWFIb3N0UmVxdWVzdBogLmV1bGVyLnYxLlRlc3RPbGxhbWFIb3N0UmVzcG9uc2USXgoQR2V0Q29tZnlVaUNvbmZpZxIhLmV1bGVyLnYxLkdldENvbWZ5VWlDb25maWdSZXF1ZXN0GiIuZXVsZXIudjEuR2V0Q29tZnlVaUNvbmZpZ1Jlc3BvbnNlIgOQAgESYgoTVXBkYXRlQ29tZnlVaUNvbmZpZxIkLmV1bGVyLnYxLlVwZGF0ZUNvbWZ5VWlDb25maWdSZXF1ZXN0GiUuZXVsZXIudjEuVXBkYXRlQ29tZnlVaUNvbmZpZ1Jlc3BvbnNlEl4KEEdldENvbWZ5VWlIZWFsdGgSIS5ldWxlci52MS5HZXRDb21meVVpSGVhbHRoUmVxdWVzdBoiLmV1bGVyLnYxLkdldENvbWZ5VWlIZWFsdGhSZXNwb25zZSIDkAIBElYKD1Rlc3RDb21meVVpSG9zdBIgLmV1bGVyLnYxLlRlc3RDb21meVVpSG9zdFJlcXVlc3QaIS5ldWxlci52MS5UZXN0Q29tZnlVaUhvc3RSZXNwb25zZRJhChFMaXN0Q29tZnlVaU1vZGVscxIiLmV1bGVyLnYxLkxpc3RDb21meVVpTW9kZWxzUmVxdWVzdBojLmV1bGVyLnYxLkxpc3RDb21meVVpTW9kZWxzUmVzcG9uc2UiA5ACARJJCglHZXRBcGlLZXkSGi5ldWxlci52MS5HZXRBcGlLZXlSZXF1ZXN0GhsuZXVsZXIudjEuR2V0QXBpS2V5UmVzcG9uc2UiA5ACARJECglTZXRBcGlLZXkSGi5ldWxlci52MS5TZXRBcGlLZXlSZXF1ZXN0GhsuZXVsZXIudjEuU2V0QXBpS2V5UmVzcG9uc2USagoUR2V0T3BlblJvdXRlckJhbGFuY2USJS5ldWxlci52MS5HZXRPcGVuUm91dGVyQmFsYW5jZVJlcXVlc3QaJi5ldWxlci52MS5HZXRPcGVuUm91dGVyQmFsYW5jZVJlc3BvbnNlIgOQAgESagoUR2V0T3BlblJvdXRlckNhdGFsb2cSJS5ldWxlci52MS5HZXRPcGVuUm91dGVyQ2F0YWxvZ1JlcXVlc3QaJi5ldWxlci52MS5HZXRPcGVuUm91dGVyQ2F0YWxvZ1Jlc3BvbnNlIgOQAgEScQoYUmVmcmVzaE9wZW5Sb3V0ZXJDYXRhbG9nEikuZXVsZXIudjEuUmVmcmVzaE9wZW5Sb3V0ZXJDYXRhbG9nUmVxdWVzdBoqLmV1bGVyLnYxLlJlZnJlc2hPcGVuUm91dGVyQ2F0YWxvZ1Jlc3BvbnNlEnQKGVNldE9wZW5Sb3V0ZXJNb2RlbEVuYWJsZWQSKi5ldWxlci52MS5TZXRPcGVuUm91dGVyTW9kZWxFbmFibGVkUmVxdWVzdBorLmV1bGVyLnYxLlNldE9wZW5Sb3V0ZXJNb2RlbEVuYWJsZWRSZXNwb25zZRJxChhUcmFja09wZW5Sb3V0ZXJQdWJsaXNoZXISKS5ldWxlci52MS5UcmFja09wZW5Sb3V0ZXJQdWJsaXNoZXJSZXF1ZXN0GiouZXVsZXIudjEuVHJhY2tPcGVuUm91dGVyUHVibGlzaGVyUmVzcG9uc2USdAoZUmVtb3ZlT3BlblJvdXRlclB1Ymxpc2hlchIqLmV1bGVyLnYxLlJlbW92ZU9wZW5Sb3V0ZXJQdWJsaXNoZXJSZXF1ZXN0GisuZXVsZXIudjEuUmVtb3ZlT3BlblJvdXRlclB1Ymxpc2hlclJlc3BvbnNlEnQKGVNldE9wZW5Sb3V0ZXJTdWJzY3JpcHRpb24SKi5ldWxlci52MS5TZXRPcGVuUm91dGVyU3Vic2NyaXB0aW9uUmVxdWVzdBorLmV1bGVyLnYxLlNldE9wZW5Sb3V0ZXJTdWJzY3JpcHRpb25SZXNwb25zZRJeChBHZXRDaGF0R3B0U3RhdHVzEiEuZXVsZXIudjEuR2V0Q2hhdEdwdFN0YXR1c1JlcXVlc3QaIi5ldWxlci52MS5HZXRDaGF0R3B0U3RhdHVzUmVzcG9uc2UiA5ACARJcChFTdGFydENoYXRHcHRMb2dpbhIiLmV1bGVyLnYxLlN0YXJ0Q2hhdEdwdExvZ2luUmVxdWVzdBojLmV1bGVyLnYxLlN0YXJ0Q2hhdEdwdExvZ2luUmVzcG9uc2USXwoSRmluaXNoQ2hhdEdwdExvZ2luEiMuZXVsZXIudjEuRmluaXNoQ2hhdEdwdExvZ2luUmVxdWVzdBokLmV1bGVyLnYxLkZpbmlzaENoYXRHcHRMb2dpblJlc3BvbnNlElwKEURpc2Nvbm5lY3RDaGF0R3B0EiIuZXVsZXIudjEuRGlzY29ubmVjdENoYXRHcHRSZXF1ZXN0GiMuZXVsZXIudjEuRGlzY29ubmVjdENoYXRHcHRSZXNwb25zZWIGcHJvdG8z", [file_buf_validate_validate, file_euler_v1_models, file_euler_v1_preferences, file_google_protobuf_timestamp]);
+  fileDesc("ChhldWxlci92MS9wcm92aWRlcnMucHJvdG8SCGV1bGVyLnYxIjIKCkhvc3RDb25maWcSDAoEaG9zdBgBIAEoCRIWCg5lZmZlY3RpdmVfaG9zdBgCIAEoCSJWCghIb3N0VGVzdBIKCgJvaxgBIAEoCBIUCgd2ZXJzaW9uGAIgASgJSACIAQESEgoFZXJyb3IYAyABKAlIAYgBAUIKCghfdmVyc2lvbkIICgZfZXJyb3IiGAoWR2V0T2xsYW1hQ29uZmlnUmVxdWVzdCJ2ChdHZXRPbGxhbWFDb25maWdSZXNwb25zZRIkCgZjb25maWcYASABKAsyFC5ldWxlci52MS5Ib3N0Q29uZmlnEjUKDmNvbnRleHRfd2luZG93GAIgASgOMh0uZXVsZXIudjEuT2xsYW1hQ29udGV4dFdpbmRvdyIzChlVcGRhdGVPbGxhbWFDb25maWdSZXF1ZXN0EhYKBGhvc3QYASABKAlCCLpIBXIDGIAQIkIKGlVwZGF0ZU9sbGFtYUNvbmZpZ1Jlc3BvbnNlEiQKBmNvbmZpZxgBIAEoCzIULmV1bGVyLnYxLkhvc3RDb25maWciYgodU2V0T2xsYW1hQ29udGV4dFdpbmRvd1JlcXVlc3QSQQoOY29udGV4dF93aW5kb3cYASABKA4yHS5ldWxlci52MS5PbGxhbWFDb250ZXh0V2luZG93Qgq6SAeCAQQQASAAIlcKHlNldE9sbGFtYUNvbnRleHRXaW5kb3dSZXNwb25zZRI1Cg5jb250ZXh0X3dpbmRvdxgBIAEoDjIdLmV1bGVyLnYxLk9sbGFtYUNvbnRleHRXaW5kb3ciGAoWR2V0T2xsYW1hSGVhbHRoUmVxdWVzdCJKChdHZXRPbGxhbWFIZWFsdGhSZXNwb25zZRIRCgljb25uZWN0ZWQYASABKAgSEgoFZXJyb3IYAiABKAlIAIgBAUIICgZfZXJyb3IiLwoVVGVzdE9sbGFtYUhvc3RSZXF1ZXN0EhYKBGhvc3QYASABKAlCCLpIBXIDGIAQIjwKFlRlc3RPbGxhbWFIb3N0UmVzcG9uc2USIgoGcmVzdWx0GAEgASgLMhIuZXVsZXIudjEuSG9zdFRlc3QiOwoLQXBpS2V5U3RhdGUSDwoHaGFzX2tleRgBIAEoCBIbChNlbnZpcm9ubWVudF9tYW5hZ2VkGAIgASgIIkoKEEdldEFwaUtleVJlcXVlc3QSNgoIcHJvdmlkZXIYASABKA4yGC5ldWxlci52MS5BcGlLZXlQcm92aWRlckIKukgHggEEEAEgACI5ChFHZXRBcGlLZXlSZXNwb25zZRIkCgVzdGF0ZRgBIAEoCzIVLmV1bGVyLnYxLkFwaUtleVN0YXRlImUKEFNldEFwaUtleVJlcXVlc3QSNgoIcHJvdmlkZXIYASABKA4yGC5ldWxlci52MS5BcGlLZXlQcm92aWRlckIKukgHggEEEAEgABIZCgdhcGlfa2V5GAIgASgJQgi6SAVyAxiABCI5ChFTZXRBcGlLZXlSZXNwb25zZRIkCgVzdGF0ZRgBIAEoCzIVLmV1bGVyLnYxLkFwaUtleVN0YXRlIlQKGUdldFByb3ZpZGVyQmFsYW5jZVJlcXVlc3QSNwoIcHJvdmlkZXIYASABKA4yFy5ldWxlci52MS5Nb2RlbFByb3ZpZGVyQgy6SAmCAQYQARgCGAQi5wEKGkdldFByb3ZpZGVyQmFsYW5jZVJlc3BvbnNlEhwKD2FjY291bnRfYmFsYW5jZRgBIAEoAUgAiAEBEhYKCWtleV9saW1pdBgCIAEoAUgBiAEBEhoKDWtleV9yZW1haW5pbmcYAyABKAFIAogBARIcCg9rZXlfbGltaXRfcmVzZXQYBCABKAlIA4gBARIRCglrZXlfdXNhZ2UYBSABKAFCEgoQX2FjY291bnRfYmFsYW5jZUIMCgpfa2V5X2xpbWl0QhAKDl9rZXlfcmVtYWluaW5nQhIKEF9rZXlfbGltaXRfcmVzZXQioQIKEENhdGFsb2dGcmVzaG5lc3MSMQoGc3RhdHVzGAEgASgOMiEuZXVsZXIudjEuQ2F0YWxvZ0ZyZXNobmVzcy5TdGF0dXMSQQoYbGFzdF9zdWNjZXNzZnVsX2ZldGNoX2F0GAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgAiAEBEhIKBWVycm9yGAMgASgJSAGIAQEiXAoGU3RhdHVzEhYKElNUQVRVU19VTlNQRUNJRklFRBAAEhAKDFNUQVRVU19GUkVTSBABEhAKDFNUQVRVU19TVEFMRRACEhYKElNUQVRVU19VTkFWQUlMQUJMRRADQhsKGV9sYXN0X3N1Y2Nlc3NmdWxfZmV0Y2hfYXRCCAoGX2Vycm9yIs0BChBDYXRhbG9nUHVibGlzaGVyEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEgoKc3Vic2NyaWJlZBgDIAEoCBI2Cg1zdWJzY3JpYmVkX2F0GAQgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEgAiAEBEhUKDWVuYWJsZWRfY291bnQYBSABKA0SGQoMcmVjZW50X2NvdW50GAYgASgNSAGIAQFCEAoOX3N1YnNjcmliZWRfYXRCDwoNX3JlY2VudF9jb3VudCJAChNEaXNjb3ZlcmVkUHVibGlzaGVyEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDwoHdHJhY2tlZBgDIAEoCCLWBAoMQ2F0YWxvZ01vZGVsEg0KBXJvdXRlGAEgASgJEhQKDHB1Ymxpc2hlcl9pZBgCIAEoCRIMCgRuYW1lGAMgASgJEhMKC2Rlc2NyaXB0aW9uGAQgASgJEisKB2NyZWF0ZWQYBSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEhsKDmNvbnRleHRfbGVuZ3RoGAYgASgNSACIAQESJQoYcHJvbXB0X3ByaWNlX3Blcl9taWxsaW9uGAcgASgBSAGIAQESKQocY29tcGxldGlvbl9wcmljZV9wZXJfbWlsbGlvbhgIIAEoAUgCiAEBEjUKEmlucHV0X2NhcGFiaWxpdGllcxgJIAMoDjIZLmV1bGVyLnYxLklucHV0Q2FwYWJpbGl0eRIWCg5zdXBwb3J0c190b29scxgKIAEoCBIbChNvdXRwdXRfY2FwYWJpbGl0aWVzGAsgAygJEjAKCXJlYXNvbmluZxgMIAEoCzIYLmV1bGVyLnYxLk1vZGVsUmVhc29uaW5nSAOIAQESDwoHZW5hYmxlZBgNIAEoCBIQCghmYXZvcml0ZRgOIAEoCBIyCgxhdmFpbGFiaWxpdHkYDyABKA4yHC5ldWxlci52MS5Nb2RlbC5BdmFpbGFiaWxpdHkSDgoGaXNfbmV3GBAgASgIQhEKD19jb250ZXh0X2xlbmd0aEIbChlfcHJvbXB0X3ByaWNlX3Blcl9taWxsaW9uQh8KHV9jb21wbGV0aW9uX3ByaWNlX3Blcl9taWxsaW9uQgwKCl9yZWFzb25pbmciOQoPUHVibGlzaGVyTW9kZWxzEiYKBm1vZGVscxgBIAMoCzIWLmV1bGVyLnYxLkNhdGFsb2dNb2RlbCLsAgoMTW9kZWxDYXRhbG9nEi0KCWZyZXNobmVzcxgBIAEoCzIaLmV1bGVyLnYxLkNhdGFsb2dGcmVzaG5lc3MSLgoKcHVibGlzaGVycxgCIAMoCzIaLmV1bGVyLnYxLkNhdGFsb2dQdWJsaXNoZXISSgoTbW9kZWxzX2J5X3B1Ymxpc2hlchgDIAMoCzItLmV1bGVyLnYxLk1vZGVsQ2F0YWxvZy5Nb2RlbHNCeVB1Ymxpc2hlckVudHJ5EkIKFWRpc2NvdmVyZWRfcHVibGlzaGVycxgEIAEoCzIeLmV1bGVyLnYxLkRpc2NvdmVyZWRQdWJsaXNoZXJzSACIAQEaUwoWTW9kZWxzQnlQdWJsaXNoZXJFbnRyeRILCgNrZXkYASABKAkSKAoFdmFsdWUYAiABKAsyGS5ldWxlci52MS5QdWJsaXNoZXJNb2RlbHM6AjgBQhgKFl9kaXNjb3ZlcmVkX3B1Ymxpc2hlcnMiUQoWR2V0TW9kZWxDYXRhbG9nUmVxdWVzdBI3Cghwcm92aWRlchgBIAEoDjIXLmV1bGVyLnYxLk1vZGVsUHJvdmlkZXJCDLpICYIBBhABGAIYBCJCChdHZXRNb2RlbENhdGFsb2dSZXNwb25zZRInCgdjYXRhbG9nGAEgASgLMhYuZXVsZXIudjEuTW9kZWxDYXRhbG9nIlUKGlJlZnJlc2hNb2RlbENhdGFsb2dSZXF1ZXN0EjcKCHByb3ZpZGVyGAEgASgOMhcuZXVsZXIudjEuTW9kZWxQcm92aWRlckIMukgJggEGEAEYAhgEIkYKG1JlZnJlc2hNb2RlbENhdGFsb2dSZXNwb25zZRInCgdjYXRhbG9nGAEgASgLMhYuZXVsZXIudjEuTW9kZWxDYXRhbG9nIkkKFERpc2NvdmVyZWRQdWJsaXNoZXJzEjEKCnB1Ymxpc2hlcnMYASADKAsyHS5ldWxlci52MS5EaXNjb3ZlcmVkUHVibGlzaGVyIoQBCh1TZXRDYXRhbG9nTW9kZWxFbmFibGVkUmVxdWVzdBIZCgVyb3V0ZRgBIAEoCUIKukgHcgUQARjIARIPCgdlbmFibGVkGAIgASgIEjcKCHByb3ZpZGVyGAMgASgOMhcuZXVsZXIudjEuTW9kZWxQcm92aWRlckIMukgJggEGEAEYAhgEIiAKHlNldENhdGFsb2dNb2RlbEVuYWJsZWRSZXNwb25zZSJ5ChxUcmFja0NhdGFsb2dQdWJsaXNoZXJSZXF1ZXN0EiAKDHB1Ymxpc2hlcl9pZBgBIAEoCUIKukgHcgUQARjIARI3Cghwcm92aWRlchgCIAEoDjIXLmV1bGVyLnYxLk1vZGVsUHJvdmlkZXJCDLpICYIBBhABGAIYBCIfCh1UcmFja0NhdGFsb2dQdWJsaXNoZXJSZXNwb25zZSJ6Ch1SZW1vdmVDYXRhbG9nUHVibGlzaGVyUmVxdWVzdBIgCgxwdWJsaXNoZXJfaWQYASABKAlCCrpIB3IFEAEYyAESNwoIcHJvdmlkZXIYAiABKA4yFy5ldWxlci52MS5Nb2RlbFByb3ZpZGVyQgy6SAmCAQYQARgCGAQiIAoeUmVtb3ZlQ2F0YWxvZ1B1Ymxpc2hlclJlc3BvbnNlIo4BCh1TZXRDYXRhbG9nU3Vic2NyaXB0aW9uUmVxdWVzdBIgCgxwdWJsaXNoZXJfaWQYASABKAlCCrpIB3IFEAEYyAESEgoKc3Vic2NyaWJlZBgCIAEoCBI3Cghwcm92aWRlchgDIAEoDjIXLmV1bGVyLnYxLk1vZGVsUHJvdmlkZXJCDLpICYIBBhABGAIYBCIgCh5TZXRDYXRhbG9nU3Vic2NyaXB0aW9uUmVzcG9uc2UiaAoKSW1hZ2VNb2RlbBIKCgJpZBgBIAEoCRIMCgRuYW1lGAIgASgJEikKCHByb3ZpZGVyGAMgASgOMhcuZXVsZXIudjEuSW1hZ2VQcm92aWRlchIVCg1hc3BlY3RfcmF0aW9zGAQgAygJIl4KFkxpc3RJbWFnZU1vZGVsc1JlcXVlc3QSMwoIcHJvdmlkZXIYASABKA4yFy5ldWxlci52MS5JbWFnZVByb3ZpZGVyQgi6SAWCAQIQARIPCgdyZWZyZXNoGAIgASgIIl0KF0xpc3RJbWFnZU1vZGVsc1Jlc3BvbnNlEiQKBm1vZGVscxgBIAMoCzIULmV1bGVyLnYxLkltYWdlTW9kZWwSEgoFZXJyb3IYAiABKAlIAIgBAUIICgZfZXJyb3IilAEKDUNoYXRHcHRTdGF0dXMSEQoJY29ubmVjdGVkGAEgASgIEhIKBWVtYWlsGAIgASgJSACIAQESFAoMcGxhbl9lbmFibGVkGAMgASgIEhEKBG5hbWUYBCABKAlIAYgBARIUCgdwaWN0dXJlGAUgASgJSAKIAQFCCAoGX2VtYWlsQgcKBV9uYW1lQgoKCF9waWN0dXJlIhkKF0dldENoYXRHcHRTdGF0dXNSZXF1ZXN0IkMKGEdldENoYXRHcHRTdGF0dXNSZXNwb25zZRInCgZzdGF0dXMYASABKAsyFy5ldWxlci52MS5DaGF0R3B0U3RhdHVzIi8KGFN0YXJ0Q2hhdEdwdExvZ2luUmVxdWVzdBITCgtuZXdfYWNjb3VudBgBIAEoCCI2ChlTdGFydENoYXRHcHRMb2dpblJlc3BvbnNlEhkKEWF1dGhvcml6YXRpb25fdXJsGAEgASgJIj8KGUZpbmlzaENoYXRHcHRMb2dpblJlcXVlc3QSIgoMY2FsbGJhY2tfdXJsGAEgASgJQgy6SAlyBxiAgAGIAQEiRQoaRmluaXNoQ2hhdEdwdExvZ2luUmVzcG9uc2USJwoGc3RhdHVzGAEgASgLMhcuZXVsZXIudjEuQ2hhdEdwdFN0YXR1cyIaChhEaXNjb25uZWN0Q2hhdEdwdFJlcXVlc3QiLAoZRGlzY29ubmVjdENoYXRHcHRSZXNwb25zZRIPCgdyZXZva2VkGAEgASgIKp0BChNPbGxhbWFDb250ZXh0V2luZG93EiUKIU9MTEFNQV9DT05URVhUX1dJTkRPV19VTlNQRUNJRklFRBAAEh0KGU9MTEFNQV9DT05URVhUX1dJTkRPV19MT1cQARIgChxPTExBTUFfQ09OVEVYVF9XSU5ET1dfTUVESVVNEAISHgoaT0xMQU1BX0NPTlRFWFRfV0lORE9XX0hJR0gQAyqUAQoOQXBpS2V5UHJvdmlkZXISIAocQVBJX0tFWV9QUk9WSURFUl9VTlNQRUNJRklFRBAAEh8KG0FQSV9LRVlfUFJPVklERVJfT1BFTlJPVVRFUhABEhoKFkFQSV9LRVlfUFJPVklERVJfQlJBVkUQAhIjCh9BUElfS0VZX1BST1ZJREVSX1ZFUkNFTF9HQVRFV0FZEAMysQ4KD1Byb3ZpZGVyU2VydmljZRJbCg9HZXRPbGxhbWFDb25maWcSIC5ldWxlci52MS5HZXRPbGxhbWFDb25maWdSZXF1ZXN0GiEuZXVsZXIudjEuR2V0T2xsYW1hQ29uZmlnUmVzcG9uc2UiA5ACARJfChJVcGRhdGVPbGxhbWFDb25maWcSIy5ldWxlci52MS5VcGRhdGVPbGxhbWFDb25maWdSZXF1ZXN0GiQuZXVsZXIudjEuVXBkYXRlT2xsYW1hQ29uZmlnUmVzcG9uc2USawoWU2V0T2xsYW1hQ29udGV4dFdpbmRvdxInLmV1bGVyLnYxLlNldE9sbGFtYUNvbnRleHRXaW5kb3dSZXF1ZXN0GiguZXVsZXIudjEuU2V0T2xsYW1hQ29udGV4dFdpbmRvd1Jlc3BvbnNlElsKD0dldE9sbGFtYUhlYWx0aBIgLmV1bGVyLnYxLkdldE9sbGFtYUhlYWx0aFJlcXVlc3QaIS5ldWxlci52MS5HZXRPbGxhbWFIZWFsdGhSZXNwb25zZSIDkAIBElMKDlRlc3RPbGxhbWFIb3N0Eh8uZXVsZXIudjEuVGVzdE9sbGFtYUhvc3RSZXF1ZXN0GiAuZXVsZXIudjEuVGVzdE9sbGFtYUhvc3RSZXNwb25zZRJJCglHZXRBcGlLZXkSGi5ldWxlci52MS5HZXRBcGlLZXlSZXF1ZXN0GhsuZXVsZXIudjEuR2V0QXBpS2V5UmVzcG9uc2UiA5ACARJECglTZXRBcGlLZXkSGi5ldWxlci52MS5TZXRBcGlLZXlSZXF1ZXN0GhsuZXVsZXIudjEuU2V0QXBpS2V5UmVzcG9uc2USZAoSR2V0UHJvdmlkZXJCYWxhbmNlEiMuZXVsZXIudjEuR2V0UHJvdmlkZXJCYWxhbmNlUmVxdWVzdBokLmV1bGVyLnYxLkdldFByb3ZpZGVyQmFsYW5jZVJlc3BvbnNlIgOQAgESWwoPR2V0TW9kZWxDYXRhbG9nEiAuZXVsZXIudjEuR2V0TW9kZWxDYXRhbG9nUmVxdWVzdBohLmV1bGVyLnYxLkdldE1vZGVsQ2F0YWxvZ1Jlc3BvbnNlIgOQAgESYgoTUmVmcmVzaE1vZGVsQ2F0YWxvZxIkLmV1bGVyLnYxLlJlZnJlc2hNb2RlbENhdGFsb2dSZXF1ZXN0GiUuZXVsZXIudjEuUmVmcmVzaE1vZGVsQ2F0YWxvZ1Jlc3BvbnNlEmsKFlNldENhdGFsb2dNb2RlbEVuYWJsZWQSJy5ldWxlci52MS5TZXRDYXRhbG9nTW9kZWxFbmFibGVkUmVxdWVzdBooLmV1bGVyLnYxLlNldENhdGFsb2dNb2RlbEVuYWJsZWRSZXNwb25zZRJoChVUcmFja0NhdGFsb2dQdWJsaXNoZXISJi5ldWxlci52MS5UcmFja0NhdGFsb2dQdWJsaXNoZXJSZXF1ZXN0GicuZXVsZXIudjEuVHJhY2tDYXRhbG9nUHVibGlzaGVyUmVzcG9uc2USawoWUmVtb3ZlQ2F0YWxvZ1B1Ymxpc2hlchInLmV1bGVyLnYxLlJlbW92ZUNhdGFsb2dQdWJsaXNoZXJSZXF1ZXN0GiguZXVsZXIudjEuUmVtb3ZlQ2F0YWxvZ1B1Ymxpc2hlclJlc3BvbnNlEmsKFlNldENhdGFsb2dTdWJzY3JpcHRpb24SJy5ldWxlci52MS5TZXRDYXRhbG9nU3Vic2NyaXB0aW9uUmVxdWVzdBooLmV1bGVyLnYxLlNldENhdGFsb2dTdWJzY3JpcHRpb25SZXNwb25zZRJbCg9MaXN0SW1hZ2VNb2RlbHMSIC5ldWxlci52MS5MaXN0SW1hZ2VNb2RlbHNSZXF1ZXN0GiEuZXVsZXIudjEuTGlzdEltYWdlTW9kZWxzUmVzcG9uc2UiA5ACARJeChBHZXRDaGF0R3B0U3RhdHVzEiEuZXVsZXIudjEuR2V0Q2hhdEdwdFN0YXR1c1JlcXVlc3QaIi5ldWxlci52MS5HZXRDaGF0R3B0U3RhdHVzUmVzcG9uc2UiA5ACARJcChFTdGFydENoYXRHcHRMb2dpbhIiLmV1bGVyLnYxLlN0YXJ0Q2hhdEdwdExvZ2luUmVxdWVzdBojLmV1bGVyLnYxLlN0YXJ0Q2hhdEdwdExvZ2luUmVzcG9uc2USXwoSRmluaXNoQ2hhdEdwdExvZ2luEiMuZXVsZXIudjEuRmluaXNoQ2hhdEdwdExvZ2luUmVxdWVzdBokLmV1bGVyLnYxLkZpbmlzaENoYXRHcHRMb2dpblJlc3BvbnNlElwKEURpc2Nvbm5lY3RDaGF0R3B0EiIuZXVsZXIudjEuRGlzY29ubmVjdENoYXRHcHRSZXF1ZXN0GiMuZXVsZXIudjEuRGlzY29ubmVjdENoYXRHcHRSZXNwb25zZWIGcHJvdG8z", [file_buf_validate_validate, file_euler_v1_models, file_euler_v1_preferences, file_google_protobuf_timestamp]);
 
 /**
  * A provider address: the saved one, and the one in effect.
@@ -249,195 +249,6 @@ export const TestOllamaHostResponseSchema: GenMessage<TestOllamaHostResponse> = 
   messageDesc(file_euler_v1_providers, 11);
 
 /**
- * @generated from message euler.v1.GetComfyUiConfigRequest
- */
-export type GetComfyUiConfigRequest = Message<"euler.v1.GetComfyUiConfigRequest"> & {
-};
-
-/**
- * Describes the message euler.v1.GetComfyUiConfigRequest.
- * Use `create(GetComfyUiConfigRequestSchema)` to create a new message.
- */
-export const GetComfyUiConfigRequestSchema: GenMessage<GetComfyUiConfigRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 12);
-
-/**
- * @generated from message euler.v1.GetComfyUiConfigResponse
- */
-export type GetComfyUiConfigResponse = Message<"euler.v1.GetComfyUiConfigResponse"> & {
-  /**
-   * @generated from field: euler.v1.HostConfig config = 1;
-   */
-  config?: HostConfig | undefined;
-
-  /**
-   * @generated from field: euler.v1.ImagePreferences image = 2;
-   */
-  image?: ImagePreferences | undefined;
-};
-
-/**
- * Describes the message euler.v1.GetComfyUiConfigResponse.
- * Use `create(GetComfyUiConfigResponseSchema)` to create a new message.
- */
-export const GetComfyUiConfigResponseSchema: GenMessage<GetComfyUiConfigResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 13);
-
-/**
- * @generated from message euler.v1.UpdateComfyUiConfigRequest
- */
-export type UpdateComfyUiConfigRequest = Message<"euler.v1.UpdateComfyUiConfigRequest"> & {
-  /**
-   * Set to change the server-wide address; empty uses the default.
-   *
-   * @generated from field: optional string host = 1;
-   */
-  host?: string | undefined;
-
-  /**
-   * @generated from field: euler.v1.UpdatePreferencesRequest.ImagePatch image = 2;
-   */
-  image?: UpdatePreferencesRequest_ImagePatch | undefined;
-};
-
-/**
- * Describes the message euler.v1.UpdateComfyUiConfigRequest.
- * Use `create(UpdateComfyUiConfigRequestSchema)` to create a new message.
- */
-export const UpdateComfyUiConfigRequestSchema: GenMessage<UpdateComfyUiConfigRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 14);
-
-/**
- * @generated from message euler.v1.UpdateComfyUiConfigResponse
- */
-export type UpdateComfyUiConfigResponse = Message<"euler.v1.UpdateComfyUiConfigResponse"> & {
-  /**
-   * @generated from field: euler.v1.HostConfig config = 1;
-   */
-  config?: HostConfig | undefined;
-
-  /**
-   * @generated from field: euler.v1.ImagePreferences image = 2;
-   */
-  image?: ImagePreferences | undefined;
-};
-
-/**
- * Describes the message euler.v1.UpdateComfyUiConfigResponse.
- * Use `create(UpdateComfyUiConfigResponseSchema)` to create a new message.
- */
-export const UpdateComfyUiConfigResponseSchema: GenMessage<UpdateComfyUiConfigResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 15);
-
-/**
- * @generated from message euler.v1.GetComfyUiHealthRequest
- */
-export type GetComfyUiHealthRequest = Message<"euler.v1.GetComfyUiHealthRequest"> & {
-};
-
-/**
- * Describes the message euler.v1.GetComfyUiHealthRequest.
- * Use `create(GetComfyUiHealthRequestSchema)` to create a new message.
- */
-export const GetComfyUiHealthRequestSchema: GenMessage<GetComfyUiHealthRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 16);
-
-/**
- * @generated from message euler.v1.GetComfyUiHealthResponse
- */
-export type GetComfyUiHealthResponse = Message<"euler.v1.GetComfyUiHealthResponse"> & {
-  /**
-   * @generated from field: bool connected = 1;
-   */
-  connected: boolean;
-
-  /**
-   * @generated from field: optional string error = 2;
-   */
-  error?: string | undefined;
-};
-
-/**
- * Describes the message euler.v1.GetComfyUiHealthResponse.
- * Use `create(GetComfyUiHealthResponseSchema)` to create a new message.
- */
-export const GetComfyUiHealthResponseSchema: GenMessage<GetComfyUiHealthResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 17);
-
-/**
- * @generated from message euler.v1.TestComfyUiHostRequest
- */
-export type TestComfyUiHostRequest = Message<"euler.v1.TestComfyUiHostRequest"> & {
-  /**
-   * Empty tests the saved address.
-   *
-   * @generated from field: string host = 1;
-   */
-  host: string;
-};
-
-/**
- * Describes the message euler.v1.TestComfyUiHostRequest.
- * Use `create(TestComfyUiHostRequestSchema)` to create a new message.
- */
-export const TestComfyUiHostRequestSchema: GenMessage<TestComfyUiHostRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 18);
-
-/**
- * @generated from message euler.v1.TestComfyUiHostResponse
- */
-export type TestComfyUiHostResponse = Message<"euler.v1.TestComfyUiHostResponse"> & {
-  /**
-   * @generated from field: euler.v1.HostTest result = 1;
-   */
-  result?: HostTest | undefined;
-};
-
-/**
- * Describes the message euler.v1.TestComfyUiHostResponse.
- * Use `create(TestComfyUiHostResponseSchema)` to create a new message.
- */
-export const TestComfyUiHostResponseSchema: GenMessage<TestComfyUiHostResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 19);
-
-/**
- * @generated from message euler.v1.ListComfyUiModelsRequest
- */
-export type ListComfyUiModelsRequest = Message<"euler.v1.ListComfyUiModelsRequest"> & {
-};
-
-/**
- * Describes the message euler.v1.ListComfyUiModelsRequest.
- * Use `create(ListComfyUiModelsRequestSchema)` to create a new message.
- */
-export const ListComfyUiModelsRequestSchema: GenMessage<ListComfyUiModelsRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 20);
-
-/**
- * @generated from message euler.v1.ListComfyUiModelsResponse
- */
-export type ListComfyUiModelsResponse = Message<"euler.v1.ListComfyUiModelsResponse"> & {
-  /**
-   * @generated from field: repeated string models = 1;
-   */
-  models: string[];
-
-  /**
-   * Why the list is empty when ComfyUI could not be reached.
-   *
-   * @generated from field: optional string error = 2;
-   */
-  error?: string | undefined;
-};
-
-/**
- * Describes the message euler.v1.ListComfyUiModelsResponse.
- * Use `create(ListComfyUiModelsResponseSchema)` to create a new message.
- */
-export const ListComfyUiModelsResponseSchema: GenMessage<ListComfyUiModelsResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 21);
-
-/**
  * Whether a key exists, never the key itself.
  *
  * @generated from message euler.v1.ApiKeyState
@@ -461,7 +272,7 @@ export type ApiKeyState = Message<"euler.v1.ApiKeyState"> & {
  * Use `create(ApiKeyStateSchema)` to create a new message.
  */
 export const ApiKeyStateSchema: GenMessage<ApiKeyState> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 22);
+  messageDesc(file_euler_v1_providers, 12);
 
 /**
  * @generated from message euler.v1.GetApiKeyRequest
@@ -478,7 +289,7 @@ export type GetApiKeyRequest = Message<"euler.v1.GetApiKeyRequest"> & {
  * Use `create(GetApiKeyRequestSchema)` to create a new message.
  */
 export const GetApiKeyRequestSchema: GenMessage<GetApiKeyRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 23);
+  messageDesc(file_euler_v1_providers, 13);
 
 /**
  * @generated from message euler.v1.GetApiKeyResponse
@@ -495,7 +306,7 @@ export type GetApiKeyResponse = Message<"euler.v1.GetApiKeyResponse"> & {
  * Use `create(GetApiKeyResponseSchema)` to create a new message.
  */
 export const GetApiKeyResponseSchema: GenMessage<GetApiKeyResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 24);
+  messageDesc(file_euler_v1_providers, 14);
 
 /**
  * @generated from message euler.v1.SetApiKeyRequest
@@ -517,7 +328,7 @@ export type SetApiKeyRequest = Message<"euler.v1.SetApiKeyRequest"> & {
  * Use `create(SetApiKeyRequestSchema)` to create a new message.
  */
 export const SetApiKeyRequestSchema: GenMessage<SetApiKeyRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 25);
+  messageDesc(file_euler_v1_providers, 15);
 
 /**
  * @generated from message euler.v1.SetApiKeyResponse
@@ -534,25 +345,29 @@ export type SetApiKeyResponse = Message<"euler.v1.SetApiKeyResponse"> & {
  * Use `create(SetApiKeyResponseSchema)` to create a new message.
  */
 export const SetApiKeyResponseSchema: GenMessage<SetApiKeyResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 26);
+  messageDesc(file_euler_v1_providers, 16);
 
 /**
- * @generated from message euler.v1.GetOpenRouterBalanceRequest
+ * @generated from message euler.v1.GetProviderBalanceRequest
  */
-export type GetOpenRouterBalanceRequest = Message<"euler.v1.GetOpenRouterBalanceRequest"> & {
+export type GetProviderBalanceRequest = Message<"euler.v1.GetProviderBalanceRequest"> & {
+  /**
+   * @generated from field: euler.v1.ModelProvider provider = 1;
+   */
+  provider: ModelProvider;
 };
 
 /**
- * Describes the message euler.v1.GetOpenRouterBalanceRequest.
- * Use `create(GetOpenRouterBalanceRequestSchema)` to create a new message.
+ * Describes the message euler.v1.GetProviderBalanceRequest.
+ * Use `create(GetProviderBalanceRequestSchema)` to create a new message.
  */
-export const GetOpenRouterBalanceRequestSchema: GenMessage<GetOpenRouterBalanceRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 27);
+export const GetProviderBalanceRequestSchema: GenMessage<GetProviderBalanceRequest> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 17);
 
 /**
- * @generated from message euler.v1.GetOpenRouterBalanceResponse
+ * @generated from message euler.v1.GetProviderBalanceResponse
  */
-export type GetOpenRouterBalanceResponse = Message<"euler.v1.GetOpenRouterBalanceResponse"> & {
+export type GetProviderBalanceResponse = Message<"euler.v1.GetProviderBalanceResponse"> & {
   /**
    * Credits minus usage, when the key may read them.
    *
@@ -582,11 +397,11 @@ export type GetOpenRouterBalanceResponse = Message<"euler.v1.GetOpenRouterBalanc
 };
 
 /**
- * Describes the message euler.v1.GetOpenRouterBalanceResponse.
- * Use `create(GetOpenRouterBalanceResponseSchema)` to create a new message.
+ * Describes the message euler.v1.GetProviderBalanceResponse.
+ * Use `create(GetProviderBalanceResponseSchema)` to create a new message.
  */
-export const GetOpenRouterBalanceResponseSchema: GenMessage<GetOpenRouterBalanceResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 28);
+export const GetProviderBalanceResponseSchema: GenMessage<GetProviderBalanceResponse> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 18);
 
 /**
  * @generated from message euler.v1.CatalogFreshness
@@ -613,7 +428,7 @@ export type CatalogFreshness = Message<"euler.v1.CatalogFreshness"> & {
  * Use `create(CatalogFreshnessSchema)` to create a new message.
  */
 export const CatalogFreshnessSchema: GenMessage<CatalogFreshness> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 29);
+  messageDesc(file_euler_v1_providers, 19);
 
 /**
  * @generated from enum euler.v1.CatalogFreshness.Status
@@ -644,12 +459,12 @@ export enum CatalogFreshness_Status {
  * Describes the enum euler.v1.CatalogFreshness.Status.
  */
 export const CatalogFreshness_StatusSchema: GenEnum<CatalogFreshness_Status> = /*@__PURE__*/
-  enumDesc(file_euler_v1_providers, 29, 0);
+  enumDesc(file_euler_v1_providers, 19, 0);
 
 /**
- * @generated from message euler.v1.OpenRouterPublisher
+ * @generated from message euler.v1.CatalogPublisher
  */
-export type OpenRouterPublisher = Message<"euler.v1.OpenRouterPublisher"> & {
+export type CatalogPublisher = Message<"euler.v1.CatalogPublisher"> & {
   /**
    * @generated from field: string id = 1;
    */
@@ -684,11 +499,11 @@ export type OpenRouterPublisher = Message<"euler.v1.OpenRouterPublisher"> & {
 };
 
 /**
- * Describes the message euler.v1.OpenRouterPublisher.
- * Use `create(OpenRouterPublisherSchema)` to create a new message.
+ * Describes the message euler.v1.CatalogPublisher.
+ * Use `create(CatalogPublisherSchema)` to create a new message.
  */
-export const OpenRouterPublisherSchema: GenMessage<OpenRouterPublisher> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 30);
+export const CatalogPublisherSchema: GenMessage<CatalogPublisher> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 20);
 
 /**
  * @generated from message euler.v1.DiscoveredPublisher
@@ -715,14 +530,14 @@ export type DiscoveredPublisher = Message<"euler.v1.DiscoveredPublisher"> & {
  * Use `create(DiscoveredPublisherSchema)` to create a new message.
  */
 export const DiscoveredPublisherSchema: GenMessage<DiscoveredPublisher> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 31);
+  messageDesc(file_euler_v1_providers, 21);
 
 /**
  * A catalog model with the user's choices.
  *
- * @generated from message euler.v1.OpenRouterModel
+ * @generated from message euler.v1.CatalogModel
  */
-export type OpenRouterModel = Message<"euler.v1.OpenRouterModel"> & {
+export type CatalogModel = Message<"euler.v1.CatalogModel"> & {
   /**
    * @generated from field: string route = 1;
    */
@@ -805,20 +620,20 @@ export type OpenRouterModel = Message<"euler.v1.OpenRouterModel"> & {
 };
 
 /**
- * Describes the message euler.v1.OpenRouterModel.
- * Use `create(OpenRouterModelSchema)` to create a new message.
+ * Describes the message euler.v1.CatalogModel.
+ * Use `create(CatalogModelSchema)` to create a new message.
  */
-export const OpenRouterModelSchema: GenMessage<OpenRouterModel> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 32);
+export const CatalogModelSchema: GenMessage<CatalogModel> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 22);
 
 /**
  * @generated from message euler.v1.PublisherModels
  */
 export type PublisherModels = Message<"euler.v1.PublisherModels"> & {
   /**
-   * @generated from field: repeated euler.v1.OpenRouterModel models = 1;
+   * @generated from field: repeated euler.v1.CatalogModel models = 1;
    */
-  models: OpenRouterModel[];
+  models: CatalogModel[];
 };
 
 /**
@@ -826,23 +641,23 @@ export type PublisherModels = Message<"euler.v1.PublisherModels"> & {
  * Use `create(PublisherModelsSchema)` to create a new message.
  */
 export const PublisherModelsSchema: GenMessage<PublisherModels> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 33);
+  messageDesc(file_euler_v1_providers, 23);
 
 /**
  * Publishers, their models, and the user's choices among them.
  *
- * @generated from message euler.v1.OpenRouterCatalog
+ * @generated from message euler.v1.ModelCatalog
  */
-export type OpenRouterCatalog = Message<"euler.v1.OpenRouterCatalog"> & {
+export type ModelCatalog = Message<"euler.v1.ModelCatalog"> & {
   /**
    * @generated from field: euler.v1.CatalogFreshness freshness = 1;
    */
   freshness?: CatalogFreshness | undefined;
 
   /**
-   * @generated from field: repeated euler.v1.OpenRouterPublisher publishers = 2;
+   * @generated from field: repeated euler.v1.CatalogPublisher publishers = 2;
    */
-  publishers: OpenRouterPublisher[];
+  publishers: CatalogPublisher[];
 
   /**
    * @generated from field: map<string, euler.v1.PublisherModels> models_by_publisher = 3;
@@ -858,71 +673,79 @@ export type OpenRouterCatalog = Message<"euler.v1.OpenRouterCatalog"> & {
 };
 
 /**
- * Describes the message euler.v1.OpenRouterCatalog.
- * Use `create(OpenRouterCatalogSchema)` to create a new message.
+ * Describes the message euler.v1.ModelCatalog.
+ * Use `create(ModelCatalogSchema)` to create a new message.
  */
-export const OpenRouterCatalogSchema: GenMessage<OpenRouterCatalog> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 34);
+export const ModelCatalogSchema: GenMessage<ModelCatalog> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 24);
 
 /**
- * @generated from message euler.v1.GetOpenRouterCatalogRequest
+ * @generated from message euler.v1.GetModelCatalogRequest
  */
-export type GetOpenRouterCatalogRequest = Message<"euler.v1.GetOpenRouterCatalogRequest"> & {
-};
-
-/**
- * Describes the message euler.v1.GetOpenRouterCatalogRequest.
- * Use `create(GetOpenRouterCatalogRequestSchema)` to create a new message.
- */
-export const GetOpenRouterCatalogRequestSchema: GenMessage<GetOpenRouterCatalogRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 35);
-
-/**
- * @generated from message euler.v1.GetOpenRouterCatalogResponse
- */
-export type GetOpenRouterCatalogResponse = Message<"euler.v1.GetOpenRouterCatalogResponse"> & {
+export type GetModelCatalogRequest = Message<"euler.v1.GetModelCatalogRequest"> & {
   /**
-   * @generated from field: euler.v1.OpenRouterCatalog catalog = 1;
+   * @generated from field: euler.v1.ModelProvider provider = 1;
    */
-  catalog?: OpenRouterCatalog | undefined;
+  provider: ModelProvider;
 };
 
 /**
- * Describes the message euler.v1.GetOpenRouterCatalogResponse.
- * Use `create(GetOpenRouterCatalogResponseSchema)` to create a new message.
+ * Describes the message euler.v1.GetModelCatalogRequest.
+ * Use `create(GetModelCatalogRequestSchema)` to create a new message.
  */
-export const GetOpenRouterCatalogResponseSchema: GenMessage<GetOpenRouterCatalogResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 36);
+export const GetModelCatalogRequestSchema: GenMessage<GetModelCatalogRequest> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 25);
 
 /**
- * @generated from message euler.v1.RefreshOpenRouterCatalogRequest
+ * @generated from message euler.v1.GetModelCatalogResponse
  */
-export type RefreshOpenRouterCatalogRequest = Message<"euler.v1.RefreshOpenRouterCatalogRequest"> & {
-};
-
-/**
- * Describes the message euler.v1.RefreshOpenRouterCatalogRequest.
- * Use `create(RefreshOpenRouterCatalogRequestSchema)` to create a new message.
- */
-export const RefreshOpenRouterCatalogRequestSchema: GenMessage<RefreshOpenRouterCatalogRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 37);
-
-/**
- * @generated from message euler.v1.RefreshOpenRouterCatalogResponse
- */
-export type RefreshOpenRouterCatalogResponse = Message<"euler.v1.RefreshOpenRouterCatalogResponse"> & {
+export type GetModelCatalogResponse = Message<"euler.v1.GetModelCatalogResponse"> & {
   /**
-   * @generated from field: euler.v1.OpenRouterCatalog catalog = 1;
+   * @generated from field: euler.v1.ModelCatalog catalog = 1;
    */
-  catalog?: OpenRouterCatalog | undefined;
+  catalog?: ModelCatalog | undefined;
 };
 
 /**
- * Describes the message euler.v1.RefreshOpenRouterCatalogResponse.
- * Use `create(RefreshOpenRouterCatalogResponseSchema)` to create a new message.
+ * Describes the message euler.v1.GetModelCatalogResponse.
+ * Use `create(GetModelCatalogResponseSchema)` to create a new message.
  */
-export const RefreshOpenRouterCatalogResponseSchema: GenMessage<RefreshOpenRouterCatalogResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 38);
+export const GetModelCatalogResponseSchema: GenMessage<GetModelCatalogResponse> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 26);
+
+/**
+ * @generated from message euler.v1.RefreshModelCatalogRequest
+ */
+export type RefreshModelCatalogRequest = Message<"euler.v1.RefreshModelCatalogRequest"> & {
+  /**
+   * @generated from field: euler.v1.ModelProvider provider = 1;
+   */
+  provider: ModelProvider;
+};
+
+/**
+ * Describes the message euler.v1.RefreshModelCatalogRequest.
+ * Use `create(RefreshModelCatalogRequestSchema)` to create a new message.
+ */
+export const RefreshModelCatalogRequestSchema: GenMessage<RefreshModelCatalogRequest> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 27);
+
+/**
+ * @generated from message euler.v1.RefreshModelCatalogResponse
+ */
+export type RefreshModelCatalogResponse = Message<"euler.v1.RefreshModelCatalogResponse"> & {
+  /**
+   * @generated from field: euler.v1.ModelCatalog catalog = 1;
+   */
+  catalog?: ModelCatalog | undefined;
+};
+
+/**
+ * Describes the message euler.v1.RefreshModelCatalogResponse.
+ * Use `create(RefreshModelCatalogResponseSchema)` to create a new message.
+ */
+export const RefreshModelCatalogResponseSchema: GenMessage<RefreshModelCatalogResponse> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 28);
 
 /**
  * @generated from message euler.v1.DiscoveredPublishers
@@ -939,12 +762,12 @@ export type DiscoveredPublishers = Message<"euler.v1.DiscoveredPublishers"> & {
  * Use `create(DiscoveredPublishersSchema)` to create a new message.
  */
 export const DiscoveredPublishersSchema: GenMessage<DiscoveredPublishers> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 39);
+  messageDesc(file_euler_v1_providers, 29);
 
 /**
- * @generated from message euler.v1.SetOpenRouterModelEnabledRequest
+ * @generated from message euler.v1.SetCatalogModelEnabledRequest
  */
-export type SetOpenRouterModelEnabledRequest = Message<"euler.v1.SetOpenRouterModelEnabledRequest"> & {
+export type SetCatalogModelEnabledRequest = Message<"euler.v1.SetCatalogModelEnabledRequest"> & {
   /**
    * @generated from field: string route = 1;
    */
@@ -954,92 +777,107 @@ export type SetOpenRouterModelEnabledRequest = Message<"euler.v1.SetOpenRouterMo
    * @generated from field: bool enabled = 2;
    */
   enabled: boolean;
+
+  /**
+   * @generated from field: euler.v1.ModelProvider provider = 3;
+   */
+  provider: ModelProvider;
 };
 
 /**
- * Describes the message euler.v1.SetOpenRouterModelEnabledRequest.
- * Use `create(SetOpenRouterModelEnabledRequestSchema)` to create a new message.
+ * Describes the message euler.v1.SetCatalogModelEnabledRequest.
+ * Use `create(SetCatalogModelEnabledRequestSchema)` to create a new message.
  */
-export const SetOpenRouterModelEnabledRequestSchema: GenMessage<SetOpenRouterModelEnabledRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 40);
+export const SetCatalogModelEnabledRequestSchema: GenMessage<SetCatalogModelEnabledRequest> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 30);
 
 /**
- * @generated from message euler.v1.SetOpenRouterModelEnabledResponse
+ * @generated from message euler.v1.SetCatalogModelEnabledResponse
  */
-export type SetOpenRouterModelEnabledResponse = Message<"euler.v1.SetOpenRouterModelEnabledResponse"> & {
+export type SetCatalogModelEnabledResponse = Message<"euler.v1.SetCatalogModelEnabledResponse"> & {
 };
 
 /**
- * Describes the message euler.v1.SetOpenRouterModelEnabledResponse.
- * Use `create(SetOpenRouterModelEnabledResponseSchema)` to create a new message.
+ * Describes the message euler.v1.SetCatalogModelEnabledResponse.
+ * Use `create(SetCatalogModelEnabledResponseSchema)` to create a new message.
  */
-export const SetOpenRouterModelEnabledResponseSchema: GenMessage<SetOpenRouterModelEnabledResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 41);
+export const SetCatalogModelEnabledResponseSchema: GenMessage<SetCatalogModelEnabledResponse> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 31);
 
 /**
- * @generated from message euler.v1.TrackOpenRouterPublisherRequest
+ * @generated from message euler.v1.TrackCatalogPublisherRequest
  */
-export type TrackOpenRouterPublisherRequest = Message<"euler.v1.TrackOpenRouterPublisherRequest"> & {
+export type TrackCatalogPublisherRequest = Message<"euler.v1.TrackCatalogPublisherRequest"> & {
   /**
    * @generated from field: string publisher_id = 1;
    */
   publisherId: string;
+
+  /**
+   * @generated from field: euler.v1.ModelProvider provider = 2;
+   */
+  provider: ModelProvider;
 };
 
 /**
- * Describes the message euler.v1.TrackOpenRouterPublisherRequest.
- * Use `create(TrackOpenRouterPublisherRequestSchema)` to create a new message.
+ * Describes the message euler.v1.TrackCatalogPublisherRequest.
+ * Use `create(TrackCatalogPublisherRequestSchema)` to create a new message.
  */
-export const TrackOpenRouterPublisherRequestSchema: GenMessage<TrackOpenRouterPublisherRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 42);
+export const TrackCatalogPublisherRequestSchema: GenMessage<TrackCatalogPublisherRequest> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 32);
 
 /**
- * @generated from message euler.v1.TrackOpenRouterPublisherResponse
+ * @generated from message euler.v1.TrackCatalogPublisherResponse
  */
-export type TrackOpenRouterPublisherResponse = Message<"euler.v1.TrackOpenRouterPublisherResponse"> & {
+export type TrackCatalogPublisherResponse = Message<"euler.v1.TrackCatalogPublisherResponse"> & {
 };
 
 /**
- * Describes the message euler.v1.TrackOpenRouterPublisherResponse.
- * Use `create(TrackOpenRouterPublisherResponseSchema)` to create a new message.
+ * Describes the message euler.v1.TrackCatalogPublisherResponse.
+ * Use `create(TrackCatalogPublisherResponseSchema)` to create a new message.
  */
-export const TrackOpenRouterPublisherResponseSchema: GenMessage<TrackOpenRouterPublisherResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 43);
+export const TrackCatalogPublisherResponseSchema: GenMessage<TrackCatalogPublisherResponse> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 33);
 
 /**
- * @generated from message euler.v1.RemoveOpenRouterPublisherRequest
+ * @generated from message euler.v1.RemoveCatalogPublisherRequest
  */
-export type RemoveOpenRouterPublisherRequest = Message<"euler.v1.RemoveOpenRouterPublisherRequest"> & {
+export type RemoveCatalogPublisherRequest = Message<"euler.v1.RemoveCatalogPublisherRequest"> & {
   /**
    * @generated from field: string publisher_id = 1;
    */
   publisherId: string;
+
+  /**
+   * @generated from field: euler.v1.ModelProvider provider = 2;
+   */
+  provider: ModelProvider;
 };
 
 /**
- * Describes the message euler.v1.RemoveOpenRouterPublisherRequest.
- * Use `create(RemoveOpenRouterPublisherRequestSchema)` to create a new message.
+ * Describes the message euler.v1.RemoveCatalogPublisherRequest.
+ * Use `create(RemoveCatalogPublisherRequestSchema)` to create a new message.
  */
-export const RemoveOpenRouterPublisherRequestSchema: GenMessage<RemoveOpenRouterPublisherRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 44);
+export const RemoveCatalogPublisherRequestSchema: GenMessage<RemoveCatalogPublisherRequest> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 34);
 
 /**
- * @generated from message euler.v1.RemoveOpenRouterPublisherResponse
+ * @generated from message euler.v1.RemoveCatalogPublisherResponse
  */
-export type RemoveOpenRouterPublisherResponse = Message<"euler.v1.RemoveOpenRouterPublisherResponse"> & {
+export type RemoveCatalogPublisherResponse = Message<"euler.v1.RemoveCatalogPublisherResponse"> & {
 };
 
 /**
- * Describes the message euler.v1.RemoveOpenRouterPublisherResponse.
- * Use `create(RemoveOpenRouterPublisherResponseSchema)` to create a new message.
+ * Describes the message euler.v1.RemoveCatalogPublisherResponse.
+ * Use `create(RemoveCatalogPublisherResponseSchema)` to create a new message.
  */
-export const RemoveOpenRouterPublisherResponseSchema: GenMessage<RemoveOpenRouterPublisherResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 45);
+export const RemoveCatalogPublisherResponseSchema: GenMessage<RemoveCatalogPublisherResponse> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 35);
 
 /**
- * @generated from message euler.v1.SetOpenRouterSubscriptionRequest
+ * @generated from message euler.v1.SetCatalogSubscriptionRequest
  */
-export type SetOpenRouterSubscriptionRequest = Message<"euler.v1.SetOpenRouterSubscriptionRequest"> & {
+export type SetCatalogSubscriptionRequest = Message<"euler.v1.SetCatalogSubscriptionRequest"> & {
   /**
    * @generated from field: string publisher_id = 1;
    */
@@ -1049,27 +887,110 @@ export type SetOpenRouterSubscriptionRequest = Message<"euler.v1.SetOpenRouterSu
    * @generated from field: bool subscribed = 2;
    */
   subscribed: boolean;
+
+  /**
+   * @generated from field: euler.v1.ModelProvider provider = 3;
+   */
+  provider: ModelProvider;
 };
 
 /**
- * Describes the message euler.v1.SetOpenRouterSubscriptionRequest.
- * Use `create(SetOpenRouterSubscriptionRequestSchema)` to create a new message.
+ * Describes the message euler.v1.SetCatalogSubscriptionRequest.
+ * Use `create(SetCatalogSubscriptionRequestSchema)` to create a new message.
  */
-export const SetOpenRouterSubscriptionRequestSchema: GenMessage<SetOpenRouterSubscriptionRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 46);
+export const SetCatalogSubscriptionRequestSchema: GenMessage<SetCatalogSubscriptionRequest> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 36);
 
 /**
- * @generated from message euler.v1.SetOpenRouterSubscriptionResponse
+ * @generated from message euler.v1.SetCatalogSubscriptionResponse
  */
-export type SetOpenRouterSubscriptionResponse = Message<"euler.v1.SetOpenRouterSubscriptionResponse"> & {
+export type SetCatalogSubscriptionResponse = Message<"euler.v1.SetCatalogSubscriptionResponse"> & {
 };
 
 /**
- * Describes the message euler.v1.SetOpenRouterSubscriptionResponse.
- * Use `create(SetOpenRouterSubscriptionResponseSchema)` to create a new message.
+ * Describes the message euler.v1.SetCatalogSubscriptionResponse.
+ * Use `create(SetCatalogSubscriptionResponseSchema)` to create a new message.
  */
-export const SetOpenRouterSubscriptionResponseSchema: GenMessage<SetOpenRouterSubscriptionResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 47);
+export const SetCatalogSubscriptionResponseSchema: GenMessage<SetCatalogSubscriptionResponse> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 37);
+
+/**
+ * @generated from message euler.v1.ImageModel
+ */
+export type ImageModel = Message<"euler.v1.ImageModel"> & {
+  /**
+   * @generated from field: string id = 1;
+   */
+  id: string;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: euler.v1.ImageProvider provider = 3;
+   */
+  provider: ImageProvider;
+
+  /**
+   * @generated from field: repeated string aspect_ratios = 4;
+   */
+  aspectRatios: string[];
+};
+
+/**
+ * Describes the message euler.v1.ImageModel.
+ * Use `create(ImageModelSchema)` to create a new message.
+ */
+export const ImageModelSchema: GenMessage<ImageModel> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 38);
+
+/**
+ * @generated from message euler.v1.ListImageModelsRequest
+ */
+export type ListImageModelsRequest = Message<"euler.v1.ListImageModelsRequest"> & {
+  /**
+   * Unspecified returns models from all providers.
+   *
+   * @generated from field: euler.v1.ImageProvider provider = 1;
+   */
+  provider: ImageProvider;
+
+  /**
+   * @generated from field: bool refresh = 2;
+   */
+  refresh: boolean;
+};
+
+/**
+ * Describes the message euler.v1.ListImageModelsRequest.
+ * Use `create(ListImageModelsRequestSchema)` to create a new message.
+ */
+export const ListImageModelsRequestSchema: GenMessage<ListImageModelsRequest> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 39);
+
+/**
+ * @generated from message euler.v1.ListImageModelsResponse
+ */
+export type ListImageModelsResponse = Message<"euler.v1.ListImageModelsResponse"> & {
+  /**
+   * @generated from field: repeated euler.v1.ImageModel models = 1;
+   */
+  models: ImageModel[];
+
+  /**
+   * @generated from field: optional string error = 2;
+   */
+  error?: string | undefined;
+};
+
+/**
+ * Describes the message euler.v1.ListImageModelsResponse.
+ * Use `create(ListImageModelsResponseSchema)` to create a new message.
+ */
+export const ListImageModelsResponseSchema: GenMessage<ListImageModelsResponse> = /*@__PURE__*/
+  messageDesc(file_euler_v1_providers, 40);
 
 /**
  * @generated from message euler.v1.ChatGptStatus
@@ -1110,7 +1031,7 @@ export type ChatGptStatus = Message<"euler.v1.ChatGptStatus"> & {
  * Use `create(ChatGptStatusSchema)` to create a new message.
  */
 export const ChatGptStatusSchema: GenMessage<ChatGptStatus> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 48);
+  messageDesc(file_euler_v1_providers, 41);
 
 /**
  * @generated from message euler.v1.GetChatGptStatusRequest
@@ -1123,7 +1044,7 @@ export type GetChatGptStatusRequest = Message<"euler.v1.GetChatGptStatusRequest"
  * Use `create(GetChatGptStatusRequestSchema)` to create a new message.
  */
 export const GetChatGptStatusRequestSchema: GenMessage<GetChatGptStatusRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 49);
+  messageDesc(file_euler_v1_providers, 42);
 
 /**
  * @generated from message euler.v1.GetChatGptStatusResponse
@@ -1140,7 +1061,7 @@ export type GetChatGptStatusResponse = Message<"euler.v1.GetChatGptStatusRespons
  * Use `create(GetChatGptStatusResponseSchema)` to create a new message.
  */
 export const GetChatGptStatusResponseSchema: GenMessage<GetChatGptStatusResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 50);
+  messageDesc(file_euler_v1_providers, 43);
 
 /**
  * @generated from message euler.v1.StartChatGptLoginRequest
@@ -1159,7 +1080,7 @@ export type StartChatGptLoginRequest = Message<"euler.v1.StartChatGptLoginReques
  * Use `create(StartChatGptLoginRequestSchema)` to create a new message.
  */
 export const StartChatGptLoginRequestSchema: GenMessage<StartChatGptLoginRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 51);
+  messageDesc(file_euler_v1_providers, 44);
 
 /**
  * @generated from message euler.v1.StartChatGptLoginResponse
@@ -1176,7 +1097,7 @@ export type StartChatGptLoginResponse = Message<"euler.v1.StartChatGptLoginRespo
  * Use `create(StartChatGptLoginResponseSchema)` to create a new message.
  */
 export const StartChatGptLoginResponseSchema: GenMessage<StartChatGptLoginResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 52);
+  messageDesc(file_euler_v1_providers, 45);
 
 /**
  * @generated from message euler.v1.FinishChatGptLoginRequest
@@ -1193,7 +1114,7 @@ export type FinishChatGptLoginRequest = Message<"euler.v1.FinishChatGptLoginRequ
  * Use `create(FinishChatGptLoginRequestSchema)` to create a new message.
  */
 export const FinishChatGptLoginRequestSchema: GenMessage<FinishChatGptLoginRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 53);
+  messageDesc(file_euler_v1_providers, 46);
 
 /**
  * @generated from message euler.v1.FinishChatGptLoginResponse
@@ -1210,7 +1131,7 @@ export type FinishChatGptLoginResponse = Message<"euler.v1.FinishChatGptLoginRes
  * Use `create(FinishChatGptLoginResponseSchema)` to create a new message.
  */
 export const FinishChatGptLoginResponseSchema: GenMessage<FinishChatGptLoginResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 54);
+  messageDesc(file_euler_v1_providers, 47);
 
 /**
  * @generated from message euler.v1.DisconnectChatGptRequest
@@ -1223,7 +1144,7 @@ export type DisconnectChatGptRequest = Message<"euler.v1.DisconnectChatGptReques
  * Use `create(DisconnectChatGptRequestSchema)` to create a new message.
  */
 export const DisconnectChatGptRequestSchema: GenMessage<DisconnectChatGptRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 55);
+  messageDesc(file_euler_v1_providers, 48);
 
 /**
  * @generated from message euler.v1.DisconnectChatGptResponse
@@ -1242,7 +1163,7 @@ export type DisconnectChatGptResponse = Message<"euler.v1.DisconnectChatGptRespo
  * Use `create(DisconnectChatGptResponseSchema)` to create a new message.
  */
 export const DisconnectChatGptResponseSchema: GenMessage<DisconnectChatGptResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_providers, 56);
+  messageDesc(file_euler_v1_providers, 49);
 
 /**
  * How much context Ollama loads a model with: 32K, 128K or 256K tokens.
@@ -1295,6 +1216,11 @@ export enum ApiKeyProvider {
    * @generated from enum value: API_KEY_PROVIDER_BRAVE = 2;
    */
   BRAVE = 2,
+
+  /**
+   * @generated from enum value: API_KEY_PROVIDER_VERCEL_GATEWAY = 3;
+   */
+  VERCEL_GATEWAY = 3,
 }
 
 /**
@@ -1304,9 +1230,9 @@ export const ApiKeyProviderSchema: GenEnum<ApiKeyProvider> = /*@__PURE__*/
   enumDesc(file_euler_v1_providers, 1);
 
 /**
- * Model and tool providers: Ollama, ComfyUI, OpenRouter, ChatGPT and Brave
- * Search. Addresses, keys and the Ollama context window are server-wide;
- * ComfyUI image defaults and the ChatGPT connection belong to the user.
+ * Model and tool providers: Ollama, OpenRouter, Vercel AI Gateway, ChatGPT and
+ * Brave Search. Addresses, keys and the Ollama context window are server-wide;
+ * the ChatGPT connection belongs to the user.
  *
  * @generated from service euler.v1.ProviderService
  */
@@ -1354,46 +1280,6 @@ export const ProviderService: GenService<{
     output: typeof TestOllamaHostResponseSchema;
   },
   /**
-   * @generated from rpc euler.v1.ProviderService.GetComfyUiConfig
-   */
-  getComfyUiConfig: {
-    methodKind: "unary";
-    input: typeof GetComfyUiConfigRequestSchema;
-    output: typeof GetComfyUiConfigResponseSchema;
-  },
-  /**
-   * @generated from rpc euler.v1.ProviderService.UpdateComfyUiConfig
-   */
-  updateComfyUiConfig: {
-    methodKind: "unary";
-    input: typeof UpdateComfyUiConfigRequestSchema;
-    output: typeof UpdateComfyUiConfigResponseSchema;
-  },
-  /**
-   * @generated from rpc euler.v1.ProviderService.GetComfyUiHealth
-   */
-  getComfyUiHealth: {
-    methodKind: "unary";
-    input: typeof GetComfyUiHealthRequestSchema;
-    output: typeof GetComfyUiHealthResponseSchema;
-  },
-  /**
-   * @generated from rpc euler.v1.ProviderService.TestComfyUiHost
-   */
-  testComfyUiHost: {
-    methodKind: "unary";
-    input: typeof TestComfyUiHostRequestSchema;
-    output: typeof TestComfyUiHostResponseSchema;
-  },
-  /**
-   * @generated from rpc euler.v1.ProviderService.ListComfyUiModels
-   */
-  listComfyUiModels: {
-    methodKind: "unary";
-    input: typeof ListComfyUiModelsRequestSchema;
-    output: typeof ListComfyUiModelsResponseSchema;
-  },
-  /**
    * @generated from rpc euler.v1.ProviderService.GetApiKey
    */
   getApiKey: {
@@ -1412,66 +1298,76 @@ export const ProviderService: GenService<{
     output: typeof SetApiKeyResponseSchema;
   },
   /**
-   * @generated from rpc euler.v1.ProviderService.GetOpenRouterBalance
+   * @generated from rpc euler.v1.ProviderService.GetProviderBalance
    */
-  getOpenRouterBalance: {
+  getProviderBalance: {
     methodKind: "unary";
-    input: typeof GetOpenRouterBalanceRequestSchema;
-    output: typeof GetOpenRouterBalanceResponseSchema;
+    input: typeof GetProviderBalanceRequestSchema;
+    output: typeof GetProviderBalanceResponseSchema;
   },
   /**
    * Publishers, their models, and the user's choices among them.
    *
-   * @generated from rpc euler.v1.ProviderService.GetOpenRouterCatalog
+   * @generated from rpc euler.v1.ProviderService.GetModelCatalog
    */
-  getOpenRouterCatalog: {
+  getModelCatalog: {
     methodKind: "unary";
-    input: typeof GetOpenRouterCatalogRequestSchema;
-    output: typeof GetOpenRouterCatalogResponseSchema;
+    input: typeof GetModelCatalogRequestSchema;
+    output: typeof GetModelCatalogResponseSchema;
   },
   /**
    * Fetches the catalog again instead of using the cached copy.
    *
-   * @generated from rpc euler.v1.ProviderService.RefreshOpenRouterCatalog
+   * @generated from rpc euler.v1.ProviderService.RefreshModelCatalog
    */
-  refreshOpenRouterCatalog: {
+  refreshModelCatalog: {
     methodKind: "unary";
-    input: typeof RefreshOpenRouterCatalogRequestSchema;
-    output: typeof RefreshOpenRouterCatalogResponseSchema;
+    input: typeof RefreshModelCatalogRequestSchema;
+    output: typeof RefreshModelCatalogResponseSchema;
   },
   /**
-   * @generated from rpc euler.v1.ProviderService.SetOpenRouterModelEnabled
+   * @generated from rpc euler.v1.ProviderService.SetCatalogModelEnabled
    */
-  setOpenRouterModelEnabled: {
+  setCatalogModelEnabled: {
     methodKind: "unary";
-    input: typeof SetOpenRouterModelEnabledRequestSchema;
-    output: typeof SetOpenRouterModelEnabledResponseSchema;
+    input: typeof SetCatalogModelEnabledRequestSchema;
+    output: typeof SetCatalogModelEnabledResponseSchema;
   },
   /**
-   * @generated from rpc euler.v1.ProviderService.TrackOpenRouterPublisher
+   * @generated from rpc euler.v1.ProviderService.TrackCatalogPublisher
    */
-  trackOpenRouterPublisher: {
+  trackCatalogPublisher: {
     methodKind: "unary";
-    input: typeof TrackOpenRouterPublisherRequestSchema;
-    output: typeof TrackOpenRouterPublisherResponseSchema;
+    input: typeof TrackCatalogPublisherRequestSchema;
+    output: typeof TrackCatalogPublisherResponseSchema;
   },
   /**
-   * @generated from rpc euler.v1.ProviderService.RemoveOpenRouterPublisher
+   * @generated from rpc euler.v1.ProviderService.RemoveCatalogPublisher
    */
-  removeOpenRouterPublisher: {
+  removeCatalogPublisher: {
     methodKind: "unary";
-    input: typeof RemoveOpenRouterPublisherRequestSchema;
-    output: typeof RemoveOpenRouterPublisherResponseSchema;
+    input: typeof RemoveCatalogPublisherRequestSchema;
+    output: typeof RemoveCatalogPublisherResponseSchema;
   },
   /**
    * A subscribed publisher's new models are enabled as they appear.
    *
-   * @generated from rpc euler.v1.ProviderService.SetOpenRouterSubscription
+   * @generated from rpc euler.v1.ProviderService.SetCatalogSubscription
    */
-  setOpenRouterSubscription: {
+  setCatalogSubscription: {
     methodKind: "unary";
-    input: typeof SetOpenRouterSubscriptionRequestSchema;
-    output: typeof SetOpenRouterSubscriptionResponseSchema;
+    input: typeof SetCatalogSubscriptionRequestSchema;
+    output: typeof SetCatalogSubscriptionResponseSchema;
+  },
+  /**
+   * Image generation models from OpenRouter and Vercel AI Gateway.
+   *
+   * @generated from rpc euler.v1.ProviderService.ListImageModels
+   */
+  listImageModels: {
+    methodKind: "unary";
+    input: typeof ListImageModelsRequestSchema;
+    output: typeof ListImageModelsResponseSchema;
   },
   /**
    * @generated from rpc euler.v1.ProviderService.GetChatGptStatus

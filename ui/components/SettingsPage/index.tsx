@@ -1,4 +1,5 @@
 import { Save } from "lucide-react";
+import { ModelProvider } from "../../../src/gen/euler/v1/models_pb";
 import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
 import { BackToChatButton } from "../BackToChatButton";
 import { Button } from "../Button";
@@ -9,7 +10,7 @@ import { ChatGptSettingsTab } from "./ChatGptSettingsTab";
 import { GeneralSettingsTab } from "./GeneralSettingsTab";
 import { ImageGenerationTab } from "./ImageGenerationTab";
 import { OllamaSettingsTab } from "./OllamaSettingsTab";
-import { OpenRouterSettingsTab } from "./OpenRouterSettingsTab";
+import { GatewaySettingsTab } from "./OpenRouterSettingsTab";
 import { WebSearchTab } from "./WebSearchTab";
 import { SETTINGS_TABS } from "./constants";
 import type { SettingsPageProps } from "./types";
@@ -105,24 +106,27 @@ export function SettingsPage(props: SettingsPageProps) {
 
           {tab === "image-generation" && (
             <ImageGenerationTab
-              environmentManaged={environment.settings?.comfyuiHost}
-              comfyuiConnected={p.comfy.server.connected}
-              comfyUri={p.comfy.server.host}
-              onComfyUriInput={p.comfy.server.onHostInput}
-              comfyTestState={p.comfy.server.testState}
-              onTestComfyUI={p.comfy.server.test}
-              comfyModel={p.comfy.model}
-              setComfyModel={p.comfy.setModel}
-              comfyModels={p.comfy.models}
-              comfySize={p.comfy.size}
-              setComfySize={p.comfy.setSize}
-              comfyNegative={p.comfy.negative}
-              setComfyNegative={p.comfy.setNegative}
+              provider={p.imageGen.provider}
+              model={p.imageGen.model}
+              onProviderChange={p.imageGen.setProvider}
+              onModelChange={p.imageGen.setModel}
             />
           )}
 
           {tab === "openrouter" && (
-            <OpenRouterSettingsTab onModelsChanged={props.onModelsChanged} />
+            <GatewaySettingsTab
+              key="openrouter"
+              provider={ModelProvider.OPENROUTER}
+              onModelsChanged={props.onModelsChanged}
+            />
+          )}
+
+          {tab === "vercel-gateway" && (
+            <GatewaySettingsTab
+              key="vercel-gateway"
+              provider={ModelProvider.VERCEL_GATEWAY}
+              onModelsChanged={props.onModelsChanged}
+            />
           )}
 
           {tab === "web-search" && <WebSearchTab />}

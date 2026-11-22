@@ -34,10 +34,7 @@ const chatGptStatus = (connected: boolean) => ({
 });
 
 /** Reads not marked side-effect free: connection tests. */
-const READ_ONLY = new Set([
-  "ProviderService/TestOllamaHost",
-  "ProviderService/TestComfyUiHost",
-]);
+const READ_ONLY = new Set(["ProviderService/TestOllamaHost"]);
 
 /**
  * Serves a fresh server with per-user preferences in `preferences`, starting
@@ -53,7 +50,7 @@ async function routeApi(
   await mockRpc(
     page,
     [
-      on(ProviderService.method.getOpenRouterCatalog, () => ({
+      on(ProviderService.method.getModelCatalog, () => ({
         catalog: {
           freshness: { status: CatalogFreshness_Status.FRESH },
           discoveredPublishers: {},
@@ -61,7 +58,6 @@ async function routeApi(
       })),
       on(PreferenceService.method.getEnvironment, () => ({
         ollamaHost: false,
-        comfyuiHost: false,
       })),
       on(ProviderService.method.getChatGptStatus, () => ({
         status: chatGptStatus(false),
@@ -74,12 +70,6 @@ async function routeApi(
       })),
       on(ProviderService.method.testOllamaHost, () => ({
         result: { ok: true, version: "0.9.0" },
-      })),
-      on(ProviderService.method.testComfyUiHost, () => ({
-        result: { ok: true, version: "0.9.0" },
-      })),
-      on(ProviderService.method.listComfyUiModels, () => ({
-        models: ["flux.safetensors"],
       })),
       on(ProviderService.method.getOllamaConfig, () => ({
         config: { host: "" },
@@ -173,9 +163,13 @@ for (const device of ["desktop", "mobile"] as const) {
       });
       await button(page, "Continue").click();
       await expect(
-        page.getByRole("heading", { name: "Cloud models" }),
+        page.getByRole("heading", { name: "OpenRouter", exact: true }),
       ).toBeFocused();
       await expect(page.getByText("Choose which models appear")).toBeVisible();
+      await button(page, "Continue").click();
+      await expect(
+        page.getByRole("heading", { name: "Vercel AI Gateway", exact: true }),
+      ).toBeFocused();
       await button(page, "Continue").click();
 
       // Typing only configures Ollama; a passing test is what connects it.
@@ -211,12 +205,6 @@ for (const device of ["desktop", "mobile"] as const) {
       ]);
       await button(page, "Continue").click();
 
-      await page.getByLabel("Server URL").fill("http://comfy.test:8188");
-      await button(page, "Test connection").click();
-      await page
-        .getByLabel("Default Checkpoint Model")
-        .selectOption("flux.safetensors");
-      await button(page, "Continue").click();
       await page.getByLabel("API key", { exact: true }).fill("brave-secret");
       await button(page, "Save key").click();
       await expect(page.getByText("Configured", { exact: true })).toBeVisible();
@@ -227,13 +215,6 @@ for (const device of ["desktop", "mobile"] as const) {
       await page.getByRole("button", { name: "Finish setup" }).click();
       await expect(page.getByText("Setup complete")).toBeVisible();
       expect(writes.slice(1)).toEqual([
-        {
-          rpc: "ProviderService/UpdateComfyUiConfig",
-          body: {
-            host: "http://comfy.test:8188",
-            image: { defaultModel: "flux.safetensors" },
-          },
-        },
         {
           rpc: "ProviderService/SetApiKey",
           body: { provider: "API_KEY_PROVIDER_BRAVE", apiKey: "brave-secret" },
@@ -300,7 +281,7 @@ for (const device of ["desktop", "mobile"] as const) {
     ]);
     try {
       await page.goto("/");
-      for (let step = 0; step < 4; step++) await button(page, "Skip").click();
+      for (let step = 0; step < 5; step++) await button(page, "Skip").click();
       await expect(
         page.getByRole("heading", { name: "ChatGPT", exact: true }),
       ).toBeFocused();
@@ -387,6 +368,7 @@ test("onboarding desktop: skipped drafts are discarded and never reach later sav
   await button(page, "Skip").click();
   await button(page, "Skip").click();
   await button(page, "Skip").click();
+  await button(page, "Skip").click();
 
   await page.getByLabel("Server URL").fill("http://draft-only:11434");
   await button(page, "Skip").click();
@@ -398,14 +380,10 @@ test("onboarding desktop: skipped drafts are discarded and never reach later sav
   // A later save must carry only its own step.
   await page.getByRole("button", { name: "Reset default model" }).click();
   await button(page, "Continue").click();
-  await expect(
-    page.getByRole("heading", { name: "Image generation" }),
-  ).toBeFocused();
+  await expect(page.getByRole("heading", { name: "Web search" })).toBeFocused();
   expect(savedSettings(preferences)).toEqual([
     expect.objectContaining({ defaultModel: "", name: "" }),
   ]);
-  await page.getByLabel("Server URL").fill("http://draft-only:8188");
-  await button(page, "Skip").click();
   await page.getByLabel("API key", { exact: true }).fill("skipped-secret");
   await button(page, "Skip").click();
   await expect(page.getByText("Setup complete")).toBeVisible();
@@ -443,32 +421,22 @@ test.describe("onboarding desktop layout", () => {
   }) => {
     const writes = await routeApi(page, [
       on(PreferenceService.method.getEnvironment, () => ({
-        ollamaHost: false,
-        comfyuiHost: true,
+        ollamaHost: true,
       })),
       on(ProviderService.method.getOllamaConfig, () => ({
-        config: { host: "http://saved-ollama:11434" },
-      })),
-      on(ProviderService.method.getComfyUiConfig, () => ({
-        config: { host: "http://env-comfy:8188" },
-        image: { defaultWidth: 1440, defaultHeight: 1440 },
+        config: { host: "http://env-ollama:11434" },
       })),
     ]);
     await page.goto("/");
-    for (let step = 0; step < 3; step++) await button(page, "Skip").click();
+    for (let step = 0; step < 4; step++) await button(page, "Skip").click();
+    await expect(page.getByLabel("Server URL")).toBeDisabled();
     await expect(page.getByLabel("Server URL")).toHaveValue(
-      "http://saved-ollama:11434",
+      "http://env-ollama:11434",
     );
+    await expect(page.getByText("Managed by the environment.")).toBeVisible();
     await expect(progress(page)).toContainText("Ollama configured");
     await button(page, "Continue").click();
     await button(page, "Continue").click();
-    await button(page, "Continue").click();
-    await expect(page.getByLabel("Server URL")).toBeDisabled();
-    await expect(page.getByLabel("Server URL")).toHaveValue(
-      "http://env-comfy:8188",
-    );
-    await expect(page.getByText("Managed by the environment.")).toBeVisible();
-    await expect(progress(page)).toContainText("ComfyUI configured");
     await button(page, "Continue").click();
     await page.getByRole("button", { name: "Finish setup" }).click();
     await expect(button(page, "Toggle chats")).toBeVisible();
@@ -496,12 +464,13 @@ test.describe("onboarding desktop layout", () => {
     await expect(button(page, "Continue")).toBeInViewport();
     await button(page, "Skip").click();
     // A section lists its steps only while one of them is current.
-    await expect(current).toContainText("Cloud models");
+    await expect(current).toContainText("OpenRouter");
+    await expect(progress(page)).toContainText("Vercel AI Gateway");
     await expect(progress(page)).toContainText("Local models");
     await button(page, "Skip").click();
-    await progress(page).getByRole("button", { name: "Cloud models" }).click();
+    await progress(page).getByRole("button", { name: "OpenRouter" }).click();
     await expect(
-      page.getByRole("heading", { name: "Cloud models" }),
+      page.getByRole("heading", { name: "OpenRouter", exact: true }),
     ).toBeFocused();
     await progress(page).getByRole("button", { name: "About you" }).click();
     await expect(
@@ -523,7 +492,7 @@ test("onboarding mobile: step menu returns to earlier steps and actions stay pin
   await expect(progress(page)).toBeHidden();
   const continueButton = button(page, "Continue");
   const continueBox = await continueButton.boundingBox();
-  for (let step = 0; step < 3; step++) await button(page, "Skip").click();
+  for (let step = 0; step < 4; step++) await button(page, "Skip").click();
   await expect(
     page.getByRole("heading", { name: "Local models" }),
   ).toBeFocused();

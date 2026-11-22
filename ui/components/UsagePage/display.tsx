@@ -23,7 +23,10 @@ const colors: Record<string, string> = {
   google: "#3186FF",
   deepseek: "#4D6BFE",
   qwen: "#6F69F7",
+  alibaba: "#6F69F7",
+  mistral: "#FF8205",
   mistralai: "#FF8205",
+  meta: "#0081FA",
   "meta-llama": "#0081FA",
 };
 export function color(model: string) {
@@ -40,11 +43,15 @@ const providerNames: Record<string, string> = {
   google: "Google",
   deepseek: "DeepSeek",
   qwen: "Qwen",
+  alibaba: "Alibaba",
+  mistral: "Mistral",
   mistralai: "Mistral",
+  meta: "Meta",
   "meta-llama": "Meta",
   "x-ai": "xAI",
   xai: "xAI",
   moonshotai: "Moonshot AI",
+  vercel_gateway: "Vercel AI Gateway",
   ollama: "Ollama",
 };
 export function ProviderLabel({ provider: id }: { provider: string }) {

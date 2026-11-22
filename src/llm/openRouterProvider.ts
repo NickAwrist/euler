@@ -1,4 +1,4 @@
-import { getOpenRouterApiKey } from "../db/index";
+import { getOpenRouterApiKey, getVercelGatewayApiKey } from "../db/index";
 import { compactReasoningDetails } from "./reasoningDetails";
 import type {
   LlmChatRequest,
@@ -8,6 +8,8 @@ import type {
 } from "./types";
 
 const OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions";
+const VERCEL_GATEWAY_CHAT_URL =
+  "https://ai-gateway.vercel.sh/v1/chat/completions";
 
 function toOpenRouterMessages(messages: LlmChatRequest["messages"]) {
   return messages.map(({ images, ...message }) => ({
@@ -56,15 +58,16 @@ type OpenRouterChunk = {
   error?: { message?: string; code?: number | string };
 };
 
-function errorMessage(body: unknown, status: number): string {
+function errorMessage(body: unknown, status: number, label: string): string {
   if (body && typeof body === "object") {
     const error = (body as { error?: unknown }).error;
+    if (typeof error === "string" && error.trim()) return error.trim();
     if (error && typeof error === "object") {
       const message = (error as { message?: unknown }).message;
       if (typeof message === "string" && message.trim()) return message.trim();
     }
   }
-  return `OpenRouter request failed (${status})`;
+  return `${label} request failed (${status})`;
 }
 
 function reasoningText(
@@ -167,9 +170,10 @@ function parseEventData(block: string): string | null {
 
 async function* openRouterChunks(
   response: Response,
+  label: string,
 ): AsyncGenerator<LlmStreamChunk> {
   const reader = response.body?.getReader();
-  if (!reader) throw new Error("OpenRouter returned no response body");
+  if (!reader) throw new Error(`${label} returned no response body`);
 
   const decoder = new TextDecoder();
   const tagParser = new ThoughtTagParser();
@@ -200,10 +204,12 @@ async function* openRouterChunks(
     try {
       payload = JSON.parse(data) as OpenRouterChunk;
     } catch {
-      throw new Error("OpenRouter returned an invalid streaming response");
+      throw new Error(`${label} returned an invalid streaming response`);
     }
     if (payload.error) {
-      throw new Error(errorMessage(payload, Number(payload.error.code) || 502));
+      throw new Error(
+        errorMessage(payload, Number(payload.error.code) || 502, label),
+      );
     }
 
     markOutputStarted(payload);
@@ -286,26 +292,34 @@ async function* openRouterChunks(
   };
 }
 
-export async function streamOpenRouterChat(
+type GatewayChatConfig = {
+  label: string;
+  url: string;
+  getApiKey: () => string;
+  extraHeaders?: Record<string, string>;
+  anthropicCacheControl?: boolean;
+};
+
+async function streamGatewayChat(
+  config: GatewayChatConfig,
   request: LlmChatRequest,
 ): Promise<LlmChatStream> {
-  const apiKey = getOpenRouterApiKey();
+  const apiKey = config.getApiKey();
   if (!apiKey) {
-    throw new Error("OpenRouter API key is not configured");
+    throw new Error(`${config.label} API key is not configured`);
   }
 
   const controller = new AbortController();
-  const response = await fetch(OPENROUTER_CHAT_URL, {
+  const response = await fetch(config.url, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "http://localhost",
-      "X-Title": "Euler",
+      ...config.extraHeaders,
     },
     body: JSON.stringify({
       model: request.model,
-      ...(request.model.startsWith("anthropic/")
+      ...(config.anthropicCacheControl && request.model.startsWith("anthropic/")
         ? { cache_control: { type: "ephemeral" } }
         : {}),
       messages: toOpenRouterMessages(request.messages),
@@ -329,11 +343,42 @@ export async function streamOpenRouterChat(
 
   if (!response.ok) {
     const body = await response.json().catch(() => null);
-    throw new Error(errorMessage(body, response.status));
+    throw new Error(errorMessage(body, response.status, config.label));
   }
 
   return {
     abort: () => controller.abort(),
-    [Symbol.asyncIterator]: () => openRouterChunks(response),
+    [Symbol.asyncIterator]: () => openRouterChunks(response, config.label),
   };
+}
+
+export function streamOpenRouterChat(
+  request: LlmChatRequest,
+): Promise<LlmChatStream> {
+  return streamGatewayChat(
+    {
+      label: "OpenRouter",
+      url: OPENROUTER_CHAT_URL,
+      getApiKey: getOpenRouterApiKey,
+      extraHeaders: {
+        "HTTP-Referer": "http://localhost",
+        "X-Title": "Euler",
+      },
+      anthropicCacheControl: true,
+    },
+    request,
+  );
+}
+
+export function streamVercelGatewayChat(
+  request: LlmChatRequest,
+): Promise<LlmChatStream> {
+  return streamGatewayChat(
+    {
+      label: "Vercel AI Gateway",
+      url: VERCEL_GATEWAY_CHAT_URL,
+      getApiKey: getVercelGatewayApiKey,
+    },
+    request,
+  );
 }

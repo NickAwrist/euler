@@ -1,7 +1,6 @@
 import { afterEach, expect, spyOn, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { agentRuntime } from "../../src/agents/runtime/AgentRuntime";
-import { ComfyUIClient } from "../../src/comfyui/client";
 import {
   createSkillRow,
   deleteSkillRow,
@@ -9,6 +8,7 @@ import {
   listSkills,
   setBraveSearchApiKey,
   setOpenRouterApiKey,
+  setVercelGatewayApiKey,
 } from "../../src/db";
 import type {
   Feature,
@@ -44,9 +44,6 @@ function hostCan(available: boolean) {
         ? { capable: true }
         : { capable: false, reason: "bubblewrap is not installed" },
     ),
-    spyOn(ComfyUIClient.prototype, "healthCheck").mockResolvedValue({
-      ok: available,
-    }),
   );
 }
 
@@ -86,6 +83,7 @@ test("a feature is active only while its requirements are met and it is enabled"
   for (const spy of spies.splice(0)) spy.mockRestore();
   hostCan(true);
   setBraveSearchApiKey("brave-key");
+  setVercelGatewayApiKey("vck-key");
   const met = await activeIds(TEST_USER_ID);
   for (const id of ["sandbox", "web", "imageGeneration"] as const)
     expect(met.has(id)).toBe(true);
@@ -97,6 +95,13 @@ test("a feature is active only while its requirements are met and it is enabled"
   });
   expect((await activeIds(TEST_USER_ID)).has("web")).toBe(false);
   expect((await activeIds(OTHER_USER_ID)).has("web")).toBe(true);
+
+  await features.setFeatureEnabled({
+    id: WireFeatureId.IMAGE_GENERATION,
+    enabled: false,
+  });
+  expect((await activeIds(TEST_USER_ID)).has("imageGeneration")).toBe(false);
+  expect((await activeIds(OTHER_USER_ID)).has("imageGeneration")).toBe(true);
 });
 
 test("features report why they cannot run and only switchable ones can be set", async () => {
@@ -109,6 +114,14 @@ test("features report why they cannot run and only switchable ones can be set", 
     toggleable: true,
     enabled: true,
     unavailableReason: "Needs a Brave Search API key",
+  });
+  expect(
+    listed.find(({ id }) => id === WireFeatureId.IMAGE_GENERATION),
+  ).toMatchObject({
+    label: "Image generation",
+    toggleable: true,
+    enabled: true,
+    unavailableReason: "Needs an OpenRouter or Vercel AI Gateway API key",
   });
   // Only a feature with something to show draws a sidebar tab.
   expect(web?.sidebarTab).toBeUndefined();
@@ -253,7 +266,7 @@ test("a chat runs with only a model provider", async () => {
     };
     expect(request.messages[0]?.content).not.toContain("Session directory");
     const tools = (request.tools ?? []).map((tool) => tool.function.name);
-    for (const tool of ["read_file", "bash", "web_search", "generate_image"])
+    for (const tool of ["read_file", "bash", "web_search"])
       expect(tools).not.toContain(tool);
     expect(tools).toContain("spawn_agent");
     // No workspace feature is active, so the chat never gets a directory.

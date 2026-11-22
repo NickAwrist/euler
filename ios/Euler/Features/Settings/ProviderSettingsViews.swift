@@ -277,87 +277,61 @@ struct ApiKeySection: View {
     }
 }
 
-/// Image Generation: the ComfyUI server, its default model and image settings.
+/// Image Generation: OpenRouter or Vercel AI Gateway provider and default model.
 struct ImageGenerationSettingsView: View {
     @Environment(AppSession.self) private var session
-    @State private var host = ""
-    @State private var config: Euler_V1_HostConfig?
-    @State private var image = Euler_V1_ImagePreferences()
-    @State private var savedImage = Euler_V1_ImagePreferences()
-    @State private var models: [String] = []
-    @State private var health: Euler_V1_GetComfyUiHealthResponse?
+    @State private var models: [Euler_V1_ImageModel] = []
+
+    private var saved: Euler_V1_ImagePreferences { session.preferences.preferences.image }
 
     var body: some View {
-        let managed = session.preferences.environment.comfyuiHost
         ThemedForm {
-            HostSection(
-                title: "ComfyUI URL",
-                placeholder: "http://127.0.0.1:8188",
-                host: $host,
-                config: config,
-                managed: managed,
-                connected: health?.connected,
-                test: { host in
-                    var request = Euler_V1_TestComfyUiHostRequest()
-                    request.host = host
-                    return try await session.backend.providers.testComfyUiHost(request: request, headers: [:]).value().result
-                },
-                save: { host in
-                    var request = Euler_V1_UpdateComfyUiConfigRequest()
-                    request.host = host
-                    config = try await session.backend.providers.updateComfyUiConfig(request: request, headers: [:]).value().config
-                    await load()
+            Section {
+                Picker("Provider", selection: Binding(
+                    get: { saved.provider },
+                    set: { next in
+                        savePreferences(session) {
+                            $0.image.provider = next
+                            if next != saved.provider { $0.image.model = "" }
+                        }
+                        Task { await loadModels(provider: next) }
+                    }
+                ).ticking()) {
+                    Text("Auto").tag(Euler_V1_ImageProvider.unspecified)
+                    Text("OpenRouter").tag(Euler_V1_ImageProvider.openrouter)
+                    Text("Vercel AI Gateway").tag(Euler_V1_ImageProvider.vercelGateway)
                 }
-            )
-            Section("Defaults") {
-                Picker("Model", selection: $image.defaultModel.ticking()) {
-                    Text("None").tag("")
-                    ForEach(models, id: \.self) { Text($0).tag($0) }
-                    if !image.defaultModel.isEmpty, !models.contains(image.defaultModel) {
-                        Text(image.defaultModel).tag(image.defaultModel)
+                .mutedPickerValue()
+
+                Picker("Model", selection: Binding(
+                    get: { saved.model },
+                    set: { next in savePreferences(session) { $0.image.model = next } }
+                ).ticking()) {
+                    Text("Auto").tag("")
+                    if !saved.model.isEmpty, !models.contains(where: { $0.id == saved.model }) {
+                        Text(saved.model).tag(saved.model)
+                    }
+                    ForEach(models, id: \.id) { model in
+                        Text(model.name).tag(model.id)
                     }
                 }
                 .mutedPickerValue()
-                Stepper("Width \(image.defaultWidth)", value: $image.defaultWidth, in: 64...16384, step: 64)
-                Stepper("Height \(image.defaultHeight)", value: $image.defaultHeight, in: 64...16384, step: 64)
-                TextField("Negative prompt", text: $image.negativePrompt, axis: .vertical)
-                    .lineLimit(2...6)
-                    .accessibilityLabel("Negative prompt")
-            }
-            FormActions {
-                Button("Save") { Task { await saveImage() } }
-                    .buttonStyle(FormActionStyle(prominent: true))
-                    .disabled(image == savedImage)
+            } header: {
+                Text("Defaults")
+            } footer: {
+                Text("Uses the API keys configured in OpenRouter and Vercel AI Gateway settings.")
             }
         }
         .navigationTitle("Image Generation")
-        .task { await load() }
+        .task { await loadModels(provider: saved.provider) }
     }
 
-    private func load() async {
-        let providers = session.backend.providers
-        if let response = try? await providers.getComfyUiConfig(request: .init(), headers: [:]).value() {
-            config = response.config
-            host = response.config.host.isEmpty ? response.config.effectiveHost : response.config.host
-            image = response.image
-            savedImage = response.image
-        }
-        health = try? await providers.getComfyUiHealth(request: .init(), headers: [:]).value()
-        models = (try? await providers.listComfyUiModels(request: .init(), headers: [:]).value().models) ?? []
-    }
-
-    private func saveImage() async {
-        var request = Euler_V1_UpdateComfyUiConfigRequest()
-        request.image.defaultModel = image.defaultModel
-        request.image.defaultWidth = image.defaultWidth
-        request.image.defaultHeight = image.defaultHeight
-        request.image.negativePrompt = image.negativePrompt
-        let ok = await session.notices.attempt {
-            let response = try await session.backend.providers.updateComfyUiConfig(request: request, headers: [:]).value()
-            image = response.image
-            savedImage = response.image
-        }
-        if ok { session.notices.success("Saved.") }
+    private func loadModels(provider: Euler_V1_ImageProvider) async {
+        var request = Euler_V1_ListImageModelsRequest()
+        request.provider = provider
+        let loaded = (try? await session.backend.providers.listImageModels(request: request, headers: [:]).value().models) ?? []
+        var seen = Set<String>()
+        models = loaded.filter { seen.insert($0.id).inserted }
     }
 }
 

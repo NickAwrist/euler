@@ -18,6 +18,7 @@ enum ModelProvider {
   MODEL_PROVIDER_OLLAMA = 1;
   MODEL_PROVIDER_OPENROUTER = 2;
   MODEL_PROVIDER_CHATGPT = 3;
+  MODEL_PROVIDER_VERCEL_GATEWAY = 4;
 }
 
 enum InputCapability {
@@ -85,13 +86,17 @@ message ProviderStates {
   message OpenRouter {
     bool configured = 1;
   }
+  message VercelGateway {
+    bool configured = 1;
+  }
   ChatGpt chatgpt = 1;
   Ollama ollama = 2;
   OpenRouter openrouter = 3;
+  VercelGateway vercel_gateway = 4;
 }
 
 message ListModelsRequest {
-  // Use the cached OpenRouter catalog instead of refreshing it.
+  // Use the cached gateway catalogs instead of refreshing them.
   bool cached_catalog = 1;
 }
 

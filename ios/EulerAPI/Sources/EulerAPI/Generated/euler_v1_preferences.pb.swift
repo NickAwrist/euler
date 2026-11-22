@@ -20,6 +20,44 @@ fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobu
   typealias Version = _2
 }
 
+public nonisolated enum Euler_V1_ImageProvider: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case openrouter // = 1
+  case vercelGateway // = 2
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .openrouter
+    case 2: self = .vercelGateway
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .openrouter: return 1
+    case .vercelGateway: return 2
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [Euler_V1_ImageProvider] = [
+    .unspecified,
+    .openrouter,
+    .vercelGateway,
+  ]
+
+}
+
 public nonisolated struct Euler_V1_UserPreferences: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -78,13 +116,11 @@ public nonisolated struct Euler_V1_ImagePreferences: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var defaultModel: String = String()
+  /// Unspecified uses the first configured provider.
+  public var provider: Euler_V1_ImageProvider = .unspecified
 
-  public var defaultWidth: UInt32 = 0
-
-  public var defaultHeight: UInt32 = 0
-
-  public var negativePrompt: String = String()
+  /// Empty uses the first model the provider offers.
+  public var model: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -492,50 +528,30 @@ public nonisolated struct Euler_V1_UpdatePreferencesRequest: @unchecked Sendable
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
 
-    public var defaultModel: String {
-      get {_defaultModel ?? String()}
-      set {_defaultModel = newValue}
+    public var provider: Euler_V1_ImageProvider {
+      get {_provider ?? .unspecified}
+      set {_provider = newValue}
     }
-    /// Returns true if `defaultModel` has been explicitly set.
-    public var hasDefaultModel: Bool {self._defaultModel != nil}
-    /// Clears the value of `defaultModel`. Subsequent reads from it will return its default value.
-    public mutating func clearDefaultModel() {self._defaultModel = nil}
+    /// Returns true if `provider` has been explicitly set.
+    public var hasProvider: Bool {self._provider != nil}
+    /// Clears the value of `provider`. Subsequent reads from it will return its default value.
+    public mutating func clearProvider() {self._provider = nil}
 
-    public var defaultWidth: UInt32 {
-      get {_defaultWidth ?? 0}
-      set {_defaultWidth = newValue}
+    public var model: String {
+      get {_model ?? String()}
+      set {_model = newValue}
     }
-    /// Returns true if `defaultWidth` has been explicitly set.
-    public var hasDefaultWidth: Bool {self._defaultWidth != nil}
-    /// Clears the value of `defaultWidth`. Subsequent reads from it will return its default value.
-    public mutating func clearDefaultWidth() {self._defaultWidth = nil}
-
-    public var defaultHeight: UInt32 {
-      get {_defaultHeight ?? 0}
-      set {_defaultHeight = newValue}
-    }
-    /// Returns true if `defaultHeight` has been explicitly set.
-    public var hasDefaultHeight: Bool {self._defaultHeight != nil}
-    /// Clears the value of `defaultHeight`. Subsequent reads from it will return its default value.
-    public mutating func clearDefaultHeight() {self._defaultHeight = nil}
-
-    public var negativePrompt: String {
-      get {_negativePrompt ?? String()}
-      set {_negativePrompt = newValue}
-    }
-    /// Returns true if `negativePrompt` has been explicitly set.
-    public var hasNegativePrompt: Bool {self._negativePrompt != nil}
-    /// Clears the value of `negativePrompt`. Subsequent reads from it will return its default value.
-    public mutating func clearNegativePrompt() {self._negativePrompt = nil}
+    /// Returns true if `model` has been explicitly set.
+    public var hasModel: Bool {self._model != nil}
+    /// Clears the value of `model`. Subsequent reads from it will return its default value.
+    public mutating func clearModel() {self._model = nil}
 
     public var unknownFields = SwiftProtobuf.UnknownStorage()
 
     public init() {}
 
-    fileprivate var _defaultModel: String? = nil
-    fileprivate var _defaultWidth: UInt32? = nil
-    fileprivate var _defaultHeight: UInt32? = nil
-    fileprivate var _negativePrompt: String? = nil
+    fileprivate var _provider: Euler_V1_ImageProvider? = nil
+    fileprivate var _model: String? = nil
   }
 
   public nonisolated struct SettingsPatch: Sendable {
@@ -972,8 +988,6 @@ public nonisolated struct Euler_V1_GetEnvironmentResponse: Sendable {
 
   public var ollamaHost: Bool = false
 
-  public var comfyuiHost: Bool = false
-
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -982,6 +996,10 @@ public nonisolated struct Euler_V1_GetEnvironmentResponse: Sendable {
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate nonisolated let _protobuf_package = "euler.v1"
+
+nonisolated extension Euler_V1_ImageProvider: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0IMAGE_PROVIDER_UNSPECIFIED\0\u{1}IMAGE_PROVIDER_OPENROUTER\0\u{1}IMAGE_PROVIDER_VERCEL_GATEWAY\0")
+}
 
 nonisolated extension Euler_V1_UserPreferences: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".UserPreferences"
@@ -1083,7 +1101,7 @@ nonisolated extension Euler_V1_UserPreferences: SwiftProtobuf.Message, SwiftProt
 
 nonisolated extension Euler_V1_ImagePreferences: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ImagePreferences"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}default_model\0\u{3}default_width\0\u{3}default_height\0\u{3}negative_prompt\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}provider\0\u{1}model\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1091,36 +1109,26 @@ nonisolated extension Euler_V1_ImagePreferences: SwiftProtobuf.Message, SwiftPro
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.defaultModel) }()
-      case 2: try { try decoder.decodeSingularUInt32Field(value: &self.defaultWidth) }()
-      case 3: try { try decoder.decodeSingularUInt32Field(value: &self.defaultHeight) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.negativePrompt) }()
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.model) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.defaultModel.isEmpty {
-      try visitor.visitSingularStringField(value: self.defaultModel, fieldNumber: 1)
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 1)
     }
-    if self.defaultWidth != 0 {
-      try visitor.visitSingularUInt32Field(value: self.defaultWidth, fieldNumber: 2)
-    }
-    if self.defaultHeight != 0 {
-      try visitor.visitSingularUInt32Field(value: self.defaultHeight, fieldNumber: 3)
-    }
-    if !self.negativePrompt.isEmpty {
-      try visitor.visitSingularStringField(value: self.negativePrompt, fieldNumber: 4)
+    if !self.model.isEmpty {
+      try visitor.visitSingularStringField(value: self.model, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Euler_V1_ImagePreferences, rhs: Euler_V1_ImagePreferences) -> Bool {
-    if lhs.defaultModel != rhs.defaultModel {return false}
-    if lhs.defaultWidth != rhs.defaultWidth {return false}
-    if lhs.defaultHeight != rhs.defaultHeight {return false}
-    if lhs.negativePrompt != rhs.negativePrompt {return false}
+    if lhs.provider != rhs.provider {return false}
+    if lhs.model != rhs.model {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1500,7 +1508,7 @@ nonisolated extension Euler_V1_UpdatePreferencesRequest: SwiftProtobuf.Message, 
 
 nonisolated extension Euler_V1_UpdatePreferencesRequest.ImagePatch: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = Euler_V1_UpdatePreferencesRequest.protoMessageName + ".ImagePatch"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}default_model\0\u{3}default_width\0\u{3}default_height\0\u{3}negative_prompt\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}provider\0\u{1}model\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1508,10 +1516,8 @@ nonisolated extension Euler_V1_UpdatePreferencesRequest.ImagePatch: SwiftProtobu
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._defaultModel) }()
-      case 2: try { try decoder.decodeSingularUInt32Field(value: &self._defaultWidth) }()
-      case 3: try { try decoder.decodeSingularUInt32Field(value: &self._defaultHeight) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self._negativePrompt) }()
+      case 1: try { try decoder.decodeSingularEnumField(value: &self._provider) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._model) }()
       default: break
       }
     }
@@ -1522,26 +1528,18 @@ nonisolated extension Euler_V1_UpdatePreferencesRequest.ImagePatch: SwiftProtobu
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._defaultModel {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
+    try { if let v = self._provider {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 1)
     } }()
-    try { if let v = self._defaultWidth {
-      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._defaultHeight {
-      try visitor.visitSingularUInt32Field(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._negativePrompt {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    try { if let v = self._model {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Euler_V1_UpdatePreferencesRequest.ImagePatch, rhs: Euler_V1_UpdatePreferencesRequest.ImagePatch) -> Bool {
-    if lhs._defaultModel != rhs._defaultModel {return false}
-    if lhs._defaultWidth != rhs._defaultWidth {return false}
-    if lhs._defaultHeight != rhs._defaultHeight {return false}
-    if lhs._negativePrompt != rhs._negativePrompt {return false}
+    if lhs._provider != rhs._provider {return false}
+    if lhs._model != rhs._model {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -2053,7 +2051,7 @@ nonisolated extension Euler_V1_GetEnvironmentRequest: SwiftProtobuf.Message, Swi
 
 nonisolated extension Euler_V1_GetEnvironmentResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GetEnvironmentResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}ollama_host\0\u{3}comfyui_host\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}ollama_host\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2062,7 +2060,6 @@ nonisolated extension Euler_V1_GetEnvironmentResponse: SwiftProtobuf.Message, Sw
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularBoolField(value: &self.ollamaHost) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.comfyuiHost) }()
       default: break
       }
     }
@@ -2072,15 +2069,11 @@ nonisolated extension Euler_V1_GetEnvironmentResponse: SwiftProtobuf.Message, Sw
     if self.ollamaHost != false {
       try visitor.visitSingularBoolField(value: self.ollamaHost, fieldNumber: 1)
     }
-    if self.comfyuiHost != false {
-      try visitor.visitSingularBoolField(value: self.comfyuiHost, fieldNumber: 2)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: Euler_V1_GetEnvironmentResponse, rhs: Euler_V1_GetEnvironmentResponse) -> Bool {
     if lhs.ollamaHost != rhs.ollamaHost {return false}
-    if lhs.comfyuiHost != rhs.comfyuiHost {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

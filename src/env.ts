@@ -5,7 +5,6 @@ const DEFAULT_MAX_RUNNING_AGENTS = 4;
 const DEFAULT_MAX_SESSION_JOBS = 4;
 const DEFAULT_MAX_OWNER_JOBS = 16;
 const DEFAULT_EPHEMERAL_CHAT_TTL_HOURS = 24;
-export const DEFAULT_COMFYUI_HOST = "http://127.0.0.1:8188";
 
 function getEnv(name: string): string {
   return process.env[name]?.trim() ?? "";
@@ -58,7 +57,6 @@ export const envConfig = {
   ),
   publicUrl: getFirstEnv(["EULER_PUBLIC_URL"]),
   ollamaHost: getFirstEnv(["EULER_OLLAMA_HOST", "OLLAMA_HOST"]),
-  comfyuiHost: getFirstEnv(["EULER_COMFYUI_HOST", "COMFYUI_HOST"]),
   jinaApiKey: getFirstEnv(["JINA_API_KEY", "EULER_JINA_API_KEY"]),
   serveFrontend: getBoolean(["EULER_SERVE_FRONTEND"], true),
   /** Agent activations one user may run at once, across all chats. */
@@ -85,6 +83,10 @@ export const envConfig = {
     "OPENROUTER_API_KEY",
     "EULER_OPENROUTER_API_KEY",
   ]),
+  vercelGatewayApiKey: getFirstEnv([
+    "AI_GATEWAY_API_KEY",
+    "EULER_VERCEL_GATEWAY_API_KEY",
+  ]),
   braveSearchApiKey: getFirstEnv([
     "BRAVE_SEARCH_API_KEY",
     "EULER_BRAVE_SEARCH_API_KEY",
@@ -99,6 +101,5 @@ export const envConfig = {
 export function getEnvironmentSettings() {
   return {
     ollamaHost: Boolean(envConfig.ollamaHost),
-    comfyuiHost: Boolean(envConfig.comfyuiHost),
   };
 }

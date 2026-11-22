@@ -42,12 +42,6 @@ export function plainSummary(markdown: string): string {
     : text;
 }
 
-function generatedImage(message: WireMessage | undefined) {
-  for (const attachment of message?.attachments ?? [])
-    if (attachment.kind === "generated_image") return attachment.url;
-  return undefined;
-}
-
 /**
  * Pushes to a user's phones when a main agent's turn ends or fails, and when
  * any agent asks to run a tool, unless a client has the event stream open.
@@ -88,14 +82,16 @@ export class TurnNotifier {
         // A stopped turn was the user's choice; a paused one resumes itself.
         if (event.outcome !== "done" && event.outcome !== "error") return;
         const summary = plainSummary(reply?.content ?? "");
-        const image = generatedImage(reply);
+        const hasImage =
+          reply?.attachments?.some(
+            (attachment) => attachment.kind === "image",
+          ) ?? false;
         return {
           sessionId: event.sessionId,
           body:
             event.outcome === "error"
               ? summary || "The reply failed."
-              : summary || (image ? "Generated an image." : "Reply ready."),
-          ...(image ? { data: { image } } : {}),
+              : summary || (hasImage ? "Generated an image." : "Reply ready."),
         };
       }
       case "approval_requested": {

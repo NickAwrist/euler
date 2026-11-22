@@ -3,7 +3,7 @@ import { timestampFromMs } from "@bufbuild/protobuf/wkt";
 import { InputCapability, Model_Availability } from "../gen/euler/v1/models_pb";
 import {
   CatalogFreshness_Status,
-  type OpenRouterCatalogSchema,
+  type ModelCatalogSchema,
 } from "../gen/euler/v1/providers_pb";
 import {
   InputCapability as DomainInputCapability,
@@ -52,10 +52,10 @@ const optionalMillis = (value: number | null | undefined) =>
 
 export type CatalogSettings = ReturnType<typeof catalogSettings>;
 
-/** Publishers, their models and the user's choices, as GetOpenRouterCatalog returns them. */
-export function openRouterCatalog(
+/** Publishers, their models and the user's choices, as GetModelCatalog returns them. */
+export function modelCatalogWire(
   settings: CatalogSettings,
-): MessageInitShape<typeof OpenRouterCatalogSchema> {
+): MessageInitShape<typeof ModelCatalogSchema> {
   return {
     freshness: {
       status: FRESHNESS[settings.catalog.status],

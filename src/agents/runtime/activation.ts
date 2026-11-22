@@ -227,6 +227,7 @@ export async function runActivation(
       signal,
       agent.ownerUuid,
       workspace,
+      agent.sessionId,
     );
     ctx.jobs = host.jobs.executor(agent.id, agent.sessionId, partial.id);
     ctx.authorizeToolCall = (tool, args, icons) =>

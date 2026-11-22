@@ -236,7 +236,7 @@ private struct TableView: View {
     }
 }
 
-/// An image a reply embeds, such as a ComfyUI output loaded by its server path.
+/// An image a reply embeds.
 private struct MarkdownImage: View {
     let path: String
     let alt: String
@@ -244,7 +244,7 @@ private struct MarkdownImage: View {
 
     var body: some View {
         if let url = session.backend.url(forPath: path) {
-            RemoteImage(url: url, alt: alt.isEmpty ? "Generated image" : alt)
+            RemoteImage(url: url, alt: alt.isEmpty ? "Image" : alt)
                 .frame(maxWidth: 320, maxHeight: 320, alignment: .leading)
         }
     }

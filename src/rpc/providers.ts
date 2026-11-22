@@ -1,21 +1,15 @@
 import type { ServiceImpl } from "@connectrpc/connect";
 import { Ollama } from "ollama";
 import {
-  ComfyUIClient,
-  getComfyUIClient,
-  getComfyUIHostConfig,
-  getResolvedComfyUIHost,
-  invalidateComfyUIClient,
-} from "../comfyui/client";
-import {
   getBraveSearchApiKey,
   getOllamaContextWindow,
   getOpenRouterApiKey,
+  getVercelGatewayApiKey,
   setBraveSearchApiKey,
-  setComfyUIHost,
   setOllamaContextWindow,
   setOllamaHost,
   setOpenRouterApiKey,
+  setVercelGatewayApiKey,
 } from "../db/index";
 import {
   getOpenRouterModelByRoute,
@@ -24,17 +18,16 @@ import {
   setPublisherSubscription,
   trackOpenRouterPublisher,
 } from "../db/openrouter";
-import {
-  effectiveUserPreferences,
-  updateUserPreferences,
-} from "../db/userPreferences";
 import { envConfig } from "../env";
+import { ModelProvider } from "../gen/euler/v1/models_pb";
 import {
   ApiKeyProvider,
   OllamaContextWindow,
   type ProviderService,
 } from "../gen/euler/v1/providers_pb";
 import { canEditEnvironmentSetting } from "../http/environmentSettings";
+import { listImageModels } from "../imageGen/index";
+import type { CatalogProvider } from "../llm/types";
 import {
   chatGptStatus,
   disconnectChatGpt,
@@ -48,7 +41,7 @@ import {
   invalidateOllamaClientCache,
   normalizeOllamaHost,
 } from "../models/ollamaClient";
-import { fetchOpenRouterBalance } from "../models/openRouterBalance";
+import { fetchProviderBalance } from "../models/openRouterBalance";
 import {
   type CatalogResult,
   isInteractiveModel,
@@ -59,10 +52,9 @@ import {
   getCatalogPreferences,
   savedModelMetadata,
 } from "../models/openRouterPreferences";
-import { openRouterCatalog } from "../models/openRouterWire";
+import { modelCatalogWire } from "../models/openRouterWire";
 import { OperationError } from "../observability/errors";
-import { logEvent } from "../observability/logger";
-import { choices, imagePatch } from "../preferences/wire";
+import { choices, imageProviders } from "../preferences/wire";
 import type { OllamaContextWindow as ContextWindow } from "../schemas/ollama";
 import { errorMessage } from "../utils/errors";
 import { ownerOf } from "./context";
@@ -78,6 +70,11 @@ const API_KEYS = {
     get: getBraveSearchApiKey,
     set: setBraveSearchApiKey,
   },
+  [ApiKeyProvider.VERCEL_GATEWAY]: {
+    environment: () => envConfig.vercelGatewayApiKey,
+    get: getVercelGatewayApiKey,
+    set: setVercelGatewayApiKey,
+  },
 } as const;
 
 const apiKey = (provider: ApiKeyProvider) =>
@@ -88,13 +85,6 @@ const contextWindows = choices<ContextWindow, OllamaContextWindow>({
   medium: OllamaContextWindow.MEDIUM,
   high: OllamaContextWindow.HIGH,
 });
-
-function comfyConfig(owner: string) {
-  return {
-    config: getComfyUIHostConfig(),
-    image: effectiveUserPreferences(owner).image,
-  };
-}
 
 function chatGpt(owner: string) {
   const status = chatGptStatus(owner);
@@ -107,12 +97,30 @@ function chatGpt(owner: string) {
   };
 }
 
-const catalog = (result: CatalogResult, owner: string) =>
-  openRouterCatalog(catalogSettings(result, owner));
+const CATALOG_PROVIDERS: Partial<Record<ModelProvider, CatalogProvider>> = {
+  [ModelProvider.OPENROUTER]: "openrouter",
+  [ModelProvider.VERCEL_GATEWAY]: "vercel_gateway",
+};
+
+function catalogProviderOf(provider: ModelProvider): CatalogProvider {
+  const resolved = CATALOG_PROVIDERS[provider];
+  if (!resolved) {
+    throw new OperationError("INVALID_REQUEST", {
+      message: "Unsupported catalog provider",
+    });
+  }
+  return resolved;
+}
+
+const catalog = (
+  result: CatalogResult,
+  owner: string,
+  provider: CatalogProvider,
+) => modelCatalogWire(catalogSettings(result, owner, provider));
 
 /** A catalog fetched for a write; the write needs its models. */
-async function requireCatalog() {
-  const result = await getCatalogPreferences(false, true);
+async function requireCatalog(provider: CatalogProvider) {
+  const result = await getCatalogPreferences(false, true, undefined, provider);
   if (!result.models) throw new OperationError("CATALOG_UNAVAILABLE");
   return result.models;
 }
@@ -169,49 +177,6 @@ export const providerService: ServiceImpl<typeof ProviderService> = {
       };
     }
   },
-  getComfyUiConfig(_request, context) {
-    return comfyConfig(ownerOf(context));
-  },
-  updateComfyUiConfig(request, context) {
-    const owner = ownerOf(context);
-    if (request.host !== undefined) {
-      if (canEditEnvironmentSetting(envConfig.comfyuiHost, request.host))
-        setComfyUIHost(request.host);
-      invalidateComfyUIClient();
-    }
-    const image = imagePatch(request.image);
-    if (image) updateUserPreferences(owner, { image });
-    return comfyConfig(owner);
-  },
-  async getComfyUiHealth() {
-    try {
-      const result = await getComfyUIClient().healthCheck();
-      return { connected: result.ok, error: result.error };
-    } catch (error) {
-      logEvent("warn", "comfyui.unavailable", { stage: "health" }, error);
-      return { connected: false, error: errorMessage(error) };
-    }
-  },
-  async testComfyUiHost(request) {
-    const url = request.host.trim() || getResolvedComfyUIHost();
-    const result = await new ComfyUIClient(url).healthCheck();
-    return {
-      result: {
-        ok: result.ok,
-        error: result.error
-          ? withContainerLoopbackHint(result.error, url)
-          : undefined,
-      },
-    };
-  },
-  async listComfyUiModels() {
-    try {
-      return { models: await getComfyUIClient().getModels() };
-    } catch (error) {
-      logEvent("warn", "comfyui.unavailable", { stage: "models" }, error);
-      return { models: [], error: errorMessage(error) };
-    }
-  },
   getApiKey(request) {
     const key = apiKey(request.provider);
     return {
@@ -232,13 +197,17 @@ export const providerService: ServiceImpl<typeof ProviderService> = {
       },
     };
   },
-  async getOpenRouterBalance() {
-    const key = getOpenRouterApiKey();
+  async getProviderBalance(request) {
+    const provider = catalogProviderOf(request.provider);
+    const key =
+      provider === "vercel_gateway"
+        ? getVercelGatewayApiKey()
+        : getOpenRouterApiKey();
     if (!key)
       throw new OperationError("INVALID_REQUEST", {
-        message: "Configure an OpenRouter API key first",
+        message: `Configure ${provider === "vercel_gateway" ? "a Vercel AI Gateway" : "an OpenRouter"} API key first`,
       });
-    const balance = await fetchOpenRouterBalance(key);
+    const balance = await fetchProviderBalance(provider, key);
     return {
       accountBalance: balance.accountBalance ?? undefined,
       keyLimit: balance.keyLimit ?? undefined,
@@ -247,36 +216,52 @@ export const providerService: ServiceImpl<typeof ProviderService> = {
       keyUsage: balance.keyUsage,
     };
   },
-  async getOpenRouterCatalog(_request, context) {
+  async getModelCatalog(request, context) {
     const owner = ownerOf(context);
-    return { catalog: catalog(await getCatalogPreferences(false), owner) };
+    const provider = catalogProviderOf(request.provider);
+    return {
+      catalog: catalog(
+        await getCatalogPreferences(false, false, undefined, provider),
+        owner,
+        provider,
+      ),
+    };
   },
-  async refreshOpenRouterCatalog(_request, context) {
+  async refreshModelCatalog(request, context) {
     const owner = ownerOf(context);
-    return { catalog: catalog(await getCatalogPreferences(true), owner) };
+    const provider = catalogProviderOf(request.provider);
+    return {
+      catalog: catalog(
+        await getCatalogPreferences(true, false, undefined, provider),
+        owner,
+        provider,
+      ),
+    };
   },
-  async setOpenRouterModelEnabled(request) {
+  async setCatalogModelEnabled(request) {
+    const provider = catalogProviderOf(request.provider);
     if (!openRouterRouteSchema.safeParse(request.route).success)
       throw new OperationError("INVALID_REQUEST", {
         message: "Provide a route and enabled boolean",
       });
-    const saved = getOpenRouterModelByRoute(request.route);
+    const saved = getOpenRouterModelByRoute(request.route, provider);
     if (!request.enabled && saved) {
-      setOpenRouterModelEnabled(savedModelMetadata(saved), false);
+      setOpenRouterModelEnabled(savedModelMetadata(saved), false, provider);
       return {};
     }
-    const model = (await requireCatalog()).find(
+    const model = (await requireCatalog(provider)).find(
       (entry) => entry.route === request.route,
     );
     if (!model || !isInteractiveModel(model))
       throw new OperationError("INVALID_REQUEST", {
         message: "Model is not available for interactive use",
       });
-    setOpenRouterModelEnabled(model, request.enabled);
+    setOpenRouterModelEnabled(model, request.enabled, provider);
     return {};
   },
-  async trackOpenRouterPublisher(request) {
-    const models = await requireCatalog();
+  async trackCatalogPublisher(request) {
+    const provider = catalogProviderOf(request.provider);
+    const models = await requireCatalog(provider);
     if (
       !models.some(
         (model) =>
@@ -287,18 +272,40 @@ export const providerService: ServiceImpl<typeof ProviderService> = {
       throw new OperationError("INVALID_REQUEST", {
         message: "Choose a publisher from the catalog",
       });
-    trackOpenRouterPublisher(request.publisherId);
+    trackOpenRouterPublisher(request.publisherId, provider);
     return {};
   },
-  removeOpenRouterPublisher(request) {
-    if (!removeOpenRouterPublisher(request.publisherId))
+  removeCatalogPublisher(request) {
+    const provider = catalogProviderOf(request.provider);
+    if (!removeOpenRouterPublisher(request.publisherId, provider))
       throw new OperationError("NOT_FOUND", { message: "Publisher not found" });
     return {};
   },
-  setOpenRouterSubscription(request) {
-    if (!setPublisherSubscription(request.publisherId, request.subscribed))
+  setCatalogSubscription(request) {
+    const provider = catalogProviderOf(request.provider);
+    if (
+      !setPublisherSubscription(
+        request.publisherId,
+        request.subscribed,
+        undefined,
+        provider,
+      )
+    )
       throw new OperationError("NOT_FOUND", { message: "Publisher not found" });
     return {};
+  },
+  async listImageModels(request) {
+    const provider = imageProviders.fromProto(request.provider) || undefined;
+    const result = await listImageModels(provider, request.refresh);
+    return {
+      models: result.models.map((model) => ({
+        id: model.id,
+        name: model.name,
+        provider: imageProviders.toProto(model.provider),
+        aspectRatios: model.aspectRatios,
+      })),
+      error: result.error,
+    };
   },
   getChatGptStatus(_request, context) {
     return { status: chatGpt(ownerOf(context)) };

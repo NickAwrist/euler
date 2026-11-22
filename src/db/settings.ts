@@ -6,10 +6,10 @@ import {
 import { getDb } from "./connection";
 import {
   BRAVE_SEARCH_API_KEY_KEY,
-  COMFYUI_HOST_KEY,
   OLLAMA_CONTEXT_WINDOW_KEY,
   OLLAMA_HOST_KEY,
   OPENROUTER_API_KEY_KEY,
+  VERCEL_GATEWAY_API_KEY_KEY,
 } from "./constants";
 
 function getAppSetting(key: string): string {
@@ -45,20 +45,22 @@ export function setOllamaContextWindow(value: OllamaContextWindow): void {
   setAppSetting(OLLAMA_CONTEXT_WINDOW_KEY, value);
 }
 
-export function getComfyUIHost(): string {
-  return envConfig.comfyuiHost || getAppSetting(COMFYUI_HOST_KEY);
-}
-
-export function setComfyUIHost(host: string): void {
-  setAppSetting(COMFYUI_HOST_KEY, host);
-}
-
 export function getOpenRouterApiKey(): string {
   return envConfig.openrouterApiKey || getAppSetting(OPENROUTER_API_KEY_KEY);
 }
 
 export function setOpenRouterApiKey(key: string): void {
   setAppSetting(OPENROUTER_API_KEY_KEY, key);
+}
+
+export function getVercelGatewayApiKey(): string {
+  return (
+    envConfig.vercelGatewayApiKey || getAppSetting(VERCEL_GATEWAY_API_KEY_KEY)
+  );
+}
+
+export function setVercelGatewayApiKey(key: string): void {
+  setAppSetting(VERCEL_GATEWAY_API_KEY_KEY, key);
 }
 
 export function getBraveSearchApiKey(): string {

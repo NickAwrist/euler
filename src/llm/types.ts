@@ -46,7 +46,9 @@ export interface LlmChatStream extends AsyncIterable<LlmStreamChunk> {
   abort(): void;
 }
 
-export type ModelProvider = "ollama" | "openrouter" | "chatgpt";
+export type CatalogProvider = "openrouter" | "vercel_gateway";
+
+export type ModelProvider = "ollama" | "chatgpt" | CatalogProvider;
 
 export type ResolvedModel = {
   provider: ModelProvider;

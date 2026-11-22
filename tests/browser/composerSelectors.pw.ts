@@ -97,7 +97,7 @@ for (const device of ["desktop", "mobile"] as const) {
       on(ProviderService.method.getApiKey, () => ({
         state: { hasKey: true, environmentManaged: false },
       })),
-      on(ProviderService.method.getOpenRouterCatalog, () => ({
+      on(ProviderService.method.getModelCatalog, () => ({
         catalog: {
           freshness: {
             status: CatalogFreshness_Status.FRESH,
