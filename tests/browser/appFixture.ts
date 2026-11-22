@@ -151,7 +151,6 @@ export async function mockApp(page: Page, fixture: AppFixture = {}) {
         ],
       })),
       on(ProviderService.method.getOllamaHealth, () => ({ connected: true })),
-      on(ProviderService.method.getComfyUiHealth, () => ({ connected: true })),
       on(FeatureService.method.listFeatures, () => ({
         features: chatFeatures,
       })),

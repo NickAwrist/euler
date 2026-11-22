@@ -301,9 +301,9 @@ test("tools desktop: features save, and one the server cannot run stays off", as
 }) => {
   let features: Init<typeof FeatureSchema>[] = [
     {
-      id: FeatureId.IMAGE_GENERATION,
-      label: "Image generation",
-      description: "Generate images with ComfyUI.",
+      id: FeatureId.WEB,
+      label: "Web search",
+      description: "Search and fetch pages from the web.",
       toggleable: true,
       enabled: true,
     },
@@ -337,12 +337,12 @@ test("tools desktop: features save, and one the server cannot run stays off", as
 
   await page.goto("/customization");
   await page.getByRole("button", { name: "Tools" }).click();
-  const imageGeneration = page.getByRole("switch", {
-    name: "Image generation",
+  const webSearch = page.getByRole("switch", {
+    name: "Web search",
   });
-  await expect(imageGeneration).toHaveAttribute("aria-checked", "true");
-  await imageGeneration.click();
-  await expect(imageGeneration).toHaveAttribute("aria-checked", "false");
+  await expect(webSearch).toHaveAttribute("aria-checked", "true");
+  await webSearch.click();
+  await expect(webSearch).toHaveAttribute("aria-checked", "false");
 
   const sandbox = page.getByRole("switch", { name: "Sandbox" });
   await expect(sandbox).toBeDisabled();
@@ -355,6 +355,6 @@ test("tools desktop: features save, and one the server cannot run stays off", as
   await page.reload();
   await page.getByRole("button", { name: "Tools" }).click();
   await expect(
-    page.getByRole("switch", { name: "Image generation" }),
+    page.getByRole("switch", { name: "Web search" }),
   ).toHaveAttribute("aria-checked", "false");
 });

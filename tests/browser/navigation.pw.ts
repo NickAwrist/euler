@@ -39,7 +39,7 @@ async function mockApp(page: Page) {
       () => new RpcFailure("unavailable", "Usage unavailable"),
     ),
     on(
-      ProviderService.method.getOpenRouterCatalog,
+      ProviderService.method.getModelCatalog,
       () => new RpcFailure("unavailable", "Catalog unavailable"),
     ),
   ]);

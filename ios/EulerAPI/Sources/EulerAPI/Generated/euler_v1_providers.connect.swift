@@ -9,9 +9,9 @@ import Connect
 import Foundation
 import SwiftProtobuf
 
-/// Model and tool providers: Ollama, ComfyUI, OpenRouter, ChatGPT and Brave
-/// Search. Addresses, keys and the Ollama context window are server-wide;
-/// ComfyUI image defaults and the ChatGPT connection belong to the user.
+/// Model and tool providers: Ollama, OpenRouter, Vercel AI Gateway, ChatGPT and
+/// Brave Search. Addresses, keys and the Ollama context window are server-wide;
+/// the ChatGPT connection belongs to the user.
 public protocol Euler_V1_ProviderServiceClientInterface: Sendable {
 
     @available(iOS 13, *)
@@ -31,21 +31,6 @@ public protocol Euler_V1_ProviderServiceClientInterface: Sendable {
     func `testOllamaHost`(request: Euler_V1_TestOllamaHostRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_TestOllamaHostResponse>
 
     @available(iOS 13, *)
-    func `getComfyUiConfig`(request: Euler_V1_GetComfyUiConfigRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_GetComfyUiConfigResponse>
-
-    @available(iOS 13, *)
-    func `updateComfyUiConfig`(request: Euler_V1_UpdateComfyUiConfigRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_UpdateComfyUiConfigResponse>
-
-    @available(iOS 13, *)
-    func `getComfyUiHealth`(request: Euler_V1_GetComfyUiHealthRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_GetComfyUiHealthResponse>
-
-    @available(iOS 13, *)
-    func `testComfyUiHost`(request: Euler_V1_TestComfyUiHostRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_TestComfyUiHostResponse>
-
-    @available(iOS 13, *)
-    func `listComfyUiModels`(request: Euler_V1_ListComfyUiModelsRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_ListComfyUiModelsResponse>
-
-    @available(iOS 13, *)
     func `getApiKey`(request: Euler_V1_GetApiKeyRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_GetApiKeyResponse>
 
     /// Saves a key; an empty key removes it.
@@ -53,28 +38,32 @@ public protocol Euler_V1_ProviderServiceClientInterface: Sendable {
     func `setApiKey`(request: Euler_V1_SetApiKeyRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_SetApiKeyResponse>
 
     @available(iOS 13, *)
-    func `getOpenRouterBalance`(request: Euler_V1_GetOpenRouterBalanceRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_GetOpenRouterBalanceResponse>
+    func `getProviderBalance`(request: Euler_V1_GetProviderBalanceRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_GetProviderBalanceResponse>
 
     /// Publishers, their models, and the user's choices among them.
     @available(iOS 13, *)
-    func `getOpenRouterCatalog`(request: Euler_V1_GetOpenRouterCatalogRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_GetOpenRouterCatalogResponse>
+    func `getModelCatalog`(request: Euler_V1_GetModelCatalogRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_GetModelCatalogResponse>
 
     /// Fetches the catalog again instead of using the cached copy.
     @available(iOS 13, *)
-    func `refreshOpenRouterCatalog`(request: Euler_V1_RefreshOpenRouterCatalogRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_RefreshOpenRouterCatalogResponse>
+    func `refreshModelCatalog`(request: Euler_V1_RefreshModelCatalogRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_RefreshModelCatalogResponse>
 
     @available(iOS 13, *)
-    func `setOpenRouterModelEnabled`(request: Euler_V1_SetOpenRouterModelEnabledRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_SetOpenRouterModelEnabledResponse>
+    func `setCatalogModelEnabled`(request: Euler_V1_SetCatalogModelEnabledRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_SetCatalogModelEnabledResponse>
 
     @available(iOS 13, *)
-    func `trackOpenRouterPublisher`(request: Euler_V1_TrackOpenRouterPublisherRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_TrackOpenRouterPublisherResponse>
+    func `trackCatalogPublisher`(request: Euler_V1_TrackCatalogPublisherRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_TrackCatalogPublisherResponse>
 
     @available(iOS 13, *)
-    func `removeOpenRouterPublisher`(request: Euler_V1_RemoveOpenRouterPublisherRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_RemoveOpenRouterPublisherResponse>
+    func `removeCatalogPublisher`(request: Euler_V1_RemoveCatalogPublisherRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_RemoveCatalogPublisherResponse>
 
     /// A subscribed publisher's new models are enabled as they appear.
     @available(iOS 13, *)
-    func `setOpenRouterSubscription`(request: Euler_V1_SetOpenRouterSubscriptionRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_SetOpenRouterSubscriptionResponse>
+    func `setCatalogSubscription`(request: Euler_V1_SetCatalogSubscriptionRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_SetCatalogSubscriptionResponse>
+
+    /// Image generation models from OpenRouter and Vercel AI Gateway.
+    @available(iOS 13, *)
+    func `listImageModels`(request: Euler_V1_ListImageModelsRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_ListImageModelsResponse>
 
     @available(iOS 13, *)
     func `getChatGptStatus`(request: Euler_V1_GetChatGptStatusRequest, headers: Connect.Headers) async -> ResponseMessage<Euler_V1_GetChatGptStatusResponse>
@@ -125,31 +114,6 @@ public final class Euler_V1_ProviderServiceClient: Euler_V1_ProviderServiceClien
     }
 
     @available(iOS 13, *)
-    public func `getComfyUiConfig`(request: Euler_V1_GetComfyUiConfigRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_GetComfyUiConfigResponse> {
-        return await self.client.unary(path: "/euler.v1.ProviderService/GetComfyUiConfig", idempotencyLevel: .noSideEffects, request: request, headers: headers)
-    }
-
-    @available(iOS 13, *)
-    public func `updateComfyUiConfig`(request: Euler_V1_UpdateComfyUiConfigRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_UpdateComfyUiConfigResponse> {
-        return await self.client.unary(path: "/euler.v1.ProviderService/UpdateComfyUiConfig", idempotencyLevel: .unknown, request: request, headers: headers)
-    }
-
-    @available(iOS 13, *)
-    public func `getComfyUiHealth`(request: Euler_V1_GetComfyUiHealthRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_GetComfyUiHealthResponse> {
-        return await self.client.unary(path: "/euler.v1.ProviderService/GetComfyUiHealth", idempotencyLevel: .noSideEffects, request: request, headers: headers)
-    }
-
-    @available(iOS 13, *)
-    public func `testComfyUiHost`(request: Euler_V1_TestComfyUiHostRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_TestComfyUiHostResponse> {
-        return await self.client.unary(path: "/euler.v1.ProviderService/TestComfyUiHost", idempotencyLevel: .unknown, request: request, headers: headers)
-    }
-
-    @available(iOS 13, *)
-    public func `listComfyUiModels`(request: Euler_V1_ListComfyUiModelsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_ListComfyUiModelsResponse> {
-        return await self.client.unary(path: "/euler.v1.ProviderService/ListComfyUiModels", idempotencyLevel: .noSideEffects, request: request, headers: headers)
-    }
-
-    @available(iOS 13, *)
     public func `getApiKey`(request: Euler_V1_GetApiKeyRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_GetApiKeyResponse> {
         return await self.client.unary(path: "/euler.v1.ProviderService/GetApiKey", idempotencyLevel: .noSideEffects, request: request, headers: headers)
     }
@@ -160,38 +124,43 @@ public final class Euler_V1_ProviderServiceClient: Euler_V1_ProviderServiceClien
     }
 
     @available(iOS 13, *)
-    public func `getOpenRouterBalance`(request: Euler_V1_GetOpenRouterBalanceRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_GetOpenRouterBalanceResponse> {
-        return await self.client.unary(path: "/euler.v1.ProviderService/GetOpenRouterBalance", idempotencyLevel: .noSideEffects, request: request, headers: headers)
+    public func `getProviderBalance`(request: Euler_V1_GetProviderBalanceRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_GetProviderBalanceResponse> {
+        return await self.client.unary(path: "/euler.v1.ProviderService/GetProviderBalance", idempotencyLevel: .noSideEffects, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
-    public func `getOpenRouterCatalog`(request: Euler_V1_GetOpenRouterCatalogRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_GetOpenRouterCatalogResponse> {
-        return await self.client.unary(path: "/euler.v1.ProviderService/GetOpenRouterCatalog", idempotencyLevel: .noSideEffects, request: request, headers: headers)
+    public func `getModelCatalog`(request: Euler_V1_GetModelCatalogRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_GetModelCatalogResponse> {
+        return await self.client.unary(path: "/euler.v1.ProviderService/GetModelCatalog", idempotencyLevel: .noSideEffects, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
-    public func `refreshOpenRouterCatalog`(request: Euler_V1_RefreshOpenRouterCatalogRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_RefreshOpenRouterCatalogResponse> {
-        return await self.client.unary(path: "/euler.v1.ProviderService/RefreshOpenRouterCatalog", idempotencyLevel: .unknown, request: request, headers: headers)
+    public func `refreshModelCatalog`(request: Euler_V1_RefreshModelCatalogRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_RefreshModelCatalogResponse> {
+        return await self.client.unary(path: "/euler.v1.ProviderService/RefreshModelCatalog", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
-    public func `setOpenRouterModelEnabled`(request: Euler_V1_SetOpenRouterModelEnabledRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_SetOpenRouterModelEnabledResponse> {
-        return await self.client.unary(path: "/euler.v1.ProviderService/SetOpenRouterModelEnabled", idempotencyLevel: .unknown, request: request, headers: headers)
+    public func `setCatalogModelEnabled`(request: Euler_V1_SetCatalogModelEnabledRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_SetCatalogModelEnabledResponse> {
+        return await self.client.unary(path: "/euler.v1.ProviderService/SetCatalogModelEnabled", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
-    public func `trackOpenRouterPublisher`(request: Euler_V1_TrackOpenRouterPublisherRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_TrackOpenRouterPublisherResponse> {
-        return await self.client.unary(path: "/euler.v1.ProviderService/TrackOpenRouterPublisher", idempotencyLevel: .unknown, request: request, headers: headers)
+    public func `trackCatalogPublisher`(request: Euler_V1_TrackCatalogPublisherRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_TrackCatalogPublisherResponse> {
+        return await self.client.unary(path: "/euler.v1.ProviderService/TrackCatalogPublisher", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
-    public func `removeOpenRouterPublisher`(request: Euler_V1_RemoveOpenRouterPublisherRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_RemoveOpenRouterPublisherResponse> {
-        return await self.client.unary(path: "/euler.v1.ProviderService/RemoveOpenRouterPublisher", idempotencyLevel: .unknown, request: request, headers: headers)
+    public func `removeCatalogPublisher`(request: Euler_V1_RemoveCatalogPublisherRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_RemoveCatalogPublisherResponse> {
+        return await self.client.unary(path: "/euler.v1.ProviderService/RemoveCatalogPublisher", idempotencyLevel: .unknown, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
-    public func `setOpenRouterSubscription`(request: Euler_V1_SetOpenRouterSubscriptionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_SetOpenRouterSubscriptionResponse> {
-        return await self.client.unary(path: "/euler.v1.ProviderService/SetOpenRouterSubscription", idempotencyLevel: .unknown, request: request, headers: headers)
+    public func `setCatalogSubscription`(request: Euler_V1_SetCatalogSubscriptionRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_SetCatalogSubscriptionResponse> {
+        return await self.client.unary(path: "/euler.v1.ProviderService/SetCatalogSubscription", idempotencyLevel: .unknown, request: request, headers: headers)
+    }
+
+    @available(iOS 13, *)
+    public func `listImageModels`(request: Euler_V1_ListImageModelsRequest, headers: Connect.Headers = [:]) async -> ResponseMessage<Euler_V1_ListImageModelsResponse> {
+        return await self.client.unary(path: "/euler.v1.ProviderService/ListImageModels", idempotencyLevel: .noSideEffects, request: request, headers: headers)
     }
 
     @available(iOS 13, *)
@@ -221,20 +190,16 @@ public final class Euler_V1_ProviderServiceClient: Euler_V1_ProviderServiceClien
             public static let setOllamaContextWindow = Connect.MethodSpec(name: "SetOllamaContextWindow", service: "euler.v1.ProviderService", type: .unary)
             public static let getOllamaHealth = Connect.MethodSpec(name: "GetOllamaHealth", service: "euler.v1.ProviderService", type: .unary)
             public static let testOllamaHost = Connect.MethodSpec(name: "TestOllamaHost", service: "euler.v1.ProviderService", type: .unary)
-            public static let getComfyUiConfig = Connect.MethodSpec(name: "GetComfyUiConfig", service: "euler.v1.ProviderService", type: .unary)
-            public static let updateComfyUiConfig = Connect.MethodSpec(name: "UpdateComfyUiConfig", service: "euler.v1.ProviderService", type: .unary)
-            public static let getComfyUiHealth = Connect.MethodSpec(name: "GetComfyUiHealth", service: "euler.v1.ProviderService", type: .unary)
-            public static let testComfyUiHost = Connect.MethodSpec(name: "TestComfyUiHost", service: "euler.v1.ProviderService", type: .unary)
-            public static let listComfyUiModels = Connect.MethodSpec(name: "ListComfyUiModels", service: "euler.v1.ProviderService", type: .unary)
             public static let getApiKey = Connect.MethodSpec(name: "GetApiKey", service: "euler.v1.ProviderService", type: .unary)
             public static let setApiKey = Connect.MethodSpec(name: "SetApiKey", service: "euler.v1.ProviderService", type: .unary)
-            public static let getOpenRouterBalance = Connect.MethodSpec(name: "GetOpenRouterBalance", service: "euler.v1.ProviderService", type: .unary)
-            public static let getOpenRouterCatalog = Connect.MethodSpec(name: "GetOpenRouterCatalog", service: "euler.v1.ProviderService", type: .unary)
-            public static let refreshOpenRouterCatalog = Connect.MethodSpec(name: "RefreshOpenRouterCatalog", service: "euler.v1.ProviderService", type: .unary)
-            public static let setOpenRouterModelEnabled = Connect.MethodSpec(name: "SetOpenRouterModelEnabled", service: "euler.v1.ProviderService", type: .unary)
-            public static let trackOpenRouterPublisher = Connect.MethodSpec(name: "TrackOpenRouterPublisher", service: "euler.v1.ProviderService", type: .unary)
-            public static let removeOpenRouterPublisher = Connect.MethodSpec(name: "RemoveOpenRouterPublisher", service: "euler.v1.ProviderService", type: .unary)
-            public static let setOpenRouterSubscription = Connect.MethodSpec(name: "SetOpenRouterSubscription", service: "euler.v1.ProviderService", type: .unary)
+            public static let getProviderBalance = Connect.MethodSpec(name: "GetProviderBalance", service: "euler.v1.ProviderService", type: .unary)
+            public static let getModelCatalog = Connect.MethodSpec(name: "GetModelCatalog", service: "euler.v1.ProviderService", type: .unary)
+            public static let refreshModelCatalog = Connect.MethodSpec(name: "RefreshModelCatalog", service: "euler.v1.ProviderService", type: .unary)
+            public static let setCatalogModelEnabled = Connect.MethodSpec(name: "SetCatalogModelEnabled", service: "euler.v1.ProviderService", type: .unary)
+            public static let trackCatalogPublisher = Connect.MethodSpec(name: "TrackCatalogPublisher", service: "euler.v1.ProviderService", type: .unary)
+            public static let removeCatalogPublisher = Connect.MethodSpec(name: "RemoveCatalogPublisher", service: "euler.v1.ProviderService", type: .unary)
+            public static let setCatalogSubscription = Connect.MethodSpec(name: "SetCatalogSubscription", service: "euler.v1.ProviderService", type: .unary)
+            public static let listImageModels = Connect.MethodSpec(name: "ListImageModels", service: "euler.v1.ProviderService", type: .unary)
             public static let getChatGptStatus = Connect.MethodSpec(name: "GetChatGptStatus", service: "euler.v1.ProviderService", type: .unary)
             public static let startChatGptLogin = Connect.MethodSpec(name: "StartChatGptLogin", service: "euler.v1.ProviderService", type: .unary)
             public static let finishChatGptLogin = Connect.MethodSpec(name: "FinishChatGptLogin", service: "euler.v1.ProviderService", type: .unary)

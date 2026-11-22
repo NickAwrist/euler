@@ -21,7 +21,7 @@ import {
   AVAILABILITY,
   type CatalogSettings,
   inputCapabilities,
-  openRouterCatalog,
+  modelCatalogWire,
 } from "../../src/models/openRouterWire";
 
 export type DemoScenario =
@@ -254,10 +254,10 @@ export function removeDemoModel(route: string) {
 }
 
 const demoProviders: Partial<ServiceImpl<typeof ProviderService>> = {
-  getOpenRouterCatalog: () => ({
-    catalog: openRouterCatalog(settingsSnapshot()),
+  getModelCatalog: () => ({
+    catalog: modelCatalogWire(settingsSnapshot()),
   }),
-  refreshOpenRouterCatalog() {
+  refreshModelCatalog() {
     if (freshness().status === "fresh") fetchedAt = Date.now();
     enableDiscoveredModels();
     record(
@@ -265,9 +265,9 @@ const demoProviders: Partial<ServiceImpl<typeof ProviderService>> = {
         ? "Catalog refreshed; subscriptions synced."
         : "Refresh failed; saved preferences retained.",
     );
-    return { catalog: openRouterCatalog(settingsSnapshot()) };
+    return { catalog: modelCatalogWire(settingsSnapshot()) };
   },
-  removeOpenRouterPublisher({ publisherId: id }) {
+  removeCatalogPublisher({ publisherId: id }) {
     publishers.delete(id);
     subscriptions.delete(id);
     for (const model of knownModels)
@@ -284,7 +284,7 @@ const demoProviders: Partial<ServiceImpl<typeof ProviderService>> = {
     record(configured ? "Demo key configured." : "Demo key removed.");
     return { state: { hasKey: configured, environmentManaged: false } };
   },
-  setOpenRouterModelEnabled({ route, enabled }) {
+  setCatalogModelEnabled({ route, enabled }) {
     const model = models.find((entry) => entry.route === route);
     if (enabled && (!model || scenario === "unavailable"))
       throw new ConnectError(
@@ -296,12 +296,12 @@ const demoProviders: Partial<ServiceImpl<typeof ProviderService>> = {
     record(`${enabled ? "Enabled" : "Disabled"} ${route}`);
     return {};
   },
-  trackOpenRouterPublisher({ publisherId }) {
+  trackCatalogPublisher({ publisherId }) {
     publishers.add(publisherId);
     record(`Tracking ${publisherId}`);
     return {};
   },
-  setOpenRouterSubscription({ publisherId: id, subscribed }) {
+  setCatalogSubscription({ publisherId: id, subscribed }) {
     if (subscribed && !subscriptions.has(id))
       subscriptions.set(id, ++simulatedNow);
     if (!subscribed) subscriptions.delete(id);

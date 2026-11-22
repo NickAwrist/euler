@@ -11,7 +11,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file euler/v1/attachments.proto.
  */
 export const file_euler_v1_attachments: GenFile = /*@__PURE__*/
-  fileDesc("ChpldWxlci92MS9hdHRhY2htZW50cy5wcm90bxIIZXVsZXIudjEiTAoPSW1hZ2VBdHRhY2htZW50EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEQoJbWltZV90eXBlGAMgASgJEgwKBHNpemUYBCABKA0ikwIKF1dvcmtzcGFjZUZpbGVBdHRhY2htZW50EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDAoEc2l6ZRgDIAEoBBIMCgRwYXRoGAQgASgJEhIKCnNlc3Npb25faWQYBSABKAkSRwoOd29ya3NwYWNlX2tpbmQYBiABKA4yLy5ldWxlci52MS5Xb3Jrc3BhY2VGaWxlQXR0YWNobWVudC5Xb3Jrc3BhY2VLaW5kImUKDVdvcmtzcGFjZUtpbmQSHgoaV09SS1NQQUNFX0tJTkRfVU5TUEVDSUZJRUQQABIaChZXT1JLU1BBQ0VfS0lORF9TQU5EQk9YEAESGAoUV09SS1NQQUNFX0tJTkRfTE9DQUwQAiInChhHZW5lcmF0ZWRJbWFnZUF0dGFjaG1lbnQSCwoDdXJsGAEgASgJIjEKE1dlYlNvdXJjZUF0dGFjaG1lbnQSDQoFdGl0bGUYASABKAkSCwoDdXJsGAIgASgJIu4BChFNZXNzYWdlQXR0YWNobWVudBIqCgVpbWFnZRgBIAEoCzIZLmV1bGVyLnYxLkltYWdlQXR0YWNobWVudEgAEjEKBGZpbGUYAiABKAsyIS5ldWxlci52MS5Xb3Jrc3BhY2VGaWxlQXR0YWNobWVudEgAEj0KD2dlbmVyYXRlZF9pbWFnZRgDIAEoCzIiLmV1bGVyLnYxLkdlbmVyYXRlZEltYWdlQXR0YWNobWVudEgAEjMKCndlYl9zb3VyY2UYBCABKAsyHS5ldWxlci52MS5XZWJTb3VyY2VBdHRhY2htZW50SABCBgoEa2luZCLBAQoQT3V0cHV0QXR0YWNobWVudBIxCgRmaWxlGAEgASgLMiEuZXVsZXIudjEuV29ya3NwYWNlRmlsZUF0dGFjaG1lbnRIABI9Cg9nZW5lcmF0ZWRfaW1hZ2UYAiABKAsyIi5ldWxlci52MS5HZW5lcmF0ZWRJbWFnZUF0dGFjaG1lbnRIABIzCgp3ZWJfc291cmNlGAMgASgLMh0uZXVsZXIudjEuV2ViU291cmNlQXR0YWNobWVudEgAQgYKBGtpbmQitgEKF0NyZWF0ZUF0dGFjaG1lbnRSZXF1ZXN0EhsKCnNlc3Npb25faWQYASABKAlCB7pIBHICEAESGgoIZmlsZW5hbWUYAiABKAlCCLpIBXIDGIAIEkYKCW1pbWVfdHlwZRgDIAEoCUIzukgwci5SCWltYWdlL3BuZ1IKaW1hZ2UvanBlZ1IKaW1hZ2Uvd2VicFIJaW1hZ2UvZ2lmEhoKBGRhdGEYBCABKAxCDLpICXoHEAEYgICABCJJChhDcmVhdGVBdHRhY2htZW50UmVzcG9uc2USLQoKYXR0YWNobWVudBgBIAEoCzIZLmV1bGVyLnYxLkltYWdlQXR0YWNobWVudCIvChhHZXRBdHRhY2htZW50RGF0YVJlcXVlc3QSEwoCaWQYASABKAlCB7pIBHICEAEiPAoZR2V0QXR0YWNobWVudERhdGFSZXNwb25zZRIRCgltaW1lX3R5cGUYASABKAkSDAoEZGF0YRgCIAEoDCIuChdEZWxldGVBdHRhY2htZW50UmVxdWVzdBITCgJpZBgBIAEoCUIHukgEcgIQASIaChhEZWxldGVBdHRhY2htZW50UmVzcG9uc2UyrAIKEUF0dGFjaG1lbnRTZXJ2aWNlElkKEENyZWF0ZUF0dGFjaG1lbnQSIS5ldWxlci52MS5DcmVhdGVBdHRhY2htZW50UmVxdWVzdBoiLmV1bGVyLnYxLkNyZWF0ZUF0dGFjaG1lbnRSZXNwb25zZRJhChFHZXRBdHRhY2htZW50RGF0YRIiLmV1bGVyLnYxLkdldEF0dGFjaG1lbnREYXRhUmVxdWVzdBojLmV1bGVyLnYxLkdldEF0dGFjaG1lbnREYXRhUmVzcG9uc2UiA5ACARJZChBEZWxldGVBdHRhY2htZW50EiEuZXVsZXIudjEuRGVsZXRlQXR0YWNobWVudFJlcXVlc3QaIi5ldWxlci52MS5EZWxldGVBdHRhY2htZW50UmVzcG9uc2ViBnByb3RvMw", [file_buf_validate_validate]);
+  fileDesc("ChpldWxlci92MS9hdHRhY2htZW50cy5wcm90bxIIZXVsZXIudjEiTAoPSW1hZ2VBdHRhY2htZW50EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSEQoJbWltZV90eXBlGAMgASgJEgwKBHNpemUYBCABKA0ikwIKF1dvcmtzcGFjZUZpbGVBdHRhY2htZW50EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDAoEc2l6ZRgDIAEoBBIMCgRwYXRoGAQgASgJEhIKCnNlc3Npb25faWQYBSABKAkSRwoOd29ya3NwYWNlX2tpbmQYBiABKA4yLy5ldWxlci52MS5Xb3Jrc3BhY2VGaWxlQXR0YWNobWVudC5Xb3Jrc3BhY2VLaW5kImUKDVdvcmtzcGFjZUtpbmQSHgoaV09SS1NQQUNFX0tJTkRfVU5TUEVDSUZJRUQQABIaChZXT1JLU1BBQ0VfS0lORF9TQU5EQk9YEAESGAoUV09SS1NQQUNFX0tJTkRfTE9DQUwQAiIxChNXZWJTb3VyY2VBdHRhY2htZW50Eg0KBXRpdGxlGAEgASgJEgsKA3VybBgCIAEoCSKvAQoRTWVzc2FnZUF0dGFjaG1lbnQSKgoFaW1hZ2UYASABKAsyGS5ldWxlci52MS5JbWFnZUF0dGFjaG1lbnRIABIxCgRmaWxlGAIgASgLMiEuZXVsZXIudjEuV29ya3NwYWNlRmlsZUF0dGFjaG1lbnRIABIzCgp3ZWJfc291cmNlGAQgASgLMh0uZXVsZXIudjEuV2ViU291cmNlQXR0YWNobWVudEgAQgYKBGtpbmQirgEKEE91dHB1dEF0dGFjaG1lbnQSMQoEZmlsZRgBIAEoCzIhLmV1bGVyLnYxLldvcmtzcGFjZUZpbGVBdHRhY2htZW50SAASMwoKd2ViX3NvdXJjZRgDIAEoCzIdLmV1bGVyLnYxLldlYlNvdXJjZUF0dGFjaG1lbnRIABIqCgVpbWFnZRgEIAEoCzIZLmV1bGVyLnYxLkltYWdlQXR0YWNobWVudEgAQgYKBGtpbmQitgEKF0NyZWF0ZUF0dGFjaG1lbnRSZXF1ZXN0EhsKCnNlc3Npb25faWQYASABKAlCB7pIBHICEAESGgoIZmlsZW5hbWUYAiABKAlCCLpIBXIDGIAIEkYKCW1pbWVfdHlwZRgDIAEoCUIzukgwci5SCWltYWdlL3BuZ1IKaW1hZ2UvanBlZ1IKaW1hZ2Uvd2VicFIJaW1hZ2UvZ2lmEhoKBGRhdGEYBCABKAxCDLpICXoHEAEYgICABCJJChhDcmVhdGVBdHRhY2htZW50UmVzcG9uc2USLQoKYXR0YWNobWVudBgBIAEoCzIZLmV1bGVyLnYxLkltYWdlQXR0YWNobWVudCIvChhHZXRBdHRhY2htZW50RGF0YVJlcXVlc3QSEwoCaWQYASABKAlCB7pIBHICEAEiPAoZR2V0QXR0YWNobWVudERhdGFSZXNwb25zZRIRCgltaW1lX3R5cGUYASABKAkSDAoEZGF0YRgCIAEoDCIuChdEZWxldGVBdHRhY2htZW50UmVxdWVzdBITCgJpZBgBIAEoCUIHukgEcgIQASIaChhEZWxldGVBdHRhY2htZW50UmVzcG9uc2UyrAIKEUF0dGFjaG1lbnRTZXJ2aWNlElkKEENyZWF0ZUF0dGFjaG1lbnQSIS5ldWxlci52MS5DcmVhdGVBdHRhY2htZW50UmVxdWVzdBoiLmV1bGVyLnYxLkNyZWF0ZUF0dGFjaG1lbnRSZXNwb25zZRJhChFHZXRBdHRhY2htZW50RGF0YRIiLmV1bGVyLnYxLkdldEF0dGFjaG1lbnREYXRhUmVxdWVzdBojLmV1bGVyLnYxLkdldEF0dGFjaG1lbnREYXRhUmVzcG9uc2UiA5ACARJZChBEZWxldGVBdHRhY2htZW50EiEuZXVsZXIudjEuRGVsZXRlQXR0YWNobWVudFJlcXVlc3QaIi5ldWxlci52MS5EZWxldGVBdHRhY2htZW50UmVzcG9uc2ViBnByb3RvMw", [file_buf_validate_validate]);
 
 /**
  * @generated from message euler.v1.ImageAttachment
@@ -118,25 +118,6 @@ export const WorkspaceFileAttachment_WorkspaceKindSchema: GenEnum<WorkspaceFileA
   enumDesc(file_euler_v1_attachments, 1, 0);
 
 /**
- * An image ComfyUI generated, served under /api/comfyui/view/.
- *
- * @generated from message euler.v1.GeneratedImageAttachment
- */
-export type GeneratedImageAttachment = Message<"euler.v1.GeneratedImageAttachment"> & {
-  /**
-   * @generated from field: string url = 1;
-   */
-  url: string;
-};
-
-/**
- * Describes the message euler.v1.GeneratedImageAttachment.
- * Use `create(GeneratedImageAttachmentSchema)` to create a new message.
- */
-export const GeneratedImageAttachmentSchema: GenMessage<GeneratedImageAttachment> = /*@__PURE__*/
-  messageDesc(file_euler_v1_attachments, 2);
-
-/**
  * A web page a search or fetch tool cited.
  *
  * @generated from message euler.v1.WebSourceAttachment
@@ -158,7 +139,7 @@ export type WebSourceAttachment = Message<"euler.v1.WebSourceAttachment"> & {
  * Use `create(WebSourceAttachmentSchema)` to create a new message.
  */
 export const WebSourceAttachmentSchema: GenMessage<WebSourceAttachment> = /*@__PURE__*/
-  messageDesc(file_euler_v1_attachments, 3);
+  messageDesc(file_euler_v1_attachments, 2);
 
 /**
  * @generated from message euler.v1.MessageAttachment
@@ -181,12 +162,6 @@ export type MessageAttachment = Message<"euler.v1.MessageAttachment"> & {
     case: "file";
   } | {
     /**
-     * @generated from field: euler.v1.GeneratedImageAttachment generated_image = 3;
-     */
-    value: GeneratedImageAttachment;
-    case: "generatedImage";
-  } | {
-    /**
      * @generated from field: euler.v1.WebSourceAttachment web_source = 4;
      */
     value: WebSourceAttachment;
@@ -199,7 +174,7 @@ export type MessageAttachment = Message<"euler.v1.MessageAttachment"> & {
  * Use `create(MessageAttachmentSchema)` to create a new message.
  */
 export const MessageAttachmentSchema: GenMessage<MessageAttachment> = /*@__PURE__*/
-  messageDesc(file_euler_v1_attachments, 4);
+  messageDesc(file_euler_v1_attachments, 3);
 
 /**
  * Output a tool or agent attaches, independent of reply text.
@@ -218,16 +193,16 @@ export type OutputAttachment = Message<"euler.v1.OutputAttachment"> & {
     case: "file";
   } | {
     /**
-     * @generated from field: euler.v1.GeneratedImageAttachment generated_image = 2;
-     */
-    value: GeneratedImageAttachment;
-    case: "generatedImage";
-  } | {
-    /**
      * @generated from field: euler.v1.WebSourceAttachment web_source = 3;
      */
     value: WebSourceAttachment;
     case: "webSource";
+  } | {
+    /**
+     * @generated from field: euler.v1.ImageAttachment image = 4;
+     */
+    value: ImageAttachment;
+    case: "image";
   } | { case: undefined; value?: undefined };
 };
 
@@ -236,7 +211,7 @@ export type OutputAttachment = Message<"euler.v1.OutputAttachment"> & {
  * Use `create(OutputAttachmentSchema)` to create a new message.
  */
 export const OutputAttachmentSchema: GenMessage<OutputAttachment> = /*@__PURE__*/
-  messageDesc(file_euler_v1_attachments, 5);
+  messageDesc(file_euler_v1_attachments, 4);
 
 /**
  * @generated from message euler.v1.CreateAttachmentRequest
@@ -268,7 +243,7 @@ export type CreateAttachmentRequest = Message<"euler.v1.CreateAttachmentRequest"
  * Use `create(CreateAttachmentRequestSchema)` to create a new message.
  */
 export const CreateAttachmentRequestSchema: GenMessage<CreateAttachmentRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_attachments, 6);
+  messageDesc(file_euler_v1_attachments, 5);
 
 /**
  * @generated from message euler.v1.CreateAttachmentResponse
@@ -285,7 +260,7 @@ export type CreateAttachmentResponse = Message<"euler.v1.CreateAttachmentRespons
  * Use `create(CreateAttachmentResponseSchema)` to create a new message.
  */
 export const CreateAttachmentResponseSchema: GenMessage<CreateAttachmentResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_attachments, 7);
+  messageDesc(file_euler_v1_attachments, 6);
 
 /**
  * @generated from message euler.v1.GetAttachmentDataRequest
@@ -302,7 +277,7 @@ export type GetAttachmentDataRequest = Message<"euler.v1.GetAttachmentDataReques
  * Use `create(GetAttachmentDataRequestSchema)` to create a new message.
  */
 export const GetAttachmentDataRequestSchema: GenMessage<GetAttachmentDataRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_attachments, 8);
+  messageDesc(file_euler_v1_attachments, 7);
 
 /**
  * @generated from message euler.v1.GetAttachmentDataResponse
@@ -324,7 +299,7 @@ export type GetAttachmentDataResponse = Message<"euler.v1.GetAttachmentDataRespo
  * Use `create(GetAttachmentDataResponseSchema)` to create a new message.
  */
 export const GetAttachmentDataResponseSchema: GenMessage<GetAttachmentDataResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_attachments, 9);
+  messageDesc(file_euler_v1_attachments, 8);
 
 /**
  * @generated from message euler.v1.DeleteAttachmentRequest
@@ -341,7 +316,7 @@ export type DeleteAttachmentRequest = Message<"euler.v1.DeleteAttachmentRequest"
  * Use `create(DeleteAttachmentRequestSchema)` to create a new message.
  */
 export const DeleteAttachmentRequestSchema: GenMessage<DeleteAttachmentRequest> = /*@__PURE__*/
-  messageDesc(file_euler_v1_attachments, 10);
+  messageDesc(file_euler_v1_attachments, 9);
 
 /**
  * @generated from message euler.v1.DeleteAttachmentResponse
@@ -354,7 +329,7 @@ export type DeleteAttachmentResponse = Message<"euler.v1.DeleteAttachmentRespons
  * Use `create(DeleteAttachmentResponseSchema)` to create a new message.
  */
 export const DeleteAttachmentResponseSchema: GenMessage<DeleteAttachmentResponse> = /*@__PURE__*/
-  messageDesc(file_euler_v1_attachments, 11);
+  messageDesc(file_euler_v1_attachments, 10);
 
 /**
  * Images a user attaches to a message, and the outputs tools attach to replies.

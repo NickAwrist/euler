@@ -54,7 +54,7 @@ nonisolated struct Backend: Sendable {
         directories = Euler_V1_DirectoryServiceClient(client: client)
     }
 
-    /// Resolves a path the server returned, such as `/api/comfyui/view/…`.
+    /// Resolves a path the server returned, such as `/api/favicons/…`.
     func url(forPath path: String) -> URL? {
         URL(string: path, relativeTo: baseURL)?.absoluteURL
     }

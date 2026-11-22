@@ -167,10 +167,10 @@ private struct AssistantMessage: View {
                 ThinkingDisclosure(text: thinking.text, duration: thinking.duration, live: false)
             }
             // A long press anywhere on the reply opens its actions, so a reply with
-            // no text, only files or images, still has them.
+            // no text, only files or sources, still has them.
             VStack(alignment: .leading, spacing: 10) {
                 MarkdownView(source: shown.content)
-                ReplyAttachments(attachments: shown.attachments, content: shown.content, sheet: $sheet)
+                ReplyAttachments(attachments: shown.attachments, sheet: $sheet)
             }
             .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading)
             .contentShape(.rect)

@@ -26,7 +26,7 @@ for (const device of ["desktop", "mobile"] as const) {
     await mockRpc(
       page,
       [
-        on(ProviderService.method.getOpenRouterBalance, () => {
+        on(ProviderService.method.getProviderBalance, () => {
           reads++;
           if (fail)
             return new RpcFailure("internal", "Failed", "INTERNAL_ERROR");
@@ -45,7 +45,7 @@ for (const device of ["desktop", "mobile"] as const) {
           hasKey = Boolean(apiKey);
           return { state: { hasKey, environmentManaged: false } };
         }),
-        on(ProviderService.method.getOpenRouterCatalog, () => ({
+        on(ProviderService.method.getModelCatalog, () => ({
           catalog: {
             freshness: {
               status: CatalogFreshness_Status.FRESH,

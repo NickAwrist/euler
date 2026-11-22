@@ -31,14 +31,19 @@ export const fixtureStep = (
   fields: MessageInitShape<typeof StepSchema>,
 ): Step => create(StepSchema, fields);
 
-export const generatedImage = (url: string): MessageAttachment =>
-  create(MessageAttachmentSchema, {
-    kind: { case: "generatedImage", value: { url } },
-  });
-
 export const webSource = (title: string, url: string): MessageAttachment =>
   create(MessageAttachmentSchema, {
     kind: { case: "webSource", value: { title, url } },
+  });
+
+export const imageAttachment = (image: {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number;
+}): MessageAttachment =>
+  create(MessageAttachmentSchema, {
+    kind: { case: "image", value: image },
   });
 
 export const workspaceFile = (file: {

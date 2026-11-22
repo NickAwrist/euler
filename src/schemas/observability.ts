@@ -10,11 +10,7 @@ export const ERROR_MESSAGES = {
   FORBIDDEN: "This action is not allowed.",
   CONFLICT: "The request conflicts with the current state. Try again.",
   ENVIRONMENT_MANAGED: "This setting is managed by the environment.",
-  CATALOG_UNAVAILABLE:
-    "The OpenRouter catalog is unavailable. Try again shortly.",
-  COMFY_UNREACHABLE:
-    "ComfyUI is unreachable. Check its connection in Settings.",
-  COMFY_ASSET_UNAVAILABLE: "ComfyUI could not provide this image.",
+  CATALOG_UNAVAILABLE: "The model catalog is unavailable. Try again shortly.",
   JOB_FAILED: "The background job stopped because of an unexpected error.",
   JOB_OUTPUT_INVALID:
     "The background job produced output that could not be saved.",

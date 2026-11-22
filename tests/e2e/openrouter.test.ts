@@ -6,6 +6,7 @@ import {
   listOpenRouterModels,
   setOllamaHost,
   setOpenRouterApiKey,
+  setVercelGatewayApiKey,
 } from "../../src/db";
 import {
   listModelFavorites,
@@ -51,8 +52,9 @@ describe("OpenRouter API integration", () => {
       provider: ApiKeyProvider.OPENROUTER,
       apiKey: "sk-or-api-test",
     });
-    await providers.getOpenRouterCatalog({});
-    await providers.setOpenRouterModelEnabled({
+    await providers.getModelCatalog({ provider: ModelProvider.OPENROUTER });
+    await providers.setCatalogModelEnabled({
+      provider: ModelProvider.OPENROUTER,
       route: "openai/gpt-5.6-terra",
       enabled: true,
     });
@@ -73,9 +75,11 @@ describe("OpenRouter API integration", () => {
     const lookup = spyOn(openRouterCatalog, "get");
     const { providers } = rpc();
     try {
-      await providers.getOpenRouterCatalog({});
+      await providers.getModelCatalog({ provider: ModelProvider.OPENROUTER });
       expect(lookup).toHaveBeenLastCalledWith(false);
-      const refreshed = await providers.refreshOpenRouterCatalog({});
+      const refreshed = await providers.refreshModelCatalog({
+        provider: ModelProvider.OPENROUTER,
+      });
       expect(lookup).toHaveBeenLastCalledWith(true);
       expect(refreshed.catalog?.publishers.length).toBeGreaterThan(0);
     } finally {
@@ -86,7 +90,7 @@ describe("OpenRouter API integration", () => {
   test("manages activation and independent favorites through settings", async () => {
     const { models, providers } = rpc();
     const route = "example/test-model";
-    await providers.getOpenRouterCatalog({});
+    await providers.getModelCatalog({ provider: ModelProvider.OPENROUTER });
     await models.setFavorite({
       provider: ModelProvider.OPENROUTER,
       modelId: route,
@@ -102,16 +106,27 @@ describe("OpenRouter API integration", () => {
       ),
     ).toBe(Code.InvalidArgument);
     expect(listOpenRouterModels()).toHaveLength(0);
-    await providers.setOpenRouterModelEnabled({ route, enabled: false });
+    await providers.setCatalogModelEnabled({
+      provider: ModelProvider.OPENROUTER,
+      route,
+      enabled: false,
+    });
     expect(listOpenRouterModels()[0]?.enabled).toBe(0);
-    await providers.setOpenRouterModelEnabled({ route, enabled: true });
-    const catalog = await providers.getOpenRouterCatalog({});
+    await providers.setCatalogModelEnabled({
+      provider: ModelProvider.OPENROUTER,
+      route,
+      enabled: true,
+    });
+    const catalog = await providers.getModelCatalog({
+      provider: ModelProvider.OPENROUTER,
+    });
     expect(catalog.catalog?.modelsByPublisher.example?.models).toMatchObject([
       { route, enabled: true, favorite: true },
     ]);
     expect(
       await rpcCode(
-        providers.setOpenRouterModelEnabled({
+        providers.setCatalogModelEnabled({
+          provider: ModelProvider.OPENROUTER,
           route: "unknown/model",
           enabled: true,
         }),
@@ -119,21 +134,33 @@ describe("OpenRouter API integration", () => {
     ).toBe(Code.InvalidArgument);
     expect(
       await rpcCode(
-        providers.trackOpenRouterPublisher({ publisherId: "invented" }),
+        providers.trackCatalogPublisher({
+          provider: ModelProvider.OPENROUTER,
+          publisherId: "invented",
+        }),
       ),
     ).toBe(Code.InvalidArgument);
-    await providers.removeOpenRouterPublisher({ publisherId: "example" });
+    await providers.removeCatalogPublisher({
+      provider: ModelProvider.OPENROUTER,
+      publisherId: "example",
+    });
     expect(listOpenRouterModels()[0]?.enabled).toBe(0);
     expect(
       listModelFavorites(TEST_USER_ID).some(
         (favorite) => favorite.model_id === route,
       ),
     ).toBeTrue();
-    await providers.trackOpenRouterPublisher({ publisherId: "example" });
+    await providers.trackCatalogPublisher({
+      provider: ModelProvider.OPENROUTER,
+      publisherId: "example",
+    });
     expect(listOpenRouterModels()[0]?.enabled).toBe(0);
     expect(
       await rpcCode(
-        providers.removeOpenRouterPublisher({ publisherId: "invented" }),
+        providers.removeCatalogPublisher({
+          provider: ModelProvider.OPENROUTER,
+          publisherId: "invented",
+        }),
       ),
     ).toBe(Code.NotFound);
   });
@@ -176,14 +203,16 @@ describe("OpenRouter API integration", () => {
       ).toBe(Model_Availability.UNVERIFIED);
       expect(
         await rpcCode(
-          providers.setOpenRouterModelEnabled({
+          providers.setCatalogModelEnabled({
+            provider: ModelProvider.OPENROUTER,
             route: "unknown/model",
             enabled: true,
           }),
         ),
       ).toBe(Code.Unavailable);
       lookup.mockClear();
-      await providers.setOpenRouterModelEnabled({
+      await providers.setCatalogModelEnabled({
+        provider: ModelProvider.OPENROUTER,
         route: model.route,
         enabled: false,
       });
@@ -213,7 +242,8 @@ describe("OpenRouter API integration", () => {
       };
       expect(
         await rpcCode(
-          providers.setOpenRouterModelEnabled({
+          providers.setCatalogModelEnabled({
+            provider: ModelProvider.OPENROUTER,
             route: "openai/test:batch",
             enabled: true,
           }),
@@ -287,5 +317,87 @@ describe("OpenRouter API integration", () => {
         steps: expect.any(Array),
       },
     ]);
+  });
+
+  test("Vercel AI Gateway shares catalog, balance, favorites, and streaming chat", async () => {
+    const { models, providers, agent } = rpc();
+    const id = crypto.randomUUID();
+    createSessionRow(TEST_USER_ID, id, Date.now(), null);
+    try {
+      setVercelGatewayApiKey("");
+      expect(
+        await rpcCode(
+          agent.sendMessage({
+            sessionId: id,
+            content: "Hello",
+            settings: { model: "vercel_gateway:anthropic/claude-sonnet-4" },
+          }),
+        ),
+      ).toBe(Code.InvalidArgument);
+
+      await providers.setApiKey({
+        provider: ApiKeyProvider.VERCEL_GATEWAY,
+        apiKey: "vck-e2e-test",
+      });
+      const balance = await providers.getProviderBalance({
+        provider: ModelProvider.VERCEL_GATEWAY,
+      });
+      expect(balance.accountBalance).toBeCloseTo(12.5, 4);
+      expect(balance.keyUsage).toBeCloseTo(3.25, 4);
+
+      const catalog = await providers.getModelCatalog({
+        provider: ModelProvider.VERCEL_GATEWAY,
+      });
+      // Image-only models are excluded from the interactive chat catalog.
+      expect(catalog.catalog?.modelsByPublisher.bfl).toBeUndefined();
+      expect(
+        catalog.catalog?.modelsByPublisher.anthropic?.models[0],
+      ).toMatchObject({
+        route: "anthropic/claude-sonnet-4",
+        name: "Claude Sonnet 4",
+        supportsTools: true,
+        contextLength: 200000,
+      });
+
+      await providers.setCatalogModelEnabled({
+        provider: ModelProvider.VERCEL_GATEWAY,
+        route: "anthropic/claude-sonnet-4",
+        enabled: true,
+      });
+      await models.setFavorite({
+        provider: ModelProvider.VERCEL_GATEWAY,
+        modelId: "anthropic/claude-sonnet-4",
+        favorite: true,
+      });
+
+      const listed = await models.listModels({});
+      expect(listed.providers?.vercelGateway?.configured).toBe(true);
+      expect(
+        listed.models.find(
+          (m) => m.id === "vercel_gateway:anthropic/claude-sonnet-4",
+        ),
+      ).toMatchObject({
+        provider: ModelProvider.VERCEL_GATEWAY,
+        lab: "Anthropic",
+        favorite: true,
+        configured: true,
+        supportsTools: true,
+        inputCapabilities: [
+          InputCapability.TEXT,
+          InputCapability.IMAGE,
+          InputCapability.FILE,
+        ],
+      });
+
+      await agent.sendMessage({
+        sessionId: id,
+        content: "Hi Vercel",
+        settings: { model: "vercel_gateway:anthropic/claude-sonnet-4" },
+      });
+      const state = await waitForActivation(id);
+      expect(state.history?.at(-1)?.content).toBe("Hello from OpenRouter.");
+    } finally {
+      await agentRuntime.deleteSession(TEST_USER_ID, id);
+    }
   });
 });

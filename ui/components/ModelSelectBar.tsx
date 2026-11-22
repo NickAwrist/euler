@@ -47,7 +47,11 @@ function modelDetails(model: ModelOption): string {
 }
 
 function isUnconfigured(model: ModelOption): boolean {
-  return model.provider === Provider.OPENROUTER && !model.configured;
+  return (
+    (model.provider === Provider.OPENROUTER ||
+      model.provider === Provider.VERCEL_GATEWAY) &&
+    !model.configured
+  );
 }
 
 export function ProviderIcon({ provider }: { provider: ModelProvider }) {
@@ -436,7 +440,11 @@ export function ModelSelectBar({
                 className="block rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-accent-ring"
                 onClick={() => {
                   close();
-                  void navigate("/settings/openrouter");
+                  void navigate(
+                    provider?.id.startsWith("vercel_gateway:")
+                      ? "/settings/vercel-gateway"
+                      : "/settings/openrouter",
+                  );
                 }}
               >
                 Choose models

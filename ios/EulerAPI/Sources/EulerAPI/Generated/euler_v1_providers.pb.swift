@@ -68,6 +68,7 @@ public nonisolated enum Euler_V1_ApiKeyProvider: SwiftProtobuf.Enum, Swift.CaseI
   case unspecified // = 0
   case openrouter // = 1
   case brave // = 2
+  case vercelGateway // = 3
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -79,6 +80,7 @@ public nonisolated enum Euler_V1_ApiKeyProvider: SwiftProtobuf.Enum, Swift.CaseI
     case 0: self = .unspecified
     case 1: self = .openrouter
     case 2: self = .brave
+    case 3: self = .vercelGateway
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -88,6 +90,7 @@ public nonisolated enum Euler_V1_ApiKeyProvider: SwiftProtobuf.Enum, Swift.CaseI
     case .unspecified: return 0
     case .openrouter: return 1
     case .brave: return 2
+    case .vercelGateway: return 3
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -97,6 +100,7 @@ public nonisolated enum Euler_V1_ApiKeyProvider: SwiftProtobuf.Enum, Swift.CaseI
     .unspecified,
     .openrouter,
     .brave,
+    .vercelGateway,
   ]
 
 }
@@ -308,211 +312,6 @@ public nonisolated struct Euler_V1_TestOllamaHostResponse: Sendable {
   fileprivate var _result: Euler_V1_HostTest? = nil
 }
 
-public nonisolated struct Euler_V1_GetComfyUiConfigRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public nonisolated struct Euler_V1_GetComfyUiConfigResponse: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var config: Euler_V1_HostConfig {
-    get {_config ?? Euler_V1_HostConfig()}
-    set {_config = newValue}
-  }
-  /// Returns true if `config` has been explicitly set.
-  public var hasConfig: Bool {self._config != nil}
-  /// Clears the value of `config`. Subsequent reads from it will return its default value.
-  public mutating func clearConfig() {self._config = nil}
-
-  public var image: Euler_V1_ImagePreferences {
-    get {_image ?? Euler_V1_ImagePreferences()}
-    set {_image = newValue}
-  }
-  /// Returns true if `image` has been explicitly set.
-  public var hasImage: Bool {self._image != nil}
-  /// Clears the value of `image`. Subsequent reads from it will return its default value.
-  public mutating func clearImage() {self._image = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _config: Euler_V1_HostConfig? = nil
-  fileprivate var _image: Euler_V1_ImagePreferences? = nil
-}
-
-public nonisolated struct Euler_V1_UpdateComfyUiConfigRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Set to change the server-wide address; empty uses the default.
-  public var host: String {
-    get {_host ?? String()}
-    set {_host = newValue}
-  }
-  /// Returns true if `host` has been explicitly set.
-  public var hasHost: Bool {self._host != nil}
-  /// Clears the value of `host`. Subsequent reads from it will return its default value.
-  public mutating func clearHost() {self._host = nil}
-
-  public var image: Euler_V1_UpdatePreferencesRequest.ImagePatch {
-    get {_image ?? Euler_V1_UpdatePreferencesRequest.ImagePatch()}
-    set {_image = newValue}
-  }
-  /// Returns true if `image` has been explicitly set.
-  public var hasImage: Bool {self._image != nil}
-  /// Clears the value of `image`. Subsequent reads from it will return its default value.
-  public mutating func clearImage() {self._image = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _host: String? = nil
-  fileprivate var _image: Euler_V1_UpdatePreferencesRequest.ImagePatch? = nil
-}
-
-public nonisolated struct Euler_V1_UpdateComfyUiConfigResponse: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var config: Euler_V1_HostConfig {
-    get {_config ?? Euler_V1_HostConfig()}
-    set {_config = newValue}
-  }
-  /// Returns true if `config` has been explicitly set.
-  public var hasConfig: Bool {self._config != nil}
-  /// Clears the value of `config`. Subsequent reads from it will return its default value.
-  public mutating func clearConfig() {self._config = nil}
-
-  public var image: Euler_V1_ImagePreferences {
-    get {_image ?? Euler_V1_ImagePreferences()}
-    set {_image = newValue}
-  }
-  /// Returns true if `image` has been explicitly set.
-  public var hasImage: Bool {self._image != nil}
-  /// Clears the value of `image`. Subsequent reads from it will return its default value.
-  public mutating func clearImage() {self._image = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _config: Euler_V1_HostConfig? = nil
-  fileprivate var _image: Euler_V1_ImagePreferences? = nil
-}
-
-public nonisolated struct Euler_V1_GetComfyUiHealthRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public nonisolated struct Euler_V1_GetComfyUiHealthResponse: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var connected: Bool = false
-
-  public var error: String {
-    get {_error ?? String()}
-    set {_error = newValue}
-  }
-  /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {self._error != nil}
-  /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {self._error = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _error: String? = nil
-}
-
-public nonisolated struct Euler_V1_TestComfyUiHostRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Empty tests the saved address.
-  public var host: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public nonisolated struct Euler_V1_TestComfyUiHostResponse: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var result: Euler_V1_HostTest {
-    get {_result ?? Euler_V1_HostTest()}
-    set {_result = newValue}
-  }
-  /// Returns true if `result` has been explicitly set.
-  public var hasResult: Bool {self._result != nil}
-  /// Clears the value of `result`. Subsequent reads from it will return its default value.
-  public mutating func clearResult() {self._result = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _result: Euler_V1_HostTest? = nil
-}
-
-public nonisolated struct Euler_V1_ListComfyUiModelsRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public nonisolated struct Euler_V1_ListComfyUiModelsResponse: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var models: [String] = []
-
-  /// Why the list is empty when ComfyUI could not be reached.
-  public var error: String {
-    get {_error ?? String()}
-    set {_error = newValue}
-  }
-  /// Returns true if `error` has been explicitly set.
-  public var hasError: Bool {self._error != nil}
-  /// Clears the value of `error`. Subsequent reads from it will return its default value.
-  public mutating func clearError() {self._error = nil}
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-
-  fileprivate var _error: String? = nil
-}
-
 /// Whether a key exists, never the key itself.
 public nonisolated struct Euler_V1_ApiKeyState: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
@@ -597,17 +396,19 @@ public nonisolated struct Euler_V1_SetApiKeyResponse: Sendable {
   fileprivate var _state: Euler_V1_ApiKeyState? = nil
 }
 
-public nonisolated struct Euler_V1_GetOpenRouterBalanceRequest: Sendable {
+public nonisolated struct Euler_V1_GetProviderBalanceRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
+
+  public var provider: Euler_V1_ModelProvider = .unspecified
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 }
 
-public nonisolated struct Euler_V1_GetOpenRouterBalanceResponse: Sendable {
+public nonisolated struct Euler_V1_GetProviderBalanceResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -736,7 +537,7 @@ public nonisolated struct Euler_V1_CatalogFreshness: Sendable {
   fileprivate var _error: String? = nil
 }
 
-public nonisolated struct Euler_V1_OpenRouterPublisher: Sendable {
+public nonisolated struct Euler_V1_CatalogPublisher: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -793,7 +594,7 @@ public nonisolated struct Euler_V1_DiscoveredPublisher: Sendable {
 }
 
 /// A catalog model with the user's choices.
-public nonisolated struct Euler_V1_OpenRouterModel: @unchecked Sendable {
+public nonisolated struct Euler_V1_CatalogModel: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -910,7 +711,7 @@ public nonisolated struct Euler_V1_PublisherModels: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var models: [Euler_V1_OpenRouterModel] = []
+  public var models: [Euler_V1_CatalogModel] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -918,7 +719,7 @@ public nonisolated struct Euler_V1_PublisherModels: Sendable {
 }
 
 /// Publishers, their models, and the user's choices among them.
-public nonisolated struct Euler_V1_OpenRouterCatalog: Sendable {
+public nonisolated struct Euler_V1_ModelCatalog: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -932,7 +733,7 @@ public nonisolated struct Euler_V1_OpenRouterCatalog: Sendable {
   /// Clears the value of `freshness`. Subsequent reads from it will return its default value.
   public mutating func clearFreshness() {self._freshness = nil}
 
-  public var publishers: [Euler_V1_OpenRouterPublisher] = []
+  public var publishers: [Euler_V1_CatalogPublisher] = []
 
   public var modelsByPublisher: Dictionary<String,Euler_V1_PublisherModels> = [:]
 
@@ -954,23 +755,25 @@ public nonisolated struct Euler_V1_OpenRouterCatalog: Sendable {
   fileprivate var _discoveredPublishers: Euler_V1_DiscoveredPublishers? = nil
 }
 
-public nonisolated struct Euler_V1_GetOpenRouterCatalogRequest: Sendable {
+public nonisolated struct Euler_V1_GetModelCatalogRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
+
+  public var provider: Euler_V1_ModelProvider = .unspecified
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 }
 
-public nonisolated struct Euler_V1_GetOpenRouterCatalogResponse: Sendable {
+public nonisolated struct Euler_V1_GetModelCatalogResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var catalog: Euler_V1_OpenRouterCatalog {
-    get {_catalog ?? Euler_V1_OpenRouterCatalog()}
+  public var catalog: Euler_V1_ModelCatalog {
+    get {_catalog ?? Euler_V1_ModelCatalog()}
     set {_catalog = newValue}
   }
   /// Returns true if `catalog` has been explicitly set.
@@ -982,26 +785,28 @@ public nonisolated struct Euler_V1_GetOpenRouterCatalogResponse: Sendable {
 
   public init() {}
 
-  fileprivate var _catalog: Euler_V1_OpenRouterCatalog? = nil
+  fileprivate var _catalog: Euler_V1_ModelCatalog? = nil
 }
 
-public nonisolated struct Euler_V1_RefreshOpenRouterCatalogRequest: Sendable {
+public nonisolated struct Euler_V1_RefreshModelCatalogRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
+
+  public var provider: Euler_V1_ModelProvider = .unspecified
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 }
 
-public nonisolated struct Euler_V1_RefreshOpenRouterCatalogResponse: Sendable {
+public nonisolated struct Euler_V1_RefreshModelCatalogResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var catalog: Euler_V1_OpenRouterCatalog {
-    get {_catalog ?? Euler_V1_OpenRouterCatalog()}
+  public var catalog: Euler_V1_ModelCatalog {
+    get {_catalog ?? Euler_V1_ModelCatalog()}
     set {_catalog = newValue}
   }
   /// Returns true if `catalog` has been explicitly set.
@@ -1013,7 +818,7 @@ public nonisolated struct Euler_V1_RefreshOpenRouterCatalogResponse: Sendable {
 
   public init() {}
 
-  fileprivate var _catalog: Euler_V1_OpenRouterCatalog? = nil
+  fileprivate var _catalog: Euler_V1_ModelCatalog? = nil
 }
 
 public nonisolated struct Euler_V1_DiscoveredPublishers: Sendable {
@@ -1028,7 +833,7 @@ public nonisolated struct Euler_V1_DiscoveredPublishers: Sendable {
   public init() {}
 }
 
-public nonisolated struct Euler_V1_SetOpenRouterModelEnabledRequest: Sendable {
+public nonisolated struct Euler_V1_SetCatalogModelEnabledRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1037,12 +842,14 @@ public nonisolated struct Euler_V1_SetOpenRouterModelEnabledRequest: Sendable {
 
   public var enabled: Bool = false
 
+  public var provider: Euler_V1_ModelProvider = .unspecified
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 }
 
-public nonisolated struct Euler_V1_SetOpenRouterModelEnabledResponse: Sendable {
+public nonisolated struct Euler_V1_SetCatalogModelEnabledResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1052,41 +859,21 @@ public nonisolated struct Euler_V1_SetOpenRouterModelEnabledResponse: Sendable {
   public init() {}
 }
 
-public nonisolated struct Euler_V1_TrackOpenRouterPublisherRequest: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var publisherID: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public nonisolated struct Euler_V1_TrackOpenRouterPublisherResponse: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-public nonisolated struct Euler_V1_RemoveOpenRouterPublisherRequest: Sendable {
+public nonisolated struct Euler_V1_TrackCatalogPublisherRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   public var publisherID: String = String()
 
+  public var provider: Euler_V1_ModelProvider = .unspecified
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 }
 
-public nonisolated struct Euler_V1_RemoveOpenRouterPublisherResponse: Sendable {
+public nonisolated struct Euler_V1_TrackCatalogPublisherResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1096,7 +883,31 @@ public nonisolated struct Euler_V1_RemoveOpenRouterPublisherResponse: Sendable {
   public init() {}
 }
 
-public nonisolated struct Euler_V1_SetOpenRouterSubscriptionRequest: Sendable {
+public nonisolated struct Euler_V1_RemoveCatalogPublisherRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var publisherID: String = String()
+
+  public var provider: Euler_V1_ModelProvider = .unspecified
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Euler_V1_RemoveCatalogPublisherResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Euler_V1_SetCatalogSubscriptionRequest: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1105,12 +916,14 @@ public nonisolated struct Euler_V1_SetOpenRouterSubscriptionRequest: Sendable {
 
   public var subscribed: Bool = false
 
+  public var provider: Euler_V1_ModelProvider = .unspecified
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 }
 
-public nonisolated struct Euler_V1_SetOpenRouterSubscriptionResponse: Sendable {
+public nonisolated struct Euler_V1_SetCatalogSubscriptionResponse: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1118,6 +931,62 @@ public nonisolated struct Euler_V1_SetOpenRouterSubscriptionResponse: Sendable {
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+}
+
+public nonisolated struct Euler_V1_ImageModel: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var id: String = String()
+
+  public var name: String = String()
+
+  public var provider: Euler_V1_ImageProvider = .unspecified
+
+  public var aspectRatios: [String] = []
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Euler_V1_ListImageModelsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Unspecified returns models from all providers.
+  public var provider: Euler_V1_ImageProvider = .unspecified
+
+  public var refresh: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public nonisolated struct Euler_V1_ListImageModelsResponse: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var models: [Euler_V1_ImageModel] = []
+
+  public var error: String {
+    get {_error ?? String()}
+    set {_error = newValue}
+  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {self._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {self._error = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _error: String? = nil
 }
 
 public nonisolated struct Euler_V1_ChatGptStatus: Sendable {
@@ -1288,7 +1157,7 @@ nonisolated extension Euler_V1_OllamaContextWindow: SwiftProtobuf._ProtoNameProv
 }
 
 nonisolated extension Euler_V1_ApiKeyProvider: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0API_KEY_PROVIDER_UNSPECIFIED\0\u{1}API_KEY_PROVIDER_OPENROUTER\0\u{1}API_KEY_PROVIDER_BRAVE\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0API_KEY_PROVIDER_UNSPECIFIED\0\u{1}API_KEY_PROVIDER_OPENROUTER\0\u{1}API_KEY_PROVIDER_BRAVE\0\u{1}API_KEY_PROVIDER_VERCEL_GATEWAY\0")
 }
 
 nonisolated extension Euler_V1_HostConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -1674,322 +1543,6 @@ nonisolated extension Euler_V1_TestOllamaHostResponse: SwiftProtobuf.Message, Sw
   }
 }
 
-nonisolated extension Euler_V1_GetComfyUiConfigRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".GetComfyUiConfigRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    // Load everything into unknown fields
-    while try decoder.nextFieldNumber() != nil {}
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Euler_V1_GetComfyUiConfigRequest, rhs: Euler_V1_GetComfyUiConfigRequest) -> Bool {
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension Euler_V1_GetComfyUiConfigResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".GetComfyUiConfigResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}config\0\u{1}image\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._config) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._image) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._config {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._image {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Euler_V1_GetComfyUiConfigResponse, rhs: Euler_V1_GetComfyUiConfigResponse) -> Bool {
-    if lhs._config != rhs._config {return false}
-    if lhs._image != rhs._image {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension Euler_V1_UpdateComfyUiConfigRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".UpdateComfyUiConfigRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}host\0\u{1}image\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self._host) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._image) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._host {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._image {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Euler_V1_UpdateComfyUiConfigRequest, rhs: Euler_V1_UpdateComfyUiConfigRequest) -> Bool {
-    if lhs._host != rhs._host {return false}
-    if lhs._image != rhs._image {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension Euler_V1_UpdateComfyUiConfigResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".UpdateComfyUiConfigResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}config\0\u{1}image\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._config) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._image) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._config {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._image {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Euler_V1_UpdateComfyUiConfigResponse, rhs: Euler_V1_UpdateComfyUiConfigResponse) -> Bool {
-    if lhs._config != rhs._config {return false}
-    if lhs._image != rhs._image {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension Euler_V1_GetComfyUiHealthRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".GetComfyUiHealthRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    // Load everything into unknown fields
-    while try decoder.nextFieldNumber() != nil {}
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Euler_V1_GetComfyUiHealthRequest, rhs: Euler_V1_GetComfyUiHealthRequest) -> Bool {
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension Euler_V1_GetComfyUiHealthResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".GetComfyUiHealthResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}connected\0\u{1}error\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBoolField(value: &self.connected) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._error) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if self.connected != false {
-      try visitor.visitSingularBoolField(value: self.connected, fieldNumber: 1)
-    }
-    try { if let v = self._error {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Euler_V1_GetComfyUiHealthResponse, rhs: Euler_V1_GetComfyUiHealthResponse) -> Bool {
-    if lhs.connected != rhs.connected {return false}
-    if lhs._error != rhs._error {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension Euler_V1_TestComfyUiHostRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".TestComfyUiHostRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}host\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.host) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.host.isEmpty {
-      try visitor.visitSingularStringField(value: self.host, fieldNumber: 1)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Euler_V1_TestComfyUiHostRequest, rhs: Euler_V1_TestComfyUiHostRequest) -> Bool {
-    if lhs.host != rhs.host {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension Euler_V1_TestComfyUiHostResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".TestComfyUiHostResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}result\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._result) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._result {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Euler_V1_TestComfyUiHostResponse, rhs: Euler_V1_TestComfyUiHostResponse) -> Bool {
-    if lhs._result != rhs._result {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension Euler_V1_ListComfyUiModelsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ListComfyUiModelsRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    // Load everything into unknown fields
-    while try decoder.nextFieldNumber() != nil {}
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Euler_V1_ListComfyUiModelsRequest, rhs: Euler_V1_ListComfyUiModelsRequest) -> Bool {
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-nonisolated extension Euler_V1_ListComfyUiModelsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ListComfyUiModelsResponse"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}models\0\u{1}error\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedStringField(value: &self.models) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self._error) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.models.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.models, fieldNumber: 1)
-    }
-    try { if let v = self._error {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Euler_V1_ListComfyUiModelsResponse, rhs: Euler_V1_ListComfyUiModelsResponse) -> Bool {
-    if lhs.models != rhs.models {return false}
-    if lhs._error != rhs._error {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 nonisolated extension Euler_V1_ApiKeyState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ApiKeyState"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}has_key\0\u{3}environment_managed\0")
@@ -2158,27 +1711,38 @@ nonisolated extension Euler_V1_SetApiKeyResponse: SwiftProtobuf.Message, SwiftPr
   }
 }
 
-nonisolated extension Euler_V1_GetOpenRouterBalanceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".GetOpenRouterBalanceRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+nonisolated extension Euler_V1_GetProviderBalanceRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetProviderBalanceRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}provider\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    // Load everything into unknown fields
-    while try decoder.nextFieldNumber() != nil {}
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
+      default: break
+      }
+    }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 1)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_GetOpenRouterBalanceRequest, rhs: Euler_V1_GetOpenRouterBalanceRequest) -> Bool {
+  public static func ==(lhs: Euler_V1_GetProviderBalanceRequest, rhs: Euler_V1_GetProviderBalanceRequest) -> Bool {
+    if lhs.provider != rhs.provider {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension Euler_V1_GetOpenRouterBalanceResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".GetOpenRouterBalanceResponse"
+nonisolated extension Euler_V1_GetProviderBalanceResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetProviderBalanceResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}account_balance\0\u{3}key_limit\0\u{3}key_remaining\0\u{3}key_limit_reset\0\u{3}key_usage\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -2220,7 +1784,7 @@ nonisolated extension Euler_V1_GetOpenRouterBalanceResponse: SwiftProtobuf.Messa
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_GetOpenRouterBalanceResponse, rhs: Euler_V1_GetOpenRouterBalanceResponse) -> Bool {
+  public static func ==(lhs: Euler_V1_GetProviderBalanceResponse, rhs: Euler_V1_GetProviderBalanceResponse) -> Bool {
     if lhs._accountBalance != rhs._accountBalance {return false}
     if lhs._keyLimit != rhs._keyLimit {return false}
     if lhs._keyRemaining != rhs._keyRemaining {return false}
@@ -2279,8 +1843,8 @@ nonisolated extension Euler_V1_CatalogFreshness.Status: SwiftProtobuf._ProtoName
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STATUS_UNSPECIFIED\0\u{1}STATUS_FRESH\0\u{1}STATUS_STALE\0\u{1}STATUS_UNAVAILABLE\0")
 }
 
-nonisolated extension Euler_V1_OpenRouterPublisher: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".OpenRouterPublisher"
+nonisolated extension Euler_V1_CatalogPublisher: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CatalogPublisher"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}subscribed\0\u{3}subscribed_at\0\u{3}enabled_count\0\u{3}recent_count\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -2326,7 +1890,7 @@ nonisolated extension Euler_V1_OpenRouterPublisher: SwiftProtobuf.Message, Swift
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_OpenRouterPublisher, rhs: Euler_V1_OpenRouterPublisher) -> Bool {
+  public static func ==(lhs: Euler_V1_CatalogPublisher, rhs: Euler_V1_CatalogPublisher) -> Bool {
     if lhs.id != rhs.id {return false}
     if lhs.name != rhs.name {return false}
     if lhs.subscribed != rhs.subscribed {return false}
@@ -2378,8 +1942,8 @@ nonisolated extension Euler_V1_DiscoveredPublisher: SwiftProtobuf.Message, Swift
   }
 }
 
-nonisolated extension Euler_V1_OpenRouterModel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".OpenRouterModel"
+nonisolated extension Euler_V1_CatalogModel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".CatalogModel"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}route\0\u{3}publisher_id\0\u{1}name\0\u{1}description\0\u{1}created\0\u{3}context_length\0\u{3}prompt_price_per_million\0\u{3}completion_price_per_million\0\u{3}input_capabilities\0\u{3}supports_tools\0\u{3}output_capabilities\0\u{1}reasoning\0\u{1}enabled\0\u{1}favorite\0\u{1}availability\0\u{3}is_new\0")
 
   fileprivate class _StorageClass {
@@ -2523,7 +2087,7 @@ nonisolated extension Euler_V1_OpenRouterModel: SwiftProtobuf.Message, SwiftProt
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_OpenRouterModel, rhs: Euler_V1_OpenRouterModel) -> Bool {
+  public static func ==(lhs: Euler_V1_CatalogModel, rhs: Euler_V1_CatalogModel) -> Bool {
     if lhs._storage !== rhs._storage {
       let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
         let _storage = _args.0
@@ -2583,8 +2147,8 @@ nonisolated extension Euler_V1_PublisherModels: SwiftProtobuf.Message, SwiftProt
   }
 }
 
-nonisolated extension Euler_V1_OpenRouterCatalog: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".OpenRouterCatalog"
+nonisolated extension Euler_V1_ModelCatalog: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ModelCatalog"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}freshness\0\u{1}publishers\0\u{3}models_by_publisher\0\u{3}discovered_publishers\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -2622,7 +2186,7 @@ nonisolated extension Euler_V1_OpenRouterCatalog: SwiftProtobuf.Message, SwiftPr
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_OpenRouterCatalog, rhs: Euler_V1_OpenRouterCatalog) -> Bool {
+  public static func ==(lhs: Euler_V1_ModelCatalog, rhs: Euler_V1_ModelCatalog) -> Bool {
     if lhs._freshness != rhs._freshness {return false}
     if lhs.publishers != rhs.publishers {return false}
     if lhs.modelsByPublisher != rhs.modelsByPublisher {return false}
@@ -2632,27 +2196,38 @@ nonisolated extension Euler_V1_OpenRouterCatalog: SwiftProtobuf.Message, SwiftPr
   }
 }
 
-nonisolated extension Euler_V1_GetOpenRouterCatalogRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".GetOpenRouterCatalogRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+nonisolated extension Euler_V1_GetModelCatalogRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetModelCatalogRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}provider\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    // Load everything into unknown fields
-    while try decoder.nextFieldNumber() != nil {}
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
+      default: break
+      }
+    }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 1)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_GetOpenRouterCatalogRequest, rhs: Euler_V1_GetOpenRouterCatalogRequest) -> Bool {
+  public static func ==(lhs: Euler_V1_GetModelCatalogRequest, rhs: Euler_V1_GetModelCatalogRequest) -> Bool {
+    if lhs.provider != rhs.provider {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension Euler_V1_GetOpenRouterCatalogResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".GetOpenRouterCatalogResponse"
+nonisolated extension Euler_V1_GetModelCatalogResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".GetModelCatalogResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}catalog\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -2678,34 +2253,45 @@ nonisolated extension Euler_V1_GetOpenRouterCatalogResponse: SwiftProtobuf.Messa
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_GetOpenRouterCatalogResponse, rhs: Euler_V1_GetOpenRouterCatalogResponse) -> Bool {
+  public static func ==(lhs: Euler_V1_GetModelCatalogResponse, rhs: Euler_V1_GetModelCatalogResponse) -> Bool {
     if lhs._catalog != rhs._catalog {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension Euler_V1_RefreshOpenRouterCatalogRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".RefreshOpenRouterCatalogRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
+nonisolated extension Euler_V1_RefreshModelCatalogRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RefreshModelCatalogRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}provider\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    // Load everything into unknown fields
-    while try decoder.nextFieldNumber() != nil {}
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
+      default: break
+      }
+    }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 1)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_RefreshOpenRouterCatalogRequest, rhs: Euler_V1_RefreshOpenRouterCatalogRequest) -> Bool {
+  public static func ==(lhs: Euler_V1_RefreshModelCatalogRequest, rhs: Euler_V1_RefreshModelCatalogRequest) -> Bool {
+    if lhs.provider != rhs.provider {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension Euler_V1_RefreshOpenRouterCatalogResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".RefreshOpenRouterCatalogResponse"
+nonisolated extension Euler_V1_RefreshModelCatalogResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RefreshModelCatalogResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}catalog\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -2731,7 +2317,7 @@ nonisolated extension Euler_V1_RefreshOpenRouterCatalogResponse: SwiftProtobuf.M
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_RefreshOpenRouterCatalogResponse, rhs: Euler_V1_RefreshOpenRouterCatalogResponse) -> Bool {
+  public static func ==(lhs: Euler_V1_RefreshModelCatalogResponse, rhs: Euler_V1_RefreshModelCatalogResponse) -> Bool {
     if lhs._catalog != rhs._catalog {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -2768,9 +2354,9 @@ nonisolated extension Euler_V1_DiscoveredPublishers: SwiftProtobuf.Message, Swif
   }
 }
 
-nonisolated extension Euler_V1_SetOpenRouterModelEnabledRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".SetOpenRouterModelEnabledRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}route\0\u{1}enabled\0")
+nonisolated extension Euler_V1_SetCatalogModelEnabledRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SetCatalogModelEnabledRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}route\0\u{1}enabled\0\u{1}provider\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2780,6 +2366,7 @@ nonisolated extension Euler_V1_SetOpenRouterModelEnabledRequest: SwiftProtobuf.M
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.route) }()
       case 2: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
       default: break
       }
     }
@@ -2792,19 +2379,23 @@ nonisolated extension Euler_V1_SetOpenRouterModelEnabledRequest: SwiftProtobuf.M
     if self.enabled != false {
       try visitor.visitSingularBoolField(value: self.enabled, fieldNumber: 2)
     }
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_SetOpenRouterModelEnabledRequest, rhs: Euler_V1_SetOpenRouterModelEnabledRequest) -> Bool {
+  public static func ==(lhs: Euler_V1_SetCatalogModelEnabledRequest, rhs: Euler_V1_SetCatalogModelEnabledRequest) -> Bool {
     if lhs.route != rhs.route {return false}
     if lhs.enabled != rhs.enabled {return false}
+    if lhs.provider != rhs.provider {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension Euler_V1_SetOpenRouterModelEnabledResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".SetOpenRouterModelEnabledResponse"
+nonisolated extension Euler_V1_SetCatalogModelEnabledResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SetCatalogModelEnabledResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -2816,15 +2407,15 @@ nonisolated extension Euler_V1_SetOpenRouterModelEnabledResponse: SwiftProtobuf.
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_SetOpenRouterModelEnabledResponse, rhs: Euler_V1_SetOpenRouterModelEnabledResponse) -> Bool {
+  public static func ==(lhs: Euler_V1_SetCatalogModelEnabledResponse, rhs: Euler_V1_SetCatalogModelEnabledResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension Euler_V1_TrackOpenRouterPublisherRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".TrackOpenRouterPublisherRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}publisher_id\0")
+nonisolated extension Euler_V1_TrackCatalogPublisherRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".TrackCatalogPublisherRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}publisher_id\0\u{1}provider\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2833,6 +2424,7 @@ nonisolated extension Euler_V1_TrackOpenRouterPublisherRequest: SwiftProtobuf.Me
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.publisherID) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
       default: break
       }
     }
@@ -2842,18 +2434,22 @@ nonisolated extension Euler_V1_TrackOpenRouterPublisherRequest: SwiftProtobuf.Me
     if !self.publisherID.isEmpty {
       try visitor.visitSingularStringField(value: self.publisherID, fieldNumber: 1)
     }
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_TrackOpenRouterPublisherRequest, rhs: Euler_V1_TrackOpenRouterPublisherRequest) -> Bool {
+  public static func ==(lhs: Euler_V1_TrackCatalogPublisherRequest, rhs: Euler_V1_TrackCatalogPublisherRequest) -> Bool {
     if lhs.publisherID != rhs.publisherID {return false}
+    if lhs.provider != rhs.provider {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension Euler_V1_TrackOpenRouterPublisherResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".TrackOpenRouterPublisherResponse"
+nonisolated extension Euler_V1_TrackCatalogPublisherResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".TrackCatalogPublisherResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -2865,15 +2461,15 @@ nonisolated extension Euler_V1_TrackOpenRouterPublisherResponse: SwiftProtobuf.M
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_TrackOpenRouterPublisherResponse, rhs: Euler_V1_TrackOpenRouterPublisherResponse) -> Bool {
+  public static func ==(lhs: Euler_V1_TrackCatalogPublisherResponse, rhs: Euler_V1_TrackCatalogPublisherResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension Euler_V1_RemoveOpenRouterPublisherRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".RemoveOpenRouterPublisherRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}publisher_id\0")
+nonisolated extension Euler_V1_RemoveCatalogPublisherRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RemoveCatalogPublisherRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}publisher_id\0\u{1}provider\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2882,6 +2478,7 @@ nonisolated extension Euler_V1_RemoveOpenRouterPublisherRequest: SwiftProtobuf.M
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.publisherID) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
       default: break
       }
     }
@@ -2891,18 +2488,22 @@ nonisolated extension Euler_V1_RemoveOpenRouterPublisherRequest: SwiftProtobuf.M
     if !self.publisherID.isEmpty {
       try visitor.visitSingularStringField(value: self.publisherID, fieldNumber: 1)
     }
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 2)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_RemoveOpenRouterPublisherRequest, rhs: Euler_V1_RemoveOpenRouterPublisherRequest) -> Bool {
+  public static func ==(lhs: Euler_V1_RemoveCatalogPublisherRequest, rhs: Euler_V1_RemoveCatalogPublisherRequest) -> Bool {
     if lhs.publisherID != rhs.publisherID {return false}
+    if lhs.provider != rhs.provider {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension Euler_V1_RemoveOpenRouterPublisherResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".RemoveOpenRouterPublisherResponse"
+nonisolated extension Euler_V1_RemoveCatalogPublisherResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RemoveCatalogPublisherResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -2914,15 +2515,15 @@ nonisolated extension Euler_V1_RemoveOpenRouterPublisherResponse: SwiftProtobuf.
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_RemoveOpenRouterPublisherResponse, rhs: Euler_V1_RemoveOpenRouterPublisherResponse) -> Bool {
+  public static func ==(lhs: Euler_V1_RemoveCatalogPublisherResponse, rhs: Euler_V1_RemoveCatalogPublisherResponse) -> Bool {
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension Euler_V1_SetOpenRouterSubscriptionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".SetOpenRouterSubscriptionRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}publisher_id\0\u{1}subscribed\0")
+nonisolated extension Euler_V1_SetCatalogSubscriptionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SetCatalogSubscriptionRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}publisher_id\0\u{1}subscribed\0\u{1}provider\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -2932,6 +2533,7 @@ nonisolated extension Euler_V1_SetOpenRouterSubscriptionRequest: SwiftProtobuf.M
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.publisherID) }()
       case 2: try { try decoder.decodeSingularBoolField(value: &self.subscribed) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
       default: break
       }
     }
@@ -2944,19 +2546,23 @@ nonisolated extension Euler_V1_SetOpenRouterSubscriptionRequest: SwiftProtobuf.M
     if self.subscribed != false {
       try visitor.visitSingularBoolField(value: self.subscribed, fieldNumber: 2)
     }
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_SetOpenRouterSubscriptionRequest, rhs: Euler_V1_SetOpenRouterSubscriptionRequest) -> Bool {
+  public static func ==(lhs: Euler_V1_SetCatalogSubscriptionRequest, rhs: Euler_V1_SetCatalogSubscriptionRequest) -> Bool {
     if lhs.publisherID != rhs.publisherID {return false}
     if lhs.subscribed != rhs.subscribed {return false}
+    if lhs.provider != rhs.provider {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-nonisolated extension Euler_V1_SetOpenRouterSubscriptionResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".SetOpenRouterSubscriptionResponse"
+nonisolated extension Euler_V1_SetCatalogSubscriptionResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".SetCatalogSubscriptionResponse"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap()
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -2968,7 +2574,126 @@ nonisolated extension Euler_V1_SetOpenRouterSubscriptionResponse: SwiftProtobuf.
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: Euler_V1_SetOpenRouterSubscriptionResponse, rhs: Euler_V1_SetOpenRouterSubscriptionResponse) -> Bool {
+  public static func ==(lhs: Euler_V1_SetCatalogSubscriptionResponse, rhs: Euler_V1_SetCatalogSubscriptionResponse) -> Bool {
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Euler_V1_ImageModel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ImageModel"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{1}provider\0\u{3}aspect_ratios\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
+      case 4: try { try decoder.decodeRepeatedStringField(value: &self.aspectRatios) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.id.isEmpty {
+      try visitor.visitSingularStringField(value: self.id, fieldNumber: 1)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 3)
+    }
+    if !self.aspectRatios.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.aspectRatios, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Euler_V1_ImageModel, rhs: Euler_V1_ImageModel) -> Bool {
+    if lhs.id != rhs.id {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs.provider != rhs.provider {return false}
+    if lhs.aspectRatios != rhs.aspectRatios {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Euler_V1_ListImageModelsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListImageModelsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}provider\0\u{1}refresh\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.provider) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.refresh) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.provider != .unspecified {
+      try visitor.visitSingularEnumField(value: self.provider, fieldNumber: 1)
+    }
+    if self.refresh != false {
+      try visitor.visitSingularBoolField(value: self.refresh, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Euler_V1_ListImageModelsRequest, rhs: Euler_V1_ListImageModelsRequest) -> Bool {
+    if lhs.provider != rhs.provider {return false}
+    if lhs.refresh != rhs.refresh {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+nonisolated extension Euler_V1_ListImageModelsResponse: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ListImageModelsResponse"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}models\0\u{1}error\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.models) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._error) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.models.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.models, fieldNumber: 1)
+    }
+    try { if let v = self._error {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: Euler_V1_ListImageModelsResponse, rhs: Euler_V1_ListImageModelsResponse) -> Bool {
+    if lhs.models != rhs.models {return false}
+    if lhs._error != rhs._error {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

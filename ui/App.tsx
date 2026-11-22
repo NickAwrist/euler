@@ -724,17 +724,8 @@ export default function App() {
         models={app.ollamaModels}
         catalogLoaded={app.catalogLoaded}
         ollama={{ host: app.ollamaHost, connected: app.ollamaConnected }}
-        comfyui={{
-          host: app.comfyuiHost,
-          defaultModel: app.comfyuiDefaultModel,
-          defaultWidth: app.comfyuiDefaultWidth,
-          defaultHeight: app.comfyuiDefaultHeight,
-          negativePrompt: app.comfyuiNegativePrompt,
-          connected: app.comfyuiConnected,
-        }}
         onSavePreferences={app.savePreferences}
         onSaveOllamaHost={app.saveOllamaHost}
-        onSaveComfyUI={app.saveComfyUISettings}
         onModelsChanged={() => refreshModels(true)}
         chatgptCatalogError={app.chatgptCatalogError}
         onComplete={() => setOnboarding(false)}
@@ -775,12 +766,6 @@ export default function App() {
               ollamaHost={app.ollamaHost}
               ollamaContextWindow={app.ollamaContextWindow}
               ollamaConnected={app.ollamaConnected}
-              comfyuiHost={app.comfyuiHost}
-              comfyuiConnected={app.comfyuiConnected}
-              comfyuiDefaultModel={app.comfyuiDefaultModel}
-              comfyuiDefaultWidth={app.comfyuiDefaultWidth}
-              comfyuiDefaultHeight={app.comfyuiDefaultHeight}
-              comfyuiNegativePrompt={app.comfyuiNegativePrompt}
               onSave={app.saveUserSettings}
               chatgptCatalogError={app.chatgptCatalogError}
               onModelsChanged={() => refreshModels(true)}

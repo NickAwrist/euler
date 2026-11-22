@@ -1,170 +1,169 @@
+import { useCallback, useEffect, useState } from "react";
+import { ImageProvider } from "../../../src/gen/euler/v1/preferences_pb";
+import {
+  ApiKeyProvider,
+  type ImageModel,
+} from "../../../src/gen/euler/v1/providers_pb";
+import { loadImageModels } from "../../persist/services";
 import { cx, eyebrowText } from "../../styles";
-import {
-  ConnectionTestFeedback,
-  connectionFeedback,
-} from "./ConnectionTestFeedback";
-import { EnvironmentSettingHint } from "./EnvironmentSettingHint";
-import {
-  SIZE_PRESETS,
-  hintClass,
-  inputClass,
-  labelClass,
-  selectClass,
-  sizeKey,
-} from "./constants";
-import type { ConnectionTestState } from "./types";
+import { RefreshButton } from "../RefreshButton";
+import { hintClass, labelClass, selectClass } from "./constants";
+import { useApiKeySetting } from "./useApiKeySetting";
+
+const PROVIDER_LABELS: Record<ImageProvider, string> = {
+  [ImageProvider.UNSPECIFIED]: "Auto",
+  [ImageProvider.OPENROUTER]: "OpenRouter",
+  [ImageProvider.VERCEL_GATEWAY]: "Vercel AI Gateway",
+};
+
+const PROVIDER_SLUGS: Record<ImageProvider, string> = {
+  [ImageProvider.UNSPECIFIED]: "auto",
+  [ImageProvider.OPENROUTER]: "openrouter",
+  [ImageProvider.VERCEL_GATEWAY]: "vercel_gateway",
+};
+
+const PROVIDER_BY_SLUG: Record<string, ImageProvider> = {
+  auto: ImageProvider.UNSPECIFIED,
+  openrouter: ImageProvider.OPENROUTER,
+  vercel_gateway: ImageProvider.VERCEL_GATEWAY,
+};
+
+function keyStatus(setting: { loading: boolean; hasKey: boolean }): string {
+  if (setting.loading) return "checking...";
+  return setting.hasKey ? "configured" : "not configured";
+}
+
+async function fetchImageModelsList(
+  provider: ImageProvider,
+  refresh: boolean,
+): Promise<{ models: ImageModel[] | null; error: string | null }> {
+  try {
+    const result = await loadImageModels(provider, refresh);
+    return { models: result.models, error: result.error ?? null };
+  } catch (error) {
+    return {
+      models: null,
+      error: error instanceof Error ? error.message : "Failed to load models",
+    };
+  }
+}
 
 type Props = {
-  /** Shows only the server and checkpoint, for setup. */
-  compact?: boolean;
-  comfyuiConnected: boolean | null;
-  environmentManaged: boolean | undefined;
-  comfyUri: string;
-  onComfyUriInput: (v: string) => void;
-  comfyTestState: ConnectionTestState;
-  onTestComfyUI: () => void;
-  comfyModel: string;
-  setComfyModel: (v: string) => void;
-  comfyModels: string[];
-  comfySize: string;
-  setComfySize: (v: string) => void;
-  comfyNegative: string;
-  setComfyNegative: (v: string) => void;
+  provider: ImageProvider;
+  model: string;
+  onProviderChange: (provider: ImageProvider) => void;
+  onModelChange: (model: string) => void;
 };
 
 export function ImageGenerationTab({
-  compact = false,
-  comfyuiConnected,
-  environmentManaged,
-  comfyUri,
-  onComfyUriInput,
-  comfyTestState,
-  onTestComfyUI,
-  comfyModel,
-  setComfyModel,
-  comfyModels,
-  comfySize,
-  setComfySize,
-  comfyNegative,
-  setComfyNegative,
+  provider,
+  model,
+  onProviderChange,
+  onModelChange,
 }: Props) {
+  const openRouterKey = useApiKeySetting(ApiKeyProvider.OPENROUTER);
+  const vercelKey = useApiKeySetting(ApiKeyProvider.VERCEL_GATEWAY);
+  const [models, setModels] = useState<ImageModel[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+
+  const effectiveProvider =
+    provider !== ImageProvider.UNSPECIFIED
+      ? provider
+      : openRouterKey.hasKey
+        ? ImageProvider.OPENROUTER
+        : vercelKey.hasKey
+          ? ImageProvider.VERCEL_GATEWAY
+          : ImageProvider.UNSPECIFIED;
+
+  const fetchModels = useCallback(
+    async (refresh = false) => {
+      setLoadingModels(true);
+      setModelsError(null);
+      const result = await fetchImageModelsList(effectiveProvider, refresh);
+      if (result.models !== null) setModels(result.models);
+      setModelsError(result.error);
+      setLoadingModels(false);
+    },
+    [effectiveProvider],
+  );
+
+  useEffect(() => {
+    if (openRouterKey.loading || vercelKey.loading) return;
+    void fetchModels(false);
+  }, [fetchModels, openRouterKey.loading, vercelKey.loading]);
+
+  const showProviderPrefix = effectiveProvider === ImageProvider.UNSPECIFIED;
+  const hasSavedModel = model !== "" && !models.some((m) => m.id === model);
+
   return (
-    <div className="space-y-4">
-      <h2 className={cx(eyebrowText, "mb-4")}>ComfyUI</h2>
+    <div className="space-y-6">
+      <section className="space-y-4">
+        <h2 className={cx(eyebrowText, "mb-4")}>Image Generation</h2>
 
-      <div className="space-y-2">
-        <label htmlFor="comfyUri" className={labelClass}>
-          Server URL
-        </label>
-        <div className="flex flex-wrap items-stretch gap-2 sm:flex-nowrap">
-          <input
-            type="text"
-            id="comfyUri"
-            aria-describedby="comfyUri-environment"
-            value={comfyUri}
-            disabled={environmentManaged !== false}
-            onChange={(e) => onComfyUriInput(e.target.value)}
-            placeholder="http://127.0.0.1:8188"
-            autoComplete="off"
-            className={cx(inputClass, "min-w-0 flex-1")}
-          />
-          <button
-            type="button"
-            onClick={() => void onTestComfyUI()}
-            disabled={comfyTestState.status === "loading"}
-            className="shrink-0 rounded-lg border border-border-subtle bg-muted/40 px-3 py-2 text-[0.875rem] font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
+        <div className="space-y-2">
+          <label htmlFor="imageProvider" className={labelClass}>
+            Provider
+          </label>
+          <select
+            id="imageProvider"
+            value={PROVIDER_SLUGS[provider]}
+            onChange={(event) =>
+              onProviderChange(
+                PROVIDER_BY_SLUG[event.target.value] ??
+                  ImageProvider.UNSPECIFIED,
+              )
+            }
+            className={selectClass}
           >
-            {comfyTestState.status === "loading"
-              ? "Testing..."
-              : "Test connection"}
-          </button>
+            <option value="auto">Auto (first configured)</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="vercel_gateway">Vercel AI Gateway</option>
+          </select>
+          <p className={hintClass}>
+            Uses API keys from Settings &gt; OpenRouter (
+            {keyStatus(openRouterKey)}) and Settings &gt; Vercel AI Gateway (
+            {keyStatus(vercelKey)}).
+          </p>
         </div>
-        <EnvironmentSettingHint
-          id="comfyUri-environment"
-          managed={environmentManaged}
-        >
-          Leave empty to use the default local ComfyUI address
-          (http://127.0.0.1:8188).
-        </EnvironmentSettingHint>
-        <ConnectionTestFeedback
-          {...connectionFeedback(comfyTestState, comfyuiConnected)}
-        />
-      </div>
 
-      <hr className="border-border-subtle" />
+        <hr className="border-border-subtle" />
 
-      <div className="space-y-2">
-        <label htmlFor="comfyModel" className={labelClass}>
-          Default Checkpoint Model
-        </label>
-        <select
-          id="comfyModel"
-          value={comfyModel}
-          onChange={(e) => setComfyModel(e.target.value)}
-          className={selectClass}
-        >
-          <option value="">Auto (first available)</option>
-          {comfyModels.map((m) => (
-            <option key={m} value={m}>
-              {m}
-            </option>
-          ))}
-        </select>
-        <p className={hintClass}>
-          The checkpoint model used for image generation. Auto uses the first
-          model ComfyUI reports.
-        </p>
-      </div>
-
-      {!compact && (
-        <>
-          <hr className="border-border-subtle" />
-
-          <div className="space-y-2">
-            <label htmlFor="comfySize" className={labelClass}>
-              Default Image Size
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor="imageModel" className={labelClass}>
+              Default model
             </label>
-            <select
-              id="comfySize"
-              value={comfySize}
-              onChange={(e) => setComfySize(e.target.value)}
-              className={selectClass}
-            >
-              {SIZE_PRESETS.map((preset) => {
-                const key = sizeKey(preset.width, preset.height);
-                return (
-                  <option key={key} value={key}>
-                    {preset.label}
-                  </option>
-                );
-              })}
-            </select>
-            <p className={hintClass}>
-              Default resolution for generated images.
-            </p>
-          </div>
-
-          <hr className="border-border-subtle" />
-
-          <div className="space-y-2">
-            <label htmlFor="comfyNegative" className={labelClass}>
-              Negative Prompt
-            </label>
-            <textarea
-              id="comfyNegative"
-              value={comfyNegative}
-              onChange={(e) => setComfyNegative(e.target.value)}
-              placeholder="e.g., low quality, blurry, watermark, text"
-              rows={4}
-              className="min-h-[100px] w-full resize-y rounded-lg border border-border-subtle bg-surface px-3 py-2 text-[0.875rem] text-foreground placeholder:text-muted-foreground transition-colors focus:border-border focus:outline-none"
+            <RefreshButton
+              label="Refresh image models"
+              refreshing={loadingModels}
+              iconOnly
+              onClick={() => void fetchModels(true)}
             />
-            <p className={hintClass}>
-              Applied to every generated image. Clear the field and save to use
-              no negative prompt.
-            </p>
           </div>
-        </>
-      )}
+          <select
+            id="imageModel"
+            value={model}
+            onChange={(event) => onModelChange(event.target.value)}
+            className={selectClass}
+          >
+            <option value="">Auto (first available)</option>
+            {hasSavedModel && <option value={model}>{model}</option>}
+            {models.map((entry) => (
+              <option key={`${entry.provider}:${entry.id}`} value={entry.id}>
+                {showProviderPrefix
+                  ? `${PROVIDER_LABELS[entry.provider]}: ${entry.name}`
+                  : entry.name}
+              </option>
+            ))}
+          </select>
+          {modelsError && (
+            <p role="alert" className="text-xs text-destructive">
+              {modelsError}
+            </p>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

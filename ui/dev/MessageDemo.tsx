@@ -13,7 +13,7 @@ import { TruncateConfirmModal } from "../components/TruncateConfirmModal";
 import type { Message, Step, TruncateConfirmState } from "../types";
 
 type MessageInit = MessageInitShape<typeof MessageSchema>;
-import { fixtureStep, generatedImage, webSource } from "./fixtures";
+import { fixtureStep, imageAttachment, webSource } from "./fixtures";
 
 const steps: Step[] = [
   fixtureStep({
@@ -62,11 +62,14 @@ const markdownMessages: Message[] = (
     },
     {
       role: Message_Role.ASSISTANT,
-      content:
-        "Here is the lighthouse:\n\n![Lighthouse](/api/comfyui/view/echoed.png)",
+      content: "Here is the lighthouse history.",
       attachments: [
-        generatedImage("/api/comfyui/view/echoed.png?type=output"),
-        generatedImage("/api/comfyui/view/omitted.png?type=output"),
+        imageAttachment({
+          id: "00000000-0000-4000-8000-000000000001",
+          name: "lighthouse.png",
+          mimeType: "image/png",
+          size: 68,
+        }),
         webSource("Lighthouse history", "https://www.example.com/lighthouses"),
       ],
     },

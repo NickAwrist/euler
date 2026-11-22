@@ -1,5 +1,9 @@
+import { ModelProvider } from "../../src/gen/euler/v1/models_pb";
 import { providerClient } from "../lib/rpc";
 
-export async function loadOpenRouterBalance(signal?: AbortSignal) {
-  return providerClient.getOpenRouterBalance({}, { signal });
+export async function loadProviderBalance(
+  provider: ModelProvider = ModelProvider.OPENROUTER,
+  signal?: AbortSignal,
+) {
+  return providerClient.getProviderBalance({ provider }, { signal });
 }

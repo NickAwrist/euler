@@ -1,7 +1,6 @@
 import type { OllamaContextWindow } from "../../../src/gen/euler/v1/providers_pb";
 import type { UserSettings } from "../../persist/userSettings";
 import type {
-  ComfyUIConfigPayload,
   ModelOption,
   OllamaConfigPayload,
   SettingsTab,
@@ -25,16 +24,9 @@ export type SettingsPageProps = {
   ollamaHost: string;
   ollamaContextWindow: OllamaContextWindow;
   ollamaConnected: boolean | null;
-  comfyuiHost: string;
-  comfyuiConnected: boolean | null;
-  comfyuiDefaultModel: string;
-  comfyuiDefaultWidth: number;
-  comfyuiDefaultHeight: number;
-  comfyuiNegativePrompt: string;
   onSave: (
     settings: Partial<UserSettings>,
     ollama?: OllamaConfigPayload,
-    comfyui?: ComfyUIConfigPayload,
   ) => Promise<void>;
   chatgptCatalogError: string | null;
   onModelsChanged: () => Promise<void>;

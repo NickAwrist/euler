@@ -12,11 +12,7 @@ export type {
   TruncateConfirmState,
 } from "./run";
 export type { ModelOption, ModelReasoning } from "./models";
-export type {
-  ComfyUIConfigPayload,
-  ComfyUIConfigState,
-  OllamaConfigPayload,
-} from "./settingsApi";
+export type { OllamaConfigPayload } from "./settingsApi";
 export type { TraceModalOpenPayload, TraceModalSelection } from "./traceModal";
 
 export type { MessageFields } from "./messageFields";

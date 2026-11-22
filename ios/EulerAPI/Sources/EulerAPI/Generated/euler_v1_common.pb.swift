@@ -34,8 +34,6 @@ public nonisolated enum Euler_V1_ErrorCode: SwiftProtobuf.Enum, Swift.CaseIterab
   case conflict // = 7
   case environmentManaged // = 8
   case catalogUnavailable // = 9
-  case comfyUnreachable // = 10
-  case comfyAssetUnavailable // = 11
   case jobFailed // = 12
   case jobOutputInvalid // = 13
   case jobInterrupted // = 14
@@ -57,8 +55,6 @@ public nonisolated enum Euler_V1_ErrorCode: SwiftProtobuf.Enum, Swift.CaseIterab
     case 7: self = .conflict
     case 8: self = .environmentManaged
     case 9: self = .catalogUnavailable
-    case 10: self = .comfyUnreachable
-    case 11: self = .comfyAssetUnavailable
     case 12: self = .jobFailed
     case 13: self = .jobOutputInvalid
     case 14: self = .jobInterrupted
@@ -78,8 +74,6 @@ public nonisolated enum Euler_V1_ErrorCode: SwiftProtobuf.Enum, Swift.CaseIterab
     case .conflict: return 7
     case .environmentManaged: return 8
     case .catalogUnavailable: return 9
-    case .comfyUnreachable: return 10
-    case .comfyAssetUnavailable: return 11
     case .jobFailed: return 12
     case .jobOutputInvalid: return 13
     case .jobInterrupted: return 14
@@ -99,8 +93,6 @@ public nonisolated enum Euler_V1_ErrorCode: SwiftProtobuf.Enum, Swift.CaseIterab
     .conflict,
     .environmentManaged,
     .catalogUnavailable,
-    .comfyUnreachable,
-    .comfyAssetUnavailable,
     .jobFailed,
     .jobOutputInvalid,
     .jobInterrupted,
@@ -342,7 +334,7 @@ public nonisolated struct Euler_V1_ToolBlock: Sendable {
 fileprivate nonisolated let _protobuf_package = "euler.v1"
 
 nonisolated extension Euler_V1_ErrorCode: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ERROR_CODE_UNSPECIFIED\0\u{1}ERROR_CODE_INTERNAL_ERROR\0\u{1}ERROR_CODE_INVALID_REQUEST\0\u{1}ERROR_CODE_UNSUPPORTED_MEDIA_TYPE\0\u{1}ERROR_CODE_BODY_TOO_LARGE\0\u{1}ERROR_CODE_NOT_FOUND\0\u{1}ERROR_CODE_FORBIDDEN\0\u{1}ERROR_CODE_CONFLICT\0\u{1}ERROR_CODE_ENVIRONMENT_MANAGED\0\u{1}ERROR_CODE_CATALOG_UNAVAILABLE\0\u{1}ERROR_CODE_COMFY_UNREACHABLE\0\u{1}ERROR_CODE_COMFY_ASSET_UNAVAILABLE\0\u{1}ERROR_CODE_JOB_FAILED\0\u{1}ERROR_CODE_JOB_OUTPUT_INVALID\0\u{1}ERROR_CODE_JOB_INTERRUPTED\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ERROR_CODE_UNSPECIFIED\0\u{1}ERROR_CODE_INTERNAL_ERROR\0\u{1}ERROR_CODE_INVALID_REQUEST\0\u{1}ERROR_CODE_UNSUPPORTED_MEDIA_TYPE\0\u{1}ERROR_CODE_BODY_TOO_LARGE\0\u{1}ERROR_CODE_NOT_FOUND\0\u{1}ERROR_CODE_FORBIDDEN\0\u{1}ERROR_CODE_CONFLICT\0\u{1}ERROR_CODE_ENVIRONMENT_MANAGED\0\u{1}ERROR_CODE_CATALOG_UNAVAILABLE\0\u{2}\u{3}ERROR_CODE_JOB_FAILED\0\u{1}ERROR_CODE_JOB_OUTPUT_INVALID\0\u{1}ERROR_CODE_JOB_INTERRUPTED\0")
 }
 
 nonisolated extension Euler_V1_DisplayIcon: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {

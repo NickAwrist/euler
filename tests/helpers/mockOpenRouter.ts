@@ -414,8 +414,8 @@ export async function handleOpenRouterRequest(
   ) {
     // The repeated search returns the same source to exercise deduplication.
     const calls = [
-      ["generate_image", { prompt: "A lighthouse" }],
       ["web_search", { query: "lighthouses" }],
+      ["generate_image", { prompt: "A lighthouse" }],
       ...(scenario === "child-outputs"
         ? ([
             [

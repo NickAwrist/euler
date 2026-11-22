@@ -40,13 +40,6 @@ export const WorkspaceFileAttachmentSchema = z.object({
   workspaceKind: z.enum(["sandbox", "local"]),
 });
 
-export const COMFYUI_VIEW_PREFIX = "/api/comfyui/view/";
-
-export const GeneratedImageAttachmentSchema = z.object({
-  kind: z.literal("generated_image"),
-  url: z.string().startsWith(COMFYUI_VIEW_PREFIX),
-});
-
 export const WebSourceAttachmentSchema = z.object({
   kind: z.literal("web_source"),
   title: z.string().min(1),
@@ -54,17 +47,14 @@ export const WebSourceAttachmentSchema = z.object({
 });
 
 export const OutputAttachmentSchema = z.discriminatedUnion("kind", [
+  ImageAttachmentSchema,
   WorkspaceFileAttachmentSchema,
-  GeneratedImageAttachmentSchema,
   WebSourceAttachmentSchema,
 ]);
 
 export type OutputAttachment = z.infer<typeof OutputAttachmentSchema>;
 
-export const MessageAttachmentSchema = z.discriminatedUnion("kind", [
-  ImageAttachmentSchema,
-  ...OutputAttachmentSchema.options,
-]);
+export const MessageAttachmentSchema = OutputAttachmentSchema;
 
 export type MessageAttachment = z.infer<typeof MessageAttachmentSchema>;
 export type WorkspaceFileAttachment = z.infer<
@@ -72,6 +62,4 @@ export type WorkspaceFileAttachment = z.infer<
 >;
 export type WebSourceAttachment = z.infer<typeof WebSourceAttachmentSchema>;
 /** Output a tool attaches to the assistant reply, independent of the reply text. */
-export type ToolOutputAttachment =
-  | z.infer<typeof GeneratedImageAttachmentSchema>
-  | WebSourceAttachment;
+export type ToolOutputAttachment = ImageAttachment | WebSourceAttachment;

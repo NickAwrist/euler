@@ -46,14 +46,13 @@ for (const device of ["desktop", "mobile"] as const) {
           await ownershipPending;
           return failOwnership
             ? new RpcFailure("internal", "Unavailable", "INTERNAL_ERROR")
-            : { ollamaHost: managed, comfyuiHost: managed };
+            : { ollamaHost: managed };
         }),
         on(ProviderService.method.getApiKey, () => ({
           state: { hasKey: true, environmentManaged: managed },
         })),
         on(ProviderService.method.testOllamaHost, () => hostTest),
-        on(ProviderService.method.testComfyUiHost, () => hostTest),
-        on(ProviderService.method.getOpenRouterCatalog, () => ({
+        on(ProviderService.method.getModelCatalog, () => ({
           catalog: {
             freshness: {
               status: CatalogFreshness_Status.FRESH,
@@ -74,29 +73,21 @@ for (const device of ["desktop", "mobile"] as const) {
     releaseOwnership();
     ownershipPending = null;
 
-    for (const [tab, id, host] of [
-      ["Ollama", "ollamaUri", "http://ollama.test"],
-      ["Image Generation", "comfyUri", "http://comfyui.test"],
-    ]) {
-      await page.getByRole("button", { name: tab, exact: true }).click();
-      await expect(page.locator(`#${id}`)).toBeDisabled();
-      await expect(page.locator(`#${id}`)).toHaveValue(host!);
-      await expect(
-        page.getByText("Managed by the environment.", { exact: false }),
-      ).toBeVisible();
-      await page.getByRole("button", { name: "Test connection" }).click();
-      await expect(
-        page.getByRole("button", { name: "Test connection" }),
-      ).toBeEnabled();
-      if (id === "comfyUri") {
-        await expect(page.locator("#comfyNegative")).toBeEnabled();
-        await page.locator("#comfyNegative").fill("Still editable");
-        await expect(
-          page.getByRole("button", { name: "Save settings" }),
-        ).toBeEnabled();
-      }
-    }
-    for (const tab of ["OpenRouter", "Web Search"]) {
+    await expect(page.locator("#ollamaUri")).toBeDisabled();
+    await expect(page.locator("#ollamaUri")).toHaveValue("http://ollama.test");
+    await expect(
+      page.getByText("Managed by the environment.", { exact: false }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Test connection" }).click();
+    await expect(
+      page.getByRole("button", { name: "Test connection" }),
+    ).toBeEnabled();
+    await expect(page.locator("#ollamaContextWindow")).toBeEnabled();
+    await page.locator("#ollamaContextWindow").selectOption("high");
+    await expect(
+      page.getByRole("button", { name: "Save settings" }),
+    ).toBeEnabled();
+    for (const tab of ["OpenRouter", "Vercel AI Gateway", "Web Search"]) {
       await page.getByRole("button", { name: tab, exact: true }).click();
       await expect(page.getByLabel("API key", { exact: true })).toBeDisabled();
       await expect(page.getByLabel("API key", { exact: true })).toHaveValue(
@@ -109,20 +100,12 @@ for (const device of ["desktop", "mobile"] as const) {
     await page.screenshot({
       path: testInfo.outputPath("environment-managed.png"),
     });
-    expect(writes).toEqual([
-      "ProviderService/TestOllamaHost",
-      "ProviderService/TestComfyUiHost",
-    ]);
+    expect(writes).toEqual(["ProviderService/TestOllamaHost"]);
 
     managed = false;
     await page.reload();
-    for (const [tab, id] of [
-      ["Ollama", "ollamaUri"],
-      ["Image Generation", "comfyUri"],
-    ]) {
-      await page.getByRole("button", { name: tab, exact: true }).click();
-      await expect(page.locator(`#${id}`)).toBeEnabled();
-    }
+    await page.getByRole("button", { name: "Ollama", exact: true }).click();
+    await expect(page.locator("#ollamaUri")).toBeEnabled();
     await page.getByRole("button", { name: "OpenRouter", exact: true }).click();
     await page.getByRole("button", { name: "Update key" }).click();
     await expect(page.getByLabel("API key", { exact: true })).toBeEnabled();

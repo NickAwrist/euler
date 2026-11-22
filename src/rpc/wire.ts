@@ -316,6 +316,18 @@ export function outputAttachment(
   value: DomainOutputAttachment,
 ): OutputAttachment {
   switch (value.kind) {
+    case "image":
+      return create(OutputAttachmentSchema, {
+        kind: {
+          case: "image",
+          value: {
+            id: value.id,
+            name: value.name,
+            mimeType: value.mimeType,
+            size: value.size,
+          },
+        },
+      });
     case "file":
       return create(OutputAttachmentSchema, {
         kind: {
@@ -330,10 +342,6 @@ export function outputAttachment(
           },
         },
       });
-    case "generated_image":
-      return create(OutputAttachmentSchema, {
-        kind: { case: "generatedImage", value: { url: value.url } },
-      });
     case "web_source":
       return create(OutputAttachmentSchema, {
         kind: {
@@ -347,18 +355,6 @@ export function outputAttachment(
 export function messageAttachment(
   value: DomainMessageAttachment,
 ): MessageAttachment {
-  if (value.kind === "image")
-    return create(MessageAttachmentSchema, {
-      kind: {
-        case: "image",
-        value: {
-          id: value.id,
-          name: value.name,
-          mimeType: value.mimeType,
-          size: value.size,
-        },
-      },
-    });
   return create(MessageAttachmentSchema, {
     kind: outputAttachment(value).kind,
   });
@@ -391,8 +387,6 @@ export function fromMessageAttachment(
         sessionId: kind.value.sessionId,
         workspaceKind: workspaceKinds.fromProto(kind.value.workspaceKind),
       };
-    case "generatedImage":
-      return { kind: "generated_image", url: kind.value.url };
     case "webSource":
       return {
         kind: "web_source",

@@ -13,7 +13,6 @@ import type {
   TraceModalSelection,
   TruncateConfirmState,
 } from "../types";
-import { useComfyUIConnection } from "./run/useComfyUIConnection";
 import { useOllamaConnection } from "./run/useOllamaConnection";
 import { useRunStreaming } from "./run/useRunStreaming";
 import { useSessionsAndNavigation } from "./run/useSessionsAndNavigation";
@@ -23,7 +22,6 @@ import { useSidebarState } from "./useSidebarState";
 export function useRunApp() {
   const sidebar = useSidebarState();
   const ollama = useOllamaConnection();
-  const comfy = useComfyUIConnection();
 
   const activeSessionIdRef = useRef<string | null>(null);
   const settings = useSettings(
@@ -31,8 +29,6 @@ export function useRunApp() {
     ollama.setOllamaContextWindow,
     ollama.fetchOllamaHealth,
     ollama.refreshOllamaModels,
-    comfy.fetchComfyUIHealth,
-    comfy.applyComfyConfigResponse,
   );
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -62,7 +58,8 @@ export function useRunApp() {
     (model) => model.id === sessions.selectedModel,
   );
   const modelSendReady =
-    selectedModelOption?.provider === ModelProvider.OPENROUTER
+    selectedModelOption?.provider === ModelProvider.OPENROUTER ||
+    selectedModelOption?.provider === ModelProvider.VERCEL_GATEWAY
       ? selectedModelOption.configured
       : selectedModelOption?.provider === ModelProvider.CHATGPT ||
         (selectedModelOption?.provider === ModelProvider.OLLAMA &&
@@ -70,7 +67,9 @@ export function useRunApp() {
   const remoteProviderReady = ollama.ollamaModels.some(
     (model) =>
       model.provider === ModelProvider.CHATGPT ||
-      (model.provider === ModelProvider.OPENROUTER && model.configured),
+      ((model.provider === ModelProvider.OPENROUTER ||
+        model.provider === ModelProvider.VERCEL_GATEWAY) &&
+        model.configured),
   );
   const supportsImageInput =
     selectedModelOption?.inputCapabilities.includes(InputCapability.IMAGE) ===
@@ -184,15 +183,8 @@ export function useRunApp() {
     userSettings: settings.userSettings,
     ollamaHost: ollama.ollamaHost,
     ollamaContextWindow: ollama.ollamaContextWindow,
-    comfyuiHost: comfy.comfyuiHost,
-    comfyuiConnected: comfy.comfyuiConnected,
-    comfyuiDefaultModel: comfy.comfyuiDefaultModel,
-    comfyuiDefaultWidth: comfy.comfyuiDefaultWidth,
-    comfyuiDefaultHeight: comfy.comfyuiDefaultHeight,
-    comfyuiNegativePrompt: comfy.comfyuiNegativePrompt,
     saveUserSettings: settings.saveUserSettings,
     saveOllamaHost: settings.saveOllamaHost,
-    saveComfyUISettings: settings.saveComfyUISettings,
     savePersonalization: settings.savePersonalization,
     savePreferences: settings.savePreferences,
     refreshModels: ollama.refreshOllamaModels,

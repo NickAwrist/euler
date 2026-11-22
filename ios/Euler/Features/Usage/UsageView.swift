@@ -65,7 +65,7 @@ struct UsageView: View {
                 Section("Models") {
                     ForEach(usage.breakdown.rows, id: \.key) { row in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(row.key.replacingOccurrences(of: "openrouter:", with: "")).lineLimit(1)
+                            Text(Euler_V1_Model.displayRoute(row.key)).lineLimit(1)
                             HStack {
                                 Text("\(Self.tokens(row.totals.tokens)) tokens")
                                 Text("\(Int(row.tokenShare.rounded()))%")
@@ -183,7 +183,7 @@ private struct UsageChart: View {
                     id: "\(series.model)|\(index)",
                     bucket: index,
                     date: chart.buckets[index].date,
-                    model: series.model.replacingOccurrences(of: "openrouter:", with: ""),
+                    model: Euler_V1_Model.displayRoute(series.model),
                     value: values.indices.contains(index) ? values[index] : 0
                 )
             }

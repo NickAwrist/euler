@@ -1,5 +1,5 @@
 import type { LlmMetrics } from "../RunContext";
-import { openRouterCatalog } from "../models/openRouterModels";
+import { catalogForProvider } from "../models/openRouterModels";
 import { resolveModelSelection } from "./modelSelection";
 
 /** Provider metrics are untrusted: negative or non-finite values are unknown. */
@@ -28,8 +28,10 @@ export async function priceLlmUsage(
   const cached = cachedTokens ?? 0;
   const resolved = resolveModelSelection(model);
   const pricing =
-    resolved.provider === "openrouter" && (cost || cached)
-      ? (await openRouterCatalog.get()).models?.find(
+    (resolved.provider === "openrouter" ||
+      resolved.provider === "vercel_gateway") &&
+    (cost || cached)
+      ? (await catalogForProvider(resolved.provider).get()).models?.find(
           (item) => item.route === resolved.model,
         )
       : undefined;

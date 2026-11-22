@@ -1,5 +1,8 @@
 import type { Database } from "bun:sqlite";
-import { POPULAR_PUBLISHERS } from "../models/openRouterPublishers";
+import {
+  POPULAR_PUBLISHERS,
+  POPULAR_VERCEL_PUBLISHERS,
+} from "../models/openRouterPublishers";
 
 const TABLES = `
 CREATE TABLE IF NOT EXISTS usage_events (
@@ -106,9 +109,24 @@ CREATE TABLE IF NOT EXISTS openrouter_models (
   enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
   catalog_created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS vercel_gateway_publishers (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  subscribed INTEGER NOT NULL DEFAULT 0 CHECK (subscribed IN (0, 1)),
+  subscribed_at INTEGER,
+  tracked INTEGER NOT NULL DEFAULT 1 CHECK (tracked IN (0, 1)),
+  CHECK (subscribed = 0 OR subscribed_at IS NOT NULL)
+);
+CREATE TABLE IF NOT EXISTS vercel_gateway_models (
+  route TEXT PRIMARY KEY,
+  publisher_id TEXT NOT NULL REFERENCES vercel_gateway_publishers(id),
+  name TEXT NOT NULL,
+  enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+  catalog_created_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS model_favorites (
   owner_uuid TEXT NOT NULL,
-  provider TEXT NOT NULL CHECK (provider IN ('openrouter', 'ollama', 'chatgpt')),
+  provider TEXT NOT NULL CHECK (provider IN ('openrouter', 'ollama', 'chatgpt', 'vercel_gateway')),
   model_id TEXT NOT NULL,
   PRIMARY KEY (owner_uuid, provider, model_id)
 );
@@ -172,6 +190,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at) WHERE
 CREATE INDEX IF NOT EXISTS idx_messages_session_position ON messages(session_id, position);
 CREATE INDEX IF NOT EXISTS idx_attachments_owner_session ON attachments(owner_uuid, session_id);
 CREATE INDEX IF NOT EXISTS idx_openrouter_models_publisher_enabled ON openrouter_models(publisher_id, enabled);
+CREATE INDEX IF NOT EXISTS idx_vercel_gateway_models_publisher_enabled ON vercel_gateway_models(publisher_id, enabled);
 CREATE INDEX IF NOT EXISTS idx_agents_session ON agents(session_id, status);
 CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);
 CREATE INDEX IF NOT EXISTS idx_agent_messages_recipient ON agent_messages(agent_id, id);
@@ -187,11 +206,35 @@ export function createSchema(db: Database) {
   db.transaction(() => {
     db.run(TABLES);
     db.run(INDEXES);
+    const favRow = db
+      .query(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'model_favorites'",
+      )
+      .get() as { sql: string } | null;
+    if (favRow?.sql && !favRow.sql.includes("vercel_gateway")) {
+      db.run(`
+        CREATE TABLE model_favorites_new (
+          owner_uuid TEXT NOT NULL,
+          provider TEXT NOT NULL CHECK (provider IN ('openrouter', 'ollama', 'chatgpt', 'vercel_gateway')),
+          model_id TEXT NOT NULL,
+          PRIMARY KEY (owner_uuid, provider, model_id)
+        );
+        INSERT INTO model_favorites_new (owner_uuid, provider, model_id)
+          SELECT owner_uuid, provider, model_id FROM model_favorites;
+        DROP TABLE model_favorites;
+        ALTER TABLE model_favorites_new RENAME TO model_favorites;
+      `);
+    }
     // A publisher the user removed stays untracked.
-    const insert = db.prepare(
+    const insertOpenRouter = db.prepare(
       "INSERT OR IGNORE INTO openrouter_publishers (id, name) VALUES (?, ?)",
     );
     for (const publisher of POPULAR_PUBLISHERS)
-      insert.run(publisher.id, publisher.name);
+      insertOpenRouter.run(publisher.id, publisher.name);
+    const insertVercel = db.prepare(
+      "INSERT OR IGNORE INTO vercel_gateway_publishers (id, name) VALUES (?, ?)",
+    );
+    for (const publisher of POPULAR_VERCEL_PUBLISHERS)
+      insertVercel.run(publisher.id, publisher.name);
   })();
 }

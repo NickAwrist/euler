@@ -10,7 +10,7 @@ import type { ModelOption } from "../../ui/types";
 
 describe("groupModelProviders icon mapping", () => {
   const makeModel = (
-    provider: "ollama" | "openrouter",
+    provider: "ollama" | "openrouter" | "vercel_gateway",
     lab: string,
     route?: string,
     name = "Test Model",
@@ -19,7 +19,11 @@ describe("groupModelProviders icon mapping", () => {
       id: `${provider}:${route ?? lab}`,
       name,
       provider:
-        provider === "ollama" ? ModelProvider.OLLAMA : ModelProvider.OPENROUTER,
+        provider === "ollama"
+          ? ModelProvider.OLLAMA
+          : provider === "vercel_gateway"
+            ? ModelProvider.VERCEL_GATEWAY
+            : ModelProvider.OPENROUTER,
       lab,
       route,
       inputCapabilities: [InputCapability.TEXT],
@@ -83,5 +87,24 @@ describe("groupModelProviders icon mapping", () => {
     for (const p of providers) {
       expect(p.iconUrl).toBeUndefined();
     }
+  });
+
+  test("groups Vercel AI Gateway models with lab icons and disambiguates overlapping labs", () => {
+    const single = groupModelProviders([
+      makeModel("vercel_gateway", "Anthropic", "anthropic/claude-sonnet-4"),
+    ]);
+    expect(single).toHaveLength(1);
+    expect(single[0]?.id).toBe("vercel_gateway:anthropic");
+    expect(single[0]?.name).toBe("Anthropic");
+    expect(single[0]?.iconUrl).toBe("/icons/providers/claude.svg");
+
+    const both = groupModelProviders([
+      makeModel("openrouter", "Anthropic", "anthropic/claude-sonnet-4"),
+      makeModel("vercel_gateway", "Anthropic", "anthropic/claude-sonnet-4"),
+    ]);
+    expect(both.map((p) => p.name)).toEqual([
+      "Anthropic (OpenRouter)",
+      "Anthropic (Vercel)",
+    ]);
   });
 });

@@ -2,7 +2,7 @@ import EulerAPI
 import ImageIO
 import UIKit
 
-/// Loads transcript images once: ComfyUI outputs and favicons by URL through a
+/// Loads transcript images once: remote images and favicons by URL through a
 /// disk-backed URL cache, attachments through `GetAttachmentData` into the
 /// caches directory. Decoded images are downsampled and kept in memory.
 actor ImagePipeline {

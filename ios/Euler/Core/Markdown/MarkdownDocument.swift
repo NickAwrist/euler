@@ -2,15 +2,15 @@ import Foundation
 import Markdown
 
 /// A reply parsed into the blocks the transcript renders. Parsing follows the
-/// web's pipeline: GFM, single newlines as line breaks (remark-breaks), the
-/// math policy in `MathDelimiters`, and ComfyUI image URLs shown as images.
+/// web's pipeline: GFM, single newlines as line breaks (remark-breaks), and the
+/// math policy in `MathDelimiters`.
 struct MarkdownDocument: Equatable {
     var blocks: [MarkdownBlock]
 
     init(_ source: String) {
         var math: [String] = []
         let prepared = Self.extractMath(
-            MathDelimiters.normalize(Self.convertComfyUIURLs(Self.unflattenPipeTables(source))),
+            MathDelimiters.normalize(Self.unflattenPipeTables(source)),
             into: &math
         )
         let document = Document(parsing: prepared)
@@ -18,7 +18,6 @@ struct MarkdownDocument: Equatable {
         blocks = converter.blocks(document.blockChildren)
     }
 
-    static let comfyUIViewPrefix = "/api/comfyui/view/"
     /// Private-use characters around a math index, which no reply contains.
     private static let mathOpen: Character = "\u{E000}"
     private static let mathClose: Character = "\u{E001}"
@@ -41,20 +40,6 @@ struct MarkdownDocument: Equatable {
     private static func unflattenPipeTables(_ markdown: String) -> String {
         guard !markdown.contains("\n"), markdown.matches(of: /\|\s+\|/).count >= 2 else { return markdown }
         return markdown.replacing(/\|\s+\|/) { _ in "|\n|" }
-    }
-
-    /// Generated image URLs that models write as JSON, quoted or bare become Markdown images.
-    private static func convertComfyUIURLs(_ markdown: String) -> String {
-        guard markdown.contains(comfyUIViewPrefix) else { return markdown }
-        var result = markdown.replacing(/\{\s*"[^"]*"\s*:\s*"(\/api\/comfyui\/view\/[^"]+)"\s*\}/) { match in
-            "![Generated Image](\(match.output.1))"
-        }
-        result = result.replacing(/(^|[^(])"(\/api\/comfyui\/view\/[^"]+)"/) { match in
-            "\(match.output.1)![Generated Image](\(match.output.2))"
-        }
-        return result.replacing(/(^|[^(\]"\/])(\/api\/comfyui\/view\/[^\s"')>\]]*[^\s"')>\].,;:!?])/) { match in
-            "\(match.output.1)![Generated Image](\(match.output.2))"
-        }
     }
 
     /// Walks swift-markdown's tree into `MarkdownBlock`s.

@@ -105,19 +105,6 @@ public nonisolated struct Euler_V1_WorkspaceFileAttachment: Sendable {
   public init() {}
 }
 
-/// An image ComfyUI generated, served under /api/comfyui/view/.
-public nonisolated struct Euler_V1_GeneratedImageAttachment: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var url: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
 /// A web page a search or fetch tool cited.
 public nonisolated struct Euler_V1_WebSourceAttachment: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
@@ -156,14 +143,6 @@ public nonisolated struct Euler_V1_MessageAttachment: Sendable {
     set {kind = .file(newValue)}
   }
 
-  public var generatedImage: Euler_V1_GeneratedImageAttachment {
-    get {
-      if case .generatedImage(let v)? = kind {return v}
-      return Euler_V1_GeneratedImageAttachment()
-    }
-    set {kind = .generatedImage(newValue)}
-  }
-
   public var webSource: Euler_V1_WebSourceAttachment {
     get {
       if case .webSource(let v)? = kind {return v}
@@ -177,7 +156,6 @@ public nonisolated struct Euler_V1_MessageAttachment: Sendable {
   public nonisolated enum OneOf_Kind: Equatable, Sendable {
     case image(Euler_V1_ImageAttachment)
     case file(Euler_V1_WorkspaceFileAttachment)
-    case generatedImage(Euler_V1_GeneratedImageAttachment)
     case webSource(Euler_V1_WebSourceAttachment)
 
   }
@@ -201,14 +179,6 @@ public nonisolated struct Euler_V1_OutputAttachment: Sendable {
     set {kind = .file(newValue)}
   }
 
-  public var generatedImage: Euler_V1_GeneratedImageAttachment {
-    get {
-      if case .generatedImage(let v)? = kind {return v}
-      return Euler_V1_GeneratedImageAttachment()
-    }
-    set {kind = .generatedImage(newValue)}
-  }
-
   public var webSource: Euler_V1_WebSourceAttachment {
     get {
       if case .webSource(let v)? = kind {return v}
@@ -217,12 +187,20 @@ public nonisolated struct Euler_V1_OutputAttachment: Sendable {
     set {kind = .webSource(newValue)}
   }
 
+  public var image: Euler_V1_ImageAttachment {
+    get {
+      if case .image(let v)? = kind {return v}
+      return Euler_V1_ImageAttachment()
+    }
+    set {kind = .image(newValue)}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public nonisolated enum OneOf_Kind: Equatable, Sendable {
     case file(Euler_V1_WorkspaceFileAttachment)
-    case generatedImage(Euler_V1_GeneratedImageAttachment)
     case webSource(Euler_V1_WebSourceAttachment)
+    case image(Euler_V1_ImageAttachment)
 
   }
 
@@ -424,36 +402,6 @@ nonisolated extension Euler_V1_WorkspaceFileAttachment.WorkspaceKind: SwiftProto
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0WORKSPACE_KIND_UNSPECIFIED\0\u{1}WORKSPACE_KIND_SANDBOX\0\u{1}WORKSPACE_KIND_LOCAL\0")
 }
 
-nonisolated extension Euler_V1_GeneratedImageAttachment: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".GeneratedImageAttachment"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.url) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.url.isEmpty {
-      try visitor.visitSingularStringField(value: self.url, fieldNumber: 1)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: Euler_V1_GeneratedImageAttachment, rhs: Euler_V1_GeneratedImageAttachment) -> Bool {
-    if lhs.url != rhs.url {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 nonisolated extension Euler_V1_WebSourceAttachment: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WebSourceAttachment"
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}title\0\u{1}url\0")
@@ -491,7 +439,7 @@ nonisolated extension Euler_V1_WebSourceAttachment: SwiftProtobuf.Message, Swift
 
 nonisolated extension Euler_V1_MessageAttachment: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".MessageAttachment"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}image\0\u{1}file\0\u{3}generated_image\0\u{3}web_source\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}image\0\u{1}file\0\u{4}\u{2}web_source\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -523,19 +471,6 @@ nonisolated extension Euler_V1_MessageAttachment: SwiftProtobuf.Message, SwiftPr
         if let v = v {
           if hadOneofValue {try decoder.handleConflictingOneOf()}
           self.kind = .file(v)
-        }
-      }()
-      case 3: try {
-        var v: Euler_V1_GeneratedImageAttachment?
-        var hadOneofValue = false
-        if let current = self.kind {
-          hadOneofValue = true
-          if case .generatedImage(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.kind = .generatedImage(v)
         }
       }()
       case 4: try {
@@ -570,10 +505,6 @@ nonisolated extension Euler_V1_MessageAttachment: SwiftProtobuf.Message, SwiftPr
       guard case .file(let v)? = self.kind else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     }()
-    case .generatedImage?: try {
-      guard case .generatedImage(let v)? = self.kind else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    }()
     case .webSource?: try {
       guard case .webSource(let v)? = self.kind else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
@@ -592,7 +523,7 @@ nonisolated extension Euler_V1_MessageAttachment: SwiftProtobuf.Message, SwiftPr
 
 nonisolated extension Euler_V1_OutputAttachment: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".OutputAttachment"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}file\0\u{3}generated_image\0\u{3}web_source\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}file\0\u{4}\u{2}web_source\0\u{1}image\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -613,19 +544,6 @@ nonisolated extension Euler_V1_OutputAttachment: SwiftProtobuf.Message, SwiftPro
           self.kind = .file(v)
         }
       }()
-      case 2: try {
-        var v: Euler_V1_GeneratedImageAttachment?
-        var hadOneofValue = false
-        if let current = self.kind {
-          hadOneofValue = true
-          if case .generatedImage(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.kind = .generatedImage(v)
-        }
-      }()
       case 3: try {
         var v: Euler_V1_WebSourceAttachment?
         var hadOneofValue = false
@@ -637,6 +555,19 @@ nonisolated extension Euler_V1_OutputAttachment: SwiftProtobuf.Message, SwiftPro
         if let v = v {
           if hadOneofValue {try decoder.handleConflictingOneOf()}
           self.kind = .webSource(v)
+        }
+      }()
+      case 4: try {
+        var v: Euler_V1_ImageAttachment?
+        var hadOneofValue = false
+        if let current = self.kind {
+          hadOneofValue = true
+          if case .image(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.kind = .image(v)
         }
       }()
       default: break
@@ -654,13 +585,13 @@ nonisolated extension Euler_V1_OutputAttachment: SwiftProtobuf.Message, SwiftPro
       guard case .file(let v)? = self.kind else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     }()
-    case .generatedImage?: try {
-      guard case .generatedImage(let v)? = self.kind else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    }()
     case .webSource?: try {
       guard case .webSource(let v)? = self.kind else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    }()
+    case .image?: try {
+      guard case .image(let v)? = self.kind else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
     }()
     case nil: break
     }

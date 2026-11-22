@@ -5,17 +5,17 @@ import {
   Model_Availability,
 } from "../../../src/gen/euler/v1/models_pb";
 import {
-  type OpenRouterCatalog,
-  type OpenRouterModel,
-  type OpenRouterPublisher,
-  OpenRouterPublisherSchema,
+  type CatalogModel,
+  type CatalogPublisher,
+  CatalogPublisherSchema,
+  type ModelCatalog,
   PublisherModelsSchema,
 } from "../../../src/gen/euler/v1/providers_pb";
 import { modelClient, providerClient } from "../../lib/rpc";
 
-export type CatalogSettings = OpenRouterCatalog;
-export type Publisher = OpenRouterPublisher;
-export type PublisherModel = OpenRouterModel;
+export type CatalogSettings = ModelCatalog;
+export type Publisher = CatalogPublisher;
+export type PublisherModel = CatalogModel;
 export type PreferenceChange =
   | { kind: "enabled"; publisherId: string; route: string; value: boolean }
   | { kind: "favorite"; publisherId: string; route: string; value: boolean }
@@ -58,7 +58,7 @@ function applyChange(
     if (discovered)
       publishers = [
         ...publishers,
-        create(OpenRouterPublisherSchema, {
+        create(CatalogPublisherSchema, {
           id,
           name: discovered.name,
           subscribed: false,
@@ -90,57 +90,68 @@ function applyChange(
   };
 }
 async function sendChange(
+  provider: ModelProvider,
   operation: PreferenceChange,
   load: () => Promise<void>,
 ) {
   const { publisherId } = operation;
   switch (operation.kind) {
     case "add-model":
-      await providerClient.setOpenRouterModelEnabled({
+      await providerClient.setCatalogModelEnabled({
+        provider,
         route: operation.route,
         enabled: true,
       });
       await load();
       break;
     case "enabled":
-      await providerClient.setOpenRouterModelEnabled({
+      await providerClient.setCatalogModelEnabled({
+        provider,
         route: operation.route,
         enabled: operation.value,
       });
       break;
     case "favorite":
       await modelClient.setFavorite({
-        provider: ModelProvider.OPENROUTER,
+        provider,
         modelId: operation.route,
         favorite: operation.value,
       });
       break;
     case "subscription":
-      await providerClient.setOpenRouterSubscription({
+      await providerClient.setCatalogSubscription({
+        provider,
         publisherId,
         subscribed: operation.value,
       });
       break;
     case "track":
-      await providerClient.trackOpenRouterPublisher({ publisherId });
+      await providerClient.trackCatalogPublisher({ provider, publisherId });
       break;
     case "remove":
-      await providerClient.removeOpenRouterPublisher({ publisherId });
+      await providerClient.removeCatalogPublisher({ provider, publisherId });
       break;
   }
 }
-export function useOpenRouterCatalog(onModelsChanged: () => Promise<void>) {
+export function useGatewayCatalog(
+  provider: ModelProvider,
+  onModelsChanged: () => Promise<void>,
+) {
   const [data, setData] = useState<CatalogSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const load = useCallback(async (force = false) => {
-    setError(null);
-    const { catalog } = force
-      ? await providerClient.refreshOpenRouterCatalog({})
-      : await providerClient.getOpenRouterCatalog({});
-    setData(catalog ?? null);
-  }, []);
+  const load = useCallback(
+    async (force = false) => {
+      setError(null);
+      const { catalog } = force
+        ? await providerClient.refreshModelCatalog({ provider })
+        : await providerClient.getModelCatalog({ provider });
+      setData(catalog ?? null);
+    },
+    [provider],
+  );
   useEffect(() => {
+    setLoading(true);
     void load()
       .then(() => {
         setLoading(false);
@@ -160,7 +171,7 @@ export function useOpenRouterCatalog(onModelsChanged: () => Promise<void>) {
       setData((current) =>
         current ? applyChange(current, operation) : current,
       );
-    await sendChange(operation, load).then(
+    await sendChange(provider, operation, load).then(
       () => {
         if (!optimistic && operation.kind !== "add-model")
           setData((current) =>
@@ -201,4 +212,8 @@ export function useOpenRouterCatalog(onModelsChanged: () => Promise<void>) {
       await onModelsChanged();
   };
   return { data, loading, error, load, change };
+}
+
+export function useOpenRouterCatalog(onModelsChanged: () => Promise<void>) {
+  return useGatewayCatalog(ModelProvider.OPENROUTER, onModelsChanged);
 }

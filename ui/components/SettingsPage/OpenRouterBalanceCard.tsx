@@ -1,7 +1,8 @@
 import { ExternalLink } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { GetOpenRouterBalanceResponse as OpenRouterBalance } from "../../../src/gen/euler/v1/providers_pb";
-import { loadOpenRouterBalance } from "../../persist/openRouter";
+import { ModelProvider } from "../../../src/gen/euler/v1/models_pb";
+import type { GetProviderBalanceResponse as ProviderBalance } from "../../../src/gen/euler/v1/providers_pb";
+import { loadProviderBalance } from "../../persist/openRouter";
 import { RefreshButton } from "../RefreshButton";
 
 const dollars = new Intl.NumberFormat("en-US", {
@@ -9,8 +10,38 @@ const dollars = new Intl.NumberFormat("en-US", {
   currency: "USD",
 });
 
-export function OpenRouterBalanceCard() {
-  const [balance, setBalance] = useState<OpenRouterBalance | null>(null);
+type BalanceProviderMeta = {
+  label: string;
+  creditsUrl: string;
+  creditsLinkLabel: string;
+  hasKeyAllowance: boolean;
+};
+
+const META: Record<
+  ModelProvider.OPENROUTER | ModelProvider.VERCEL_GATEWAY,
+  BalanceProviderMeta
+> = {
+  [ModelProvider.OPENROUTER]: {
+    label: "OpenRouter",
+    creditsUrl: "https://openrouter.ai/settings/credits",
+    creditsLinkLabel: "View credits on OpenRouter",
+    hasKeyAllowance: true,
+  },
+  [ModelProvider.VERCEL_GATEWAY]: {
+    label: "Vercel AI Gateway",
+    creditsUrl: "https://vercel.com/ai-gateway",
+    creditsLinkLabel: "View credits on Vercel",
+    hasKeyAllowance: false,
+  },
+};
+
+export function ProviderBalanceCard({
+  provider = ModelProvider.OPENROUTER,
+}: {
+  provider?: ModelProvider.OPENROUTER | ModelProvider.VERCEL_GATEWAY;
+}) {
+  const meta = META[provider];
+  const [balance, setBalance] = useState<ProviderBalance | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -19,7 +50,7 @@ export function OpenRouterBalanceCard() {
     setLoading(true);
     setError(false);
     setBalance(null);
-    void loadOpenRouterBalance(controller.signal)
+    void loadProviderBalance(provider, controller.signal)
       .then((value) => {
         if (!controller.signal.aborted) setBalance(value);
       })
@@ -30,11 +61,11 @@ export function OpenRouterBalanceCard() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [revision]);
+  }, [provider, revision]);
   return (
     <section
       className="space-y-4 rounded-xl border border-border-subtle bg-card px-5 py-4"
-      aria-label="OpenRouter credits"
+      aria-label={`${meta.label} credits`}
     >
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-medium">Credits and usage</h2>
@@ -51,12 +82,18 @@ export function OpenRouterBalanceCard() {
       )}
       {error && (
         <p role="alert" className="text-sm text-destructive">
-          Could not load OpenRouter balance. Try refreshing.
+          Could not load {meta.label} balance. Try refreshing.
         </p>
       )}
       {balance && (
         <>
-          <dl className="grid gap-4 sm:grid-cols-3">
+          <dl
+            className={
+              meta.hasKeyAllowance
+                ? "grid gap-4 sm:grid-cols-3"
+                : "grid gap-4 sm:grid-cols-2"
+            }
+          >
             <div>
               <dt className="text-sm text-muted-foreground">Account balance</dt>
               <dd className="text-lg font-medium tabular-nums">
@@ -65,45 +102,55 @@ export function OpenRouterBalanceCard() {
                   : dollars.format(balance.accountBalance)}
               </dd>
             </div>
+            {meta.hasKeyAllowance && (
+              <div>
+                <dt className="text-sm text-muted-foreground">
+                  Key allowance remaining
+                </dt>
+                <dd className="text-lg font-medium tabular-nums">
+                  {balance.keyLimit === undefined
+                    ? "No spending limit"
+                    : balance.keyRemaining === undefined
+                      ? "Unavailable"
+                      : dollars.format(balance.keyRemaining)}
+                </dd>
+              </div>
+            )}
             <div>
               <dt className="text-sm text-muted-foreground">
-                Key allowance remaining
-              </dt>
-              <dd className="text-lg font-medium tabular-nums">
-                {balance.keyLimit === undefined
-                  ? "No spending limit"
-                  : balance.keyRemaining === undefined
-                    ? "Unavailable"
-                    : dollars.format(balance.keyRemaining)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-sm text-muted-foreground">
-                Key usage, all time
+                {meta.hasKeyAllowance
+                  ? "Key usage, all time"
+                  : "Total usage, all time"}
               </dt>
               <dd className="text-lg font-medium tabular-nums">
                 {dollars.format(balance.keyUsage)}
               </dd>
             </div>
           </dl>
-          <p className="text-sm text-muted-foreground">
-            {balance.accountBalance === undefined &&
-              "OpenRouter requires a management key to read the account balance. "}
-            {balance.keyLimit !== undefined &&
-              `Key spending limit: ${dollars.format(balance.keyLimit)}${balance.keyLimitReset ? `, resets ${balance.keyLimitReset}` : ""}. `}
-            Key allowance is separate from account credits.
-          </p>
+          {meta.hasKeyAllowance && (
+            <p className="text-sm text-muted-foreground">
+              {balance.accountBalance === undefined &&
+                "OpenRouter requires a management key to read the account balance. "}
+              {balance.keyLimit !== undefined &&
+                `Key spending limit: ${dollars.format(balance.keyLimit)}${balance.keyLimitReset ? `, resets ${balance.keyLimitReset}` : ""}. `}
+              Key allowance is separate from account credits.
+            </p>
+          )}
         </>
       )}
       <a
         className="inline-flex items-center gap-1.5 text-sm text-accent underline underline-offset-4"
-        href="https://openrouter.ai/settings/credits"
+        href={meta.creditsUrl}
         target="_blank"
         rel="noreferrer"
       >
-        View credits on OpenRouter
+        {meta.creditsLinkLabel}
         <ExternalLink size={14} aria-hidden="true" />
       </a>
     </section>
   );
+}
+
+export function OpenRouterBalanceCard() {
+  return <ProviderBalanceCard provider={ModelProvider.OPENROUTER} />;
 }

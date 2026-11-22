@@ -587,10 +587,6 @@ test("model defaults desktop: stale device saves preserve another device's chang
       .click();
     await first.getByText("Nord", { exact: true }).click();
     await first
-      .getByRole("button", { name: "Image Generation", exact: true })
-      .click();
-    await first.getByLabel("Negative Prompt").fill("device-one");
-    await first
       .getByRole("button", { name: "Save settings", exact: true })
       .click();
     await expect(
@@ -615,7 +611,6 @@ test("model defaults desktop: stale device saves preserve another device's chang
       second.getByRole("button", { name: "Model: Remote", exact: true }),
     ).toBeVisible();
     await expect(second.locator("html")).toHaveAttribute("data-theme", "nord");
-    expect(store.get(sameUser)?.image.negativePrompt).toBe("device-one");
     expect(store.get(sameUser)?.settings.showDebugButton).toBe(true);
     expect(store.get(sameUser)?.appearance.font).toBe("serif");
     await other.goto("/settings/general");

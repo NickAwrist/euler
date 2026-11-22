@@ -27,7 +27,7 @@ function start(): Promise<string> {
     throw new Error("secret provider body");
   });
   app.get("/unreachable", () => {
-    throw new OperationError("COMFY_UNREACHABLE", {
+    throw new OperationError("CATALOG_UNAVAILABLE", {
       message: "connect ECONNREFUSED 10.0.0.2",
     });
   });
@@ -66,10 +66,10 @@ describe("HTTP diagnostics", () => {
   test("keeps a known server failure's shared message", async () => {
     const url = await start();
     const response = await fetch(`${url}/unreachable`);
-    expect(response.status).toBe(502);
+    expect(response.status).toBe(503);
     expect(await diagnostic(response)).toMatchObject({
-      code: "COMFY_UNREACHABLE",
-      message: ERROR_MESSAGES.COMFY_UNREACHABLE,
+      code: "CATALOG_UNAVAILABLE",
+      message: ERROR_MESSAGES.CATALOG_UNAVAILABLE,
     });
   });
 

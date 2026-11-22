@@ -2,7 +2,7 @@
 
 The web app and the iPhone app call RPCs defined in `proto/euler/v1/` and
 served by [Connect](https://connectrpc.com/) at `/api/rpc`. Plain GET routes
-serve `<img src>` (ComfyUI outputs and favicons) and the MCP OAuth callback.
+serve favicons and the MCP OAuth callback.
 
 ## Contract and generated code
 
@@ -79,8 +79,7 @@ approvals.
 `DeviceService` stores APNs tokens per user. With `APNS_KEY_FILE`,
 `APNS_KEY_ID`, and `APNS_TEAM_ID` set, the server signs requests with the .p8
 key. It pushes when a main agent's turn finishes or fails, and when any agent
-asks to run a tool. Approval pushes carry Allow once and Deny actions, and the
-notification service extension attaches a reply's generated image.
+asks to run a tool. Approval pushes carry Allow once and Deny actions.
 
 Devices register per user, so a push reaches all of a user's phones. The
 server skips them all while any client of that user holds the event stream

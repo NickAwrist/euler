@@ -16,8 +16,6 @@ const ERROR_STATUS: Record<ErrorCode, number> = {
   CONFLICT: 409,
   ENVIRONMENT_MANAGED: 409,
   CATALOG_UNAVAILABLE: 503,
-  COMFY_UNREACHABLE: 502,
-  COMFY_ASSET_UNAVAILABLE: 502,
   // Background job failures are job state, never a request's response.
   JOB_FAILED: 500,
   JOB_OUTPUT_INVALID: 500,

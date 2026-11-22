@@ -1,14 +1,23 @@
 import EulerAPI
 import SwiftUI
 
-/// OpenRouter: the API key, credits, and which publishers' models appear in the composer.
+/// OpenRouter or Vercel AI Gateway: the API key, credits, and which publishers' models appear in the composer.
 struct OpenRouterSettingsView: View {
+    var provider: Euler_V1_ModelProvider = .openrouter
     @Environment(AppSession.self) private var session
-    @State private var store: OpenRouterStore?
+    @State private var store: GatewayCatalogStore?
+
+    private var apiKeyProvider: Euler_V1_ApiKeyProvider {
+        provider == .vercelGateway ? .vercelGateway : .openrouter
+    }
+
+    private var title: String {
+        provider == .vercelGateway ? "Vercel AI Gateway" : "OpenRouter"
+    }
 
     var body: some View {
         ThemedForm {
-            ApiKeySection(provider: .openrouter, title: "API key") {
+            ApiKeySection(provider: apiKeyProvider, title: "API key") {
                 await store?.load()
                 await session.models.load()
             }
@@ -19,7 +28,7 @@ struct OpenRouterSettingsView: View {
                 }
             }
         }
-        .navigationTitle("OpenRouter")
+        .navigationTitle(title)
         .toolbar {
             if let store, store.hasKey {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -29,35 +38,42 @@ struct OpenRouterSettingsView: View {
             }
         }
         .task {
-            let store = store ?? OpenRouterStore(session: session)
+            let store = store ?? GatewayCatalogStore(session: session, provider: provider)
             self.store = store
             await store.load()
         }
     }
 }
 
-/// The catalog, balance and choices the OpenRouter pages share.
+/// The catalog, balance and choices shared by OpenRouter and Vercel AI Gateway settings pages.
 @Observable
-final class OpenRouterStore {
-    private(set) var catalog: Euler_V1_OpenRouterCatalog?
-    private(set) var balance: Euler_V1_GetOpenRouterBalanceResponse?
+final class GatewayCatalogStore {
+    let provider: Euler_V1_ModelProvider
+    private(set) var catalog: Euler_V1_ModelCatalog?
+    private(set) var balance: Euler_V1_GetProviderBalanceResponse?
     private(set) var balanceError: String?
     private(set) var hasKey = false
     private(set) var refreshing = false
     @ObservationIgnored private let session: AppSession
 
-    init(session: AppSession) {
+    init(session: AppSession, provider: Euler_V1_ModelProvider) {
         self.session = session
+        self.provider = provider
     }
 
+    var title: String { provider == .vercelGateway ? "Vercel AI Gateway" : "OpenRouter" }
+    var hasKeyAllowance: Bool { provider == .openrouter }
+    private var apiKeyProvider: Euler_V1_ApiKeyProvider { provider == .vercelGateway ? .vercelGateway : .openrouter }
     private var providers: any Euler_V1_ProviderServiceClientInterface { session.backend.providers }
 
     func load() async {
         var request = Euler_V1_GetApiKeyRequest()
-        request.provider = .openrouter
+        request.provider = apiKeyProvider
         hasKey = (try? await providers.getApiKey(request: request, headers: [:]).value().state.hasKey_p) ?? false
         guard hasKey else { return }
-        async let catalog = providers.getOpenRouterCatalog(request: .init(), headers: [:]).value()
+        var catalogRequest = Euler_V1_GetModelCatalogRequest()
+        catalogRequest.provider = provider
+        async let catalog = providers.getModelCatalog(request: catalogRequest, headers: [:]).value()
         async let balance: Void = loadBalance()
         self.catalog = try? await catalog.catalog
         await balance
@@ -65,7 +81,9 @@ final class OpenRouterStore {
 
     func loadBalance() async {
         do {
-            balance = try await providers.getOpenRouterBalance(request: .init(), headers: [:]).value()
+            var request = Euler_V1_GetProviderBalanceRequest()
+            request.provider = provider
+            balance = try await providers.getProviderBalance(request: request, headers: [:]).value()
             balanceError = nil
         } catch {
             balance = nil
@@ -77,12 +95,14 @@ final class OpenRouterStore {
         refreshing = true
         defer { refreshing = false }
         await session.notices.attempt {
-            catalog = try await providers.refreshOpenRouterCatalog(request: .init(), headers: [:]).value().catalog
+            var request = Euler_V1_RefreshModelCatalogRequest()
+            request.provider = provider
+            catalog = try await providers.refreshModelCatalog(request: request, headers: [:]).value().catalog
         }
         await session.models.load()
     }
 
-    func models(_ publisherID: String) -> [Euler_V1_OpenRouterModel] {
+    func models(_ publisherID: String) -> [Euler_V1_CatalogModel] {
         catalog?.modelsByPublisher[publisherID]?.models ?? []
     }
 
@@ -90,20 +110,24 @@ final class OpenRouterStore {
     func change(_ work: (any Euler_V1_ProviderServiceClientInterface) async throws -> Void) async {
         let ok = await session.notices.attempt { try await work(providers) }
         if ok { Haptics.light() }
-        catalog = try? await providers.getOpenRouterCatalog(request: .init(), headers: [:]).value().catalog
+        var catalogRequest = Euler_V1_GetModelCatalogRequest()
+        catalogRequest.provider = provider
+        catalog = try? await providers.getModelCatalog(request: catalogRequest, headers: [:]).value().catalog
         await session.models.load()
     }
 }
 
 private struct BalanceSection: View {
-    let store: OpenRouterStore
+    let store: GatewayCatalogStore
 
     var body: some View {
         Section {
             if let balance = store.balance {
                 LabeledContent("Credits", value: balance.hasAccountBalance ? money(balance.accountBalance) : "Unavailable for this key")
-                LabeledContent("Key limit", value: balance.hasKeyLimit ? money(balance.keyLimit) : "No spending limit")
-                if balance.hasKeyRemaining { LabeledContent("Remaining", value: money(balance.keyRemaining)) }
+                if store.hasKeyAllowance {
+                    LabeledContent("Key limit", value: balance.hasKeyLimit ? money(balance.keyLimit) : "No spending limit")
+                    if balance.hasKeyRemaining { LabeledContent("Remaining", value: money(balance.keyRemaining)) }
+                }
                 LabeledContent("Used", value: money(balance.keyUsage))
             } else if let error = store.balanceError {
                 Text(error).foregroundStyle(.red)
@@ -112,7 +136,7 @@ private struct BalanceSection: View {
             }
             Button("Refresh balance", systemImage: "arrow.clockwise") { Task { await store.loadBalance() } }
         } header: {
-            Text("OpenRouter credits")
+            Text("\(store.title) credits")
         }
     }
 
@@ -122,7 +146,7 @@ private struct BalanceSection: View {
 }
 
 private struct PublishersSection: View {
-    let store: OpenRouterStore
+    let store: GatewayCatalogStore
     @State private var adding = false
 
     var body: some View {
@@ -159,7 +183,7 @@ private struct PublishersSection: View {
 }
 
 private struct PublisherView: View {
-    let store: OpenRouterStore
+    let store: GatewayCatalogStore
     let publisherID: String
     @Environment(\.dismiss) private var dismiss
     @State private var search = ""
@@ -177,10 +201,11 @@ private struct PublisherView: View {
                         set: { subscribed in
                             Task {
                                 await store.change { providers in
-                                    var request = Euler_V1_SetOpenRouterSubscriptionRequest()
+                                    var request = Euler_V1_SetCatalogSubscriptionRequest()
+                                    request.provider = store.provider
                                     request.publisherID = publisherID
                                     request.subscribed = subscribed
-                                    _ = try await providers.setOpenRouterSubscription(request: request, headers: [:]).value()
+                                    _ = try await providers.setCatalogSubscription(request: request, headers: [:]).value()
                                 }
                             }
                         }
@@ -198,9 +223,10 @@ private struct PublisherView: View {
                     Button("Remove publisher", role: .destructive) {
                         Task {
                             await store.change { providers in
-                                var request = Euler_V1_RemoveOpenRouterPublisherRequest()
+                                var request = Euler_V1_RemoveCatalogPublisherRequest()
+                                request.provider = store.provider
                                 request.publisherID = publisherID
-                                _ = try await providers.removeOpenRouterPublisher(request: request, headers: [:]).value()
+                                _ = try await providers.removeCatalogPublisher(request: request, headers: [:]).value()
                             }
                             dismiss()
                         }
@@ -215,8 +241,8 @@ private struct PublisherView: View {
 }
 
 private struct ModelRow: View {
-    let store: OpenRouterStore
-    let model: Euler_V1_OpenRouterModel
+    let store: GatewayCatalogStore
+    let model: Euler_V1_CatalogModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -225,10 +251,11 @@ private struct ModelRow: View {
                 set: { enabled in
                     Task {
                         await store.change { providers in
-                            var request = Euler_V1_SetOpenRouterModelEnabledRequest()
+                            var request = Euler_V1_SetCatalogModelEnabledRequest()
+                            request.provider = store.provider
                             request.route = model.route
                             request.enabled = enabled
-                            _ = try await providers.setOpenRouterModelEnabled(request: request, headers: [:]).value()
+                            _ = try await providers.setCatalogModelEnabled(request: request, headers: [:]).value()
                         }
                     }
                 }
@@ -260,7 +287,7 @@ private struct ModelRow: View {
 }
 
 private struct AddPublisherSheet: View {
-    let store: OpenRouterStore
+    let store: GatewayCatalogStore
     @Environment(\.dismiss) private var dismiss
     @State private var search = ""
 
@@ -280,9 +307,10 @@ private struct AddPublisherSheet: View {
                             Button("Add") {
                                 Task {
                                     await store.change { providers in
-                                        var request = Euler_V1_TrackOpenRouterPublisherRequest()
+                                        var request = Euler_V1_TrackCatalogPublisherRequest()
+                                        request.provider = store.provider
                                         request.publisherID = publisher.id
-                                        _ = try await providers.trackOpenRouterPublisher(request: request, headers: [:]).value()
+                                        _ = try await providers.trackCatalogPublisher(request: request, headers: [:]).value()
                                     }
                                 }
                             }

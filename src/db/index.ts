@@ -29,14 +29,14 @@ export type {
 export {
   getBraveSearchApiKey,
   setBraveSearchApiKey,
-  getComfyUIHost,
   getOllamaContextWindow,
   getOllamaHost,
   getOpenRouterApiKey,
-  setComfyUIHost,
+  getVercelGatewayApiKey,
   setOllamaContextWindow,
   setOllamaHost,
   setOpenRouterApiKey,
+  setVercelGatewayApiKey,
 } from "./settings";
 
 export {

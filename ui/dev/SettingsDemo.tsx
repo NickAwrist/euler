@@ -30,12 +30,6 @@ export default function SettingsDemo() {
         ollamaHost="http://ollama.test"
         ollamaContextWindow={OllamaContextWindow.LOW}
         ollamaConnected={false}
-        comfyuiHost="http://comfyui.test"
-        comfyuiConnected={false}
-        comfyuiDefaultModel=""
-        comfyuiDefaultWidth={1440}
-        comfyuiDefaultHeight={1440}
-        comfyuiNegativePrompt=""
         onSave={async (next) =>
           setSettings((current) => ({ ...current, ...next }))
         }

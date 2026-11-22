@@ -13,8 +13,8 @@ storage paths, background-job limits, and iPhone push.
 | `EULER_BACKEND_HOST` | `127.0.0.1` | API server bind address |
 | `EULER_FRONTEND_PORT` | `5174` | Vite dev server port |
 | `EULER_OLLAMA_HOST` | `http://127.0.0.1:11434` | Ollama endpoint |
-| `EULER_COMFYUI_HOST` | `http://127.0.0.1:8188` | ComfyUI endpoint |
 | `OPENROUTER_API_KEY` | unset | OpenRouter API key |
+| `AI_GATEWAY_API_KEY` | unset | Vercel AI Gateway API key |
 | `BRAVE_SEARCH_API_KEY` | unset | Brave Search API key |
 | `EULER_HOST_DIRECTORY` | your `HOME` | Starting folder for the directory picker. Set it when running under a service account. |
 | `EULER_MAX_RUNNING_AGENTS` | `4` | Agent activations one user may run at once |
@@ -33,17 +33,18 @@ saved setting. **Settings** then disables that field, and the API rejects
 changes to it. Remove the variable and restart the server to manage it in
 **Settings**.
 
-`.env.example` sets `EULER_OLLAMA_HOST` and `EULER_COMFYUI_HOST`, so a copied
-`.env` locks both endpoint fields until you remove those lines.
+`.env.example` sets `EULER_OLLAMA_HOST`, so a copied `.env` locks the Ollama
+endpoint field until you remove that line.
 
 ## Providers
 
 Each provider and service has a tab under **Settings**:
 
 - **Ollama**: the endpoint and **Context window**
-- **OpenRouter**: an API key
+- **OpenRouter**: an API key, credits, and publisher/model choices
+- **Vercel AI Gateway**: an API key, credits, and publisher/model choices
 - **ChatGPT**: sign-in, described below
-- **Image Generation**: a ComfyUI endpoint
+- **Image Generation**: provider (Auto, OpenRouter, or Vercel AI Gateway) and default model
 - **Web Search**: a Brave Search API key
 
 ## ChatGPT

@@ -5,7 +5,7 @@ import {
   ModelService,
 } from "../../src/gen/euler/v1/models_pb";
 import { ProviderService } from "../../src/gen/euler/v1/providers_pb";
-import { openRouterCatalog } from "../../src/models/openRouterWire";
+import { modelCatalogWire } from "../../src/models/openRouterWire";
 import { mockApp, ollamaModel, openRouterModel } from "./appFixture";
 import { RpcFailure, mockRpc, on } from "./rpcMock";
 import { mockUserPreferences } from "./userPreferencesFixture";
@@ -55,7 +55,7 @@ for (const device of ["desktop", "mobile"] as const) {
       outputCapabilities: ["text"],
     });
     const snapshot = () => ({
-      catalog: openRouterCatalog({
+      catalog: modelCatalogWire({
         catalog: {
           status,
           lastSuccessfulFetchAt:
@@ -95,11 +95,11 @@ for (const device of ["desktop", "mobile"] as const) {
     };
     await mockApp(page);
     await mockRpc(page, [
-      on(ProviderService.method.getOpenRouterCatalog, () => {
+      on(ProviderService.method.getModelCatalog, () => {
         catalogReads++;
         return snapshot();
       }),
-      on(ProviderService.method.refreshOpenRouterCatalog, async () => {
+      on(ProviderService.method.refreshModelCatalog, async () => {
         const failure = await saved(() => {});
         return failure instanceof RpcFailure ? failure : snapshot();
       }),
@@ -110,17 +110,17 @@ for (const device of ["desktop", "mobile"] as const) {
           else favorite = request.favorite;
         }),
       ),
-      on(ProviderService.method.setOpenRouterModelEnabled, (request) =>
+      on(ProviderService.method.setCatalogModelEnabled, (request) =>
         saved(() => {
           enabled = request.enabled;
         }),
       ),
-      on(ProviderService.method.setOpenRouterSubscription, (request) =>
+      on(ProviderService.method.setCatalogSubscription, (request) =>
         saved(() => {
           subscribed = request.subscribed;
         }),
       ),
-      on(ProviderService.method.trackOpenRouterPublisher, () =>
+      on(ProviderService.method.trackCatalogPublisher, () =>
         saved(() => {
           tracked = true;
         }),

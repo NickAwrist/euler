@@ -1,11 +1,6 @@
-import crypto from "node:crypto";
 import type { Tool } from "ollama";
 import type { RunContext } from "../RunContext";
-import { COMFYUI_VIEW_PREFIX } from "../attachments/types";
-import { getComfyUIClient } from "../comfyui/client";
-import { buildImageWorkflow } from "../comfyui/workflows";
-import { effectiveUserPreferences } from "../db/userPreferences";
-import { imagePreferencesSchema } from "../schemas/userPreferences";
+import { generateAndStoreImage } from "../imageGen/index";
 import { errorMessage } from "../utils/errors";
 import { BaseTool, type ToolResult, textToolResult } from "./BaseTool";
 
@@ -13,7 +8,7 @@ export class GenerateImageTool extends BaseTool {
   constructor() {
     super(
       "generate_image",
-      "Generate an image from a text prompt using ComfyUI. Returns the URL of the generated image.",
+      "Generate an image from a text prompt and attach it to the reply.",
     );
   }
 
@@ -32,6 +27,11 @@ export class GenerateImageTool extends BaseTool {
               description:
                 "A detailed text description of the image to generate.",
             },
+            aspect_ratio: {
+              type: "string",
+              description:
+                "Optional aspect ratio such as 1:1, 16:9, 9:16, 4:3, 3:4, 3:2, or 2:3.",
+            },
           },
         },
       },
@@ -45,59 +45,30 @@ export class GenerateImageTool extends BaseTool {
     if (typeof args.prompt !== "string" || args.prompt.trim().length === 0) {
       return textToolResult("Error: prompt must be a non-empty string");
     }
-    const promptText = args.prompt.trim();
+    if (!ctx?.ownerUuid || !ctx.sessionId) {
+      return textToolResult(
+        "Error: image generation requires an active chat session",
+      );
+    }
+    const aspectRatio =
+      typeof args.aspect_ratio === "string" && args.aspect_ratio.trim()
+        ? args.aspect_ratio.trim()
+        : undefined;
 
-    const client = getComfyUIClient();
-
-    return client.runSerialized(async (): Promise<ToolResult> => {
-      const image =
-        (ctx?.ownerUuid
-          ? effectiveUserPreferences(ctx.ownerUuid).image
-          : null) ?? imagePreferencesSchema.parse({});
-      const defaultModel = image.defaultModel;
-      let checkpointName = defaultModel;
-      if (!checkpointName) {
-        const models = await client.getModels();
-        if (models.length === 0) {
-          return textToolResult("Error: No models available in ComfyUI");
-        }
-        checkpointName = models[0]!;
-      }
-
-      const { defaultWidth: width, defaultHeight: height } = image;
-      const clientId = crypto.randomUUID();
-
-      const workflow = buildImageWorkflow({
-        prompt: promptText,
-        negativePrompt: image.negativePrompt,
-        checkpointName,
-        width,
-        height,
+    try {
+      const { attachment, providerLabel, model } = await generateAndStoreImage({
+        ownerUuid: ctx.ownerUuid,
+        sessionId: ctx.sessionId,
+        prompt: args.prompt.trim(),
+        aspectRatio,
+        signal: ctx.signal,
       });
-
-      try {
-        await client.connectWebSocket(clientId);
-        const response = await client.queuePrompt(workflow, clientId);
-        const images = await client.waitForPrompt(response.prompt_id);
-
-        const img = images[0];
-        if (!img) {
-          return textToolResult(
-            "Error: Image generation completed but no images were produced",
-          );
-        }
-
-        const params = new URLSearchParams({ type: img.type });
-        if (img.subfolder) params.set("subfolder", img.subfolder);
-        const queryString = params.toString();
-        const url = `${COMFYUI_VIEW_PREFIX}${img.filename}${queryString ? `?${queryString}` : ""}`;
-        return {
-          text: url,
-          attachments: [{ kind: "generated_image", url }],
-        };
-      } catch (e) {
-        return textToolResult(`Error generating image: ${errorMessage(e)}`);
-      }
-    }, "generate_image");
+      return {
+        text: `Generated image "${attachment.name}" with ${providerLabel} (${model}). It is attached to this reply.`,
+        attachments: [attachment],
+      };
+    } catch (error) {
+      return textToolResult(`Error generating image: ${errorMessage(error)}`);
+    }
   }
 }

@@ -67,11 +67,13 @@ function modelDetails(model: PublisherModel): string[] {
 export function PublisherDialog({
   publisher,
   data,
+  providerLabel = "OpenRouter",
   onClose,
   onChange,
 }: {
   publisher: Publisher | "add";
   data: CatalogSettings;
+  providerLabel?: string;
   onClose: () => void;
   onChange: (change: PreferenceChange) => Promise<void>;
 }) {
@@ -156,7 +158,7 @@ export function PublisherDialog({
               <span className="text-sm">Auto-enable new models</span>
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              Automatically enable future OpenRouter listings. Models you
+              Automatically enable future {providerLabel} listings. Models you
               disable stay disabled.
             </p>
           </div>

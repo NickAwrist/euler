@@ -321,8 +321,8 @@ test("tools desktop: field match offers the selected tool's fields", async ({
       ],
     },
     {
-      name: "generate_image",
-      description: "Generate an image",
+      name: "resize_canvas",
+      description: "Resize a canvas",
       fields: [{ path: "size.width", type: "number" }],
     },
     { name: "list_files", description: "List files", fields: [] },
@@ -380,20 +380,22 @@ test("tools desktop: field match offers the selected tool's fields", async ({
   // A field the next tool lacks is cleared rather than carried over.
   await skills
     .getByRole("combobox", { name: "Tool", exact: true })
-    .selectOption("generate_image");
-  const image = page.getByRole("group", { name: "Rule for generate_image" });
-  await expect(image.getByLabel("Field", { exact: true })).toHaveValue("");
-  await expect(image.getByRole("button", { name: "Save rule" })).toBeDisabled();
-  await image.getByLabel("Field", { exact: true }).selectOption("size.width");
+    .selectOption("resize_canvas");
+  const resize = page.getByRole("group", { name: "Rule for resize_canvas" });
+  await expect(resize.getByLabel("Field", { exact: true })).toHaveValue("");
+  await expect(
+    resize.getByRole("button", { name: "Save rule" }),
+  ).toBeDisabled();
+  await resize.getByLabel("Field", { exact: true }).selectOption("size.width");
   // Regex only matches text, so typed fields only offer Equals.
-  await expect(image.getByLabel("Match").getByRole("option")).toHaveText([
+  await expect(resize.getByLabel("Match").getByRole("option")).toHaveText([
     "Equals",
   ]);
-  await image.getByLabel("Value").fill("1024");
-  await image.getByRole("button", { name: "Save rule" }).click();
-  await expect(image.getByRole("button", { name: "Save rule" })).toBeHidden();
+  await resize.getByLabel("Value").fill("1024");
+  await resize.getByRole("button", { name: "Save rule" }).click();
+  await expect(resize.getByRole("button", { name: "Save rule" })).toBeHidden();
   expect(saved()?.rules.at(-1)).toMatchObject({
-    tool: "generate_image",
+    tool: "resize_canvas",
     condition: { kind: "argument", field: "size.width", value: 1024 },
   });
 

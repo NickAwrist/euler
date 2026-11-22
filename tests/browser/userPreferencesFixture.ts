@@ -5,10 +5,8 @@ import {
   PreferenceService,
   UpdatePreferencesRequestSchema,
 } from "../../src/gen/euler/v1/preferences_pb";
-import { ProviderService } from "../../src/gen/euler/v1/providers_pb";
 import { fromProtoRule } from "../../src/permissions/wire";
 import {
-  imagePatch,
   preferencesPatch,
   preferences as toProto,
 } from "../../src/preferences/wire";
@@ -33,8 +31,8 @@ function merge(
 }
 
 /**
- * Serves PreferenceService and the ComfyUI config like the server: users
- * without saved preferences get `initial`, and each update saves into `store`.
+ * Serves PreferenceService like the server: users without saved preferences
+ * get `initial`, and each update saves into `store`.
  */
 export async function mockUserPreferences(
   page: Page,
@@ -83,16 +81,6 @@ export async function mockUserPreferences(
           ),
         },
       });
-    }),
-    on(ProviderService.method.getComfyUiConfig, (_request, { userId }) => ({
-      config: { host: "", effectiveHost: "" },
-      image: current(userId).image,
-    })),
-    on(ProviderService.method.updateComfyUiConfig, (request, { userId }) => {
-      const preferences = current(userId);
-      const image = { ...preferences.image, ...imagePatch(request.image) };
-      store.set(lastUser, { ...preferences, image });
-      return { config: { host: "", effectiveHost: "" }, image };
     }),
   ]);
 }

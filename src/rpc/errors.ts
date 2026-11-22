@@ -18,8 +18,6 @@ const CONNECT_CODES: Record<EulerErrorCode, Code> = {
   CONFLICT: Code.FailedPrecondition,
   ENVIRONMENT_MANAGED: Code.FailedPrecondition,
   CATALOG_UNAVAILABLE: Code.Unavailable,
-  COMFY_UNREACHABLE: Code.Unavailable,
-  COMFY_ASSET_UNAVAILABLE: Code.Unavailable,
   JOB_FAILED: Code.Internal,
   JOB_OUTPUT_INVALID: Code.Internal,
   JOB_INTERRUPTED: Code.Internal,

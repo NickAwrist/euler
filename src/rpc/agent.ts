@@ -1,6 +1,6 @@
 import type { HandlerContext, ServiceImpl } from "@connectrpc/connect";
 import { agentRuntime } from "../agents/runtime/AgentRuntime";
-import { getOpenRouterApiKey } from "../db";
+import { getOpenRouterApiKey, getVercelGatewayApiKey } from "../db";
 import { getAttachment } from "../db/attachments";
 import type {
   AgentService,
@@ -32,6 +32,11 @@ function requireModelAvailable(model: string, owner: string) {
     throw new OperationError("INVALID_REQUEST", {
       message:
         "Configure an OpenRouter API key in Settings before using this model",
+    });
+  if (provider === "vercel_gateway" && !getVercelGatewayApiKey())
+    throw new OperationError("INVALID_REQUEST", {
+      message:
+        "Configure a Vercel AI Gateway API key in Settings before using this model",
     });
   if (provider === "chatgpt" && !chatGptStatus(owner).planEnabled)
     throw new OperationError("INVALID_REQUEST", {

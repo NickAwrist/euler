@@ -3,11 +3,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
-  Download,
   RefreshCw,
   Waypoints,
 } from "lucide-react";
-import { type ComponentProps, useMemo } from "react";
+import type { ComponentProps } from "react";
 import type { WorkspaceFileAttachment } from "../../../src/gen/euler/v1/attachments_pb";
 import { attachmentsOfKind } from "../../lib/attachments";
 import { fileWorkspaceKind } from "../../lib/workspace";
@@ -16,13 +15,9 @@ import type { Message } from "../../types";
 import { useArtifacts } from "../Artifacts/ArtifactContext";
 import { FileIcon } from "../Artifacts/FileIcon";
 import { traceStepsForDisplay } from "../ExecutionTrace";
-import {
-  MarkdownImageCard,
-  MarkdownMessage,
-  comfyUIImageKey,
-  extractComfyUIImageUrls,
-} from "../MarkdownMessage";
+import { MarkdownMessage } from "../MarkdownMessage";
 import { ThinkingBlock } from "../ThinkingBlock";
+import { AttachmentImage } from "./AttachmentImage";
 import { MessageActions } from "./MessageActions";
 import { SourceList } from "./SourceList";
 import {
@@ -61,16 +56,7 @@ export function AssistantMessageBubble({
 }: Props) {
   const artifacts = useArtifacts();
   const attachments = message.attachments;
-  const markdownImageUrls = useMemo(
-    () => extractComfyUIImageUrls(message.content),
-    [message.content],
-  );
-  const markdownImageKeys = new Set(markdownImageUrls.map(comfyUIImageKey));
-  // Tool results keep generated images visible when the reply omits their URLs.
-  const generatedImageUrls = attachmentsOfKind(attachments, "generatedImage")
-    .map((image) => image.url)
-    .filter((url) => !markdownImageKeys.has(comfyUIImageKey(url)));
-  const comfyImageUrls = [...markdownImageUrls, ...generatedImageUrls];
+  const outputImages = attachmentsOfKind(attachments, "image");
   const outputFiles = attachmentsOfKind(attachments, "file");
   // Files from a previous workspace no longer resolve against the current one.
   const isOtherWorkspace = (file: WorkspaceFileAttachment) =>
@@ -108,10 +94,10 @@ export function AssistantMessageBubble({
           <MarkdownMessage className="text-foreground">
             {message.content}
           </MarkdownMessage>
-          {generatedImageUrls.length > 0 && (
-            <div className="flex flex-wrap gap-x-3">
-              {generatedImageUrls.map((src) => (
-                <MarkdownImageCard key={src} src={src} />
+          {outputImages.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {outputImages.map((attachment) => (
+                <AttachmentImage key={attachment.id} attachment={attachment} />
               ))}
             </div>
           )}
@@ -181,23 +167,6 @@ export function AssistantMessageBubble({
               "group-hover/msg:opacity-100 focus-within:opacity-100",
             )}
           >
-            {comfyImageUrls.map((href, index) => (
-              <a
-                key={href}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={msgIconBtn}
-                title="Open image"
-                aria-label={
-                  comfyImageUrls.length > 1
-                    ? `Open generated image ${index + 1} in new tab`
-                    : "Open generated image in new tab"
-                }
-              >
-                <Download size={msgIconSize} strokeWidth={msgIconStroke} />
-              </a>
-            ))}
             <MessageActions
               actions={[
                 {

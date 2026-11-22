@@ -1,15 +1,10 @@
 import { expect, spyOn, test } from "bun:test";
 import { AgentRuntime } from "../../src/agents/runtime/AgentRuntime";
 import type { OutputAttachment } from "../../src/attachments/types";
-import {
-  setBraveSearchApiKey,
-  setComfyUIHost,
-  setOpenRouterApiKey,
-} from "../../src/db";
+import { setBraveSearchApiKey, setOpenRouterApiKey } from "../../src/db";
 import { AgentStore } from "../../src/db/agents";
 import { createSessionRow, getSessionById } from "../../src/db/sessions";
 import { eventHub } from "../../src/events/eventHub";
-import { GenerateImageTool } from "../../src/tools/generate_image";
 import { workspaceService } from "../../src/workspaces/WorkspaceService";
 import {
   getOpenRouterRequests,
@@ -160,28 +155,22 @@ test("child outputs survive waiting and result delivery without depending on rep
   };
   runtime.store.save(child);
   setBraveSearchApiKey("brave-child-outputs-test");
-  // The image feature needs a reachable ComfyUI; this host answers from the fetch mock.
-  setComfyUIHost("http://comfyui.test");
   setOpenRouterScenario("child-outputs");
-  const image = {
-    kind: "generated_image",
-    url: "/api/comfyui/view/child.png",
-  } as const;
-  const generate = spyOn(
-    GenerateImageTool.prototype,
-    "execute",
-  ).mockResolvedValue({ text: "Image created", attachments: [image] });
   try {
     runtime.enqueue(child, main.id, "task", "Generate a report");
     await until(() => runtime.store.get(child.id)?.status === "waiting");
     const outputs = runtime.store.get(child.id)!.pendingOutputs;
     expect(outputs).toEqual([
-      image,
       {
         kind: "web_source",
         title: "Mocked Search Result 1",
         url: "https://example.com/result1",
       },
+      expect.objectContaining({
+        kind: "image",
+        name: "a-lighthouse.png",
+        mimeType: "image/png",
+      }),
       expect.objectContaining({
         kind: "file",
         path: "report.txt",
@@ -196,7 +185,7 @@ test("child outputs survive waiting and result delivery without depending on rep
         report()?.deliveredAt != null && !runtime.busy(owner, main.sessionId),
     );
     expect(report()?.attachments).toEqual(outputs);
-    expect(report()?.content).not.toContain("child.png");
+    expect(report()?.content).not.toContain("result1");
     const { history } = runtime.snapshot(owner, main.sessionId);
     const replies = history.length;
     expect(history.at(-1)?.attachments).toEqual(outputs);
@@ -213,7 +202,6 @@ test("child outputs survive waiting and result delivery without depending on rep
       runtime.snapshot(owner, main.sessionId).history.at(-1)?.attachments ?? [],
     ).toEqual([]);
   } finally {
-    generate.mockRestore();
     await runtime.deleteSession(owner, main.sessionId);
   }
 });
@@ -222,7 +210,11 @@ test("restart preserves outputs already delivered to an interrupted parent exact
   const first = new AgentRuntime();
   const main = await session(first);
   const outputs: OutputAttachment[] = [
-    { kind: "generated_image", url: "/api/comfyui/view/child.png" },
+    {
+      kind: "web_source",
+      title: "Mocked Search Result 1",
+      url: "https://example.com/result1",
+    },
   ];
   main.status = "running";
   main.pendingOutputs = outputs;

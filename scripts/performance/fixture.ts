@@ -78,7 +78,6 @@ Object.assign(process.env, {
   EULER_DB_PATH: join(workspace, "euler.sqlite"),
   EULER_DATA_ROOT: join(workspace, "data"),
   EULER_OLLAMA_HOST: `http://127.0.0.1:${ollama.port}`,
-  EULER_COMFYUI_HOST: "",
   EULER_OPENROUTER_API_KEY: "",
   OPENROUTER_API_KEY: "",
   EULER_BRAVE_SEARCH_API_KEY: "",
